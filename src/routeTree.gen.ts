@@ -13,7 +13,7 @@ import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedOfficeRouteImport } from './routes/_authenticated/office'
-import { Route as AuthenticatedOfficeEditorRouteImport } from './routes/_authenticated/office.editor'
+import { Route as AuthenticatedOfficeEditorRouteImport } from './routes/_authenticated/office_.editor'
 
 const AuthRoute = AuthRouteImport.update({
   id: '/auth',
@@ -36,21 +36,21 @@ const AuthenticatedOfficeRoute = AuthenticatedOfficeRouteImport.update({
 } as any)
 const AuthenticatedOfficeEditorRoute =
   AuthenticatedOfficeEditorRouteImport.update({
-    id: '/editor',
-    path: '/editor',
-    getParentRoute: () => AuthenticatedOfficeRoute,
+    id: '/office_/editor',
+    path: '/office/editor',
+    getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
-  '/office': typeof AuthenticatedOfficeRouteWithChildren
+  '/office': typeof AuthenticatedOfficeRoute
   '/office/editor': typeof AuthenticatedOfficeEditorRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
-  '/office': typeof AuthenticatedOfficeRouteWithChildren
+  '/office': typeof AuthenticatedOfficeRoute
   '/office/editor': typeof AuthenticatedOfficeEditorRoute
 }
 export interface FileRoutesById {
@@ -58,8 +58,8 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/auth': typeof AuthRoute
-  '/_authenticated/office': typeof AuthenticatedOfficeRouteWithChildren
-  '/_authenticated/office/editor': typeof AuthenticatedOfficeEditorRoute
+  '/_authenticated/office': typeof AuthenticatedOfficeRoute
+  '/_authenticated/office_/editor': typeof AuthenticatedOfficeEditorRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -72,7 +72,7 @@ export interface FileRouteTypes {
     | '/_authenticated'
     | '/auth'
     | '/_authenticated/office'
-    | '/_authenticated/office/editor'
+    | '/_authenticated/office_/editor'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -111,33 +111,24 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedOfficeRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
-    '/_authenticated/office/editor': {
-      id: '/_authenticated/office/editor'
-      path: '/editor'
+    '/_authenticated/office_/editor': {
+      id: '/_authenticated/office_/editor'
+      path: '/office/editor'
       fullPath: '/office/editor'
       preLoaderRoute: typeof AuthenticatedOfficeEditorRouteImport
-      parentRoute: typeof AuthenticatedOfficeRoute
+      parentRoute: typeof AuthenticatedRouteRoute
     }
   }
 }
 
-interface AuthenticatedOfficeRouteChildren {
+interface AuthenticatedRouteRouteChildren {
+  AuthenticatedOfficeRoute: typeof AuthenticatedOfficeRoute
   AuthenticatedOfficeEditorRoute: typeof AuthenticatedOfficeEditorRoute
 }
 
-const AuthenticatedOfficeRouteChildren: AuthenticatedOfficeRouteChildren = {
-  AuthenticatedOfficeEditorRoute: AuthenticatedOfficeEditorRoute,
-}
-
-const AuthenticatedOfficeRouteWithChildren =
-  AuthenticatedOfficeRoute._addFileChildren(AuthenticatedOfficeRouteChildren)
-
-interface AuthenticatedRouteRouteChildren {
-  AuthenticatedOfficeRoute: typeof AuthenticatedOfficeRouteWithChildren
-}
-
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
-  AuthenticatedOfficeRoute: AuthenticatedOfficeRouteWithChildren,
+  AuthenticatedOfficeRoute: AuthenticatedOfficeRoute,
+  AuthenticatedOfficeEditorRoute: AuthenticatedOfficeEditorRoute,
 }
 
 const AuthenticatedRouteRouteWithChildren =
