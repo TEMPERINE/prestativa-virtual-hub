@@ -301,22 +301,6 @@ export function OfficeScene() {
           draggable={false}
         />
 
-        {/* Zone outlines (subtle) */}
-        {ZONES.filter((z) => z.id !== "lobby").map((z) => (
-          <div
-            key={z.id}
-            className="absolute pointer-events-none transition-colors duration-300"
-            style={{
-              left: `${z.rect.x1 * 100}%`,
-              top: `${z.rect.y1 * 100}%`,
-              width: `${(z.rect.x2 - z.rect.x1) * 100}%`,
-              height: `${(z.rect.y2 - z.rect.y1) * 100}%`,
-              border: zone === z.id ? `3px solid ${z.accent}` : "1.5px dashed rgba(255,255,255,0.25)",
-              borderRadius: 10,
-              boxShadow: zone === z.id ? `0 0 30px ${z.accent}` : "none",
-            }}
-          />
-        ))}
 
         {/* Private-area overlay (Gather-style): darken everything outside the active zone */}
         {focusedZone && (
@@ -371,17 +355,6 @@ export function OfficeScene() {
                       filter: isMe
                         ? `drop-shadow(0 0 8px ${profile.avatar_color}) drop-shadow(0 3px 4px rgba(0,0,0,0.35))`
                         : "drop-shadow(0 3px 4px rgba(0,0,0,0.35))",
-                    }}
-                  />
-                  {/* foot shadow — colada ao pé */}
-                  <div
-                    className="absolute left-1/2 -translate-x-1/2 rounded-[50%]"
-                    style={{
-                      bottom: "2%",
-                      width: "45%",
-                      height: "5%",
-                      background: "radial-gradient(ellipse at center, rgba(0,0,0,0.45) 0%, rgba(0,0,0,0.25) 60%, rgba(0,0,0,0) 100%)",
-                      filter: "blur(1.5px)",
                     }}
                   />
                 </div>
