@@ -450,6 +450,13 @@ export function OfficeScene() {
             <IconButton active={showTeam} onClick={() => setShowTeam(!showTeam)} title="Equipe">
               <Users className="w-4 h-4" />
             </IconButton>
+            <Link
+              to="/office/editor"
+              title="Editor de mapa"
+              className="inline-flex items-center justify-center w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 text-white"
+            >
+              <Pencil className="w-4 h-4" />
+            </Link>
             <IconButton onClick={signOut} title="Sair">
               <LogOut className="w-4 h-4" />
             </IconButton>
