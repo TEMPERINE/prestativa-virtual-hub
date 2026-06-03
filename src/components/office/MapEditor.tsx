@@ -10,7 +10,7 @@ import {
   clearOverrides,
   type MapOverrides,
 } from "@/lib/map-overrides";
-import { ZONES, COLLIDERS, type ZoneId } from "@/lib/office-map";
+import { ZONES, COLLIDERS, collides, type ZoneId } from "@/lib/office-map";
 import officeMap from "@/assets/office-map.jpg";
 import { toast } from "sonner";
 import { ArrowLeft, Eraser, Square, Download, Trash2, Eye, EyeOff } from "lucide-react";
