@@ -372,14 +372,15 @@ export function OfficeScene() {
                         : "drop-shadow(0 3px 4px rgba(0,0,0,0.35))",
                     }}
                   />
-                  {/* foot shadow */}
+                  {/* foot shadow — colada ao pé */}
                   <div
-                    className="absolute left-1/2 -translate-x-1/2 -bottom-1 rounded-full"
+                    className="absolute left-1/2 -translate-x-1/2 rounded-[50%]"
                     style={{
-                      width: "60%",
-                      height: "8%",
-                      background: "rgba(0,0,0,0.35)",
-                      filter: "blur(4px)",
+                      bottom: "2%",
+                      width: "45%",
+                      height: "5%",
+                      background: "radial-gradient(ellipse at center, rgba(0,0,0,0.45) 0%, rgba(0,0,0,0.25) 60%, rgba(0,0,0,0) 100%)",
+                      filter: "blur(1.5px)",
                     }}
                   />
                 </div>
