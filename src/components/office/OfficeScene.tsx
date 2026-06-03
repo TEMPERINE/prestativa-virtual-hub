@@ -5,7 +5,6 @@ import {
   SPAWN,
   collides,
   zoneAt,
-  rotateIso,
   type Point,
   type ZoneId,
 } from "@/lib/office-map";
@@ -42,12 +41,10 @@ export function OfficeScene() {
 
   const moveAvatar = useCallback((rawDx: number, rawDy: number, speed = SPEED) => {
     if (!rawDx && !rawDy) return;
-    // Apply isometric rotation so movement follows the office perspective.
-    const rot = rotateIso(rawDx, rawDy);
-    const len = Math.hypot(rot.dx, rot.dy);
+    const len = Math.hypot(rawDx, rawDy);
     if (!len) return;
-    const dx = (rot.dx / len) * speed;
-    const dy = (rot.dy / len) * speed;
+    const dx = (rawDx / len) * speed;
+    const dy = (rawDy / len) * speed;
     const cur = posRef.current;
 
     let nx = cur.x + dx;
@@ -220,8 +217,6 @@ export function OfficeScene() {
       if (dx || dy) {
         moveAvatar(dx, dy);
       } else if (walkTarget.current) {
-        // walkTarget is in image-space already; compute raw delta without iso
-        // rotation (rotation will be applied inside moveAvatar).
         const target = walkTarget.current;
         const cur = posRef.current;
         const tx = target.x - cur.x;
@@ -229,13 +224,6 @@ export function OfficeScene() {
         if (Math.hypot(tx, ty) < SPEED * 1.5) {
           walkTarget.current = null;
         } else {
-          // Pre-undo rotation so when moveAvatar applies iso rotation we end up
-          // moving toward the actual click point.
-          const inv = rotateIso(tx, -ty); // we want rotate by -ROT; rotateIso uses negative rotation already, so compose
-          // Simpler: bypass rotation by passing rotated-back input.
-          // We'll just call moveAvatar with raw delta — perspective rotation
-          // will slightly bend the path; acceptable for click-to-walk v1.
-          void inv;
           moveAvatar(tx, ty, SPEED * 1.5);
         }
       }
@@ -369,7 +357,7 @@ export function OfficeScene() {
                     draggable={false}
                     className="select-none"
                     style={{
-                      width: "min(4.2vh, 56px)",
+                      width: "min(9vh, 110px)",
                       height: "auto",
                       filter: isMe
                         ? `drop-shadow(0 0 8px ${profile.avatar_color}) drop-shadow(0 3px 4px rgba(0,0,0,0.35))`

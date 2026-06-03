@@ -46,7 +46,7 @@ export const ZONES: Zone[] = [
     id: "reuniao",
     label: "Sala de Reunião",
     subtitle: "Até 16 pessoas",
-    rect: { x1: 0.68, y1: 0.04, x2: 0.94, y2: 0.46 },
+    rect: { x1: 0.685, y1: 0.05, x2: 0.915, y2: 0.44 },
     audioRoom: "zone:reuniao",
     supportsVideo: true,
     accent: "var(--zone-reuniao)",
@@ -98,45 +98,69 @@ export function zoneAt(p: Point): Zone {
   return ZONES[ZONES.length - 1];
 }
 
-// Walkable boundary inside the building (avatar cannot leave the office).
-const FLOOR = { x1: 0.105, y1: 0.04, x2: 0.955, y2: 0.96 };
-
 // Furniture / wall colliders the avatar must walk around.
 export const COLLIDERS: Array<{ x1: number; y1: number; x2: number; y2: number }> = [
   // Descompressão sofas + coffee table
   { x1: 0.14, y1: 0.10, x2: 0.29, y2: 0.27 },
-
   // Diretoria — two desks
   { x1: 0.34, y1: 0.14, x2: 0.47, y2: 0.30 },
   { x1: 0.50, y1: 0.14, x2: 0.63, y2: 0.30 },
-
-  // Sala de Reunião — table + chairs (whole interior blocked, entry from left around y=0.36)
-  { x1: 0.70, y1: 0.08, x2: 0.92, y2: 0.34 },
-  { x1: 0.70, y1: 0.40, x2: 0.92, y2: 0.46 },
-  // Reunião wall (separates from main floor) with a door gap around y=0.34-0.40
-  { x1: 0.66, y1: 0.04, x2: 0.685, y2: 0.34 },
+  // Sala de Reunião — interior (table + chairs); door gap on left around y=0.34-0.40
+  { x1: 0.70, y1: 0.08, x2: 0.91, y2: 0.34 },
+  { x1: 0.70, y1: 0.40, x2: 0.91, y2: 0.44 },
+  // Reunião wall (separates from main floor) with door gap
+  { x1: 0.66, y1: 0.05, x2: 0.685, y2: 0.34 },
   { x1: 0.66, y1: 0.40, x2: 0.685, y2: 0.50 },
-
   // Supervisora desk
   { x1: 0.19, y1: 0.50, x2: 0.31, y2: 0.62 },
-
-  // Operação — 2 rows of desks (corridor of 0.04 between rows)
+  // Operação — 2 rows of desks
   { x1: 0.35, y1: 0.55, x2: 0.64, y2: 0.68 },
   { x1: 0.35, y1: 0.76, x2: 0.64, y2: 0.90 },
-
-  // Feedback room (interior + walls; door gap on left around y=0.68-0.74)
+  // Feedback room (interior + walls; door gap on left)
   { x1: 0.80, y1: 0.60, x2: 0.92, y2: 0.84 },
   { x1: 0.78, y1: 0.58, x2: 0.80, y2: 0.68 },
   { x1: 0.78, y1: 0.74, x2: 0.80, y2: 0.86 },
-
   // Kitchen / watercooler counter on far left
   { x1: 0.105, y1: 0.34, x2: 0.16, y2: 0.94 },
 ];
 
+
+// Walkable world bounds — a slightly trapezoidal polygon so the floor
+// edges follow the office's isometric perspective instead of a flat
+// rectangle. Points in clockwise order: TL, TR, BR, BL.
+export const FLOOR_POLY: Point[] = [
+  { x: 0.118, y: 0.05 },  // top-left
+  { x: 0.948, y: 0.05 },  // top-right
+  { x: 0.955, y: 0.955 }, // bottom-right (slight outward flare)
+  { x: 0.105, y: 0.955 }, // bottom-left
+];
+
+function pointInPolygon(p: Point, poly: Point[]): boolean {
+  let inside = false;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const xi = poly[i].x, yi = poly[i].y;
+    const xj = poly[j].x, yj = poly[j].y;
+    const intersect =
+      yi > p.y !== yj > p.y &&
+      p.x < ((xj - xi) * (p.y - yi)) / (yj - yi) + xi;
+    if (intersect) inside = !inside;
+  }
+  return inside;
+}
+
 export function collides(p: Point, radius = 0.014): boolean {
-  // Outside the building floor
-  if (p.x - radius < FLOOR.x1 || p.x + radius > FLOOR.x2) return true;
-  if (p.y - radius < FLOOR.y1 || p.y + radius > FLOOR.y2) return true;
+  // Outside the building floor polygon
+  if (!pointInPolygon(p, FLOOR_POLY)) return true;
+  // Check the four "shoulders" of the body around the point so the avatar
+  // doesn't clip into the iso edges.
+  if (
+    !pointInPolygon({ x: p.x - radius, y: p.y }, FLOOR_POLY) ||
+    !pointInPolygon({ x: p.x + radius, y: p.y }, FLOOR_POLY) ||
+    !pointInPolygon({ x: p.x, y: p.y - radius }, FLOOR_POLY) ||
+    !pointInPolygon({ x: p.x, y: p.y + radius }, FLOOR_POLY)
+  ) {
+    return true;
+  }
   // Hit any furniture / wall
   for (const c of COLLIDERS) {
     if (p.x + radius > c.x1 && p.x - radius < c.x2 && p.y + radius > c.y1 && p.y - radius < c.y2) {
@@ -146,17 +170,5 @@ export function collides(p: Point, radius = 0.014): boolean {
   return false;
 }
 
-// Spawn at the lobby — central corridor between the diretoria/operação,
-// guaranteed to be outside any collider.
+// Spawn at the lobby — central corridor between diretoria and operação.
 export const SPAWN: Point = { x: 0.50, y: 0.42 };
-
-// Isometric rotation applied to input vector so "up arrow" feels like walking
-// INTO the office (slightly up-right). The office image is mostly top-down
-// with a small forward tilt, so a gentle rotation reads as natural.
-export const ISO_ROTATION_RAD = (-12 * Math.PI) / 180;
-
-export function rotateIso(dx: number, dy: number): { dx: number; dy: number } {
-  const c = Math.cos(ISO_ROTATION_RAD);
-  const s = Math.sin(ISO_ROTATION_RAD);
-  return { dx: dx * c - dy * s, dy: dx * s + dy * c };
-}
