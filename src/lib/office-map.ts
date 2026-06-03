@@ -153,4 +153,4 @@ export function collides(p: Point, radius = 0.018): boolean {
   return false;
 }
 
-export const SPAWN: Point = { x: 0.50, y: 0.94 }; // front door / entrance
+export const SPAWN: Point = { x: 0.50, y: 0.92 }; // front door / entrance
