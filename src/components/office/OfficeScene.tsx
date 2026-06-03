@@ -153,6 +153,10 @@ export function OfficeScene() {
       if (MOVE_KEYS.has(k)) {
         e.preventDefault();
         keys.current[k] = true;
+        if (k === "arrowup" || k === "w") moveAvatar(0, -1, SPEED * 6);
+        if (k === "arrowdown" || k === "s") moveAvatar(0, 1, SPEED * 6);
+        if (k === "arrowleft" || k === "a") moveAvatar(-1, 0, SPEED * 6);
+        if (k === "arrowright" || k === "d") moveAvatar(1, 0, SPEED * 6);
       }
     };
     const up = (e: KeyboardEvent) => {
@@ -168,7 +172,7 @@ export function OfficeScene() {
       window.removeEventListener("keydown", down);
       window.removeEventListener("keyup", up);
     };
-  }, []);
+  }, [moveAvatar]);
 
   // movement loop
   useEffect(() => {
@@ -183,47 +187,13 @@ export function OfficeScene() {
       if (k["arrowright"] || k["d"]) dx += 1;
 
       if (dx || dy) {
-        const len = Math.hypot(dx, dy);
-        dx = (dx / len) * SPEED;
-        dy = (dy / len) * SPEED;
-        const cur = posRef.current;
-        // try axis-separated movement to allow sliding along walls
-        let nx = cur.x + dx;
-        let ny = cur.y;
-        if (collides({ x: nx, y: ny })) nx = cur.x;
-        ny = ny + dy;
-        if (collides({ x: nx, y: ny })) ny = cur.y;
-        nx = Math.max(0.02, Math.min(0.98, nx));
-        ny = Math.max(0.02, Math.min(0.98, ny));
-        if (nx !== cur.x || ny !== cur.y) {
-          const np = { x: nx, y: ny };
-          setPos(np);
-          const z = zoneAt(np);
-          setZone((prev) => (prev !== z.id ? z.id : prev));
-
-          // throttle network send
-          const now = performance.now();
-          if (now - lastSent.current > SEND_INTERVAL_MS) {
-            lastSent.current = now;
-            void supabase.auth.getUser().then(({ data }) => {
-              if (!data.user) return;
-              void supabase.from("positions").upsert({
-                user_id: data.user.id,
-                x: np.x,
-                y: np.y,
-                zone: z.id,
-                facing: Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? "right" : "left") : dy > 0 ? "down" : "up",
-                is_online: true,
-              });
-            });
-          }
-        }
+        moveAvatar(dx, dy);
       }
       raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, []);
+  }, [moveAvatar]);
 
   const currentZone = useMemo(() => ZONES.find((z) => z.id === zone) ?? ZONES[ZONES.length - 1], [zone]);
 
