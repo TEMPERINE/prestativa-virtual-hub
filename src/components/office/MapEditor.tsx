@@ -171,6 +171,33 @@ export function MapEditor() {
     URL.revokeObjectURL(url);
   }, [overrides]);
 
+  const pushHistory = useCallback((snapshot: MapOverrides) => {
+    historyRef.current.push(snapshot);
+    if (historyRef.current.length > 50) historyRef.current.shift();
+    setCanUndo(true);
+  }, []);
+
+  const undo = useCallback(() => {
+    const hist = historyRef.current;
+    if (hist.length === 0) return;
+    const prev = hist.pop()!;
+    setOverrides(prev);
+    setCanUndo(hist.length > 0);
+    setDirty(true);
+  }, []);
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.ctrlKey && (e.key === "z" || e.key === "Z")) {
+        e.preventDefault();
+        undo();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [undo]);
+
   // Pre-render tiles as plain divs would be huge (2560+). Use a canvas overlay.
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const effectiveCanvasRef = useRef<HTMLCanvasElement | null>(null);
