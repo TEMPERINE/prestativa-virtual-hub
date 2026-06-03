@@ -4,7 +4,16 @@
 export type Point = { x: number; y: number };
 
 export type ZoneId =
-  | "operacao"
+  | "atendente-1"
+  | "atendente-2"
+  | "atendente-3"
+  | "atendente-4"
+  | "atendente-5"
+  | "atendente-6"
+  | "atendente-7"
+  | "atendente-8"
+  | "atendente-9"
+  | "atendente-10"
   | "supervisao"
   | "diretoria"
   | "reuniao"
@@ -60,15 +69,8 @@ export const ZONES: Zone[] = [
     supportsVideo: false,
     accent: "var(--zone-supervisao)",
   },
-  {
-    id: "operacao",
-    label: "Operação / Atendimento",
-    subtitle: "10 secretárias",
-    rect: { x1: 0.33, y1: 0.50, x2: 0.66, y2: 0.93 },
-    audioRoom: "zone:operacao",
-    supportsVideo: false,
-    accent: "var(--zone-operacao)",
-  },
+  // 10 atendente seats (2 rows × 5) — replaces the single "operação" zone.
+  ...buildAtendenteZones(),
   {
     id: "feedback",
     label: "Sala de Feedback",
@@ -87,6 +89,36 @@ export const ZONES: Zone[] = [
     accent: "var(--muted)",
   },
 ];
+
+// Build 10 individual atendente seat zones (2 rows × 5 columns) aligned
+// with the desk colliders below. Each seat is a small tile right in front
+// of its desk so the avatar "sits" at that workstation.
+function buildAtendenteZones(): Zone[] {
+  const cols = [0.355, 0.415, 0.475, 0.535, 0.595];
+  const colW = 0.05;
+  const rows = [
+    { y1: 0.67, y2: 0.72 }, // row 1 — seats below top desks
+    { y1: 0.73, y2: 0.78 }, // row 2 — seats above bottom desks
+  ];
+  const zones: Zone[] = [];
+  let i = 1;
+  for (const r of rows) {
+    for (const x of cols) {
+      const id = `atendente-${i}` as ZoneId;
+      zones.push({
+        id,
+        label: `Atendente ${i}`,
+        subtitle: `Mesa ${i}`,
+        rect: { x1: x, y1: r.y1, x2: x + colW, y2: r.y2 },
+        audioRoom: `zone:${id}`,
+        supportsVideo: false,
+        accent: "var(--zone-operacao)",
+      });
+      i++;
+    }
+  }
+  return zones;
+}
 
 export function zoneAt(p: Point): Zone {
   for (const z of ZONES) {
@@ -113,9 +145,9 @@ export const COLLIDERS: Array<{ x1: number; y1: number; x2: number; y2: number }
   { x1: 0.66, y1: 0.40, x2: 0.685, y2: 0.50 },
   // Supervisora desk
   { x1: 0.19, y1: 0.50, x2: 0.31, y2: 0.62 },
-  // Operação — 2 rows of desks
-  { x1: 0.35, y1: 0.55, x2: 0.64, y2: 0.68 },
-  { x1: 0.35, y1: 0.76, x2: 0.64, y2: 0.90 },
+  // Atendimento — 2 rows of desks (seats sit in the corridor between them)
+  { x1: 0.35, y1: 0.55, x2: 0.64, y2: 0.66 },
+  { x1: 0.35, y1: 0.78, x2: 0.64, y2: 0.89 },
   // Feedback room (interior + walls; door gap on left)
   { x1: 0.80, y1: 0.60, x2: 0.92, y2: 0.84 },
   { x1: 0.78, y1: 0.58, x2: 0.80, y2: 0.68 },
