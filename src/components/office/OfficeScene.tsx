@@ -276,6 +276,7 @@ export function OfficeScene() {
         <div
           className="relative shadow-soft rounded-2xl overflow-hidden ring-1 ring-white/20"
           style={{ aspectRatio: "1536 / 1024", width: "min(100%, calc((100vh - 6rem) * 1.5))" }}
+          onPointerDown={walkToPoint}
         >
           <img
             src={officeMap}
@@ -434,8 +435,8 @@ export function OfficeScene() {
       {/* Movement hint */}
       <div className="absolute bottom-4 left-1/2 -translate-x-1/2 pointer-events-none">
         <div className="glass-panel rounded-full px-4 py-2 shadow-soft text-xs text-muted-foreground">
-          Use <kbd className="px-1.5 py-0.5 bg-muted rounded text-[10px] font-mono">WASD</kbd> ou{" "}
-          <kbd className="px-1.5 py-0.5 bg-muted rounded text-[10px] font-mono">setas</kbd> para caminhar
+          Use <kbd className="px-1.5 py-0.5 bg-muted rounded text-[10px] font-mono">WASD</kbd>,{" "}
+          <kbd className="px-1.5 py-0.5 bg-muted rounded text-[10px] font-mono">setas</kbd> ou clique no mapa
         </div>
       </div>
     </div>
