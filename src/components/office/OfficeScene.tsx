@@ -40,14 +40,30 @@ export function OfficeScene() {
       const { data: posData } = await supabase.from("positions").select("user_id, x, y, zone, is_online");
       const pmap: Record<string, RemotePos> = {};
       (posData ?? []).forEach((p) => (pmap[p.user_id] = p as RemotePos));
+
+      // upsert my position as online (preserve existing coords if any)
+      const existing = pmap[userData.user.id];
+      const startX = existing?.x ?? SPAWN.x;
+      const startY = existing?.y ?? SPAWN.y;
+      const startZone = existing?.zone ?? "lobby";
+      setPos({ x: startX, y: startY });
+      setZone(startZone as ZoneId);
+
+      const mine: RemotePos = {
+        user_id: userData.user.id,
+        x: startX,
+        y: startY,
+        zone: startZone,
+        is_online: true,
+      };
+      pmap[userData.user.id] = mine;
       setPositions(pmap);
 
-      // upsert my position as online
       await supabase.from("positions").upsert({
         user_id: userData.user.id,
-        x: SPAWN.x,
-        y: SPAWN.y,
-        zone: "lobby",
+        x: startX,
+        y: startY,
+        zone: startZone,
         facing: "down",
         is_online: true,
       });
@@ -180,10 +196,24 @@ export function OfficeScene() {
 
   return (
     <div className="relative w-screen h-screen overflow-hidden bg-background">
+      {/* Ambient extended scenery (blurred & dimmed copy of the map filling the viewport) */}
+      <div
+        className="absolute inset-0"
+        style={{
+          backgroundImage: `url(${officeMap})`,
+          backgroundSize: "cover",
+          backgroundPosition: "center",
+          filter: "blur(28px) brightness(0.85) saturate(1.05)",
+          transform: "scale(1.15)",
+        }}
+        aria-hidden
+      />
+      <div className="absolute inset-0 bg-black/10" aria-hidden />
+
       {/* Map stage */}
       <div className="absolute inset-0 flex items-center justify-center p-4">
         <div
-          className="relative shadow-soft rounded-2xl overflow-hidden border"
+          className="relative shadow-soft rounded-2xl overflow-hidden ring-1 ring-white/20"
           style={{ aspectRatio: "1536 / 1024", width: "min(100%, calc((100vh - 6rem) * 1.5))" }}
         >
           <img
@@ -192,6 +222,7 @@ export function OfficeScene() {
             className="absolute inset-0 w-full h-full object-cover select-none pointer-events-none"
             draggable={false}
           />
+
 
           {/* Zone label overlays */}
           {ZONES.filter((z) => z.id !== "lobby").map((z) => (
