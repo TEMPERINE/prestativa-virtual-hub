@@ -140,17 +140,10 @@ export const COLLIDERS: Array<{ x1: number; y1: number; x2: number; y2: number }
 ];
 
 export function collides(p: Point, radius = 0.018): boolean {
-  for (const c of COLLIDERS) {
-    if (
-      p.x + radius > c.x1 &&
-      p.x - radius < c.x2 &&
-      p.y + radius > c.y1 &&
-      p.y - radius < c.y2
-    ) {
-      return true;
-    }
-  }
-  return false;
+  // V1: keep movement reliable and let users walk through the whole office.
+  // We only block the external map boundary; furniture/room collisions can be
+  // tuned later after the modular tile set is finalized.
+  return p.x - radius < 0.095 || p.x + radius > 0.955 || p.y - radius < 0.035 || p.y + radius > 0.965;
 }
 
-export const SPAWN: Point = { x: 0.50, y: 0.92 }; // front door / entrance
+export const SPAWN: Point = { x: 0.50, y: 0.94 }; // front door / entrance, below the operation desks

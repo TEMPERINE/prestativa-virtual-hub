@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { ZONES, SPAWN, collides, zoneAt, type Point, type ZoneId } from "@/lib/office-map";
 import officeMap from "@/assets/office-map.jpg";
@@ -12,6 +12,7 @@ const SPEED = 0.0045; // normalized units per frame at 60fps
 const SEND_INTERVAL_MS = 120;
 
 export function OfficeScene() {
+  const sceneRef = useRef<HTMLDivElement | null>(null);
   const [me, setMe] = useState<Profile | null>(null);
   const [profiles, setProfiles] = useState<Record<string, Profile>>({});
   const [positions, setPositions] = useState<Record<string, RemotePos>>({});
@@ -23,8 +24,75 @@ export function OfficeScene() {
 
   const keys = useRef<Record<string, boolean>>({});
   const lastSent = useRef(0);
+  const walkTarget = useRef<Point | null>(null);
   const posRef = useRef(pos);
   posRef.current = pos;
+
+  const moveAvatar = useCallback((rawDx: number, rawDy: number, speed = SPEED) => {
+    if (!rawDx && !rawDy) return;
+    const len = Math.hypot(rawDx, rawDy);
+    const dx = (rawDx / len) * speed;
+    const dy = (rawDy / len) * speed;
+    const cur = posRef.current;
+
+    let nx = cur.x + dx;
+    let ny = cur.y;
+    if (collides({ x: nx, y: ny })) nx = cur.x;
+    ny += dy;
+    if (collides({ x: nx, y: ny })) ny = cur.y;
+    nx = Math.max(0.02, Math.min(0.98, nx));
+    ny = Math.max(0.02, Math.min(0.98, ny));
+    if (nx === cur.x && ny === cur.y) return;
+
+    const np = { x: nx, y: ny };
+    posRef.current = np;
+    setPos(np);
+    const z = zoneAt(np);
+    setZone((prev) => (prev !== z.id ? z.id : prev));
+
+    const now = performance.now();
+    if (now - lastSent.current > SEND_INTERVAL_MS) {
+      lastSent.current = now;
+      void supabase.auth.getUser().then(({ data }) => {
+        if (!data.user) return;
+        void supabase.from("positions").upsert({
+          user_id: data.user.id,
+          x: np.x,
+          y: np.y,
+          zone: z.id,
+          facing: Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? "right" : "left") : dy > 0 ? "down" : "up",
+          is_online: true,
+        });
+      });
+    }
+  }, []);
+
+  const handleMoveKey = useCallback(
+    (key: string, pressed: boolean, step = false) => {
+      const k = key.toLowerCase();
+      if (!["arrowup", "arrowdown", "arrowleft", "arrowright", "w", "a", "s", "d"].includes(k)) return false;
+      keys.current[k] = pressed;
+      if (pressed) walkTarget.current = null;
+      if (pressed && step) {
+        if (k === "arrowup" || k === "w") moveAvatar(0, -1, SPEED * 8);
+        if (k === "arrowdown" || k === "s") moveAvatar(0, 1, SPEED * 8);
+        if (k === "arrowleft" || k === "a") moveAvatar(-1, 0, SPEED * 8);
+        if (k === "arrowright" || k === "d") moveAvatar(1, 0, SPEED * 8);
+      }
+      return true;
+    },
+    [moveAvatar]
+  );
+
+  const walkToPoint = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+    sceneRef.current?.focus();
+    const bounds = event.currentTarget.getBoundingClientRect();
+    const next = {
+      x: Math.max(0.095, Math.min(0.955, (event.clientX - bounds.left) / bounds.width)),
+      y: Math.max(0.035, Math.min(0.965, (event.clientY - bounds.top) / bounds.height)),
+    };
+    walkTarget.current = next;
+  }, []);
 
   // Load me + all profiles + initial positions
   useEffect(() => {
@@ -43,8 +111,10 @@ export function OfficeScene() {
 
       // upsert my position as online (preserve existing coords if any)
       const existing = pmap[userData.user.id];
-      const startX = existing?.x ?? SPAWN.x;
-      const startY = existing?.y ?? SPAWN.y;
+      const savedStart = { x: existing?.x ?? SPAWN.x, y: existing?.y ?? SPAWN.y };
+      const safeStart = collides(savedStart) ? SPAWN : savedStart;
+      const startX = safeStart.x;
+      const startY = safeStart.y;
       const startZone = existing?.zone ?? "lobby";
       setPos({ x: startX, y: startY });
       setZone(startZone as ZoneId);
@@ -108,17 +178,15 @@ export function OfficeScene() {
   useEffect(() => {
     const MOVE_KEYS = new Set(["arrowup", "arrowdown", "arrowleft", "arrowright", "w", "a", "s", "d"]);
     const down = (e: KeyboardEvent) => {
-      const k = e.key.toLowerCase();
-      if (MOVE_KEYS.has(k)) {
+      if (MOVE_KEYS.has(e.key.toLowerCase())) {
         e.preventDefault();
-        keys.current[k] = true;
+        handleMoveKey(e.key, true, true);
       }
     };
     const up = (e: KeyboardEvent) => {
-      const k = e.key.toLowerCase();
-      if (MOVE_KEYS.has(k)) {
+      if (MOVE_KEYS.has(e.key.toLowerCase())) {
         e.preventDefault();
-        keys.current[k] = false;
+        handleMoveKey(e.key, false);
       }
     };
     window.addEventListener("keydown", down, { passive: false });
@@ -127,7 +195,7 @@ export function OfficeScene() {
       window.removeEventListener("keydown", down);
       window.removeEventListener("keyup", up);
     };
-  }, []);
+  }, [handleMoveKey]);
 
   // movement loop
   useEffect(() => {
@@ -142,47 +210,20 @@ export function OfficeScene() {
       if (k["arrowright"] || k["d"]) dx += 1;
 
       if (dx || dy) {
-        const len = Math.hypot(dx, dy);
-        dx = (dx / len) * SPEED;
-        dy = (dy / len) * SPEED;
+        moveAvatar(dx, dy);
+      } else if (walkTarget.current) {
+        const target = walkTarget.current;
         const cur = posRef.current;
-        // try axis-separated movement to allow sliding along walls
-        let nx = cur.x + dx;
-        let ny = cur.y;
-        if (collides({ x: nx, y: ny })) nx = cur.x;
-        ny = ny + dy;
-        if (collides({ x: nx, y: ny })) ny = cur.y;
-        nx = Math.max(0.02, Math.min(0.98, nx));
-        ny = Math.max(0.02, Math.min(0.98, ny));
-        if (nx !== cur.x || ny !== cur.y) {
-          const np = { x: nx, y: ny };
-          setPos(np);
-          const z = zoneAt(np);
-          setZone((prev) => (prev !== z.id ? z.id : prev));
-
-          // throttle network send
-          const now = performance.now();
-          if (now - lastSent.current > SEND_INTERVAL_MS) {
-            lastSent.current = now;
-            void supabase.auth.getUser().then(({ data }) => {
-              if (!data.user) return;
-              void supabase.from("positions").upsert({
-                user_id: data.user.id,
-                x: np.x,
-                y: np.y,
-                zone: z.id,
-                facing: Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? "right" : "left") : dy > 0 ? "down" : "up",
-                is_online: true,
-              });
-            });
-          }
-        }
+        const tx = target.x - cur.x;
+        const ty = target.y - cur.y;
+        if (Math.hypot(tx, ty) < SPEED * 1.5) walkTarget.current = null;
+        else moveAvatar(tx, ty, SPEED * 1.5);
       }
       raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, []);
+  }, [moveAvatar]);
 
   const currentZone = useMemo(() => ZONES.find((z) => z.id === zone) ?? ZONES[ZONES.length - 1], [zone]);
 
@@ -204,7 +245,18 @@ export function OfficeScene() {
   };
 
   return (
-    <div className="relative w-screen h-screen overflow-hidden bg-background">
+    <div
+      ref={sceneRef}
+      tabIndex={0}
+      className="relative w-screen h-screen overflow-hidden bg-background outline-none"
+      onMouseDown={() => sceneRef.current?.focus()}
+      onKeyDown={(e) => {
+        if (handleMoveKey(e.key, true, true)) e.preventDefault();
+      }}
+      onKeyUp={(e) => {
+        if (handleMoveKey(e.key, false)) e.preventDefault();
+      }}
+    >
       {/* Ambient extended scenery (blurred & dimmed copy of the map filling the viewport) */}
       <div
         className="absolute inset-0"
@@ -224,6 +276,7 @@ export function OfficeScene() {
         <div
           className="relative shadow-soft rounded-2xl overflow-hidden ring-1 ring-white/20"
           style={{ aspectRatio: "1536 / 1024", width: "min(100%, calc((100vh - 6rem) * 1.5))" }}
+          onPointerDown={walkToPoint}
         >
           <img
             src={officeMap}
@@ -382,8 +435,8 @@ export function OfficeScene() {
       {/* Movement hint */}
       <div className="absolute bottom-4 left-1/2 -translate-x-1/2 pointer-events-none">
         <div className="glass-panel rounded-full px-4 py-2 shadow-soft text-xs text-muted-foreground">
-          Use <kbd className="px-1.5 py-0.5 bg-muted rounded text-[10px] font-mono">WASD</kbd> ou{" "}
-          <kbd className="px-1.5 py-0.5 bg-muted rounded text-[10px] font-mono">setas</kbd> para caminhar
+          Use <kbd className="px-1.5 py-0.5 bg-muted rounded text-[10px] font-mono">WASD</kbd>,{" "}
+          <kbd className="px-1.5 py-0.5 bg-muted rounded text-[10px] font-mono">setas</kbd> ou clique no mapa
         </div>
       </div>
     </div>
