@@ -79,6 +79,7 @@ export function MapEditor() {
   const [brush, setBrush] = useState(1);
   const [showGrid, setShowGrid] = useState(true);
   const [showImage, setShowImage] = useState(true);
+  const [showEffective, setShowEffective] = useState(true);
   const [dirty, setDirty] = useState(!loadOverrides());
   const painting = useRef(false);
 
