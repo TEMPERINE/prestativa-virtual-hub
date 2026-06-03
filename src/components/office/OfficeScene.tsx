@@ -226,7 +226,18 @@ export function OfficeScene() {
   };
 
   return (
-    <div className="relative w-screen h-screen overflow-hidden bg-background">
+    <div
+      ref={sceneRef}
+      tabIndex={0}
+      className="relative w-screen h-screen overflow-hidden bg-background outline-none"
+      onMouseDown={() => sceneRef.current?.focus()}
+      onKeyDown={(e) => {
+        if (handleMoveKey(e.key, true, true)) e.preventDefault();
+      }}
+      onKeyUp={(e) => {
+        if (handleMoveKey(e.key, false)) e.preventDefault();
+      }}
+    >
       {/* Ambient extended scenery (blurred & dimmed copy of the map filling the viewport) */}
       <div
         className="absolute inset-0"
