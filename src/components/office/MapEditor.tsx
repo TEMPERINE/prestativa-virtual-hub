@@ -171,6 +171,8 @@ export function MapEditor() {
 
   // Pre-render tiles as plain divs would be huge (2560+). Use a canvas overlay.
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const effectiveCanvasRef = useRef<HTMLCanvasElement | null>(null);
+
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -195,6 +197,59 @@ export function MapEditor() {
       }
     }
   }, [overrides]);
+
+  // Effective-collision overlay: shows EXACTLY what the game blocks for
+  // the avatar (FLOOR_POLY + painted blocked OR default COLLIDERS).
+  // This is the source of truth for calibration so painted area === in-game blocked area.
+  useEffect(() => {
+    const canvas = effectiveCanvasRef.current;
+    if (!canvas) return;
+    const cols = overrides.cols;
+    const rows = overrides.rows;
+    canvas.width = cols;
+    canvas.height = rows;
+    const ctx = canvas.getContext("2d")!;
+    ctx.clearRect(0, 0, cols, rows);
+    if (!showEffective) return;
+
+    const hasPainted = overrides.blocked.some((b) => b === 1);
+
+    const pointInPoly = (px: number, py: number) => {
+      let inside = false;
+      for (let i = 0, j = FLOOR_POLY.length - 1; i < FLOOR_POLY.length; j = i++) {
+        const xi = FLOOR_POLY[i].x, yi = FLOOR_POLY[i].y;
+        const xj = FLOOR_POLY[j].x, yj = FLOOR_POLY[j].y;
+        const intersect = yi > py !== yj > py && px < ((xj - xi) * (py - yi)) / (yj - yi) + xi;
+        if (intersect) inside = !inside;
+      }
+      return inside;
+    };
+
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        const px = (c + 0.5) / cols;
+        const py = (r + 0.5) / rows;
+        let blocked = !pointInPoly(px, py);
+        if (!blocked) {
+          if (hasPainted) {
+            blocked = overrides.blocked[cellIndex(c, r, cols)] === 1;
+          } else {
+            for (const co of COLLIDERS) {
+              if (px > co.x1 && px < co.x2 && py > co.y1 && py < co.y2) {
+                blocked = true;
+                break;
+              }
+            }
+          }
+        }
+        if (blocked) {
+          // Yellow outline-style — distinct from the red paint layer.
+          ctx.fillStyle = "rgba(250, 204, 21, 0.35)";
+          ctx.fillRect(c, r, 1, 1);
+        }
+      }
+    }
+  }, [overrides, showEffective]);
 
   return (
     <div className="h-screen w-screen flex flex-col bg-background text-foreground">
