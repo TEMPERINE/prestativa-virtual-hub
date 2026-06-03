@@ -196,10 +196,24 @@ export function OfficeScene() {
 
   return (
     <div className="relative w-screen h-screen overflow-hidden bg-background">
+      {/* Ambient extended scenery (blurred & dimmed copy of the map filling the viewport) */}
+      <div
+        className="absolute inset-0"
+        style={{
+          backgroundImage: `url(${officeMap})`,
+          backgroundSize: "cover",
+          backgroundPosition: "center",
+          filter: "blur(28px) brightness(0.85) saturate(1.05)",
+          transform: "scale(1.15)",
+        }}
+        aria-hidden
+      />
+      <div className="absolute inset-0 bg-black/10" aria-hidden />
+
       {/* Map stage */}
       <div className="absolute inset-0 flex items-center justify-center p-4">
         <div
-          className="relative shadow-soft rounded-2xl overflow-hidden border"
+          className="relative shadow-soft rounded-2xl overflow-hidden ring-1 ring-white/20"
           style={{ aspectRatio: "1536 / 1024", width: "min(100%, calc((100vh - 6rem) * 1.5))" }}
         >
           <img
@@ -208,6 +222,7 @@ export function OfficeScene() {
             className="absolute inset-0 w-full h-full object-cover select-none pointer-events-none"
             draggable={false}
           />
+
 
           {/* Zone label overlays */}
           {ZONES.filter((z) => z.id !== "lobby").map((z) => (
