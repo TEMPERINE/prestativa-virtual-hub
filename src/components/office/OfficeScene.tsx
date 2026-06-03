@@ -24,6 +24,7 @@ export function OfficeScene() {
 
   const keys = useRef<Record<string, boolean>>({});
   const lastSent = useRef(0);
+  const walkTarget = useRef<Point | null>(null);
   const posRef = useRef(pos);
   posRef.current = pos;
 
@@ -71,6 +72,7 @@ export function OfficeScene() {
       const k = key.toLowerCase();
       if (!["arrowup", "arrowdown", "arrowleft", "arrowright", "w", "a", "s", "d"].includes(k)) return false;
       keys.current[k] = pressed;
+      if (pressed) walkTarget.current = null;
       if (pressed && step) {
         if (k === "arrowup" || k === "w") moveAvatar(0, -1, SPEED * 8);
         if (k === "arrowdown" || k === "s") moveAvatar(0, 1, SPEED * 8);
@@ -81,6 +83,16 @@ export function OfficeScene() {
     },
     [moveAvatar]
   );
+
+  const walkToPoint = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+    sceneRef.current?.focus();
+    const bounds = event.currentTarget.getBoundingClientRect();
+    const next = {
+      x: Math.max(0.095, Math.min(0.955, (event.clientX - bounds.left) / bounds.width)),
+      y: Math.max(0.035, Math.min(0.965, (event.clientY - bounds.top) / bounds.height)),
+    };
+    walkTarget.current = next;
+  }, []);
 
   // Load me + all profiles + initial positions
   useEffect(() => {
