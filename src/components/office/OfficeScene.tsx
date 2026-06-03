@@ -40,14 +40,30 @@ export function OfficeScene() {
       const { data: posData } = await supabase.from("positions").select("user_id, x, y, zone, is_online");
       const pmap: Record<string, RemotePos> = {};
       (posData ?? []).forEach((p) => (pmap[p.user_id] = p as RemotePos));
+
+      // upsert my position as online (preserve existing coords if any)
+      const existing = pmap[userData.user.id];
+      const startX = existing?.x ?? SPAWN.x;
+      const startY = existing?.y ?? SPAWN.y;
+      const startZone = existing?.zone ?? "lobby";
+      setPos({ x: startX, y: startY });
+      setZone(startZone as ZoneId);
+
+      const mine: RemotePos = {
+        user_id: userData.user.id,
+        x: startX,
+        y: startY,
+        zone: startZone,
+        is_online: true,
+      };
+      pmap[userData.user.id] = mine;
       setPositions(pmap);
 
-      // upsert my position as online
       await supabase.from("positions").upsert({
         user_id: userData.user.id,
-        x: SPAWN.x,
-        y: SPAWN.y,
-        zone: "lobby",
+        x: startX,
+        y: startY,
+        zone: startZone,
         facing: "down",
         is_online: true,
       });
