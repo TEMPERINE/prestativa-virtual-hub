@@ -411,6 +411,12 @@ export function MapEditor() {
               className="absolute inset-0 w-full h-full pointer-events-none"
               style={{ imageRendering: "pixelated" }}
             />
+            {/* Effective game-collision overlay (FLOOR_POLY + colliders/painted) */}
+            <canvas
+              ref={effectiveCanvasRef}
+              className="absolute inset-0 w-full h-full pointer-events-none"
+              style={{ imageRendering: "pixelated", mixBlendMode: "screen" }}
+            />
             {/* Grid overlay */}
             {showGrid && (
               <div
