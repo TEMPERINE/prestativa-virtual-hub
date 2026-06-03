@@ -4,7 +4,7 @@ import {
   ZONES,
   SPAWN,
   collides,
-  zoneAt,
+  zoneAtWithOverrides as zoneAt,
   type Point,
   type ZoneId,
 } from "@/lib/office-map";
@@ -13,7 +13,8 @@ import parkLeft from "@/assets/scene-park-left.jpg";
 import roadRight from "@/assets/scene-road-right.jpg";
 import avatarSprite from "@/assets/avatar-sprite.png";
 import { toast } from "sonner";
-import { LogOut, Mic, MicOff, Video, VideoOff, MonitorUp, Users } from "lucide-react";
+import { LogOut, Mic, MicOff, Video, VideoOff, MonitorUp, Users, Pencil } from "lucide-react";
+import { Link } from "@tanstack/react-router";
 
 type Profile = { id: string; display_name: string; avatar_color: string };
 type RemotePos = { user_id: string; x: number; y: number; zone: string; is_online: boolean };
@@ -449,6 +450,13 @@ export function OfficeScene() {
             <IconButton active={showTeam} onClick={() => setShowTeam(!showTeam)} title="Equipe">
               <Users className="w-4 h-4" />
             </IconButton>
+            <Link
+              to="/office/editor"
+              title="Editor de mapa"
+              className="inline-flex items-center justify-center w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 text-white"
+            >
+              <Pencil className="w-4 h-4" />
+            </Link>
             <IconButton onClick={signOut} title="Sair">
               <LogOut className="w-4 h-4" />
             </IconButton>

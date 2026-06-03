@@ -180,6 +180,8 @@ function pointInPolygon(p: Point, poly: Point[]): boolean {
   return inside;
 }
 
+import { isBlockedByOverrides, zoneFromOverrides, hasZoneOverrides, loadOverrides } from "./map-overrides";
+
 export function collides(p: Point, radius = 0.014): boolean {
   // Outside the building floor polygon
   if (!pointInPolygon(p, FLOOR_POLY)) return true;
@@ -193,7 +195,11 @@ export function collides(p: Point, radius = 0.014): boolean {
   ) {
     return true;
   }
-  // Hit any furniture / wall
+  // Map editor overrides take precedence over the default colliders.
+  if (loadOverrides()) {
+    return isBlockedByOverrides(p, radius);
+  }
+  // Hit any default furniture / wall
   for (const c of COLLIDERS) {
     if (p.x + radius > c.x1 && p.x - radius < c.x2 && p.y + radius > c.y1 && p.y - radius < c.y2) {
       return true;
@@ -201,6 +207,22 @@ export function collides(p: Point, radius = 0.014): boolean {
   }
   return false;
 }
+
+// Wrap zoneAt to honor painted zone overrides when present.
+const _zoneAtBuiltin = zoneAt;
+export function zoneAtWithOverrides(p: Point): Zone {
+  if (hasZoneOverrides()) {
+    const id = zoneFromOverrides(p);
+    if (id) {
+      const z = ZONES.find((zz) => zz.id === id);
+      if (z) return z;
+    }
+    return ZONES[ZONES.length - 1]; // lobby
+  }
+  return _zoneAtBuiltin(p);
+}
+
+
 
 // Spawn at the lobby — central corridor between diretoria and operação.
 export const SPAWN: Point = { x: 0.50, y: 0.42 };
