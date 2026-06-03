@@ -13,7 +13,7 @@ import {
 import { ZONES, COLLIDERS, FLOOR_POLY, type ZoneId } from "@/lib/office-map";
 import officeMap from "@/assets/office-map.jpg";
 import { toast } from "sonner";
-import { ArrowLeft, Eraser, Square, Download, Trash2, Eye, EyeOff } from "lucide-react";
+import { ArrowLeft, Eraser, Square, Download, Trash2, Eye, EyeOff, Undo } from "lucide-react";
 
 type Tool =
   | { kind: "blocked" }
