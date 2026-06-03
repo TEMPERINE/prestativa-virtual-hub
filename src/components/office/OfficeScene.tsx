@@ -43,8 +43,10 @@ export function OfficeScene() {
 
       // upsert my position as online (preserve existing coords if any)
       const existing = pmap[userData.user.id];
-      const startX = existing?.x ?? SPAWN.x;
-      const startY = existing?.y ?? SPAWN.y;
+      const savedStart = { x: existing?.x ?? SPAWN.x, y: existing?.y ?? SPAWN.y };
+      const safeStart = collides(savedStart) ? SPAWN : savedStart;
+      const startX = safeStart.x;
+      const startY = safeStart.y;
       const startZone = existing?.zone ?? "lobby";
       setPos({ x: startX, y: startY });
       setZone(startZone as ZoneId);
