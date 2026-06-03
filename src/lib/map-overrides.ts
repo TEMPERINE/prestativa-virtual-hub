@@ -106,3 +106,31 @@ export function hasZoneOverrides(): boolean {
   if (!o) return false;
   return o.zones.some((z) => z !== null);
 }
+
+// Bounding box (normalized 0..1) of all painted tiles for a given zone id.
+// Returns null when nothing is painted for that zone.
+export function zoneRectFromOverrides(
+  id: ZoneId
+): { x1: number; y1: number; x2: number; y2: number } | null {
+  const o = loadOverrides();
+  if (!o) return null;
+  let minC = Infinity, minR = Infinity, maxC = -Infinity, maxR = -Infinity;
+  for (let r = 0; r < o.rows; r++) {
+    for (let c = 0; c < o.cols; c++) {
+      if (o.zones[cellIndex(c, r, o.cols)] === id) {
+        if (c < minC) minC = c;
+        if (c > maxC) maxC = c;
+        if (r < minR) minR = r;
+        if (r > maxR) maxR = r;
+      }
+    }
+  }
+  if (!isFinite(minC)) return null;
+  return {
+    x1: minC / o.cols,
+    y1: minR / o.rows,
+    x2: (maxC + 1) / o.cols,
+    y2: (maxR + 1) / o.rows,
+  };
+}
+

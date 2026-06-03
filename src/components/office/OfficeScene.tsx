@@ -8,6 +8,7 @@ import {
   type Point,
   type ZoneId,
 } from "@/lib/office-map";
+import { zoneRectFromOverrides } from "@/lib/map-overrides";
 import officeMap from "@/assets/office-map.jpg";
 import parkLeft from "@/assets/scene-park-left.jpg";
 import roadRight from "@/assets/scene-road-right.jpg";
@@ -243,7 +244,15 @@ export function OfficeScene() {
   }, [moveAvatar]);
 
   const currentZone = useMemo(() => ZONES.find((z) => z.id === zone) ?? ZONES[ZONES.length - 1], [zone]);
-  const focusedZone = currentZone.id !== "lobby" ? currentZone : null;
+  // Prefer the painted bounding box (editor overrides) over the hardcoded rect
+  // so the spotlight visually matches exactly what the user painted.
+  const focusedZone = useMemo(() => {
+    if (currentZone.id === "lobby") return null;
+    const painted = zoneRectFromOverrides(currentZone.id);
+    return painted
+      ? { ...currentZone, rect: painted }
+      : currentZone;
+  }, [currentZone]);
 
   const onlineList = useMemo(() => {
     return Object.values(positions)
