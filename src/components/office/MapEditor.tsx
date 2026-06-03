@@ -418,6 +418,11 @@ export function MapEditor() {
             onPointerDown={(e) => {
               (e.target as Element).setPointerCapture?.(e.pointerId);
               painting.current = true;
+              pushHistory({
+                ...overrides,
+                blocked: overrides.blocked.slice(),
+                zones: overrides.zones.slice(),
+              });
               handlePointer(e);
             }}
             onPointerMove={(e) => {
