@@ -4,7 +4,16 @@
 export type Point = { x: number; y: number };
 
 export type ZoneId =
-  | "operacao"
+  | "atendente-1"
+  | "atendente-2"
+  | "atendente-3"
+  | "atendente-4"
+  | "atendente-5"
+  | "atendente-6"
+  | "atendente-7"
+  | "atendente-8"
+  | "atendente-9"
+  | "atendente-10"
   | "supervisao"
   | "diretoria"
   | "reuniao"
