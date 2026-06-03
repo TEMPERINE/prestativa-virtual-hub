@@ -309,6 +309,17 @@ export function MapEditor() {
             icon={<Eraser size={14} />}
             label="Apagar"
           />
+          <button
+            onClick={undo}
+            disabled={!canUndo}
+            className={`inline-flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded ${
+              canUndo ? "bg-muted/60 hover:bg-muted" : "opacity-50 cursor-not-allowed"
+            }`}
+            title="Desfazer (Ctrl+Z)"
+          >
+            <Undo size={14} />
+            Desfazer
+          </button>
         </div>
 
         <div className="flex items-center gap-1 ml-2">
