@@ -211,6 +211,13 @@ export function OfficeScene() {
 
       if (dx || dy) {
         moveAvatar(dx, dy);
+      } else if (walkTarget.current) {
+        const target = walkTarget.current;
+        const cur = posRef.current;
+        const tx = target.x - cur.x;
+        const ty = target.y - cur.y;
+        if (Math.hypot(tx, ty) < SPEED * 1.5) walkTarget.current = null;
+        else moveAvatar(tx, ty, SPEED * 1.5);
       }
       raf = requestAnimationFrame(tick);
     };
