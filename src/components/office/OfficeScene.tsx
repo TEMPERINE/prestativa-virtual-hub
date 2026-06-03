@@ -12,6 +12,7 @@ const SPEED = 0.0045; // normalized units per frame at 60fps
 const SEND_INTERVAL_MS = 120;
 
 export function OfficeScene() {
+  const sceneRef = useRef<HTMLDivElement | null>(null);
   const [me, setMe] = useState<Profile | null>(null);
   const [profiles, setProfiles] = useState<Record<string, Profile>>({});
   const [positions, setPositions] = useState<Record<string, RemotePos>>({});
@@ -64,6 +65,22 @@ export function OfficeScene() {
       });
     }
   }, []);
+
+  const handleMoveKey = useCallback(
+    (key: string, pressed: boolean, step = false) => {
+      const k = key.toLowerCase();
+      if (!["arrowup", "arrowdown", "arrowleft", "arrowright", "w", "a", "s", "d"].includes(k)) return false;
+      keys.current[k] = pressed;
+      if (pressed && step) {
+        if (k === "arrowup" || k === "w") moveAvatar(0, -1, SPEED * 8);
+        if (k === "arrowdown" || k === "s") moveAvatar(0, 1, SPEED * 8);
+        if (k === "arrowleft" || k === "a") moveAvatar(-1, 0, SPEED * 8);
+        if (k === "arrowright" || k === "d") moveAvatar(1, 0, SPEED * 8);
+      }
+      return true;
+    },
+    [moveAvatar]
+  );
 
   // Load me + all profiles + initial positions
   useEffect(() => {
