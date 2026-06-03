@@ -1,6 +1,5 @@
-// Office map definition. All coordinates are normalized 0..1 relative to the
-// background image (src/assets/office-map.jpg, 1536x1024 effective area).
-// This makes the layout resolution-independent and easy to tweak.
+// Office map definition. Coordinates are normalized 0..1 relative to the
+// office building image (src/assets/office-map.jpg).
 
 export type Point = { x: number; y: number };
 
@@ -17,19 +16,19 @@ export type Zone = {
   id: ZoneId;
   label: string;
   subtitle?: string;
-  // axis-aligned bounding rectangle in normalized coords (x1,y1)-(x2,y2)
   rect: { x1: number; y1: number; x2: number; y2: number };
-  audioRoom: string; // LiveKit room name (used in fase 3)
+  audioRoom: string;
   supportsVideo: boolean;
-  accent: string; // tailwind color token (CSS var)
+  accent: string;
 };
 
+// Zones tuned to the actual office image (only INSIDE the building).
 export const ZONES: Zone[] = [
   {
     id: "descompressao",
     label: "Área de Descompressão",
     subtitle: "Respire. Desacelere. Recomece.",
-    rect: { x1: 0.105, y1: 0.04, x2: 0.345, y2: 0.31 },
+    rect: { x1: 0.115, y1: 0.06, x2: 0.30, y2: 0.30 },
     audioRoom: "zone:descompressao",
     supportsVideo: false,
     accent: "var(--zone-descompressao)",
@@ -38,7 +37,7 @@ export const ZONES: Zone[] = [
     id: "diretoria",
     label: "Diretoria",
     subtitle: "Márcio · Dani",
-    rect: { x1: 0.345, y1: 0.04, x2: 0.66, y2: 0.32 },
+    rect: { x1: 0.31, y1: 0.10, x2: 0.66, y2: 0.32 },
     audioRoom: "zone:diretoria",
     supportsVideo: false,
     accent: "var(--zone-diretoria)",
@@ -47,7 +46,7 @@ export const ZONES: Zone[] = [
     id: "reuniao",
     label: "Sala de Reunião",
     subtitle: "Até 16 pessoas",
-    rect: { x1: 0.66, y1: 0.04, x2: 0.93, y2: 0.50 },
+    rect: { x1: 0.68, y1: 0.04, x2: 0.94, y2: 0.46 },
     audioRoom: "zone:reuniao",
     supportsVideo: true,
     accent: "var(--zone-reuniao)",
@@ -56,7 +55,7 @@ export const ZONES: Zone[] = [
     id: "supervisao",
     label: "Supervisão",
     subtitle: "Dani Oliveira",
-    rect: { x1: 0.16, y1: 0.46, x2: 0.32, y2: 0.65 },
+    rect: { x1: 0.17, y1: 0.46, x2: 0.32, y2: 0.66 },
     audioRoom: "zone:supervisao",
     supportsVideo: false,
     accent: "var(--zone-supervisao)",
@@ -65,7 +64,7 @@ export const ZONES: Zone[] = [
     id: "operacao",
     label: "Operação / Atendimento",
     subtitle: "10 secretárias",
-    rect: { x1: 0.32, y1: 0.50, x2: 0.66, y2: 0.95 },
+    rect: { x1: 0.33, y1: 0.50, x2: 0.66, y2: 0.93 },
     audioRoom: "zone:operacao",
     supportsVideo: false,
     accent: "var(--zone-operacao)",
@@ -99,51 +98,65 @@ export function zoneAt(p: Point): Zone {
   return ZONES[ZONES.length - 1];
 }
 
-// Collision: axis-aligned rectangles the avatar cannot enter. Coordinates
-// hand-tuned against the generated office-map.jpg. Walls + furniture only —
-// open floor (corridors) is walkable.
+// Walkable boundary inside the building (avatar cannot leave the office).
+const FLOOR = { x1: 0.105, y1: 0.04, x2: 0.955, y2: 0.96 };
+
+// Furniture / wall colliders the avatar must walk around.
 export const COLLIDERS: Array<{ x1: number; y1: number; x2: number; y2: number }> = [
-  // Outer walls (top/bottom/left strips, leaving a small inner playable area)
-  { x1: 0, y1: 0, x2: 1, y2: 0.035 }, // top wall
-  { x1: 0, y1: 0.965, x2: 1, y2: 1 }, // bottom wall
-  { x1: 0, y1: 0, x2: 0.095, y2: 1 }, // left wall (kitchen/grass)
-  { x1: 0.955, y1: 0, x2: 1, y2: 1 }, // right wall (road)
+  // Descompressão sofas + coffee table
+  { x1: 0.14, y1: 0.10, x2: 0.29, y2: 0.27 },
 
-  // Decompressão furniture (sofas, table)
-  { x1: 0.13, y1: 0.10, x2: 0.30, y2: 0.27 },
+  // Diretoria — two desks
+  { x1: 0.34, y1: 0.14, x2: 0.47, y2: 0.30 },
+  { x1: 0.50, y1: 0.14, x2: 0.63, y2: 0.30 },
 
-  // Diretoria desks (two big desks under the logo wall)
-  { x1: 0.37, y1: 0.16, x2: 0.49, y2: 0.30 },
-  { x1: 0.52, y1: 0.16, x2: 0.64, y2: 0.30 },
-
-  // Reuniao table + chairs (entire interior of the room is blocked except entry)
-  { x1: 0.69, y1: 0.10, x2: 0.91, y2: 0.46 },
-
-  // Wall separating reuniao from main floor (with door gap around y=0.46)
-  { x1: 0.66, y1: 0.04, x2: 0.68, y2: 0.44 },
+  // Sala de Reunião — table + chairs (whole interior blocked, entry from left around y=0.36)
+  { x1: 0.70, y1: 0.08, x2: 0.92, y2: 0.34 },
+  { x1: 0.70, y1: 0.40, x2: 0.92, y2: 0.46 },
+  // Reunião wall (separates from main floor) with a door gap around y=0.34-0.40
+  { x1: 0.66, y1: 0.04, x2: 0.685, y2: 0.34 },
+  { x1: 0.66, y1: 0.40, x2: 0.685, y2: 0.50 },
 
   // Supervisora desk
-  { x1: 0.18, y1: 0.52, x2: 0.31, y2: 0.62 },
+  { x1: 0.19, y1: 0.50, x2: 0.31, y2: 0.62 },
 
-  // Operação — 2 rows of 5 desks
-  { x1: 0.34, y1: 0.55, x2: 0.65, y2: 0.69 }, // row 1
-  { x1: 0.34, y1: 0.77, x2: 0.65, y2: 0.91 }, // row 2
+  // Operação — 2 rows of desks (corridor of 0.04 between rows)
+  { x1: 0.35, y1: 0.55, x2: 0.64, y2: 0.68 },
+  { x1: 0.35, y1: 0.76, x2: 0.64, y2: 0.90 },
 
-  // Feedback room interior
-  { x1: 0.80, y1: 0.62, x2: 0.92, y2: 0.84 },
-  // Wall separating feedback from floor (gap on left for door)
-  { x1: 0.78, y1: 0.55, x2: 0.80, y2: 0.62 },
-  { x1: 0.78, y1: 0.72, x2: 0.80, y2: 0.86 },
+  // Feedback room (interior + walls; door gap on left around y=0.68-0.74)
+  { x1: 0.80, y1: 0.60, x2: 0.92, y2: 0.84 },
+  { x1: 0.78, y1: 0.58, x2: 0.80, y2: 0.68 },
+  { x1: 0.78, y1: 0.74, x2: 0.80, y2: 0.86 },
 
-  // Kitchen counter on far left
-  { x1: 0.105, y1: 0.35, x2: 0.17, y2: 0.95 },
+  // Kitchen / watercooler counter on far left
+  { x1: 0.105, y1: 0.34, x2: 0.16, y2: 0.94 },
 ];
 
-export function collides(p: Point, radius = 0.018): boolean {
-  // V1: keep movement reliable and let users walk through the whole office.
-  // We only block the external map boundary; furniture/room collisions can be
-  // tuned later after the modular tile set is finalized.
-  return p.x - radius < 0.095 || p.x + radius > 0.955 || p.y - radius < 0.035 || p.y + radius > 0.965;
+export function collides(p: Point, radius = 0.014): boolean {
+  // Outside the building floor
+  if (p.x - radius < FLOOR.x1 || p.x + radius > FLOOR.x2) return true;
+  if (p.y - radius < FLOOR.y1 || p.y + radius > FLOOR.y2) return true;
+  // Hit any furniture / wall
+  for (const c of COLLIDERS) {
+    if (p.x + radius > c.x1 && p.x - radius < c.x2 && p.y + radius > c.y1 && p.y - radius < c.y2) {
+      return true;
+    }
+  }
+  return false;
 }
 
-export const SPAWN: Point = { x: 0.50, y: 0.94 }; // front door / entrance, below the operation desks
+// Spawn at the lobby — central corridor between the diretoria/operação,
+// guaranteed to be outside any collider.
+export const SPAWN: Point = { x: 0.50, y: 0.42 };
+
+// Isometric rotation applied to input vector so "up arrow" feels like walking
+// INTO the office (slightly up-right). The office image is mostly top-down
+// with a small forward tilt, so a gentle rotation reads as natural.
+export const ISO_ROTATION_RAD = (-12 * Math.PI) / 180;
+
+export function rotateIso(dx: number, dy: number): { dx: number; dy: number } {
+  const c = Math.cos(ISO_ROTATION_RAD);
+  const s = Math.sin(ISO_ROTATION_RAD);
+  return { dx: dx * c - dy * s, dy: dx * s + dy * c };
+}
