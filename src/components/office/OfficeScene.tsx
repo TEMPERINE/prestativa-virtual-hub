@@ -166,21 +166,15 @@ export function OfficeScene() {
   useEffect(() => {
     const MOVE_KEYS = new Set(["arrowup", "arrowdown", "arrowleft", "arrowright", "w", "a", "s", "d"]);
     const down = (e: KeyboardEvent) => {
-      const k = e.key.toLowerCase();
-      if (MOVE_KEYS.has(k)) {
+      if (MOVE_KEYS.has(e.key.toLowerCase())) {
         e.preventDefault();
-        keys.current[k] = true;
-        if (k === "arrowup" || k === "w") moveAvatar(0, -1, SPEED * 6);
-        if (k === "arrowdown" || k === "s") moveAvatar(0, 1, SPEED * 6);
-        if (k === "arrowleft" || k === "a") moveAvatar(-1, 0, SPEED * 6);
-        if (k === "arrowright" || k === "d") moveAvatar(1, 0, SPEED * 6);
+        handleMoveKey(e.key, true, true);
       }
     };
     const up = (e: KeyboardEvent) => {
-      const k = e.key.toLowerCase();
-      if (MOVE_KEYS.has(k)) {
+      if (MOVE_KEYS.has(e.key.toLowerCase())) {
         e.preventDefault();
-        keys.current[k] = false;
+        handleMoveKey(e.key, false);
       }
     };
     window.addEventListener("keydown", down, { passive: false });
@@ -189,7 +183,7 @@ export function OfficeScene() {
       window.removeEventListener("keydown", down);
       window.removeEventListener("keyup", up);
     };
-  }, [moveAvatar]);
+  }, [handleMoveKey]);
 
   // movement loop
   useEffect(() => {
