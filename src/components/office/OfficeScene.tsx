@@ -214,6 +214,12 @@ export function OfficeScene() {
       if (k["arrowleft"] || k["a"]) dx -= 1;
       if (k["arrowright"] || k["d"]) dx += 1;
 
+      // 4-directional movement only: if both axes pressed, prefer the dominant.
+      if (dx && dy) {
+        if (Math.abs(dx) >= Math.abs(dy)) dy = 0;
+        else dx = 0;
+      }
+
       if (dx || dy) {
         moveAvatar(dx, dy);
       } else if (walkTarget.current) {
@@ -224,7 +230,9 @@ export function OfficeScene() {
         if (Math.hypot(tx, ty) < SPEED * 1.5) {
           walkTarget.current = null;
         } else {
-          moveAvatar(tx, ty, SPEED * 1.5);
+          // Click-to-walk also goes one axis at a time (dominant first).
+          if (Math.abs(tx) >= Math.abs(ty)) moveAvatar(tx, 0, SPEED * 1.5);
+          else moveAvatar(0, ty, SPEED * 1.5);
         }
       }
       raf = requestAnimationFrame(tick);

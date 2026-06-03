@@ -129,10 +129,10 @@ export const COLLIDERS: Array<{ x1: number; y1: number; x2: number; y2: number }
 // edges follow the office's isometric perspective instead of a flat
 // rectangle. Points in clockwise order: TL, TR, BR, BL.
 export const FLOOR_POLY: Point[] = [
-  { x: 0.118, y: 0.05 },  // top-left
-  { x: 0.948, y: 0.05 },  // top-right
-  { x: 0.955, y: 0.955 }, // bottom-right (slight outward flare)
-  { x: 0.105, y: 0.955 }, // bottom-left
+  { x: 0.125, y: 0.06 },  // top-left
+  { x: 0.935, y: 0.06 },  // top-right
+  { x: 0.940, y: 0.925 }, // bottom-right
+  { x: 0.115, y: 0.925 }, // bottom-left
 ];
 
 function pointInPolygon(p: Point, poly: Point[]): boolean {
