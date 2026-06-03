@@ -13,7 +13,8 @@ import parkLeft from "@/assets/scene-park-left.jpg";
 import roadRight from "@/assets/scene-road-right.jpg";
 import avatarSprite from "@/assets/avatar-sprite.png";
 import { toast } from "sonner";
-import { LogOut, Mic, MicOff, Video, VideoOff, MonitorUp, Users } from "lucide-react";
+import { LogOut, Mic, MicOff, Video, VideoOff, MonitorUp, Users, Pencil } from "lucide-react";
+import { Link } from "@tanstack/react-router";
 
 type Profile = { id: string; display_name: string; avatar_color: string };
 type RemotePos = { user_id: string; x: number; y: number; zone: string; is_online: boolean };
