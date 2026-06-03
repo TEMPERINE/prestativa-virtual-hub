@@ -222,9 +222,7 @@ export function zoneAtWithOverrides(p: Point): Zone {
   return _zoneAtBuiltin(p);
 }
 
-  }
-  return false;
-}
+
 
 // Spawn at the lobby — central corridor between diretoria and operação.
 export const SPAWN: Point = { x: 0.50, y: 0.42 };
