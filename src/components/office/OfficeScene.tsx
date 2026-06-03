@@ -5,7 +5,6 @@ import {
   SPAWN,
   collides,
   zoneAt,
-  rotateIso,
   type Point,
   type ZoneId,
 } from "@/lib/office-map";
@@ -42,12 +41,10 @@ export function OfficeScene() {
 
   const moveAvatar = useCallback((rawDx: number, rawDy: number, speed = SPEED) => {
     if (!rawDx && !rawDy) return;
-    // Apply isometric rotation so movement follows the office perspective.
-    const rot = rotateIso(rawDx, rawDy);
-    const len = Math.hypot(rot.dx, rot.dy);
+    const len = Math.hypot(rawDx, rawDy);
     if (!len) return;
-    const dx = (rot.dx / len) * speed;
-    const dy = (rot.dy / len) * speed;
+    const dx = (rawDx / len) * speed;
+    const dy = (rawDy / len) * speed;
     const cur = posRef.current;
 
     let nx = cur.x + dx;
