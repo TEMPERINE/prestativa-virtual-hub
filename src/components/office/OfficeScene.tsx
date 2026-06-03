@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { ZONES, SPAWN, collides, zoneAt, type Point, type ZoneId } from "@/lib/office-map";
 import officeMap from "@/assets/office-map.jpg";
@@ -25,6 +25,45 @@ export function OfficeScene() {
   const lastSent = useRef(0);
   const posRef = useRef(pos);
   posRef.current = pos;
+
+  const moveAvatar = useCallback((rawDx: number, rawDy: number, speed = SPEED) => {
+    if (!rawDx && !rawDy) return;
+    const len = Math.hypot(rawDx, rawDy);
+    const dx = (rawDx / len) * speed;
+    const dy = (rawDy / len) * speed;
+    const cur = posRef.current;
+
+    let nx = cur.x + dx;
+    let ny = cur.y;
+    if (collides({ x: nx, y: ny })) nx = cur.x;
+    ny += dy;
+    if (collides({ x: nx, y: ny })) ny = cur.y;
+    nx = Math.max(0.02, Math.min(0.98, nx));
+    ny = Math.max(0.02, Math.min(0.98, ny));
+    if (nx === cur.x && ny === cur.y) return;
+
+    const np = { x: nx, y: ny };
+    posRef.current = np;
+    setPos(np);
+    const z = zoneAt(np);
+    setZone((prev) => (prev !== z.id ? z.id : prev));
+
+    const now = performance.now();
+    if (now - lastSent.current > SEND_INTERVAL_MS) {
+      lastSent.current = now;
+      void supabase.auth.getUser().then(({ data }) => {
+        if (!data.user) return;
+        void supabase.from("positions").upsert({
+          user_id: data.user.id,
+          x: np.x,
+          y: np.y,
+          zone: z.id,
+          facing: Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? "right" : "left") : dy > 0 ? "down" : "up",
+          is_online: true,
+        });
+      });
+    }
+  }, []);
 
   // Load me + all profiles + initial positions
   useEffect(() => {
