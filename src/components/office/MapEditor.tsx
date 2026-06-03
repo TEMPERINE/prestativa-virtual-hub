@@ -82,6 +82,8 @@ export function MapEditor() {
   const [showEffective, setShowEffective] = useState(true);
   const [dirty, setDirty] = useState(!loadOverrides());
   const painting = useRef(false);
+  const historyRef = useRef<MapOverrides[]>([]);
+  const [canUndo, setCanUndo] = useState(false);
 
   const paintableZones = useMemo(
     () => ZONES.filter((z) => z.id !== "lobby"),
