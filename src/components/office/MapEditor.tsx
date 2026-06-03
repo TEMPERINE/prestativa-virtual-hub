@@ -10,7 +10,7 @@ import {
   clearOverrides,
   type MapOverrides,
 } from "@/lib/map-overrides";
-import { ZONES, COLLIDERS, type ZoneId } from "@/lib/office-map";
+import { ZONES, COLLIDERS, FLOOR_POLY, type ZoneId } from "@/lib/office-map";
 import officeMap from "@/assets/office-map.jpg";
 import { toast } from "sonner";
 import { ArrowLeft, Eraser, Square, Download, Trash2, Eye, EyeOff } from "lucide-react";
@@ -79,6 +79,7 @@ export function MapEditor() {
   const [brush, setBrush] = useState(1);
   const [showGrid, setShowGrid] = useState(true);
   const [showImage, setShowImage] = useState(true);
+  const [showEffective, setShowEffective] = useState(true);
   const [dirty, setDirty] = useState(!loadOverrides());
   const painting = useRef(false);
 
@@ -170,6 +171,8 @@ export function MapEditor() {
 
   // Pre-render tiles as plain divs would be huge (2560+). Use a canvas overlay.
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const effectiveCanvasRef = useRef<HTMLCanvasElement | null>(null);
+
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -194,6 +197,59 @@ export function MapEditor() {
       }
     }
   }, [overrides]);
+
+  // Effective-collision overlay: shows EXACTLY what the game blocks for
+  // the avatar (FLOOR_POLY + painted blocked OR default COLLIDERS).
+  // This is the source of truth for calibration so painted area === in-game blocked area.
+  useEffect(() => {
+    const canvas = effectiveCanvasRef.current;
+    if (!canvas) return;
+    const cols = overrides.cols;
+    const rows = overrides.rows;
+    canvas.width = cols;
+    canvas.height = rows;
+    const ctx = canvas.getContext("2d")!;
+    ctx.clearRect(0, 0, cols, rows);
+    if (!showEffective) return;
+
+    const hasPainted = overrides.blocked.some((b) => b === 1);
+
+    const pointInPoly = (px: number, py: number) => {
+      let inside = false;
+      for (let i = 0, j = FLOOR_POLY.length - 1; i < FLOOR_POLY.length; j = i++) {
+        const xi = FLOOR_POLY[i].x, yi = FLOOR_POLY[i].y;
+        const xj = FLOOR_POLY[j].x, yj = FLOOR_POLY[j].y;
+        const intersect = yi > py !== yj > py && px < ((xj - xi) * (py - yi)) / (yj - yi) + xi;
+        if (intersect) inside = !inside;
+      }
+      return inside;
+    };
+
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        const px = (c + 0.5) / cols;
+        const py = (r + 0.5) / rows;
+        let blocked = !pointInPoly(px, py);
+        if (!blocked) {
+          if (hasPainted) {
+            blocked = overrides.blocked[cellIndex(c, r, cols)] === 1;
+          } else {
+            for (const co of COLLIDERS) {
+              if (px > co.x1 && px < co.x2 && py > co.y1 && py < co.y2) {
+                blocked = true;
+                break;
+              }
+            }
+          }
+        }
+        if (blocked) {
+          // Yellow outline-style — distinct from the red paint layer.
+          ctx.fillStyle = "rgba(250, 204, 21, 0.35)";
+          ctx.fillRect(c, r, 1, 1);
+        }
+      }
+    }
+  }, [overrides, showEffective]);
 
   return (
     <div className="h-screen w-screen flex flex-col bg-background text-foreground">
@@ -253,6 +309,15 @@ export function MapEditor() {
             className="text-xs px-2 py-1 rounded bg-muted inline-flex items-center gap-1"
           >
             {showGrid ? <Eye size={12} /> : <EyeOff size={12} />} Grid
+          </button>
+          <button
+            onClick={() => setShowEffective((v) => !v)}
+            className={`text-xs px-2 py-1 rounded inline-flex items-center gap-1 ${
+              showEffective ? "bg-yellow-500/30 text-yellow-100" : "bg-muted"
+            }`}
+            title="Mostra o bloqueio EXATO que o jogo aplica (polígono do piso + colisões)"
+          >
+            {showEffective ? <Eye size={12} /> : <EyeOff size={12} />} Bloqueio do jogo
           </button>
           <button onClick={exportJson} className="text-xs px-2 py-1 rounded bg-muted inline-flex items-center gap-1">
             <Download size={12} /> Export
@@ -345,6 +410,12 @@ export function MapEditor() {
               ref={canvasRef}
               className="absolute inset-0 w-full h-full pointer-events-none"
               style={{ imageRendering: "pixelated" }}
+            />
+            {/* Effective game-collision overlay (FLOOR_POLY + colliders/painted) */}
+            <canvas
+              ref={effectiveCanvasRef}
+              className="absolute inset-0 w-full h-full pointer-events-none"
+              style={{ imageRendering: "pixelated", mixBlendMode: "screen" }}
             />
             {/* Grid overlay */}
             {showGrid && (
