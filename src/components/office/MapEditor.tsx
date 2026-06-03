@@ -310,6 +310,15 @@ export function MapEditor() {
           >
             {showGrid ? <Eye size={12} /> : <EyeOff size={12} />} Grid
           </button>
+          <button
+            onClick={() => setShowEffective((v) => !v)}
+            className={`text-xs px-2 py-1 rounded inline-flex items-center gap-1 ${
+              showEffective ? "bg-yellow-500/30 text-yellow-100" : "bg-muted"
+            }`}
+            title="Mostra o bloqueio EXATO que o jogo aplica (polígono do piso + colisões)"
+          >
+            {showEffective ? <Eye size={12} /> : <EyeOff size={12} />} Bloqueio do jogo
+          </button>
           <button onClick={exportJson} className="text-xs px-2 py-1 rounded bg-muted inline-flex items-center gap-1">
             <Download size={12} /> Export
           </button>
