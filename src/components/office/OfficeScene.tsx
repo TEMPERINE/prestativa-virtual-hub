@@ -217,8 +217,6 @@ export function OfficeScene() {
       if (dx || dy) {
         moveAvatar(dx, dy);
       } else if (walkTarget.current) {
-        // walkTarget is in image-space already; compute raw delta without iso
-        // rotation (rotation will be applied inside moveAvatar).
         const target = walkTarget.current;
         const cur = posRef.current;
         const tx = target.x - cur.x;
@@ -226,13 +224,6 @@ export function OfficeScene() {
         if (Math.hypot(tx, ty) < SPEED * 1.5) {
           walkTarget.current = null;
         } else {
-          // Pre-undo rotation so when moveAvatar applies iso rotation we end up
-          // moving toward the actual click point.
-          const inv = rotateIso(tx, -ty); // we want rotate by -ROT; rotateIso uses negative rotation already, so compose
-          // Simpler: bypass rotation by passing rotated-back input.
-          // We'll just call moveAvatar with raw delta — perspective rotation
-          // will slightly bend the path; acceptable for click-to-walk v1.
-          void inv;
           moveAvatar(tx, ty, SPEED * 1.5);
         }
       }
