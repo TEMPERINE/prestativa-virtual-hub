@@ -106,14 +106,23 @@ export function OfficeScene() {
 
   // keyboard input
   useEffect(() => {
+    const MOVE_KEYS = new Set(["arrowup", "arrowdown", "arrowleft", "arrowright", "w", "a", "s", "d"]);
     const down = (e: KeyboardEvent) => {
-      keys.current[e.key.toLowerCase()] = true;
+      const k = e.key.toLowerCase();
+      if (MOVE_KEYS.has(k)) {
+        e.preventDefault();
+        keys.current[k] = true;
+      }
     };
     const up = (e: KeyboardEvent) => {
-      keys.current[e.key.toLowerCase()] = false;
+      const k = e.key.toLowerCase();
+      if (MOVE_KEYS.has(k)) {
+        e.preventDefault();
+        keys.current[k] = false;
+      }
     };
-    window.addEventListener("keydown", down);
-    window.addEventListener("keyup", up);
+    window.addEventListener("keydown", down, { passive: false });
+    window.addEventListener("keyup", up, { passive: false });
     return () => {
       window.removeEventListener("keydown", down);
       window.removeEventListener("keyup", up);
