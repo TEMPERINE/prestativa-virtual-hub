@@ -98,6 +98,33 @@ export function zoneAt(p: Point): Zone {
   return ZONES[ZONES.length - 1];
 }
 
+// Furniture / wall colliders the avatar must walk around.
+export const COLLIDERS: Array<{ x1: number; y1: number; x2: number; y2: number }> = [
+  // Descompressão sofas + coffee table
+  { x1: 0.14, y1: 0.10, x2: 0.29, y2: 0.27 },
+  // Diretoria — two desks
+  { x1: 0.34, y1: 0.14, x2: 0.47, y2: 0.30 },
+  { x1: 0.50, y1: 0.14, x2: 0.63, y2: 0.30 },
+  // Sala de Reunião — interior (table + chairs); door gap on left around y=0.34-0.40
+  { x1: 0.70, y1: 0.08, x2: 0.91, y2: 0.34 },
+  { x1: 0.70, y1: 0.40, x2: 0.91, y2: 0.44 },
+  // Reunião wall (separates from main floor) with door gap
+  { x1: 0.66, y1: 0.05, x2: 0.685, y2: 0.34 },
+  { x1: 0.66, y1: 0.40, x2: 0.685, y2: 0.50 },
+  // Supervisora desk
+  { x1: 0.19, y1: 0.50, x2: 0.31, y2: 0.62 },
+  // Operação — 2 rows of desks
+  { x1: 0.35, y1: 0.55, x2: 0.64, y2: 0.68 },
+  { x1: 0.35, y1: 0.76, x2: 0.64, y2: 0.90 },
+  // Feedback room (interior + walls; door gap on left)
+  { x1: 0.80, y1: 0.60, x2: 0.92, y2: 0.84 },
+  { x1: 0.78, y1: 0.58, x2: 0.80, y2: 0.68 },
+  { x1: 0.78, y1: 0.74, x2: 0.80, y2: 0.86 },
+  // Kitchen / watercooler counter on far left
+  { x1: 0.105, y1: 0.34, x2: 0.16, y2: 0.94 },
+];
+
+
 // Walkable world bounds — a slightly trapezoidal polygon so the floor
 // edges follow the office's isometric perspective instead of a flat
 // rectangle. Points in clockwise order: TL, TR, BR, BL.
