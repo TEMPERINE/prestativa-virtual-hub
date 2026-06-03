@@ -104,10 +104,10 @@ export function zoneAt(p: Point): Zone {
 // open floor (corridors) is walkable.
 export const COLLIDERS: Array<{ x1: number; y1: number; x2: number; y2: number }> = [
   // Outer walls (top/bottom/left strips, leaving a small inner playable area)
-  { x1: 0, y1: 0, x2: 1, y2: 0.04 }, // top wall
-  { x1: 0, y1: 0.95, x2: 1, y2: 1 }, // bottom wall
-  { x1: 0, y1: 0, x2: 0.105, y2: 1 }, // left wall (kitchen/grass)
-  { x1: 0.94, y1: 0, x2: 1, y2: 1 }, // right wall (road)
+  { x1: 0, y1: 0, x2: 1, y2: 0.035 }, // top wall
+  { x1: 0, y1: 0.965, x2: 1, y2: 1 }, // bottom wall
+  { x1: 0, y1: 0, x2: 0.095, y2: 1 }, // left wall (kitchen/grass)
+  { x1: 0.955, y1: 0, x2: 1, y2: 1 }, // right wall (road)
 
   // Decompressão furniture (sofas, table)
   { x1: 0.13, y1: 0.10, x2: 0.30, y2: 0.27 },
