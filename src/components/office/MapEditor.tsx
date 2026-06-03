@@ -13,7 +13,7 @@ import {
 import { ZONES, COLLIDERS, FLOOR_POLY, type ZoneId } from "@/lib/office-map";
 import officeMap from "@/assets/office-map.jpg";
 import { toast } from "sonner";
-import { ArrowLeft, Eraser, Square, Download, Trash2, Eye, EyeOff } from "lucide-react";
+import { ArrowLeft, Eraser, Square, Download, Trash2, Eye, EyeOff, Undo } from "lucide-react";
 
 type Tool =
   | { kind: "blocked" }
@@ -82,6 +82,8 @@ export function MapEditor() {
   const [showEffective, setShowEffective] = useState(true);
   const [dirty, setDirty] = useState(!loadOverrides());
   const painting = useRef(false);
+  const historyRef = useRef<MapOverrides[]>([]);
+  const [canUndo, setCanUndo] = useState(false);
 
   const paintableZones = useMemo(
     () => ZONES.filter((z) => z.id !== "lobby"),
@@ -168,6 +170,33 @@ export function MapEditor() {
     a.click();
     URL.revokeObjectURL(url);
   }, [overrides]);
+
+  const pushHistory = useCallback((snapshot: MapOverrides) => {
+    historyRef.current.push(snapshot);
+    if (historyRef.current.length > 50) historyRef.current.shift();
+    setCanUndo(true);
+  }, []);
+
+  const undo = useCallback(() => {
+    const hist = historyRef.current;
+    if (hist.length === 0) return;
+    const prev = hist.pop()!;
+    setOverrides(prev);
+    setCanUndo(hist.length > 0);
+    setDirty(true);
+  }, []);
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.ctrlKey && (e.key === "z" || e.key === "Z")) {
+        e.preventDefault();
+        undo();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [undo]);
 
   // Pre-render tiles as plain divs would be huge (2560+). Use a canvas overlay.
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -280,6 +309,17 @@ export function MapEditor() {
             icon={<Eraser size={14} />}
             label="Apagar"
           />
+          <button
+            onClick={undo}
+            disabled={!canUndo}
+            className={`inline-flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded ${
+              canUndo ? "bg-muted/60 hover:bg-muted" : "opacity-50 cursor-not-allowed"
+            }`}
+            title="Desfazer (Ctrl+Z)"
+          >
+            <Undo size={14} />
+            Desfazer
+          </button>
         </div>
 
         <div className="flex items-center gap-1 ml-2">
@@ -389,6 +429,11 @@ export function MapEditor() {
             onPointerDown={(e) => {
               (e.target as Element).setPointerCapture?.(e.pointerId);
               painting.current = true;
+              pushHistory({
+                ...overrides,
+                blocked: overrides.blocked.slice(),
+                zones: overrides.zones.slice(),
+              });
               handlePointer(e);
             }}
             onPointerMove={(e) => {
