@@ -14,33 +14,7 @@ import { zoneRectFromOverrides, getZoneKind, customZonesFromOverrides, pullOverr
 import officeMap from "@/assets/office-map.jpg";
 import parkLeft from "@/assets/scene-park-left.jpg";
 import roadRight from "@/assets/scene-road-right.jpg";
-import avatarDown from "@/assets/avatar-down.png";
-import avatarUp from "@/assets/avatar-up.png";
-import avatarLeft from "@/assets/avatar-left.png";
-import avatarRight from "@/assets/avatar-right.png";
-
-type Facing = "up" | "down" | "left" | "right";
-const AVATAR_SPRITES: Record<Facing, string> = {
-  up: avatarUp,
-  down: avatarDown,
-  left: avatarLeft,
-  right: avatarRight,
-};
-// Each sheet: 1536px wide, 6 frames of 256px wide. Heights vary per direction.
-const SHEET_HEIGHT: Record<Facing, number> = {
-  down: 245,
-  up: 235,
-  left: 235,
-  right: 235,
-};
-const FRAME_WIDTHS: Record<Facing, number> = {
-  down: 151,
-  up: 136,
-  left: 142,
-  right: 139,
-};
-const FRAME_W = 151; // legacy fallback aspect (down)
-const FRAMES = 6; // frame 0 = idle, frames 1..5 = walk cycle
+import { SPRITES, getSprite, SPRITE_FRAMES as FRAMES, type Facing } from "@/lib/sprite-catalog";
 const WALK_FRAME_MS = 110;
 
 function dirFromKey(k: string): Facing | null {
@@ -71,7 +45,15 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 
-type Profile = { id: string; display_name: string; avatar_color: string };
+type Profile = {
+  id: string;
+  display_name: string;
+  avatar_color: string;
+  sprite_id?: string | null;
+  tagline?: string | null;
+  status?: "available" | "busy" | "away" | null;
+  onboarded_at?: string | null;
+};
 type RemotePos = { user_id: string; x: number; y: number; zone: string; is_online: boolean; facing?: Facing };
 type DeskNote = {
   id: string;
@@ -294,10 +276,12 @@ export function OfficeScene() {
 
   // Preload all directional sprites so swapping facing never shows a blank frame
   useEffect(() => {
-    (Object.values(AVATAR_SPRITES) as string[]).forEach((src) => {
-      const img = new Image();
-      img.src = src;
-    });
+    SPRITES.forEach((sp) =>
+      Object.values(sp.sheets).forEach((src) => {
+        const img = new Image();
+        img.src = src;
+      }),
+    );
   }, []);
 
   // Hydrate the office map from Lovable Cloud on mount so the layout drawn
@@ -346,7 +330,7 @@ export function OfficeScene() {
       const { data: userData } = await supabase.auth.getUser();
       if (!userData.user) return;
       meIdRef.current = userData.user.id;
-      const { data: profs } = await supabase.from("profiles").select("id, display_name, avatar_color");
+      const { data: profs } = await supabase.from("profiles").select("id, display_name, avatar_color, sprite_id, tagline, status, onboarded_at");
       const map: Record<string, Profile> = {};
       (profs ?? []).forEach((p) => (map[p.id] = p as Profile));
       setProfiles(map);
@@ -1079,6 +1063,7 @@ export function OfficeScene() {
                     facing={isMe ? facing : (p.facing ?? "down")}
                     frame={isMe ? frame : 0}
                     glowColor={isMe ? profile.avatar_color : undefined}
+                    spriteId={profile.sprite_id}
                   />
                 </div>
               </div>
@@ -1670,13 +1655,16 @@ function SpriteAvatar({
   facing,
   frame,
   glowColor,
+  spriteId,
 }: {
   facing: Facing;
   frame: number;
   glowColor?: string;
+  spriteId?: string | null;
 }) {
-  const sheetH = SHEET_HEIGHT[facing];
-  const frameW = FRAME_WIDTHS[facing];
+  const sprite = getSprite(spriteId);
+  const sheetH = sprite.dims[facing].h;
+  const frameW = sprite.dims[facing].w;
   // Para laterais, substitui o frame 3 pelo idle (frame 0) — quebra a sensação de deslizar.
   const displayFrame = (facing === "left" || facing === "right") && frame === 3 ? 0 : frame;
   return (
@@ -1704,9 +1692,9 @@ function SpriteAvatar({
           zIndex: 0,
         }}
       />
-      {(Object.keys(AVATAR_SPRITES) as Facing[]).map((f) => {
-        const h = SHEET_HEIGHT[f];
-        const w = FRAME_WIDTHS[f];
+      {(Object.keys(sprite.sheets) as Facing[]).map((f) => {
+        const h = sprite.dims[f].h;
+        const w = sprite.dims[f].w;
         const active = f === facing;
         return (
           <div
@@ -1718,7 +1706,7 @@ function SpriteAvatar({
               transform: "translateX(-50%)",
               height: "100%",
               aspectRatio: `${w} / ${h}`,
-              backgroundImage: `url(${AVATAR_SPRITES[f]})`,
+              backgroundImage: `url(${sprite.sheets[f]})`,
               backgroundRepeat: "no-repeat",
               backgroundSize: `${FRAMES * 100}% 100%`,
               backgroundPosition: `${(displayFrame / (FRAMES - 1)) * 100}% 0`,
