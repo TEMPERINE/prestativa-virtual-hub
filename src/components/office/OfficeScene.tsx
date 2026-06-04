@@ -72,6 +72,17 @@ import { Button } from "@/components/ui/button";
 
 type Profile = { id: string; display_name: string; avatar_color: string };
 type RemotePos = { user_id: string; x: number; y: number; zone: string; is_online: boolean; facing?: Facing };
+type DeskNote = {
+  id: string;
+  zone_id: string;
+  sender_id: string;
+  recipient_id: string;
+  body: string;
+  x: number;
+  y: number;
+  created_at: string;
+  read_at: string | null;
+};
 
 const SPEED = 0.0042;
 const SEND_INTERVAL_MS = 120;
