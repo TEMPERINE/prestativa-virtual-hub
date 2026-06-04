@@ -56,6 +56,8 @@ const REACTION_DURATION_MS = 3000;
 import { toast } from "sonner";
 import { LogOut, Mic, MicOff, Video, VideoOff, MonitorUp, Users, Pencil } from "lucide-react";
 import { Link } from "@tanstack/react-router";
+import { useRtcMesh } from "@/lib/rtc/useRtcMesh";
+import { RemoteVideoTiles } from "./RemoteVideoTiles";
 
 type Profile = { id: string; display_name: string; avatar_color: string };
 type RemotePos = { user_id: string; x: number; y: number; zone: string; is_online: boolean; facing?: Facing };
