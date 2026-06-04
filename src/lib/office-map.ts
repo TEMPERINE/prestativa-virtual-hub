@@ -180,7 +180,7 @@ function pointInPolygon(p: Point, poly: Point[]): boolean {
   return inside;
 }
 
-import { isBlockedByOverrides, zoneFromOverrides, hasZoneOverrides, loadOverrides } from "./map-overrides";
+import { isBlockedByOverrides, zoneFromOverrides, hasZoneOverrides, loadOverrides, customZonesFromOverrides } from "./map-overrides";
 
 export function collides(p: Point, radius = 0.014): boolean {
   // Outside the building floor polygon
@@ -208,6 +208,29 @@ export function collides(p: Point, radius = 0.014): boolean {
   return false;
 }
 
+// Build a synthetic Zone object for a user-defined custom zone id.
+function customZoneAsZone(id: string): Zone | null {
+  const custom = customZonesFromOverrides().find((c) => c.id === id);
+  if (!custom) return null;
+  return {
+    id: id as ZoneId,
+    label: custom.label,
+    subtitle: "Área personalizada",
+    rect: { x1: 0, y1: 0, x2: 1, y2: 1 },
+    audioRoom: `zone:${id}`,
+    supportsVideo: false,
+    accent: custom.color,
+  };
+}
+
+// Find a zone by id, including user-defined custom zones from the editor.
+export function findZoneById(id: string | null | undefined): Zone | null {
+  if (!id) return null;
+  const built = ZONES.find((z) => z.id === id);
+  if (built) return built;
+  return customZoneAsZone(id);
+}
+
 // Wrap zoneAt to honor painted zone overrides when present.
 const _zoneAtBuiltin = zoneAt;
 export function zoneAtWithOverrides(p: Point): Zone {
@@ -216,6 +239,8 @@ export function zoneAtWithOverrides(p: Point): Zone {
     if (id) {
       const z = ZONES.find((zz) => zz.id === id);
       if (z) return z;
+      const custom = customZoneAsZone(id);
+      if (custom) return custom;
     }
     return ZONES[ZONES.length - 1]; // lobby
   }
