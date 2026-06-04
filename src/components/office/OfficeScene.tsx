@@ -319,7 +319,10 @@ export function OfficeScene() {
   const claimsRef = useRef<Record<string, string>>({});
   useEffect(() => { claimsRef.current = claims; }, [claims]);
 
-  const teleportToMyClaim = useCallback(() => {
+  // Auto-walk target: when set, the avatar walks toward this point each tick.
+  const autoWalkRef = useRef<{ x: number; y: number } | null>(null);
+
+  const walkToMyClaim = useCallback(() => {
     const uid = meIdRef.current;
     if (!uid) return;
     const myZone = Object.entries(claimsRef.current).find(([, u]) => u === uid)?.[0];
@@ -330,15 +333,10 @@ export function OfficeScene() {
     const rect = zoneRectFromOverrides(myZone as ZoneId) ?? findZoneById(myZone)?.rect;
     if (!rect) return;
     const target = seatPointForRect(rect);
-    const safe = collides(target) ? SPAWN : target;
-    posRef.current = safe;
-    setPos(safe);
-    const z = zoneAt(safe);
-    setZone(z.id);
-    setLocalFacing("down");
-    sendPos(safe.x, safe.y, z.id, "down");
-    toast.success(`Teleportado para ${findZoneById(myZone)?.label ?? myZone}.`);
-  }, [sendPos, setLocalFacing]);
+    autoWalkRef.current = target;
+    toast.success(`Indo para ${findZoneById(myZone)?.label ?? myZone}...`);
+  }, []);
+
 
 
 
@@ -371,10 +369,10 @@ export function OfficeScene() {
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
       const key = e.key.toLowerCase();
-      // Ctrl/Cmd + D — teleport to claimed workspace
+      // Ctrl/Cmd + D — auto-walk to claimed workspace
       if (key === "d" && (e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey) {
         e.preventDefault();
-        teleportToMyClaim();
+        walkToMyClaim();
         return;
       }
       const emoji = EMOJI_MAP[key];
@@ -391,10 +389,13 @@ export function OfficeScene() {
       if (!dir) return;
       e.preventDefault();
       if (e.repeat) return;
+      // Manual movement cancels auto-walk
+      autoWalkRef.current = null;
       keysDown.current.add(dir);
       lastDir.current = dir;
       setLocalFacing(dir);
     };
+
     const up = (e: KeyboardEvent) => {
       const dir = dirFromKey(e.key.toLowerCase());
       if (!dir) return;
@@ -419,19 +420,58 @@ export function OfficeScene() {
       window.removeEventListener("keyup", up);
       window.removeEventListener("blur", blur);
     };
-  }, [setLocalFacing, sendReaction, teleportToMyClaim]);
+  }, [setLocalFacing, sendReaction, walkToMyClaim]);
 
   // movement + animation loop
   useEffect(() => {
     let raf = 0;
     const tick = (t: number) => {
-      const dir = lastDir.current;
+      let dir = lastDir.current;
+
+      // Auto-walk: if no manual key, compute a direction toward the target.
+      if (!dir && autoWalkRef.current) {
+        const cur = posRef.current;
+        const tgt = autoWalkRef.current;
+        const dx = tgt.x - cur.x;
+        const dy = tgt.y - cur.y;
+        const adx = Math.abs(dx);
+        const ady = Math.abs(dy);
+        if (adx < SPEED && ady < SPEED) {
+          // Arrived
+          autoWalkRef.current = null;
+          const z = zoneAt(cur);
+          sendPos(cur.x, cur.y, z.id, facingRef.current);
+        } else {
+          // Prefer the larger axis; if blocked, fall back to the other.
+          const primary: Facing = adx >= ady
+            ? (dx > 0 ? "right" : "left")
+            : (dy > 0 ? "down" : "up");
+          const secondary: Facing = adx >= ady
+            ? (dy > 0 ? "down" : "up")
+            : (dx > 0 ? "right" : "left");
+          setLocalFacing(primary);
+          if (tryMove(primary)) {
+            dir = primary;
+          } else {
+            setLocalFacing(secondary);
+            if (tryMove(secondary)) {
+              dir = secondary;
+            } else {
+              // Stuck — abort auto-walk
+              autoWalkRef.current = null;
+            }
+          }
+        }
+      }
+
       if (dir) {
-        const moved = tryMove(dir);
+        // For manual movement, tryMove was already called via keydown path below;
+        // when manual key is held we still need to advance position each frame.
+        const isManual = lastDir.current === dir;
+        const moved = isManual ? tryMove(dir) : true;
         if (moved) {
           if (t - lastFrameTick.current > WALK_FRAME_MS) {
             lastFrameTick.current = t;
-            // cycle frames 1..5
             const next = frameRef.current >= 5 || frameRef.current < 1 ? 1 : frameRef.current + 1;
             frameRef.current = next;
             setFrame(next);
@@ -443,7 +483,6 @@ export function OfficeScene() {
       } else if (frameRef.current !== 0) {
         frameRef.current = 0;
         setFrame(0);
-        // send final idle position so remotes see exact pose
         const cur = posRef.current;
         const z = zoneAt(cur);
         sendPos(cur.x, cur.y, z.id, facingRef.current);
@@ -452,7 +491,8 @@ export function OfficeScene() {
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [tryMove, sendPos]);
+  }, [tryMove, sendPos, setLocalFacing]);
+
 
 
   const currentZone = useMemo(() => findZoneById(zone) ?? ZONES[ZONES.length - 1], [zone]);
