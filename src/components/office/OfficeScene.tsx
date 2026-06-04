@@ -920,11 +920,13 @@ export function OfficeScene() {
           const ownerId = claims[wz.id];
           const owner = ownerId ? profiles[ownerId] : null;
           const ownerOnline = ownerId ? positions[ownerId]?.is_online ?? false : false;
-          const isMyClaim = ownerId && me && ownerId === me.id;
-          const iHaveAClaim = me && Object.values(claims).includes(me.id);
+          const isMyClaim = !!(ownerId && me && ownerId === me.id);
+          const iHaveAClaim = !!(me && Object.values(claims).includes(me.id));
           const isHovered = hoveredZone === wz.id;
-          const canHover = !isMyClaim; // allow hover on others' desks even if I have my own
-          const showCompose = ownerId && !isMyClaim;
+          // Skip entirely when there's no function available here:
+          // - empty zone but I already have a claim → can't claim, nothing to do
+          if (!ownerId && iHaveAClaim) return null;
+          const showCompose = !!ownerId && !isMyClaim;
           return (
             <div
               key={`ws-${wz.id}`}
@@ -934,28 +936,22 @@ export function OfficeScene() {
                 top: `${wz.rect.y1 * 100}%`,
                 width: `${(wz.rect.x2 - wz.rect.x1) * 100}%`,
                 height: `${(wz.rect.y2 - wz.rect.y1) * 100}%`,
-                zIndex: isHovered && canHover ? 55 : 15,
+                zIndex: isHovered ? 55 : 15,
               }}
-              onMouseEnter={() => canHover && setHoveredZone(wz.id)}
+              onMouseEnter={() => setHoveredZone(wz.id)}
               onMouseLeave={() => setHoveredZone((cur) => (cur === wz.id ? null : cur))}
             >
-              {/* subtle highlight on hover */}
-              {canHover && (
-                <div
-                  className="absolute inset-0 rounded-md transition-all duration-150 pointer-events-none"
-                  style={{
-                    background: isHovered
-                      ? ownerId
-                        ? "color-mix(in oklab, var(--primary) 10%, transparent)"
-                        : "color-mix(in oklab, var(--primary) 18%, transparent)"
-                      : "transparent",
-                    outline: isHovered
-                      ? `1.5px dashed color-mix(in oklab, var(--primary) 70%, transparent)`
-                      : "none",
-                  }}
-                />
-              )}
-              {isHovered && canHover && (
+              {/* Hover outline only — no fill */}
+              <div
+                className="absolute inset-0 rounded-md transition-all duration-150 pointer-events-none"
+                style={{
+                  outline: isHovered
+                    ? `1.5px dashed color-mix(in oklab, var(--destructive) 80%, transparent)`
+                    : "none",
+                  outlineOffset: "-1px",
+                }}
+              />
+              {isHovered && (
                 <div
                   className="absolute left-1/2 -translate-x-1/2 pointer-events-auto"
                   style={{ zIndex: 70, bottom: "100%", marginBottom: 8 }}
@@ -964,6 +960,7 @@ export function OfficeScene() {
                     <OccupantCard
                       profile={owner}
                       online={ownerOnline}
+                      isMe={isMyClaim}
                       onLeaveNote={
                         showCompose
                           ? () => {
@@ -977,16 +974,22 @@ export function OfficeScene() {
                             }
                           : undefined
                       }
+                      onLeaveDesk={
+                        isMyClaim
+                          ? () => {
+                              releaseClaim();
+                              setHoveredZone(null);
+                            }
+                          : undefined
+                      }
                     />
                   ) : (
-                    !iHaveAClaim && (
-                      <button
-                        onClick={() => claimZone(wz.id)}
-                        className="rounded-full px-3 py-1.5 text-xs font-semibold bg-primary text-primary-foreground shadow-soft hover:opacity-90 whitespace-nowrap"
-                      >
-                        Reivindicar espaço
-                      </button>
-                    )
+                    <button
+                      onClick={() => claimZone(wz.id)}
+                      className="rounded-full px-3 py-1.5 text-xs font-semibold bg-primary text-primary-foreground shadow-soft hover:opacity-90 whitespace-nowrap"
+                    >
+                      Reivindicar espaço
+                    </button>
                   )}
                 </div>
               )}
