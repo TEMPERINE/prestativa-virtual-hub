@@ -492,7 +492,72 @@ export function OfficeScene() {
           <ZoneSpotlight rect={focusedZone.rect} />
         )}
 
+        {/* Workspace-zone hover overlays (claim button / owner tooltip) */}
+        {workspaceZones.map((wz) => {
+          const ownerId = claims[wz.id];
+          const owner = ownerId ? profiles[ownerId] : null;
+          const isMyClaim = ownerId && me && ownerId === me.id;
+          const isHovered = hoveredZone === wz.id;
+          return (
+            <div
+              key={`ws-${wz.id}`}
+              className="absolute"
+              style={{
+                left: `${wz.rect.x1 * 100}%`,
+                top: `${wz.rect.y1 * 100}%`,
+                width: `${(wz.rect.x2 - wz.rect.x1) * 100}%`,
+                height: `${(wz.rect.y2 - wz.rect.y1) * 100}%`,
+                zIndex: isHovered ? 55 : 15,
+              }}
+              onMouseEnter={() => setHoveredZone(wz.id)}
+              onMouseLeave={() => setHoveredZone((cur) => (cur === wz.id ? null : cur))}
+            >
+              {/* subtle highlight on hover */}
+              <div
+                className="absolute inset-0 rounded-md transition-all duration-150 pointer-events-none"
+                style={{
+                  background: isHovered
+                    ? ownerId
+                      ? "color-mix(in oklab, var(--primary) 10%, transparent)"
+                      : "color-mix(in oklab, var(--primary) 18%, transparent)"
+                    : "transparent",
+                  outline: isHovered
+                    ? `1.5px dashed color-mix(in oklab, var(--primary) 70%, transparent)`
+                    : "none",
+                }}
+              />
+              {isHovered && (
+                <div
+                  className="absolute left-1/2 -translate-x-1/2 -top-2 -translate-y-full whitespace-nowrap pointer-events-auto"
+                  style={{ zIndex: 70 }}
+                >
+                  {ownerId ? (
+                    <div className="glass-panel rounded-full px-3 py-1 shadow-soft text-xs font-medium flex items-center gap-2">
+                      <span
+                        className="inline-block w-2 h-2 rounded-full"
+                        style={{ background: owner?.avatar_color ?? "var(--primary)" }}
+                      />
+                      {owner?.display_name ?? "Reservado"}
+                      {isMyClaim && (
+                        <span className="text-[10px] text-muted-foreground">(seu espaço)</span>
+                      )}
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => claimZone(wz.id)}
+                      className="rounded-full px-3 py-1.5 text-xs font-semibold bg-primary text-primary-foreground shadow-soft hover:opacity-90"
+                    >
+                      Reivindicar espaço
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })}
+
         {/* Avatars */}
+
         {onlineList.map(({ pos: p, profile }) => {
           const isMe = me?.id === profile.id;
           const display = isMe ? pos : { x: p.x, y: p.y };
