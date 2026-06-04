@@ -493,6 +493,22 @@ export function OfficeScene() {
     });
   }, []);
 
+  const releaseClaim = useCallback(async () => {
+    const uid = meIdRef.current;
+    if (!uid) return;
+    const { error } = await supabase.from("workspace_claims").delete().eq("user_id", uid);
+    if (error) {
+      toast.error("Não foi possível deixar a mesa.");
+      return;
+    }
+    toast.success("Você deixou sua mesa. Escolha um novo espaço quando quiser.");
+    setClaims((prev) => {
+      const next: Record<string, string> = {};
+      for (const [k, v] of Object.entries(prev)) if (v !== uid) next[k] = v;
+      return next;
+    });
+  }, []);
+
   // Live ref to claims so the keyboard handler can read latest values.
   const claimsRef = useRef<Record<string, string>>({});
   useEffect(() => { claimsRef.current = claims; }, [claims]);
