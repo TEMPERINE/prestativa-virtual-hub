@@ -60,15 +60,29 @@ const EMOJI_MAP: Record<string, string> = {
 };
 const REACTION_DURATION_MS = 3000;
 import { toast } from "sonner";
-import { LogOut, Mic, MicOff, Video, VideoOff, MonitorUp, Users, Pencil } from "lucide-react";
+import { LogOut, Mic, MicOff, Video, VideoOff, MonitorUp, Users, Pencil, User as UserIcon, Hand, MessageCircle, StickyNote, X as XIcon } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import { useRtcMesh } from "@/lib/rtc/useRtcMesh";
 import { RemoteVideoTiles } from "./RemoteVideoTiles";
 import { CamPreviewAndPicker } from "./CamPreviewAndPicker";
 import { ScreenShareViewer } from "./ScreenShareViewer";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
+import { Button } from "@/components/ui/button";
 
 type Profile = { id: string; display_name: string; avatar_color: string };
 type RemotePos = { user_id: string; x: number; y: number; zone: string; is_online: boolean; facing?: Facing };
+type DeskNote = {
+  id: string;
+  zone_id: string;
+  sender_id: string;
+  recipient_id: string;
+  body: string;
+  x: number;
+  y: number;
+  created_at: string;
+  read_at: string | null;
+};
 
 const SPEED = 0.0042;
 const SEND_INTERVAL_MS = 120;
@@ -119,6 +133,12 @@ export function OfficeScene() {
   // zone_id -> user_id (claims)
   const [claims, setClaims] = useState<Record<string, string>>({});
   const [hoveredZone, setHoveredZone] = useState<string | null>(null);
+  const [notes, setNotes] = useState<DeskNote[]>([]);
+  const [composeFor, setComposeFor] = useState<{ zoneId: string; recipientId: string; recipientName: string } | null>(null);
+  const [composeText, setComposeText] = useState("");
+  const [placing, setPlacing] = useState<{ zoneId: string; recipientId: string; body: string } | null>(null);
+  const [cursor, setCursor] = useState<{ x: number; y: number } | null>(null);
+  const [openingNote, setOpeningNote] = useState<DeskNote | null>(null);
   const reactionChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const meIdRef = useRef<string | null>(null);
 
@@ -363,10 +383,39 @@ export function OfficeScene() {
     };
     window.addEventListener("beforeunload", offline);
 
+    // Load + subscribe to desk notes (post-it gifts left on workstations)
+    void (async () => {
+      const { data } = await supabase
+        .from("desk_notes")
+        .select("id, zone_id, sender_id, recipient_id, body, x, y, created_at, read_at")
+        .is("read_at", null);
+      if (data) setNotes(data as DeskNote[]);
+    })();
+    const notesCh = supabase
+      .channel("desk-notes-room")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "desk_notes" },
+        (payload) => {
+          setNotes((prev) => {
+            if (payload.eventType === "DELETE") {
+              const old = payload.old as { id: string };
+              return prev.filter((n) => n.id !== old.id);
+            }
+            const row = payload.new as DeskNote;
+            if (row.read_at) return prev.filter((n) => n.id !== row.id);
+            const without = prev.filter((n) => n.id !== row.id);
+            return [...without, row];
+          });
+        }
+      )
+      .subscribe();
+
     return () => {
       supabase.removeChannel(ch);
       supabase.removeChannel(reactionCh);
       supabase.removeChannel(claimsCh);
+      supabase.removeChannel(notesCh);
       reactionChannelRef.current = null;
       window.removeEventListener("beforeunload", offline);
       offline();
@@ -710,9 +759,12 @@ export function OfficeScene() {
         {workspaceZones.map((wz) => {
           const ownerId = claims[wz.id];
           const owner = ownerId ? profiles[ownerId] : null;
+          const ownerOnline = ownerId ? positions[ownerId]?.is_online ?? false : false;
           const isMyClaim = ownerId && me && ownerId === me.id;
           const iHaveAClaim = me && Object.values(claims).includes(me.id);
           const isHovered = hoveredZone === wz.id;
+          const canHover = !isMyClaim; // allow hover on others' desks even if I have my own
+          const showCompose = ownerId && !isMyClaim;
           return (
             <div
               key={`ws-${wz.id}`}
@@ -722,13 +774,13 @@ export function OfficeScene() {
                 top: `${wz.rect.y1 * 100}%`,
                 width: `${(wz.rect.x2 - wz.rect.x1) * 100}%`,
                 height: `${(wz.rect.y2 - wz.rect.y1) * 100}%`,
-                zIndex: isHovered && !iHaveAClaim ? 55 : 15,
+                zIndex: isHovered && canHover ? 55 : 15,
               }}
-              onMouseEnter={() => !iHaveAClaim && setHoveredZone(wz.id)}
+              onMouseEnter={() => canHover && setHoveredZone(wz.id)}
               onMouseLeave={() => setHoveredZone((cur) => (cur === wz.id ? null : cur))}
             >
               {/* subtle highlight on hover */}
-              {!iHaveAClaim && (
+              {canHover && (
                 <div
                   className="absolute inset-0 rounded-md transition-all duration-150 pointer-events-none"
                   style={{
@@ -743,29 +795,38 @@ export function OfficeScene() {
                   }}
                 />
               )}
-              {isHovered && !iHaveAClaim && (
+              {isHovered && canHover && (
                 <div
-                  className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 whitespace-nowrap pointer-events-auto"
-                  style={{ zIndex: 70 }}
+                  className="absolute left-1/2 -translate-x-1/2 pointer-events-auto"
+                  style={{ zIndex: 70, bottom: "100%", marginBottom: 8 }}
                 >
                   {ownerId ? (
-                    <div className="glass-panel rounded-full px-3 py-1 shadow-soft text-xs font-medium flex items-center gap-2">
-                      <span
-                        className="inline-block w-2 h-2 rounded-full"
-                        style={{ background: owner?.avatar_color ?? "var(--primary)" }}
-                      />
-                      {owner?.display_name ?? "Reservado"}
-                      {isMyClaim && (
-                        <span className="text-[10px] text-muted-foreground">(seu espaço)</span>
-                      )}
-                    </div>
+                    <OccupantCard
+                      profile={owner}
+                      online={ownerOnline}
+                      onLeaveNote={
+                        showCompose
+                          ? () => {
+                              setComposeFor({
+                                zoneId: wz.id,
+                                recipientId: ownerId,
+                                recipientName: owner?.display_name ?? "colega",
+                              });
+                              setComposeText("");
+                              setHoveredZone(null);
+                            }
+                          : undefined
+                      }
+                    />
                   ) : (
-                    <button
-                      onClick={() => claimZone(wz.id)}
-                      className="rounded-full px-3 py-1.5 text-xs font-semibold bg-primary text-primary-foreground shadow-soft hover:opacity-90"
-                    >
-                      Reivindicar espaço
-                    </button>
+                    !iHaveAClaim && (
+                      <button
+                        onClick={() => claimZone(wz.id)}
+                        className="rounded-full px-3 py-1.5 text-xs font-semibold bg-primary text-primary-foreground shadow-soft hover:opacity-90 whitespace-nowrap"
+                      >
+                        Reivindicar espaço
+                      </button>
+                    )
                   )}
                 </div>
               )}
@@ -842,6 +903,82 @@ export function OfficeScene() {
           />
         )}
 
+        {/* Desk notes (post-it gifts) sitting on workstations */}
+        {notes.map((n) => {
+          const isForMe = me?.id === n.recipient_id;
+          const sender = profiles[n.sender_id];
+          return (
+            <button
+              key={n.id}
+              type="button"
+              onClick={() => isForMe && setOpeningNote(n)}
+              className="absolute"
+              style={{
+                left: `${n.x * 100}%`,
+                top: `${n.y * 100}%`,
+                transform: "translate(-50%, -85%)",
+                zIndex: Math.round(n.y * 1000) + 5,
+                cursor: isForMe ? "pointer" : "default",
+                pointerEvents: isForMe ? "auto" : "none",
+              }}
+              title={
+                isForMe
+                  ? `Recadinho de ${sender?.display_name ?? "alguém"} — clique para abrir`
+                  : `Recadinho para ${profiles[n.recipient_id]?.display_name ?? ""}`
+              }
+            >
+              <GiftSprite color={sender?.avatar_color} bounce={isForMe} />
+            </button>
+          );
+        })}
+
+        {/* Placement layer — appears after composing a note */}
+        {placing && (
+          <PlacementLayer
+            placing={placing}
+            workspaceZones={workspaceZones}
+            onMove={(p) => setCursor(p)}
+            onCancel={() => {
+              setPlacing(null);
+              setCursor(null);
+            }}
+            onConfirm={async (p) => {
+              const uid = meIdRef.current;
+              if (!uid) return;
+              const { error } = await supabase.from("desk_notes").insert({
+                zone_id: placing.zoneId,
+                sender_id: uid,
+                recipient_id: placing.recipientId,
+                body: placing.body,
+                x: p.x,
+                y: p.y,
+              });
+              if (error) {
+                toast.error("Não foi possível deixar o recadinho.");
+                return;
+              }
+              toast.success("✨ Recadinho deixado na mesa!");
+              setPlacing(null);
+              setCursor(null);
+            }}
+          />
+        )}
+        {placing && cursor && (
+          <div
+            className="absolute pointer-events-none"
+            style={{
+              left: `${cursor.x * 100}%`,
+              top: `${cursor.y * 100}%`,
+              transform: "translate(-50%, -85%)",
+              zIndex: 95,
+              opacity: 0.95,
+              filter: "drop-shadow(0 4px 10px rgba(0,0,0,0.35))",
+            }}
+          >
+            <GiftSprite color={me?.avatar_color} bounce />
+          </div>
+        )}
+
         <ScreenShareViewer
           localStream={rtc.localScreenStream}
           remoteStreams={rtc.remoteScreenStreams}
@@ -850,6 +987,110 @@ export function OfficeScene() {
           anchorRect={focusedZone?.rect ?? null}
         />
       </div>
+
+      {/* Compose note dialog */}
+      <Dialog
+        open={!!composeFor}
+        onOpenChange={(o) => {
+          if (!o) setComposeFor(null);
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-center">Deixar um recado</DialogTitle>
+          </DialogHeader>
+          <div className="relative">
+            <div className="absolute -top-3 left-1/2 -translate-x-1/2 text-3xl">🎁</div>
+            <div
+              className="rounded-lg p-4 shadow-soft"
+              style={{
+                background: "linear-gradient(180deg, #FFE680 0%, #FFD84D 100%)",
+                color: "#3a2e00",
+                minHeight: 180,
+              }}
+            >
+              <Textarea
+                value={composeText}
+                onChange={(e) => setComposeText(e.target.value.slice(0, 280))}
+                placeholder="Escreva uma mensagem!"
+                className="bg-transparent border-0 focus-visible:ring-0 resize-none text-sm placeholder:text-amber-900/50 min-h-[150px]"
+                autoFocus
+              />
+            </div>
+            <div className="text-[10px] text-muted-foreground text-right mt-1">
+              {composeText.length}/280
+            </div>
+          </div>
+          <DialogFooter className="gap-2 sm:gap-2">
+            <Button variant="ghost" onClick={() => setComposeFor(null)}>
+              Cancelar
+            </Button>
+            <Button
+              disabled={!composeText.trim()}
+              onClick={() => {
+                if (!composeFor) return;
+                setPlacing({
+                  zoneId: composeFor.zoneId,
+                  recipientId: composeFor.recipientId,
+                  body: composeText.trim(),
+                });
+                setCursor(null);
+                setComposeFor(null);
+                toast.info(`Clique na mesa de ${composeFor.recipientName} para deixar o presentinho 🎁`);
+              }}
+              className="bg-emerald-500 hover:bg-emerald-600 text-white"
+            >
+              Colocar na mesa dele(a)
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Read note dialog */}
+      <Dialog
+        open={!!openingNote}
+        onOpenChange={(o) => {
+          if (!o && openingNote) {
+            const id = openingNote.id;
+            // Mark as read (which removes it for everyone via realtime + filter)
+            void supabase.from("desk_notes").update({ read_at: new Date().toISOString() }).eq("id", id);
+            setNotes((prev) => prev.filter((n) => n.id !== id));
+            setOpeningNote(null);
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-center">
+              Recadinho de {openingNote ? profiles[openingNote.sender_id]?.display_name ?? "alguém" : ""}
+            </DialogTitle>
+          </DialogHeader>
+          <div
+            className="rounded-lg p-4 shadow-soft whitespace-pre-wrap text-sm"
+            style={{
+              background: "linear-gradient(180deg, #FFE680 0%, #FFD84D 100%)",
+              color: "#3a2e00",
+              minHeight: 140,
+            }}
+          >
+            {openingNote?.body}
+          </div>
+          <DialogFooter>
+            <Button
+              onClick={() => {
+                if (!openingNote) return;
+                const id = openingNote.id;
+                void supabase.from("desk_notes").update({ read_at: new Date().toISOString() }).eq("id", id);
+                setNotes((prev) => prev.filter((n) => n.id !== id));
+                setOpeningNote(null);
+              }}
+            >
+              Lido (some o recadinho)
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
 
       {/* Extended scenery — road on the right */}
       <div
@@ -1295,5 +1536,208 @@ function TeamRow({
         )}
       </div>
     </div>
+  );
+}
+
+/** Gather-style hover card showing the occupant + 4 social action icons. */
+function OccupantCard({
+  profile,
+  online,
+  onLeaveNote,
+}: {
+  profile: Profile | null;
+  online: boolean;
+  onLeaveNote?: () => void;
+}) {
+  const initials = (profile?.display_name ?? "?").charAt(0).toUpperCase();
+  return (
+    <div
+      className="rounded-xl shadow-soft px-4 pt-3 pb-2.5 text-white flex flex-col items-center gap-2 min-w-[180px]"
+      style={{
+        background: "rgba(20, 22, 38, 0.95)",
+        border: "1px solid rgba(255,255,255,0.08)",
+        backdropFilter: "blur(8px)",
+      }}
+    >
+      <div
+        className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-semibold text-white shadow-soft"
+        style={{ background: profile?.avatar_color ?? "var(--primary)" }}
+      >
+        {initials}
+      </div>
+      <div className="text-center leading-tight">
+        <div className="text-sm font-semibold flex items-center justify-center gap-1.5">
+          {profile?.display_name ?? "Reservado"}
+          <span
+            className={`inline-block w-1.5 h-1.5 rounded-full ${online ? "bg-emerald-400" : "bg-zinc-400"}`}
+          />
+        </div>
+        <div className="text-[10px] opacity-70">{online ? "Online" : "Offline"}</div>
+      </div>
+      <div className="flex items-center gap-1.5 mt-1">
+        <CardIconBtn title="Perfil (em breve)" disabled>
+          <UserIcon className="w-3.5 h-3.5" />
+        </CardIconBtn>
+        <CardIconBtn title="Cumprimentar (em breve)" disabled>
+          <Hand className="w-3.5 h-3.5" />
+        </CardIconBtn>
+        <CardIconBtn title="Chat (em breve)" disabled>
+          <MessageCircle className="w-3.5 h-3.5" />
+        </CardIconBtn>
+        <CardIconBtn
+          title="Deixar recadinho"
+          onClick={onLeaveNote}
+          disabled={!onLeaveNote}
+          active
+        >
+          <StickyNote className="w-3.5 h-3.5" />
+        </CardIconBtn>
+      </div>
+    </div>
+  );
+}
+
+function CardIconBtn({
+  children,
+  title,
+  onClick,
+  disabled,
+  active,
+}: {
+  children: React.ReactNode;
+  title: string;
+  onClick?: () => void;
+  disabled?: boolean;
+  active?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      title={title}
+      disabled={disabled}
+      onClick={onClick}
+      className={`w-7 h-7 rounded-md flex items-center justify-center transition ${
+        disabled
+          ? "bg-white/5 text-white/30 cursor-not-allowed"
+          : active
+          ? "bg-primary text-primary-foreground hover:opacity-90"
+          : "bg-white/10 text-white/80 hover:bg-white/20"
+      }`}
+    >
+      {children}
+    </button>
+  );
+}
+
+/** Little pixel-art-ish gift box that sits on a desk. */
+function GiftSprite({ color, bounce }: { color?: string; bounce?: boolean }) {
+  const ribbon = color ?? "var(--primary)";
+  return (
+    <div
+      className={bounce ? "animate-bounce" : ""}
+      style={{
+        width: "min(4.2vh, 44px)",
+        height: "min(4.2vh, 44px)",
+        animationDuration: "1.6s",
+        filter: "drop-shadow(0 3px 4px rgba(0,0,0,0.4))",
+        imageRendering: "pixelated",
+      }}
+    >
+      <svg viewBox="0 0 32 32" width="100%" height="100%" shapeRendering="crispEdges">
+        {/* Lid */}
+        <rect x="4" y="10" width="24" height="6" fill="#E94B8C" />
+        <rect x="4" y="10" width="24" height="2" fill="#FF7AB0" />
+        <rect x="4" y="15" width="24" height="1" fill="#A02560" />
+        {/* Box body */}
+        <rect x="6" y="16" width="20" height="12" fill="#F06AA0" />
+        <rect x="6" y="27" width="20" height="1" fill="#A02560" />
+        {/* Vertical ribbon */}
+        <rect x="14" y="10" width="4" height="18" fill={ribbon} />
+        <rect x="14" y="10" width="1" height="18" fill="#FFF" opacity="0.35" />
+        {/* Bow */}
+        <rect x="11" y="6" width="4" height="4" fill={ribbon} />
+        <rect x="17" y="6" width="4" height="4" fill={ribbon} />
+        <rect x="14" y="7" width="4" height="3" fill={ribbon} />
+        <rect x="15" y="8" width="2" height="2" fill="#FFF" opacity="0.5" />
+        {/* Small note sticking out the top */}
+        <rect x="20" y="4" width="8" height="6" fill="#FFF7C2" />
+        <rect x="20" y="4" width="8" height="1" fill="#E6D98A" />
+        <rect x="21" y="6" width="6" height="1" fill="#C9B96A" />
+        <rect x="21" y="8" width="4" height="1" fill="#C9B96A" />
+      </svg>
+    </div>
+  );
+}
+
+/** Transparent overlay that captures mouse movement + click while placing a note. */
+function PlacementLayer({
+  placing,
+  workspaceZones,
+  onMove,
+  onCancel,
+  onConfirm,
+}: {
+  placing: { zoneId: string; recipientId: string; body: string };
+  workspaceZones: { id: string; rect: { x1: number; y1: number; x2: number; y2: number } }[];
+  onMove: (p: { x: number; y: number }) => void;
+  onCancel: () => void;
+  onConfirm: (p: { x: number; y: number }) => void;
+}) {
+  const targetRect = workspaceZones.find((wz) => wz.id === placing.zoneId)?.rect ?? null;
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onCancel();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onCancel]);
+  return (
+    <>
+      <div
+        className="absolute inset-0"
+        style={{ zIndex: 90, cursor: "crosshair", background: "rgba(0,0,0,0.18)" }}
+        onMouseMove={(e) => {
+          const rect = e.currentTarget.getBoundingClientRect();
+          const x = (e.clientX - rect.left) / rect.width;
+          const y = (e.clientY - rect.top) / rect.height;
+          onMove({ x, y });
+        }}
+        onClick={(e) => {
+          const rect = e.currentTarget.getBoundingClientRect();
+          const x = (e.clientX - rect.left) / rect.width;
+          const y = (e.clientY - rect.top) / rect.height;
+          if (!targetRect) return;
+          if (x < targetRect.x1 || x > targetRect.x2 || y < targetRect.y1 || y > targetRect.y2) {
+            toast.error("Clique sobre a mesa do destinatário.");
+            return;
+          }
+          onConfirm({ x, y });
+        }}
+      />
+      {/* Highlight target zone */}
+      {targetRect && (
+        <div
+          className="absolute pointer-events-none rounded-md"
+          style={{
+            left: `${targetRect.x1 * 100}%`,
+            top: `${targetRect.y1 * 100}%`,
+            width: `${(targetRect.x2 - targetRect.x1) * 100}%`,
+            height: `${(targetRect.y2 - targetRect.y1) * 100}%`,
+            zIndex: 91,
+            outline: "2px dashed color-mix(in oklab, var(--primary) 80%, transparent)",
+            background: "color-mix(in oklab, var(--primary) 12%, transparent)",
+            boxShadow: "0 0 0 9999px rgba(0,0,0,0.001)",
+          }}
+        />
+      )}
+      {/* Cancel pill */}
+      <button
+        type="button"
+        onClick={onCancel}
+        className="absolute left-1/2 -translate-x-1/2 bottom-6 z-[120] flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold bg-white text-foreground shadow-soft hover:bg-white/90"
+      >
+        <XIcon className="w-4 h-4" /> Cancelar (Esc)
+      </button>
+    </>
   );
 }
