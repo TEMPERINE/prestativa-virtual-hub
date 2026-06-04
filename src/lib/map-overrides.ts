@@ -10,6 +10,8 @@ const STORAGE_KEY = "office-map-overrides:v1";
 export type ZoneKind = "workspace" | "common";
 export type CustomZone = { id: string; label: string; color: string; kind?: ZoneKind };
 
+export type SpawnPoint = { x: number; y: number };
+
 export type MapOverrides = {
   cols: number;
   rows: number;
@@ -18,6 +20,8 @@ export type MapOverrides = {
   customZones?: CustomZone[];
   // Per-zone kind override (workspace=claimable, common=shared).
   zoneKinds?: Record<string, ZoneKind>;
+  // Per-zone spawn / teleport landing point (normalized 0..1).
+  spawnPoints?: Record<string, SpawnPoint>;
 };
 
 function emptyOverrides(): MapOverrides {
@@ -29,6 +33,7 @@ function emptyOverrides(): MapOverrides {
     zones: new Array(size).fill(null),
     customZones: [],
     zoneKinds: {},
+    spawnPoints: {},
   };
 }
 
