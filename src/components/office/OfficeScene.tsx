@@ -1793,38 +1793,41 @@ function OccupantCard({
   const initials = (profile?.display_name ?? "?").charAt(0).toUpperCase();
   return (
     <div
-      className="rounded-xl shadow-soft px-4 pt-3 pb-2.5 text-white flex flex-col items-center gap-2 min-w-[200px]"
+      className="rounded-lg shadow-soft px-2.5 py-2 text-white flex flex-col items-center gap-1.5 min-w-[150px]"
       style={{
-        background: "rgba(20, 22, 38, 0.95)",
+        background: "rgba(20, 22, 38, 0.96)",
         border: "1px solid rgba(255,255,255,0.08)",
         backdropFilter: "blur(8px)",
       }}
     >
-      <div
-        className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-semibold text-white shadow-soft"
-        style={{ background: profile?.avatar_color ?? "var(--primary)" }}
-      >
-        {initials}
-      </div>
-      <div className="text-center leading-tight">
-        <div className="text-sm font-semibold flex items-center justify-center gap-1.5">
-          {profile?.display_name ?? "Reservado"}
-          {isMe && <span className="text-[10px] opacity-60">(você)</span>}
-          <span
-            className={`inline-block w-1.5 h-1.5 rounded-full ${online ? "bg-emerald-400" : "bg-zinc-400"}`}
-          />
+      <div className="flex items-center gap-2 w-full">
+        <div
+          className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-semibold text-white shrink-0"
+          style={{ background: profile?.avatar_color ?? "var(--primary)" }}
+        >
+          {initials}
         </div>
-        <div className="text-[10px] opacity-70">{online ? "Online" : "Offline"}</div>
+        <div className="leading-tight min-w-0 flex-1">
+          <div className="text-xs font-semibold flex items-center gap-1 truncate">
+            <span className="truncate">{profile?.display_name ?? "Reservado"}</span>
+            <span
+              className={`inline-block w-1.5 h-1.5 rounded-full shrink-0 ${online ? "bg-emerald-400" : "bg-zinc-400"}`}
+            />
+          </div>
+          <div className="text-[9px] opacity-70">
+            {isMe ? "você" : online ? "Online" : "Offline"}
+          </div>
+        </div>
       </div>
-      <div className="flex items-center gap-1.5 mt-1">
+      <div className="flex items-center gap-1">
         <CardIconBtn title="Perfil (em breve)" disabled>
-          <UserIcon className="w-3.5 h-3.5" />
+          <UserIcon className="w-3 h-3" />
         </CardIconBtn>
         <CardIconBtn title="Cumprimentar (em breve)" disabled>
-          <Hand className="w-3.5 h-3.5" />
+          <Hand className="w-3 h-3" />
         </CardIconBtn>
         <CardIconBtn title="Chat (em breve)" disabled>
-          <MessageCircle className="w-3.5 h-3.5" />
+          <MessageCircle className="w-3 h-3" />
         </CardIconBtn>
         {!isMe && (
           <CardIconBtn
@@ -1833,7 +1836,7 @@ function OccupantCard({
             disabled={!onLeaveNote}
             active
           >
-            <StickyNote className="w-3.5 h-3.5" />
+            <StickyNote className="w-3 h-3" />
           </CardIconBtn>
         )}
       </div>
@@ -1841,9 +1844,9 @@ function OccupantCard({
         <button
           type="button"
           onClick={onLeaveDesk}
-          className="mt-1 w-full rounded-md px-3 py-1.5 text-xs font-semibold bg-white/10 hover:bg-destructive/80 text-white transition flex items-center justify-center gap-1.5"
+          className="w-full rounded-md px-2 py-1 text-[10px] font-semibold bg-white/10 hover:bg-destructive/80 text-white transition flex items-center justify-center gap-1"
         >
-          <LogOut className="w-3 h-3" />
+          <LogOut className="w-2.5 h-2.5" />
           Deixar mesa
         </button>
       )}
