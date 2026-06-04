@@ -10,11 +10,12 @@ import {
   clearOverrides,
   type MapOverrides,
   type CustomZone,
+  type ZoneKind,
 } from "@/lib/map-overrides";
 import { ZONES, COLLIDERS, FLOOR_POLY, type ZoneId } from "@/lib/office-map";
 import officeMap from "@/assets/office-map.jpg";
 import { toast } from "sonner";
-import { ArrowLeft, Eraser, Square, Download, Trash2, Eye, EyeOff, Undo, Plus, X } from "lucide-react";
+import { ArrowLeft, Eraser, Square, Download, Trash2, Eye, EyeOff, Undo, Plus, X, Briefcase, Users } from "lucide-react";
 
 type Tool =
   | { kind: "blocked" }
