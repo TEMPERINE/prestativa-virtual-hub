@@ -27,18 +27,18 @@ const AVATAR_SPRITES: Record<Facing, string> = {
 };
 // Each sheet: 1536px wide, 6 frames of 256px wide. Heights vary per direction.
 const SHEET_HEIGHT: Record<Facing, number> = {
-  down: 241,
-  up: 233,
-  left: 230,
-  right: 233,
+  down: 245,
+  up: 235,
+  left: 235,
+  right: 235,
 };
 const FRAME_WIDTHS: Record<Facing, number> = {
-  down: 145,
-  up: 132,
-  left: 135,
-  right: 134,
+  down: 151,
+  up: 136,
+  left: 142,
+  right: 139,
 };
-const FRAME_W = 145; // legacy fallback aspect (down)
+const FRAME_W = 151; // legacy fallback aspect (down)
 const FRAMES = 6; // frame 0 = idle, frames 1..5 = walk cycle
 const WALK_FRAME_MS = 110;
 
