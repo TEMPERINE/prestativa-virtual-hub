@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { supabase } from "@/integrations/supabase/client";
 import {
   ZONES,
@@ -811,80 +812,10 @@ export function OfficeScene() {
     <div
       ref={sceneRef}
       tabIndex={0}
-      className="relative w-screen h-screen overflow-hidden bg-black outline-none flex flex-col"
+      className="relative w-screen h-screen overflow-hidden bg-black outline-none flex items-stretch"
       onMouseDown={() => sceneRef.current?.focus()}
     >
-      {/* Topbar (fixed strip above the map — no overlay) */}
-      <div className="relative z-[100] p-3 shrink-0">
-        <div className="glass-panel rounded-2xl shadow-soft px-4 py-2 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl gradient-primary flex items-center justify-center shadow-glow">
-              <span className="text-sm font-bold text-primary-foreground">P</span>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2">
-            {rtc.connectedPeers.length > 0 && (
-              <div className="text-xs text-muted-foreground px-2 hidden sm:block">
-                Em chamada com {rtc.connectedPeers.length}
-              </div>
-            )}
-            <IconButton
-              active={rtc.micOn}
-              onClick={() => {
-                rtc.toggleMic().catch(() => toast.error("Não foi possível acessar o microfone"));
-              }}
-              title="Microfone"
-            >
-              {rtc.micOn ? <Mic className="w-4 h-4" /> : <MicOff className="w-4 h-4" />}
-            </IconButton>
-            <IconButton
-              active={rtc.camOn}
-              onClick={() => {
-                rtc.toggleCam().catch(() => toast.error("Não foi possível acessar a câmera"));
-              }}
-              title="Câmera"
-            >
-              {rtc.camOn ? <Video className="w-4 h-4" /> : <VideoOff className="w-4 h-4" />}
-            </IconButton>
-            <CamPreviewAndPicker
-              stream={rtc.localVideoStream}
-              devices={rtc.videoDevices}
-              selectedId={rtc.selectedVideoDeviceId}
-              onSelect={(id) => rtc.setVideoDevice(id).catch(() => toast.error("Falha ao trocar câmera"))}
-              visible={rtc.camOn}
-            />
-            {currentZone.id !== "lobby" && (
-              <IconButton
-                active={rtc.screenOn}
-                onClick={() => {
-                  rtc.toggleScreen().catch(() => toast.error("Não foi possível compartilhar a tela"));
-                }}
-                title={rtc.screenOn ? "Parar compartilhamento" : "Compartilhar tela (janela, aba ou tela inteira)"}
-              >
-                <MonitorUp className="w-4 h-4" />
-              </IconButton>
-            )}
-            <IconButton active={showTeam} onClick={() => setShowTeam(!showTeam)} title="Equipe">
-              <Users className="w-4 h-4" />
-            </IconButton>
-            <Link
-              to="/office/editor"
-              title="Editor de mapa"
-              className="inline-flex items-center justify-center w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 text-white"
-            >
-              <Pencil className="w-4 h-4" />
-            </Link>
-            <IconButton onClick={signOut} title="Sair">
-              <LogOut className="w-4 h-4" />
-            </IconButton>
-          </div>
-        </div>
-      </div>
-
-      {/* Map row (park + office stage) */}
-      <div className="relative flex-1 flex items-stretch min-h-0 overflow-hidden">
-
+      {/* Extended scenery — park on the left */}
       <div
         className="flex-1 h-full"
         style={{
@@ -901,6 +832,9 @@ export function OfficeScene() {
         ref={stageRef}
         className="relative h-full shrink-0 overflow-hidden select-none"
         style={{ aspectRatio: "1536 / 1024" }}
+
+
+
         onWheel={(e) => {
           e.preventDefault();
           const stage = stageRef.current;
@@ -1004,73 +938,51 @@ export function OfficeScene() {
           if (!ownerId && iHaveAClaim) return null;
           const showCompose = !!ownerId && !isMyClaim;
           return (
-            <div
+            <WorkspaceZoneHover
               key={`ws-${wz.id}`}
-              className="absolute"
-              style={{
-                left: `${wz.rect.x1 * 100}%`,
-                top: `${wz.rect.y1 * 100}%`,
-                width: `${(wz.rect.x2 - wz.rect.x1) * 100}%`,
-                height: `${(wz.rect.y2 - wz.rect.y1) * 100}%`,
-                zIndex: isHovered ? 55 : 15,
-              }}
-              onMouseEnter={() => setHoveredZone(wz.id)}
-              onMouseLeave={() => setHoveredZone((cur) => (cur === wz.id ? null : cur))}
+              rect={wz.rect}
+              isHovered={isHovered}
+              onEnter={() => setHoveredZone(wz.id)}
+              onLeave={() => setHoveredZone((cur) => (cur === wz.id ? null : cur))}
             >
-              {/* Hover outline only — no fill */}
-              <div
-                className="absolute inset-0 rounded-md transition-all duration-150 pointer-events-none"
-                style={{
-                  outline: isHovered
-                    ? `1.5px dashed color-mix(in oklab, var(--destructive) 80%, transparent)`
-                    : "none",
-                  outlineOffset: "-1px",
-                }}
-              />
-              {isHovered && (
-                <div
-                  className="absolute left-1/2 -translate-x-1/2 pointer-events-auto"
-                  style={{ zIndex: 9999, bottom: "100%", marginBottom: 8 }}
+              {ownerId ? (
+                <OccupantCard
+                  profile={owner}
+                  online={ownerOnline}
+                  isMe={isMyClaim}
+                  onLeaveNote={
+                    showCompose
+                      ? () => {
+                          setComposeFor({
+                            zoneId: wz.id,
+                            recipientId: ownerId,
+                            recipientName: owner?.display_name ?? "colega",
+                          });
+                          setComposeText("");
+                          setHoveredZone(null);
+                        }
+                      : undefined
+                  }
+                  onLeaveDesk={
+                    isMyClaim
+                      ? () => {
+                          releaseClaim();
+                          setHoveredZone(null);
+                        }
+                      : undefined
+                  }
+                />
+              ) : (
+                <button
+                  onClick={() => claimZone(wz.id)}
+                  className="rounded-full px-3 py-1.5 text-xs font-semibold bg-primary text-primary-foreground shadow-soft hover:opacity-90 whitespace-nowrap"
                 >
-                  {ownerId ? (
-                    <OccupantCard
-                      profile={owner}
-                      online={ownerOnline}
-                      isMe={isMyClaim}
-                      onLeaveNote={
-                        showCompose
-                          ? () => {
-                              setComposeFor({
-                                zoneId: wz.id,
-                                recipientId: ownerId,
-                                recipientName: owner?.display_name ?? "colega",
-                              });
-                              setComposeText("");
-                              setHoveredZone(null);
-                            }
-                          : undefined
-                      }
-                      onLeaveDesk={
-                        isMyClaim
-                          ? () => {
-                              releaseClaim();
-                              setHoveredZone(null);
-                            }
-                          : undefined
-                      }
-                    />
-                  ) : (
-                    <button
-                      onClick={() => claimZone(wz.id)}
-                      className="rounded-full px-3 py-1.5 text-xs font-semibold bg-primary text-primary-foreground shadow-soft hover:opacity-90 whitespace-nowrap"
-                    >
-                      Reivindicar espaço
-                    </button>
-                  )}
-                </div>
+                  Reivindicar espaço
+                </button>
               )}
-            </div>
+            </WorkspaceZoneHover>
           );
+
         })}
 
         {/* Avatars */}
@@ -1284,7 +1196,7 @@ export function OfficeScene() {
           </button>
         </div>
       </div>
-      </div>{/* /Map row */}
+      
 
 
 
@@ -1412,7 +1324,73 @@ export function OfficeScene() {
       />
 
 
-      {/* Topbar moved to top of component */}
+      {/* Topbar */}
+      <div className="absolute top-0 left-0 right-0 p-4 pointer-events-none z-[100]">
+        <div className="glass-panel rounded-2xl shadow-soft px-4 py-2.5 flex items-center justify-between pointer-events-auto">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl gradient-primary flex items-center justify-center shadow-glow">
+              <span className="text-sm font-bold text-primary-foreground">P</span>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            {rtc.connectedPeers.length > 0 && (
+              <div className="text-xs text-muted-foreground px-2 hidden sm:block">
+                Em chamada com {rtc.connectedPeers.length}
+              </div>
+            )}
+            <IconButton
+              active={rtc.micOn}
+              onClick={() => {
+                rtc.toggleMic().catch(() => toast.error("Não foi possível acessar o microfone"));
+              }}
+              title="Microfone"
+            >
+              {rtc.micOn ? <Mic className="w-4 h-4" /> : <MicOff className="w-4 h-4" />}
+            </IconButton>
+            <IconButton
+              active={rtc.camOn}
+              onClick={() => {
+                rtc.toggleCam().catch(() => toast.error("Não foi possível acessar a câmera"));
+              }}
+              title="Câmera"
+            >
+              {rtc.camOn ? <Video className="w-4 h-4" /> : <VideoOff className="w-4 h-4" />}
+            </IconButton>
+            <CamPreviewAndPicker
+              stream={rtc.localVideoStream}
+              devices={rtc.videoDevices}
+              selectedId={rtc.selectedVideoDeviceId}
+              onSelect={(id) => rtc.setVideoDevice(id).catch(() => toast.error("Falha ao trocar câmera"))}
+              visible={rtc.camOn}
+            />
+            {currentZone.id !== "lobby" && (
+              <IconButton
+                active={rtc.screenOn}
+                onClick={() => {
+                  rtc.toggleScreen().catch(() => toast.error("Não foi possível compartilhar a tela"));
+                }}
+                title={rtc.screenOn ? "Parar compartilhamento" : "Compartilhar tela (janela, aba ou tela inteira)"}
+              >
+                <MonitorUp className="w-4 h-4" />
+              </IconButton>
+            )}
+            <IconButton active={showTeam} onClick={() => setShowTeam(!showTeam)} title="Equipe">
+              <Users className="w-4 h-4" />
+            </IconButton>
+            <Link
+              to="/office/editor"
+              title="Editor de mapa"
+              className="inline-flex items-center justify-center w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 text-white"
+            >
+              <Pencil className="w-4 h-4" />
+            </Link>
+            <IconButton onClick={signOut} title="Sair">
+              <LogOut className="w-4 h-4" />
+            </IconButton>
+          </div>
+        </div>
+      </div>
 
 
       {/* Zone enter-toast (Gather style) */}
@@ -1444,7 +1422,7 @@ export function OfficeScene() {
 
       {/* Team panel */}
       {showTeam && (
-        <div className="absolute right-4 top-4 bottom-4 w-72 pointer-events-auto z-[80]">
+        <div className="absolute right-4 top-24 bottom-4 w-72 pointer-events-auto z-[80]">
           <div className="glass-panel rounded-2xl shadow-soft h-full flex flex-col overflow-hidden">
             <div className="px-4 py-3 border-b">
               <div className="text-sm font-semibold">Equipe</div>
@@ -1490,7 +1468,90 @@ export function OfficeScene() {
 }
 
 /** Magic teleport effect — pink sparkles + halo at the given normalized point. */
+/**
+ * Hover wrapper for a workspace zone. The zone outline stays inside the
+ * scaled stage, but the popup card is rendered via portal at fixed
+ * screen coordinates so it escapes the stage's overflow/stacking context.
+ */
+function WorkspaceZoneHover({
+  rect,
+  isHovered,
+  onEnter,
+  onLeave,
+  children,
+}: {
+  rect: { x1: number; y1: number; x2: number; y2: number };
+  isHovered: boolean;
+  onEnter: () => void;
+  onLeave: () => void;
+  children: React.ReactNode;
+}) {
+  const anchorRef = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState<{ left: number; top: number } | null>(null);
+
+  useEffect(() => {
+    if (!isHovered) {
+      setPos(null);
+      return;
+    }
+    let raf = 0;
+    const tick = () => {
+      const el = anchorRef.current;
+      if (el) {
+        const r = el.getBoundingClientRect();
+        setPos({ left: r.left + r.width / 2, top: r.top });
+      }
+      raf = window.requestAnimationFrame(tick);
+    };
+    tick();
+    return () => window.cancelAnimationFrame(raf);
+  }, [isHovered]);
+
+  return (
+    <div
+      ref={anchorRef}
+      className="absolute"
+      style={{
+        left: `${rect.x1 * 100}%`,
+        top: `${rect.y1 * 100}%`,
+        width: `${(rect.x2 - rect.x1) * 100}%`,
+        height: `${(rect.y2 - rect.y1) * 100}%`,
+        zIndex: isHovered ? 55 : 15,
+      }}
+      onMouseEnter={onEnter}
+      onMouseLeave={onLeave}
+    >
+      <div
+        className="absolute inset-0 rounded-md transition-all duration-150 pointer-events-none"
+        style={{
+          outline: isHovered
+            ? `1.5px dashed color-mix(in oklab, var(--destructive) 80%, transparent)`
+            : "none",
+          outlineOffset: "-1px",
+        }}
+      />
+      {isHovered && pos && typeof document !== "undefined" &&
+        createPortal(
+          <div
+            style={{
+              position: "fixed",
+              left: pos.left,
+              top: pos.top - 8,
+              transform: "translate(-50%, -100%)",
+              zIndex: 2147483647,
+              pointerEvents: "auto",
+            }}
+          >
+            {children}
+          </div>,
+          document.body,
+        )}
+    </div>
+  );
+}
+
 function TeleportFx({ point, phase }: { point: Point; phase: "out" | "in" }) {
+
   const particles = useMemo(() => {
     return Array.from({ length: 18 }).map((_, i) => {
       const angle = (i / 18) * Math.PI * 2 + Math.random() * 0.4;
