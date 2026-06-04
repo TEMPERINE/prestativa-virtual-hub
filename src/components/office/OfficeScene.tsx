@@ -190,60 +190,76 @@ export function OfficeScene() {
     };
   }, []);
 
-  // keyboard input
+  // keyboard input — standard 2D game movement (hold to walk, release to idle)
   useEffect(() => {
-    const MOVE_KEYS = new Set(["arrowup", "arrowdown", "arrowleft", "arrowright", "w", "a", "s", "d"]);
     const down = (e: KeyboardEvent) => {
-      if (MOVE_KEYS.has(e.key.toLowerCase())) {
-        e.preventDefault();
-        handleMoveKey(e.key, true, true);
-      }
+      const dir = dirFromKey(e.key.toLowerCase());
+      if (!dir) return;
+      e.preventDefault();
+      if (e.repeat) return;
+      keysDown.current.add(dir);
+      lastDir.current = dir;
+      setLocalFacing(dir);
     };
     const up = (e: KeyboardEvent) => {
-      if (MOVE_KEYS.has(e.key.toLowerCase())) {
-        e.preventDefault();
-        handleMoveKey(e.key, false);
+      const dir = dirFromKey(e.key.toLowerCase());
+      if (!dir) return;
+      e.preventDefault();
+      keysDown.current.delete(dir);
+      if (lastDir.current === dir) {
+        // Fall back to any other key still held
+        const remaining = Array.from(keysDown.current);
+        lastDir.current = remaining[remaining.length - 1] ?? null;
+        if (lastDir.current) setLocalFacing(lastDir.current);
       }
+    };
+    const blur = () => {
+      keysDown.current.clear();
+      lastDir.current = null;
     };
     window.addEventListener("keydown", down, { passive: false });
     window.addEventListener("keyup", up, { passive: false });
+    window.addEventListener("blur", blur);
     return () => {
       window.removeEventListener("keydown", down);
       window.removeEventListener("keyup", up);
+      window.removeEventListener("blur", blur);
     };
-  }, [handleMoveKey]);
+  }, [setLocalFacing]);
 
-  // movement loop
+  // movement + animation loop
   useEffect(() => {
     let raf = 0;
-    const tick = () => {
-      let dx = 0;
-      let dy = 0;
-      if (activeMoveDirection.current === "up") dy = -1;
-      else if (activeMoveDirection.current === "down") dy = 1;
-      else if (activeMoveDirection.current === "left") dx = -1;
-      else if (activeMoveDirection.current === "right") dx = 1;
-
-      if (dx || dy) {
-        moveAvatar(dx, dy);
-      } else if (walkTarget.current) {
-        const target = walkTarget.current;
-        const cur = posRef.current;
-        const tx = target.x - cur.x;
-        const ty = target.y - cur.y;
-        if (Math.hypot(tx, ty) < SPEED * 1.5) {
-          walkTarget.current = null;
-        } else {
-          // Click-to-walk also goes one axis at a time (dominant first).
-          if (Math.abs(tx) >= Math.abs(ty)) moveAvatar(tx, 0, SPEED * 1.5);
-          else moveAvatar(0, ty, SPEED * 1.5);
+    const tick = (t: number) => {
+      const dir = lastDir.current;
+      if (dir) {
+        const moved = tryMove(dir);
+        if (moved) {
+          if (t - lastFrameTick.current > WALK_FRAME_MS) {
+            lastFrameTick.current = t;
+            // cycle frames 1..5
+            const next = frameRef.current >= 5 || frameRef.current < 1 ? 1 : frameRef.current + 1;
+            frameRef.current = next;
+            setFrame(next);
+          }
+        } else if (frameRef.current !== 0) {
+          frameRef.current = 0;
+          setFrame(0);
         }
+      } else if (frameRef.current !== 0) {
+        frameRef.current = 0;
+        setFrame(0);
+        // send final idle position so remotes see exact pose
+        const cur = posRef.current;
+        const z = zoneAt(cur);
+        sendPos(cur.x, cur.y, z.id, facingRef.current);
       }
       raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [moveAvatar]);
+  }, [tryMove, sendPos]);
+
 
   const currentZone = useMemo(() => ZONES.find((z) => z.id === zone) ?? ZONES[ZONES.length - 1], [zone]);
   // Prefer the painted bounding box (editor overrides) over the hardcoded rect
