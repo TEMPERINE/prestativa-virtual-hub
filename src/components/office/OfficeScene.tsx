@@ -960,7 +960,7 @@ export function OfficeScene() {
               {isHovered && (
                 <div
                   className="absolute left-1/2 -translate-x-1/2 pointer-events-auto"
-                  style={{ zIndex: 70, bottom: "100%", marginBottom: 8 }}
+                  style={{ zIndex: 9999, bottom: "100%", marginBottom: 8 }}
                 >
                   {ownerId ? (
                     <OccupantCard
