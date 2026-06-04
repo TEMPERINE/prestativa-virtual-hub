@@ -48,10 +48,13 @@ export type RtcMeshState = {
 export function useRtcMesh(myId: string | null, desiredPeers: string[]): RtcMeshState {
   const [micOn, setMicOn] = useState(false);
   const [camOn, setCamOn] = useState(false);
+  const [screenOn, setScreenOn] = useState(false);
   const [remoteStreams, setRemoteStreams] = useState<Record<string, MediaStream>>({});
+  const [remoteScreenStreams, setRemoteScreenStreams] = useState<Record<string, MediaStream>>({});
   const [connectedPeers, setConnectedPeers] = useState<string[]>([]);
   const [speakingPeers, setSpeakingPeers] = useState<Record<string, boolean>>({});
   const [localVideoStream, setLocalVideoStream] = useState<MediaStream | null>(null);
+  const [localScreenStream, setLocalScreenStream] = useState<MediaStream | null>(null);
   const [videoDevices, setVideoDevices] = useState<MediaDeviceInfo[]>([]);
   const [selectedVideoDeviceId, setSelectedVideoDeviceId] = useState<string | null>(null);
 
