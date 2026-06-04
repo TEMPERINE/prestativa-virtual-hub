@@ -797,6 +797,29 @@ export function MapEditor() {
               </div>
             )}
           </div>
+          {/* Zoom HUD */}
+          <div className="sticky bottom-2 ml-auto mr-2 w-fit flex items-center gap-1 bg-card/90 border border-border rounded-full px-2 py-1 text-xs shadow-soft backdrop-blur" style={{ float: "right" }}>
+            <button
+              type="button"
+              onClick={() => setZoom((z) => Math.max(1, z / 1.25))}
+              className="px-1.5 rounded hover:bg-muted"
+              title="Diminuir zoom"
+            >−</button>
+            <span className="tabular-nums w-10 text-center">{Math.round(zoom * 100)}%</span>
+            <button
+              type="button"
+              onClick={() => setZoom((z) => Math.min(8, z * 1.25))}
+              className="px-1.5 rounded hover:bg-muted"
+              title="Aumentar zoom"
+            >+</button>
+            <button
+              type="button"
+              onClick={() => setZoom(1)}
+              className="ml-1 px-1.5 rounded hover:bg-muted text-muted-foreground"
+              title="Resetar zoom"
+              disabled={zoom === 1}
+            >1×</button>
+          </div>
         </main>
       </div>
     </div>
