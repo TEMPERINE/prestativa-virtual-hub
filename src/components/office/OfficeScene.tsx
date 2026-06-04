@@ -594,10 +594,22 @@ export function OfficeScene() {
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
       const key = e.key.toLowerCase();
-      // Ctrl/Cmd + D — auto-walk to claimed workspace
+      // Ctrl/Cmd + D — teleport to claimed workspace
       if (key === "d" && (e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey) {
         e.preventDefault();
         teleportToMyClaim();
+        return;
+      }
+      // Ctrl + R — teleport to meeting room
+      if (key === "r" && (e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey) {
+        e.preventDefault();
+        teleportToZone("reuniao", "Sala de Reunião");
+        return;
+      }
+      // Ctrl + F — teleport to feedback room
+      if (key === "f" && (e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey) {
+        e.preventDefault();
+        teleportToZone("feedback", "Sala de Feedback");
         return;
       }
       const emoji = EMOJI_MAP[key];
