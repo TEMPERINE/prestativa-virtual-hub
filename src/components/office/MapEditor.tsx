@@ -651,6 +651,7 @@ export function MapEditor() {
             className="relative mx-auto select-none cursor-crosshair"
             style={{ aspectRatio: "1536 / 1024", width: "min(100%, calc((100vh - 110px) * 1.5))" }}
             onPointerDown={(e) => {
+              if (draggingPin.current) return;
               (e.target as Element).setPointerCapture?.(e.pointerId);
               painting.current = true;
               pushHistory({
@@ -661,10 +662,14 @@ export function MapEditor() {
               handlePointer(e);
             }}
             onPointerMove={(e) => {
+              if (draggingPin.current) {
+                moveSpawnToPointer(e, draggingPin.current);
+                return;
+              }
               if (painting.current) handlePointer(e);
             }}
-            onPointerUp={() => (painting.current = false)}
-            onPointerCancel={() => (painting.current = false)}
+            onPointerUp={() => { painting.current = false; draggingPin.current = null; }}
+            onPointerCancel={() => { painting.current = false; draggingPin.current = null; }}
           >
             {showImage && (
               <img
