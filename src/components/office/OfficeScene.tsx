@@ -808,7 +808,7 @@ export function OfficeScene() {
               onSelect={(id) => rtc.setVideoDevice(id).catch(() => toast.error("Falha ao trocar câmera"))}
               visible={rtc.camOn}
             />
-            {currentZone.supportsVideo && (
+            {currentZone.id !== "lobby" && (
               <IconButton
                 active={rtc.screenOn}
                 onClick={() => {
