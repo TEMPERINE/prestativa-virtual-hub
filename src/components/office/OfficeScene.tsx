@@ -1124,7 +1124,7 @@ export function OfficeScene() {
             title="Aproximar"
             onClick={() => {
               const s = zoomRef.current;
-              const ns = Math.min(MAX_ZOOM, s * 1.25);
+              const ns = Math.min(MAX_ZOOM, s * 1.15);
               const stage = stageRef.current;
               if (!stage || ns === s) return;
               const W = stage.clientWidth, H = stage.clientHeight;
