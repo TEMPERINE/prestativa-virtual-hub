@@ -115,6 +115,38 @@ export function OfficeScene() {
     setFacing(nextFacing);
   }, []);
 
+  // ---- WebRTC mesh: voice/video by proximity or same claimed zone ----
+  const PROXIMITY_CONNECT = 0.08;
+  const PROXIMITY_DISCONNECT = 0.12;
+  const connectedPeersRef = useRef<Set<string>>(new Set());
+  const desiredPeers = useMemo(() => {
+    const meId = me?.id;
+    if (!meId) return [] as string[];
+    const myClaimZone = Object.entries(claims).find(([, uid]) => uid === meId)?.[0];
+    const result: string[] = [];
+    for (const [uid, p] of Object.entries(positions)) {
+      if (uid === meId) continue;
+      if (!p.is_online) continue;
+      // Same claimed zone → always connect
+      const peerClaim = Object.entries(claims).find(([, u]) => u === uid)?.[0];
+      const sameZone = myClaimZone && peerClaim && peerClaim === myClaimZone;
+      // Proximity with hysteresis
+      const dx = p.x - pos.x;
+      const dy = p.y - pos.y;
+      const dist = Math.hypot(dx, dy);
+      const already = connectedPeersRef.current.has(uid);
+      const closeEnough = already ? dist <= PROXIMITY_DISCONNECT : dist <= PROXIMITY_CONNECT;
+      if (sameZone || closeEnough) result.push(uid);
+    }
+    // cap to 6 peers
+    return result.slice(0, 6);
+  }, [me?.id, positions, claims, pos.x, pos.y]);
+
+  const rtc = useRtcMesh(me?.id ?? null, desiredPeers);
+  useEffect(() => {
+    connectedPeersRef.current = new Set(desiredPeers);
+  }, [desiredPeers]);
+
   const sendPos = useCallback((x: number, y: number, z: ZoneId, f: Facing) => {
     void supabase.auth.getUser().then(({ data }) => {
       if (!data.user) return;
