@@ -79,21 +79,27 @@ export function useRtcMesh(myId: string | null, desiredPeers: string[]): RtcMesh
 
     const pc = new RTCPeerConnection(ICE_CONFIG);
     const remoteStream = new MediaStream();
+    const remoteScreenStream = new MediaStream();
 
     // Always add transceivers so we can both send/recv without renegotiation later
     const audioTx = pc.addTransceiver("audio", { direction: "sendrecv" });
     const videoTx = pc.addTransceiver("video", { direction: "sendrecv" });
+    const screenTx = pc.addTransceiver("video", { direction: "sendrecv" });
 
     // If we already have local tracks, attach now
     if (audioTrackRef.current) void audioTx.sender.replaceTrack(audioTrackRef.current);
     if (videoTrackRef.current) void videoTx.sender.replaceTrack(videoTrackRef.current);
+    if (screenTrackRef.current) void screenTx.sender.replaceTrack(screenTrackRef.current);
 
     const entry: PeerEntry = {
       pc,
       audioSender: audioTx.sender,
       videoSender: videoTx.sender,
+      screenTransceiver: screenTx,
+      screenSender: screenTx.sender,
       makingOffer: false,
       remoteStream,
+      remoteScreenStream,
     };
 
     pc.onicecandidate = (e) => {
@@ -101,14 +107,25 @@ export function useRtcMesh(myId: string | null, desiredPeers: string[]): RtcMesh
     };
 
     pc.ontrack = (e) => {
-      e.streams[0]?.getTracks().forEach((t) => {
-        if (!remoteStream.getTracks().find((rt) => rt.id === t.id)) remoteStream.addTrack(t);
-      });
-      // Also handle the case where streams[0] is empty: add the bare track
-      if (!e.streams[0]) {
-        if (!remoteStream.getTracks().find((rt) => rt.id === e.track.id)) remoteStream.addTrack(e.track);
+      const isScreen = e.transceiver === entry.screenTransceiver;
+      const target = isScreen ? remoteScreenStream : remoteStream;
+      if (!target.getTracks().find((rt) => rt.id === e.track.id)) target.addTrack(e.track);
+      if (isScreen) {
+        setRemoteScreenStreams((prev) => ({ ...prev, [peerId]: remoteScreenStream }));
+        e.track.onended = () => {
+          target.removeTrack(e.track);
+          setRemoteScreenStreams((prev) => {
+            if (target.getVideoTracks().length === 0) {
+              const next = { ...prev };
+              delete next[peerId];
+              return next;
+            }
+            return { ...prev, [peerId]: target };
+          });
+        };
+      } else {
+        setRemoteStreams((prev) => ({ ...prev, [peerId]: remoteStream }));
       }
-      setRemoteStreams((prev) => ({ ...prev, [peerId]: remoteStream }));
     };
 
     pc.onconnectionstatechange = () => {
