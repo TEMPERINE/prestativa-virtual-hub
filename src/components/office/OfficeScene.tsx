@@ -333,7 +333,7 @@ export function OfficeScene() {
 
         {/* Private-area overlay (Gather-style): darken everything outside the active zone */}
         {focusedZone && (
-          <ZoneSpotlight rect={focusedZone.rect} accent={focusedZone.accent} />
+          <ZoneSpotlight rect={focusedZone.rect} />
         )}
 
         {/* Avatars */}
@@ -548,30 +548,20 @@ function SpriteAvatar({
 
 
 
-/** Darkens everything outside the given zone rect with a soft gradient fade. */
-function ZoneSpotlight({ rect, accent }: { rect: { x1: number; y1: number; x2: number; y2: number }; accent?: string }) {
-  const fadePx = 80;
-  const solid = "rgba(5, 6, 12, 0.45)";
-  const transparent = "rgba(5, 6, 12, 0)";
+/** Darkens everything outside the given zone rect within the office stage. */
+function ZoneSpotlight({ rect }: { rect: { x1: number; y1: number; x2: number; y2: number } }) {
+  const overlay = "rgba(5, 6, 12, 0.72)";
   return (
     <>
       {/* top */}
       <div
         className="absolute left-0 right-0 top-0 pointer-events-none z-50"
-        style={{
-          height: `${rect.y1 * 100}%`,
-          background: `linear-gradient(to bottom, ${solid} 60%, ${transparent})`,
-          transition: "all 300ms ease",
-        }}
+        style={{ height: `${rect.y1 * 100}%`, background: overlay, transition: "all 200ms" }}
       />
       {/* bottom */}
       <div
         className="absolute left-0 right-0 bottom-0 pointer-events-none z-50"
-        style={{
-          height: `${(1 - rect.y2) * 100}%`,
-          background: `linear-gradient(to top, ${solid} 60%, ${transparent})`,
-          transition: "all 300ms ease",
-        }}
+        style={{ height: `${(1 - rect.y2) * 100}%`, background: overlay, transition: "all 200ms" }}
       />
       {/* left */}
       <div
@@ -580,8 +570,8 @@ function ZoneSpotlight({ rect, accent }: { rect: { x1: number; y1: number; x2: n
           top: `${rect.y1 * 100}%`,
           bottom: `${(1 - rect.y2) * 100}%`,
           width: `${rect.x1 * 100}%`,
-          background: `linear-gradient(to right, ${solid} 60%, ${transparent})`,
-          transition: "all 300ms ease",
+          background: overlay,
+          transition: "all 200ms",
         }}
       />
       {/* right */}
@@ -591,21 +581,8 @@ function ZoneSpotlight({ rect, accent }: { rect: { x1: number; y1: number; x2: n
           top: `${rect.y1 * 100}%`,
           bottom: `${(1 - rect.y2) * 100}%`,
           width: `${(1 - rect.x2) * 100}%`,
-          background: `linear-gradient(to left, ${solid} 60%, ${transparent})`,
-          transition: "all 300ms ease",
-        }}
-      />
-      {/* Soft glow border around the active zone */}
-      <div
-        className="absolute pointer-events-none z-[55]"
-        style={{
-          left: `${rect.x1 * 100}%`,
-          top: `${rect.y1 * 100}%`,
-          width: `${(rect.x2 - rect.x1) * 100}%`,
-          height: `${(rect.y2 - rect.y1) * 100}%`,
-          boxShadow: `inset 0 0 ${fadePx}px ${fadePx / 2.5}px rgba(5,6,12,0.35), 0 0 ${fadePx / 2}px ${fadePx / 4}px ${accent ? `${accent}33` : "rgba(255,255,255,0.08)"}`,
-          borderRadius: 12,
-          transition: "all 300ms ease",
+          background: overlay,
+          transition: "all 200ms",
         }}
       />
     </>
