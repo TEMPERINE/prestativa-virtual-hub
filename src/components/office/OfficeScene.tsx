@@ -1217,10 +1217,11 @@ export function OfficeScene() {
             type="button"
             title={followMe ? "Câmera seguindo você" : "Centralizar em mim"}
             onClick={() => {
-              setFollowMe(true);
+              setFollowMe(false);
               const targetZoom = Math.max(zoomRef.current, 2.0);
-              setZoom(targetZoom);
-              centerOn(posRef.current.x, posRef.current.y, targetZoom);
+              tweenCenterOn(posRef.current.x, posRef.current.y, targetZoom, 700, () => {
+                setFollowMe(true);
+              });
             }}
             className={`w-9 h-9 rounded-full flex items-center justify-center shadow-soft backdrop-blur-sm ${
               followMe ? "bg-primary text-primary-foreground" : "bg-black/60 hover:bg-black/80 text-white"
