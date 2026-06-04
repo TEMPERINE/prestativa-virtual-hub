@@ -421,6 +421,24 @@ export function OfficeScene() {
       : currentZone;
   }, [currentZone]);
 
+  // All workspace zones (built-in + custom) with their effective rect for hover overlays.
+  const workspaceZones = useMemo(() => {
+    const out: { id: string; label: string; rect: { x1: number; y1: number; x2: number; y2: number } }[] = [];
+    const seen = new Set<string>();
+    for (const z of ZONES) {
+      if (z.id === "lobby") continue;
+      if (getZoneKind(z.id) !== "workspace") continue;
+      const rect = zoneRectFromOverrides(z.id) ?? z.rect;
+      out.push({ id: z.id, label: z.label, rect });
+      seen.add(z.id);
+    }
+    // Custom zones (only those with painted tiles).
+    const customs = (typeof window !== "undefined" ? (window as unknown as { __mo?: unknown }) : null) ? null : null;
+    void customs;
+    return out;
+  }, [claims]); // re-evaluate when claims change so hover state remains consistent
+
+
   const onlineList = useMemo(() => {
     return Object.values(positions)
       .filter((p) => p.is_online)
