@@ -82,6 +82,22 @@ function seatPointForRect(rect: { x1: number; y1: number; x2: number; y2: number
   return { x, y: (rect.y1 + rect.y2) / 2 };
 }
 
+// Pick a random walkable spot in the corridor/lobby (no claimed zone).
+// Used when the user has no workstation assigned so they don't all stack on SPAWN.
+function randomCorridorPoint(): Point {
+  for (let i = 0; i < 80; i++) {
+    const x = 0.18 + Math.random() * 0.72;
+    const y = 0.18 + Math.random() * 0.72;
+    const p = { x, y };
+    if (collides(p)) continue;
+    // Must be in the lobby (corridor) — not inside any built-in zone rect.
+    const z = zoneAt(p);
+    if (z.id !== "lobby") continue;
+    return p;
+  }
+  return SPAWN;
+}
+
 export function OfficeScene() {
   const sceneRef = useRef<HTMLDivElement | null>(null);
   const stageRef = useRef<HTMLDivElement | null>(null);
