@@ -78,6 +78,8 @@ const ZONE_COLORS: Record<string, string> = {
 
 export function MapEditor() {
   const stageRef = useRef<HTMLDivElement | null>(null);
+  const mainRef = useRef<HTMLElement | null>(null);
+  const [zoom, setZoom] = useState(1);
   const [overrides, setOverrides] = useState<MapOverrides>(() => {
     return loadOverrides() ?? seedFromDefaults();
   });
@@ -90,6 +92,35 @@ export function MapEditor() {
   const painting = useRef(false);
   const historyRef = useRef<MapOverrides[]>([]);
   const [canUndo, setCanUndo] = useState(false);
+
+  // Mouse-wheel zoom (anchored to cursor) for precise painting.
+  useEffect(() => {
+    const main = mainRef.current;
+    if (!main) return;
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const stage = stageRef.current;
+      if (!stage) return;
+      const rect = stage.getBoundingClientRect();
+      // Position of cursor within the (already scaled) stage, in stage-local px.
+      const sx = e.clientX - rect.left;
+      const sy = e.clientY - rect.top;
+      const factor = e.deltaY < 0 ? 1.15 : 1 / 1.15;
+      setZoom((z) => {
+        const next = Math.max(1, Math.min(8, z * factor));
+        const ratio = next / z;
+        // Adjust scroll so the point under the cursor stays put.
+        requestAnimationFrame(() => {
+          main.scrollLeft += sx * (ratio - 1);
+          main.scrollTop += sy * (ratio - 1);
+        });
+        return next;
+      });
+    };
+    main.addEventListener("wheel", onWheel, { passive: false });
+    return () => main.removeEventListener("wheel", onWheel);
+  }, []);
+
 
   const customZones = overrides.customZones ?? [];
 
@@ -645,11 +676,19 @@ export function MapEditor() {
         </aside>
 
         {/* Stage */}
-        <main className="flex-1 overflow-auto bg-neutral-900 p-4">
+        <main
+          ref={mainRef}
+          className="flex-1 overflow-auto bg-neutral-900 p-4 relative"
+          style={{ overscrollBehavior: "contain" }}
+        >
           <div
             ref={stageRef}
             className="relative mx-auto select-none cursor-crosshair"
-            style={{ aspectRatio: "1536 / 1024", width: "min(100%, calc((100vh - 110px) * 1.5))" }}
+            style={{
+              aspectRatio: "1536 / 1024",
+              width: `calc(${zoom} * min(100%, calc((100vh - 110px) * 1.5)))`,
+            }}
+
             onPointerDown={(e) => {
               if (draggingPin.current) return;
               (e.target as Element).setPointerCapture?.(e.pointerId);
@@ -757,6 +796,29 @@ export function MapEditor() {
                 Clique no mapa para fixar o ponto · arraste o pino para ajustes finos
               </div>
             )}
+          </div>
+          {/* Zoom HUD */}
+          <div className="sticky bottom-2 ml-auto mr-2 w-fit flex items-center gap-1 bg-card/90 border border-border rounded-full px-2 py-1 text-xs shadow-soft backdrop-blur" style={{ float: "right" }}>
+            <button
+              type="button"
+              onClick={() => setZoom((z) => Math.max(1, z / 1.25))}
+              className="px-1.5 rounded hover:bg-muted"
+              title="Diminuir zoom"
+            >−</button>
+            <span className="tabular-nums w-10 text-center">{Math.round(zoom * 100)}%</span>
+            <button
+              type="button"
+              onClick={() => setZoom((z) => Math.min(8, z * 1.25))}
+              className="px-1.5 rounded hover:bg-muted"
+              title="Aumentar zoom"
+            >+</button>
+            <button
+              type="button"
+              onClick={() => setZoom(1)}
+              className="ml-1 px-1.5 rounded hover:bg-muted text-muted-foreground"
+              title="Resetar zoom"
+              disabled={zoom === 1}
+            >1×</button>
           </div>
         </main>
       </div>
