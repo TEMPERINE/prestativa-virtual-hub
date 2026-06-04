@@ -149,6 +149,12 @@ export function OfficeScene() {
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 }); // pixel offset of scaled content in stage
   const [followMe, setFollowMe] = useState(true);
+
+  // Auto-hide the welcome hint after 5s.
+  useEffect(() => {
+    const t = window.setTimeout(() => setShowHint(false), 5000);
+    return () => window.clearTimeout(t);
+  }, []);
   const zoomRef = useRef(1);
   const panRef = useRef({ x: 0, y: 0 });
   const followRef = useRef(true);
