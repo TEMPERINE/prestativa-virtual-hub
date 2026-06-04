@@ -622,7 +622,7 @@ export function OfficeScene() {
       />
 
       {/* Topbar */}
-      <div className="absolute top-0 left-0 right-0 p-4 pointer-events-none">
+      <div className="absolute top-0 left-0 right-0 p-4 pointer-events-none z-[100]">
         <div className="glass-panel rounded-2xl shadow-soft px-4 py-2.5 flex items-center justify-between pointer-events-auto">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl gradient-primary flex items-center justify-center shadow-glow">
@@ -684,7 +684,7 @@ export function OfficeScene() {
 
       {/* Zone enter-toast (Gather style) */}
       {focusedZone && (
-        <div className="absolute bottom-20 left-1/2 -translate-x-1/2 pointer-events-none z-[70]">
+        <div className="absolute bottom-20 left-1/2 -translate-x-1/2 pointer-events-none z-[100]">
           <div
             className="px-4 py-2 rounded-full text-sm font-medium shadow-soft backdrop-blur-sm"
             style={{
@@ -732,7 +732,7 @@ export function OfficeScene() {
       )}
 
       {/* Movement hint */}
-      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 pointer-events-none z-[70]">
+      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 pointer-events-none z-[100]">
         <div className="glass-panel rounded-full px-4 py-2 shadow-soft text-xs text-muted-foreground">
           Use <kbd className="px-1.5 py-0.5 bg-muted rounded text-[10px] font-mono">WASD</kbd> ou{" "}
           <kbd className="px-1.5 py-0.5 bg-muted rounded text-[10px] font-mono">setas</kbd> para se mover
