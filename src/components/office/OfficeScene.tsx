@@ -55,11 +55,37 @@ export function OfficeScene() {
   const [facing, setFacing] = useState<Facing>("down");
   const facingRef = useRef<Facing>("down");
 
-  const keys = useRef<Record<string, boolean>>({});
+  const activeMoveDirection = useRef<Facing | null>(null);
   const lastSent = useRef(0);
   const walkTarget = useRef<Point | null>(null);
   const posRef = useRef(pos);
   posRef.current = pos;
+
+  const setLocalFacing = useCallback((nextFacing: Facing) => {
+    if (facingRef.current === nextFacing) return;
+    facingRef.current = nextFacing;
+    setFacing(nextFacing);
+  }, []);
+
+  const turnAvatar = useCallback(
+    (nextFacing: Facing) => {
+      setLocalFacing(nextFacing);
+      const current = posRef.current;
+      const z = zoneAt(current);
+      void supabase.auth.getUser().then(({ data }) => {
+        if (!data.user) return;
+        void supabase.from("positions").upsert({
+          user_id: data.user.id,
+          x: current.x,
+          y: current.y,
+          zone: z.id,
+          facing: nextFacing,
+          is_online: true,
+        });
+      });
+    },
+    [setLocalFacing]
+  );
 
   const moveAvatar = useCallback((rawDx: number, rawDy: number, speed = SPEED) => {
     if (!rawDx && !rawDy) return;
@@ -84,10 +110,7 @@ export function OfficeScene() {
 
     const newFacing: Facing =
       Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? "right" : "left") : dy > 0 ? "down" : "up";
-    if (facingRef.current !== newFacing) {
-      facingRef.current = newFacing;
-      setFacing(newFacing);
-    }
+    setLocalFacing(newFacing);
 
     const now = performance.now();
     if (now - lastSent.current > SEND_INTERVAL_MS) {
@@ -104,22 +127,26 @@ export function OfficeScene() {
         });
       });
     }
-  }, []);
+  }, [setLocalFacing]);
 
   const handleMoveKey = useCallback(
     (key: string, pressed: boolean, step = false) => {
       const k = key.toLowerCase();
       const dir = dirFromKey(k);
       if (!dir) return false;
-      keys.current[k] = pressed;
-      if (pressed) {
-        walkTarget.current = null;
-        // Always update facing immediately when a direction key is pressed.
-        if (facingRef.current !== dir) {
-          facingRef.current = dir;
-          setFacing(dir);
-        }
+      if (!pressed) {
+        if (activeMoveDirection.current === dir) activeMoveDirection.current = null;
+        return true;
       }
+
+      walkTarget.current = null;
+      if (facingRef.current !== dir) {
+        activeMoveDirection.current = null;
+        turnAvatar(dir);
+        return true;
+      }
+
+      activeMoveDirection.current = dir;
       if (pressed && step) {
         if (dir === "up") moveAvatar(0, -1, SPEED * 6);
         else if (dir === "down") moveAvatar(0, 1, SPEED * 6);
@@ -128,7 +155,7 @@ export function OfficeScene() {
       }
       return true;
     },
-    [moveAvatar]
+    [moveAvatar, turnAvatar]
   );
 
   const walkToPoint = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
