@@ -63,6 +63,21 @@ type RemotePos = { user_id: string; x: number; y: number; zone: string; is_onlin
 const SPEED = 0.0042;
 const SEND_INTERVAL_MS = 120;
 
+// "Seat" point of a zone rect — bottom-center, in front of the desk.
+// If that point collides with furniture, walk it upward until it's walkable.
+function seatPointForRect(rect: { x1: number; y1: number; x2: number; y2: number }): Point {
+  const x = (rect.x1 + rect.x2) / 2;
+  const bottomMargin = 0.012;
+  let y = rect.y2 - bottomMargin;
+  for (let i = 0; i < 20; i++) {
+    if (!collides({ x, y })) return { x, y };
+    y -= 0.012;
+    if (y <= rect.y1) break;
+  }
+  // Fallback: rect center.
+  return { x, y: (rect.y1 + rect.y2) / 2 };
+}
+
 export function OfficeScene() {
   const sceneRef = useRef<HTMLDivElement | null>(null);
   const stageRef = useRef<HTMLDivElement | null>(null);
