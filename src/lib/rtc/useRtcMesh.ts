@@ -1,0 +1,390 @@
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
+
+type SignalType = "offer" | "answer" | "ice" | "bye" | "hello";
+type SignalMsg = {
+  from: string;
+  to: string;
+  type: SignalType;
+  sdp?: RTCSessionDescriptionInit;
+  candidate?: RTCIceCandidateInit | null;
+};
+
+type PeerEntry = {
+  pc: RTCPeerConnection;
+  audioSender: RTCRtpSender | null;
+  videoSender: RTCRtpSender | null;
+  makingOffer: boolean;
+  remoteStream: MediaStream;
+};
+
+const ICE_CONFIG: RTCConfiguration = {
+  iceServers: [{ urls: ["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302"] }],
+};
+
+const SIGNAL_CHANNEL = "rtc-mesh-v1";
+
+export type RtcMeshState = {
+  micOn: boolean;
+  camOn: boolean;
+  toggleMic: () => Promise<void>;
+  toggleCam: () => Promise<void>;
+  remoteStreams: Record<string, MediaStream>;
+  connectedPeers: string[];
+  speakingPeers: Record<string, boolean>;
+  localPreview: MediaStream | null;
+};
+
+export function useRtcMesh(myId: string | null, desiredPeers: string[]): RtcMeshState {
+  const [micOn, setMicOn] = useState(false);
+  const [camOn, setCamOn] = useState(false);
+  const [remoteStreams, setRemoteStreams] = useState<Record<string, MediaStream>>({});
+  const [connectedPeers, setConnectedPeers] = useState<string[]>([]);
+  const [speakingPeers, setSpeakingPeers] = useState<Record<string, boolean>>({});
+
+  const peersRef = useRef<Map<string, PeerEntry>>(new Map());
+  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  const localStreamRef = useRef<MediaStream | null>(null);
+  const audioTrackRef = useRef<MediaStreamTrack | null>(null);
+  const videoTrackRef = useRef<MediaStreamTrack | null>(null);
+  const desiredRef = useRef<Set<string>>(new Set());
+
+  const sendSignal = useCallback((msg: Omit<SignalMsg, "from">) => {
+    const ch = channelRef.current;
+    if (!ch || !myId) return;
+    void ch.send({ type: "broadcast", event: "rtc", payload: { ...msg, from: myId } });
+  }, [myId]);
+
+  // Create a PC for a peer
+  const createPeer = useCallback((peerId: string, initiator: boolean) => {
+    if (!myId) return null;
+    if (peersRef.current.has(peerId)) return peersRef.current.get(peerId)!;
+
+    const pc = new RTCPeerConnection(ICE_CONFIG);
+    const remoteStream = new MediaStream();
+
+    // Always add transceivers so we can both send/recv without renegotiation later
+    const audioTx = pc.addTransceiver("audio", { direction: "sendrecv" });
+    const videoTx = pc.addTransceiver("video", { direction: "sendrecv" });
+
+    // If we already have local tracks, attach now
+    if (audioTrackRef.current) void audioTx.sender.replaceTrack(audioTrackRef.current);
+    if (videoTrackRef.current) void videoTx.sender.replaceTrack(videoTrackRef.current);
+
+    const entry: PeerEntry = {
+      pc,
+      audioSender: audioTx.sender,
+      videoSender: videoTx.sender,
+      makingOffer: false,
+      remoteStream,
+    };
+
+    pc.onicecandidate = (e) => {
+      sendSignal({ to: peerId, type: "ice", candidate: e.candidate ? e.candidate.toJSON() : null });
+    };
+
+    pc.ontrack = (e) => {
+      e.streams[0]?.getTracks().forEach((t) => {
+        if (!remoteStream.getTracks().find((rt) => rt.id === t.id)) remoteStream.addTrack(t);
+      });
+      // Also handle the case where streams[0] is empty: add the bare track
+      if (!e.streams[0]) {
+        if (!remoteStream.getTracks().find((rt) => rt.id === e.track.id)) remoteStream.addTrack(e.track);
+      }
+      setRemoteStreams((prev) => ({ ...prev, [peerId]: remoteStream }));
+    };
+
+    pc.onconnectionstatechange = () => {
+      const st = pc.connectionState;
+      if (st === "connected") {
+        setConnectedPeers((prev) => (prev.includes(peerId) ? prev : [...prev, peerId]));
+      } else if (st === "failed" || st === "closed" || st === "disconnected") {
+        setConnectedPeers((prev) => prev.filter((p) => p !== peerId));
+      }
+    };
+
+    pc.onnegotiationneeded = async () => {
+      try {
+        entry.makingOffer = true;
+        const offer = await pc.createOffer();
+        await pc.setLocalDescription(offer);
+        sendSignal({ to: peerId, type: "offer", sdp: pc.localDescription! });
+      } catch (err) {
+        console.error("negotiationneeded failed", err);
+      } finally {
+        entry.makingOffer = false;
+      }
+    };
+
+    peersRef.current.set(peerId, entry);
+
+    // If we're the initiator, kick off offer immediately
+    if (initiator) {
+      // negotiationneeded will fire from the transceivers; nothing more to do
+    }
+    return entry;
+  }, [myId, sendSignal]);
+
+  const destroyPeer = useCallback((peerId: string) => {
+    const entry = peersRef.current.get(peerId);
+    if (!entry) return;
+    try { entry.pc.close(); } catch { /* noop */ }
+    peersRef.current.delete(peerId);
+    setRemoteStreams((prev) => {
+      const next = { ...prev };
+      delete next[peerId];
+      return next;
+    });
+    setConnectedPeers((prev) => prev.filter((p) => p !== peerId));
+    setSpeakingPeers((prev) => {
+      const next = { ...prev };
+      delete next[peerId];
+      return next;
+    });
+  }, []);
+
+  // Handle incoming signaling
+  const handleSignal = useCallback(async (msg: SignalMsg) => {
+    if (!myId || msg.to !== myId || msg.from === myId) return;
+    const peerId = msg.from;
+
+    if (msg.type === "bye") {
+      destroyPeer(peerId);
+      return;
+    }
+
+    if (msg.type === "hello") {
+      // Other side announces presence; if we should connect and our id wins, create offer
+      if (desiredRef.current.has(peerId) && myId > peerId) {
+        createPeer(peerId, true);
+      }
+      return;
+    }
+
+    // Make sure peer exists for incoming offer/answer/ice
+    let entry = peersRef.current.get(peerId);
+    if (!entry) {
+      if (msg.type === "offer") {
+        entry = createPeer(peerId, false) ?? undefined;
+      } else {
+        return; // ignore stray ice/answer
+      }
+    }
+    if (!entry) return;
+    const pc = entry.pc;
+
+    try {
+      if (msg.type === "offer" && msg.sdp) {
+        // Polite peer: if we're making an offer and our id is lower, rollback
+        const polite = myId < peerId;
+        const offerCollision = entry.makingOffer || pc.signalingState !== "stable";
+        if (offerCollision && !polite) return;
+        if (offerCollision && polite) {
+          await Promise.all([
+            pc.setLocalDescription({ type: "rollback" }),
+            pc.setRemoteDescription(msg.sdp),
+          ]);
+        } else {
+          await pc.setRemoteDescription(msg.sdp);
+        }
+        const answer = await pc.createAnswer();
+        await pc.setLocalDescription(answer);
+        sendSignal({ to: peerId, type: "answer", sdp: pc.localDescription! });
+      } else if (msg.type === "answer" && msg.sdp) {
+        if (pc.signalingState === "have-local-offer") {
+          await pc.setRemoteDescription(msg.sdp);
+        }
+      } else if (msg.type === "ice") {
+        try {
+          if (msg.candidate) await pc.addIceCandidate(msg.candidate);
+        } catch (err) {
+          console.warn("addIceCandidate failed", err);
+        }
+      }
+    } catch (err) {
+      console.error("signal handle error", err);
+    }
+  }, [myId, createPeer, destroyPeer, sendSignal]);
+
+  // Subscribe to signaling channel
+  useEffect(() => {
+    if (!myId) return;
+    const ch = supabase.channel(SIGNAL_CHANNEL, { config: { broadcast: { self: false } } });
+    channelRef.current = ch;
+    ch.on("broadcast", { event: "rtc" }, (payload) => {
+      const msg = payload.payload as SignalMsg;
+      void handleSignal(msg);
+    });
+    void ch.subscribe((status) => {
+      if (status === "SUBSCRIBED") {
+        // announce ourselves to currently desired peers
+        for (const p of desiredRef.current) {
+          sendSignal({ to: p, type: "hello" });
+        }
+      }
+    });
+    return () => {
+      // bye to all peers
+      for (const peerId of Array.from(peersRef.current.keys())) {
+        sendSignal({ to: peerId, type: "bye" });
+        destroyPeer(peerId);
+      }
+      supabase.removeChannel(ch);
+      channelRef.current = null;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [myId]);
+
+  // Reconcile desired peers
+  useEffect(() => {
+    desiredRef.current = new Set(desiredPeers);
+    if (!myId) return;
+
+    // Connect to new peers
+    for (const peerId of desiredPeers) {
+      if (peerId === myId) continue;
+      if (peersRef.current.has(peerId)) continue;
+      // Send hello — and if our id wins, create offer immediately
+      sendSignal({ to: peerId, type: "hello" });
+      if (myId > peerId) createPeer(peerId, true);
+    }
+
+    // Disconnect from peers no longer desired
+    for (const peerId of Array.from(peersRef.current.keys())) {
+      if (!desiredPeers.includes(peerId)) {
+        sendSignal({ to: peerId, type: "bye" });
+        destroyPeer(peerId);
+      }
+    }
+  }, [desiredPeers, myId, createPeer, destroyPeer, sendSignal]);
+
+  // Speaking detection (simple: analyse remote audio levels)
+  useEffect(() => {
+    const ctxRef: { ctx?: AudioContext } = {};
+    const analysers: { peerId: string; analyser: AnalyserNode; data: Uint8Array }[] = [];
+    try {
+      ctxRef.ctx = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
+    } catch { /* noop */ }
+
+    Object.entries(remoteStreams).forEach(([peerId, stream]) => {
+      const audioTracks = stream.getAudioTracks();
+      if (!audioTracks.length || !ctxRef.ctx) return;
+      try {
+        const src = ctxRef.ctx.createMediaStreamSource(new MediaStream([audioTracks[0]]));
+        const analyser = ctxRef.ctx.createAnalyser();
+        analyser.fftSize = 512;
+        src.connect(analyser);
+        analysers.push({ peerId, analyser, data: new Uint8Array(analyser.frequencyBinCount) });
+      } catch { /* noop */ }
+    });
+
+    if (!analysers.length) return;
+    let raf = 0;
+    const tick = () => {
+      const next: Record<string, boolean> = {};
+      for (const a of analysers) {
+        a.analyser.getByteFrequencyData(a.data);
+        let sum = 0;
+        for (let i = 0; i < a.data.length; i++) sum += a.data[i];
+        next[a.peerId] = sum / a.data.length > 12;
+      }
+      setSpeakingPeers((prev) => {
+        const keys = new Set([...Object.keys(prev), ...Object.keys(next)]);
+        for (const k of keys) if (prev[k] !== next[k]) return next;
+        return prev;
+      });
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => {
+      cancelAnimationFrame(raf);
+      try { void ctxRef.ctx?.close(); } catch { /* noop */ }
+    };
+  }, [remoteStreams]);
+
+  // Acquire local mic
+  const enableMic = useCallback(async () => {
+    if (audioTrackRef.current) {
+      audioTrackRef.current.enabled = true;
+      setMicOn(true);
+      return;
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const track = stream.getAudioTracks()[0];
+      audioTrackRef.current = track;
+      if (!localStreamRef.current) localStreamRef.current = new MediaStream();
+      localStreamRef.current.addTrack(track);
+      for (const entry of peersRef.current.values()) {
+        if (entry.audioSender) await entry.audioSender.replaceTrack(track);
+      }
+      setMicOn(true);
+    } catch (err) {
+      console.error("mic access denied", err);
+      throw err;
+    }
+  }, []);
+
+  const disableMic = useCallback(() => {
+    if (audioTrackRef.current) {
+      audioTrackRef.current.enabled = false;
+    }
+    setMicOn(false);
+  }, []);
+
+  const toggleMic = useCallback(async () => {
+    if (micOn) disableMic();
+    else await enableMic();
+  }, [micOn, enableMic, disableMic]);
+
+  const enableCam = useCallback(async () => {
+    if (videoTrackRef.current) {
+      videoTrackRef.current.enabled = true;
+      setCamOn(true);
+      return;
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 320, height: 240 } });
+      const track = stream.getVideoTracks()[0];
+      videoTrackRef.current = track;
+      if (!localStreamRef.current) localStreamRef.current = new MediaStream();
+      localStreamRef.current.addTrack(track);
+      for (const entry of peersRef.current.values()) {
+        if (entry.videoSender) await entry.videoSender.replaceTrack(track);
+      }
+      setCamOn(true);
+    } catch (err) {
+      console.error("camera access denied", err);
+      throw err;
+    }
+  }, []);
+
+  const disableCam = useCallback(() => {
+    if (videoTrackRef.current) {
+      videoTrackRef.current.stop();
+      videoTrackRef.current = null;
+      for (const entry of peersRef.current.values()) {
+        if (entry.videoSender) void entry.videoSender.replaceTrack(null);
+      }
+    }
+    setCamOn(false);
+  }, []);
+
+  const toggleCam = useCallback(async () => {
+    if (camOn) disableCam();
+    else await enableCam();
+  }, [camOn, enableCam, disableCam]);
+
+  const localPreview = useMemo(() => localStreamRef.current, []);
+
+  return {
+    micOn,
+    camOn,
+    toggleMic,
+    toggleCam,
+    remoteStreams,
+    connectedPeers,
+    speakingPeers,
+    localPreview,
+  };
+}
