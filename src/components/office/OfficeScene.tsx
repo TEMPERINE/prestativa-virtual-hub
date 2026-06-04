@@ -748,6 +748,13 @@ export function OfficeScene() {
         aria-hidden
       />
 
+      {/* Remote video/audio tiles */}
+      <RemoteVideoTiles
+        streams={rtc.remoteStreams}
+        profiles={profiles}
+        speakingPeers={rtc.speakingPeers}
+      />
+
       {/* Topbar */}
       <div className="absolute top-0 left-0 right-0 p-4 pointer-events-none z-[100]">
         <div className="glass-panel rounded-2xl shadow-soft px-4 py-2.5 flex items-center justify-between pointer-events-auto">
