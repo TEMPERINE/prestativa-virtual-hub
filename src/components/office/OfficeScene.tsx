@@ -755,6 +755,10 @@ export function OfficeScene() {
               display.x <= focusedZone.rect.x2 &&
               display.y >= focusedZone.rect.y1 &&
               display.y <= focusedZone.rect.y2);
+          const myTeleporting = isMe && teleport;
+          const meOpacity = myTeleporting
+            ? teleport!.phase === "out" ? 0 : 1
+            : (inFocus ? 1 : 0.35);
           return (
             <div
               key={profile.id}
@@ -763,10 +767,14 @@ export function OfficeScene() {
                 left: `${display.x * 100}%`,
                 top: `${display.y * 100}%`,
                 transform: "translate(-50%, -90%)",
-                transition: isMe ? "none" : "left 120ms linear, top 120ms linear",
+                transition: isMe
+                  ? (myTeleporting ? "opacity 420ms ease-in-out, filter 420ms ease-in-out" : "none")
+                  : "left 120ms linear, top 120ms linear",
                 zIndex: focusedZone ? (inFocus ? 60 : 20) : Math.round(display.y * 1000),
-                opacity: inFocus ? 1 : 0.35,
-                filter: inFocus ? "none" : "grayscale(0.5)",
+                opacity: isMe ? meOpacity : (inFocus ? 1 : 0.35),
+                filter: myTeleporting
+                  ? `drop-shadow(0 0 18px var(--primary)) drop-shadow(0 0 36px var(--primary-glow)) brightness(${teleport!.phase === "out" ? 1.8 : 1.4})`
+                  : (inFocus ? "none" : "grayscale(0.5)"),
               }}
             >
               <div className="flex flex-col items-center">
@@ -794,6 +802,15 @@ export function OfficeScene() {
             </div>
           );
         })}
+
+        {/* Magic teleport particles */}
+        {teleport && (
+          <TeleportFx
+            point={teleport.phase === "out" ? teleport.from : teleport.to}
+            phase={teleport.phase}
+            key={`${teleport.id}-${teleport.phase}`}
+          />
+        )}
 
         <ScreenShareViewer
           localStream={rtc.localScreenStream}
