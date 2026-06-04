@@ -60,7 +60,7 @@ const EMOJI_MAP: Record<string, string> = {
 };
 const REACTION_DURATION_MS = 3000;
 import { toast } from "sonner";
-import { LogOut, Mic, MicOff, Video, VideoOff, MonitorUp, Users, Pencil, User as UserIcon, Hand, MessageCircle, StickyNote, X as XIcon } from "lucide-react";
+import { LogOut, Mic, MicOff, Video, VideoOff, MonitorUp, Users, Pencil, User as UserIcon, Hand, MessageCircle, StickyNote, X as XIcon, Plus, Minus, Locate } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import { useRtcMesh } from "@/lib/rtc/useRtcMesh";
 import { RemoteVideoTiles } from "./RemoteVideoTiles";
@@ -141,6 +141,55 @@ export function OfficeScene() {
   const [openingNote, setOpeningNote] = useState<DeskNote | null>(null);
   const reactionChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const meIdRef = useRef<string | null>(null);
+
+  // ===== Camera (zoom + pan + follow) =====
+  const MIN_ZOOM = 1;
+  const MAX_ZOOM = 7; // ~roughly one workspace fills the screen
+  const [zoom, setZoom] = useState(1);
+  const [pan, setPan] = useState({ x: 0, y: 0 }); // pixel offset of scaled content in stage
+  const [followMe, setFollowMe] = useState(true);
+  const zoomRef = useRef(1);
+  const panRef = useRef({ x: 0, y: 0 });
+  const followRef = useRef(true);
+  zoomRef.current = zoom;
+  panRef.current = pan;
+  followRef.current = followMe;
+  const dragRef = useRef<{ startX: number; startY: number; panX: number; panY: number; moved: boolean } | null>(null);
+  const wasDragRef = useRef(false);
+
+  const clampPan = useCallback((s: number, p: { x: number; y: number }) => {
+    const stage = stageRef.current;
+    if (!stage) return p;
+    const W = stage.clientWidth, H = stage.clientHeight;
+    const minX = W - W * s, minY = H - H * s;
+    return {
+      x: Math.min(0, Math.max(minX, p.x)),
+      y: Math.min(0, Math.max(minY, p.y)),
+    };
+  }, []);
+
+  const centerOn = useCallback((nx: number, ny: number, s = zoomRef.current) => {
+    const stage = stageRef.current;
+    if (!stage) return;
+    const W = stage.clientWidth, H = stage.clientHeight;
+    const tx = W / 2 - nx * W * s;
+    const ty = H / 2 - ny * H * s;
+    setPan(clampPan(s, { x: tx, y: ty }));
+  }, [clampPan]);
+
+  // Follow avatar smoothly when enabled
+  useEffect(() => {
+    if (!followMe) return;
+    centerOn(pos.x, pos.y, zoom);
+  }, [pos.x, pos.y, zoom, followMe, centerOn]);
+
+  // Re-clamp pan on window resize
+  useEffect(() => {
+    const onResize = () => setPan((p) => clampPan(zoomRef.current, p));
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, [clampPan]);
+
 
   const keysDown = useRef<Set<Facing>>(new Set());
   const lastDir = useRef<Facing | null>(null);
@@ -565,6 +614,8 @@ export function OfficeScene() {
       keysDown.current.add(dir);
       lastDir.current = dir;
       setLocalFacing(dir);
+      // Re-enable camera follow as soon as the user starts moving
+      if (!followRef.current) setFollowMe(true);
     };
 
     const up = (e: KeyboardEvent) => {
@@ -738,16 +789,83 @@ export function OfficeScene() {
       {/* Office stage — fixed aspect, full height */}
       <div
         ref={stageRef}
-        className="relative h-full shrink-0"
+        className="relative h-full shrink-0 overflow-hidden select-none"
         style={{ aspectRatio: "1536 / 1024" }}
+        onWheel={(e) => {
+          e.preventDefault();
+          const stage = stageRef.current;
+          if (!stage) return;
+          const rect = stage.getBoundingClientRect();
+          const cx = e.clientX - rect.left;
+          const cy = e.clientY - rect.top;
+          const s = zoomRef.current;
+          const factor = e.deltaY < 0 ? 1.15 : 1 / 1.15;
+          const ns = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, s * factor));
+          if (ns === s) return;
+          const p = panRef.current;
+          const np = { x: cx - (cx - p.x) * (ns / s), y: cy - (cy - p.y) * (ns / s) };
+          setZoom(ns);
+          setPan(clampPan(ns, np));
+          setFollowMe(false);
+        }}
+        onPointerDown={(e) => {
+          if (e.button !== 0) return;
+          // Don't start a drag on interactive children (buttons, etc.)
+          const tgt = e.target as HTMLElement;
+          if (tgt.closest("button, a, input, textarea, [role='button']")) return;
+          (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+          dragRef.current = {
+            startX: e.clientX,
+            startY: e.clientY,
+            panX: panRef.current.x,
+            panY: panRef.current.y,
+            moved: false,
+          };
+        }}
+        onPointerMove={(e) => {
+          const d = dragRef.current;
+          if (!d) return;
+          const dx = e.clientX - d.startX;
+          const dy = e.clientY - d.startY;
+          if (!d.moved && Math.hypot(dx, dy) < 4) return;
+          d.moved = true;
+          setFollowMe(false);
+          setPan(clampPan(zoomRef.current, { x: d.panX + dx, y: d.panY + dy }));
+        }}
+        onPointerUp={(e) => {
+          const d = dragRef.current;
+          dragRef.current = null;
+          wasDragRef.current = !!d?.moved;
+          try { (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId); } catch {}
+        }}
+        onClickCapture={(e) => {
+          if (wasDragRef.current) {
+            e.stopPropagation();
+            e.preventDefault();
+            wasDragRef.current = false;
+          }
+        }}
       >
+        {/* Camera transform layer */}
+        <div
+          className="absolute inset-0"
+          style={{
+            transform: `translate3d(${pan.x}px, ${pan.y}px, 0) scale(${zoom})`,
+            transformOrigin: "0 0",
+            willChange: "transform",
+            cursor: dragRef.current?.moved ? "grabbing" : "grab",
+          }}
+        >
 
         <img
           src={officeMap}
           alt="Escritório Prestativa Virtual"
           className="absolute inset-0 w-full h-full object-cover select-none pointer-events-none"
           draggable={false}
+          style={{ imageRendering: "pixelated" }}
         />
+
+
 
 
         {/* Private-area overlay (Gather-style): darken everything outside the active zone */}
@@ -986,7 +1104,65 @@ export function OfficeScene() {
           onStopLocal={() => { rtc.toggleScreen().catch(() => {}); }}
           anchorRect={focusedZone?.rect ?? null}
         />
+        </div>
+        {/* /Camera transform layer */}
+
+        {/* Map navigation controls (right side) */}
+        <div className="absolute right-3 top-1/2 -translate-y-1/2 flex flex-col gap-2 z-[90] pointer-events-auto">
+          <button
+            type="button"
+            title="Aproximar"
+            onClick={() => {
+              const s = zoomRef.current;
+              const ns = Math.min(MAX_ZOOM, s * 1.25);
+              const stage = stageRef.current;
+              if (!stage || ns === s) return;
+              const W = stage.clientWidth, H = stage.clientHeight;
+              const cx = W / 2, cy = H / 2;
+              const p = panRef.current;
+              setZoom(ns);
+              setPan(clampPan(ns, { x: cx - (cx - p.x) * (ns / s), y: cy - (cy - p.y) * (ns / s) }));
+            }}
+            className="w-9 h-9 rounded-full bg-black/60 hover:bg-black/80 text-white flex items-center justify-center shadow-soft backdrop-blur-sm"
+          >
+            <Plus className="w-4 h-4" />
+          </button>
+          <button
+            type="button"
+            title="Afastar"
+            onClick={() => {
+              const s = zoomRef.current;
+              const ns = Math.max(MIN_ZOOM, s / 1.25);
+              const stage = stageRef.current;
+              if (!stage || ns === s) return;
+              const W = stage.clientWidth, H = stage.clientHeight;
+              const cx = W / 2, cy = H / 2;
+              const p = panRef.current;
+              setZoom(ns);
+              setPan(clampPan(ns, { x: cx - (cx - p.x) * (ns / s), y: cy - (cy - p.y) * (ns / s) }));
+            }}
+            className="w-9 h-9 rounded-full bg-black/60 hover:bg-black/80 text-white flex items-center justify-center shadow-soft backdrop-blur-sm"
+          >
+            <Minus className="w-4 h-4" />
+          </button>
+          <button
+            type="button"
+            title={followMe ? "Câmera seguindo você" : "Centralizar em mim"}
+            onClick={() => {
+              setFollowMe(true);
+              const targetZoom = Math.max(zoomRef.current, 2.2);
+              setZoom(targetZoom);
+              centerOn(posRef.current.x, posRef.current.y, targetZoom);
+            }}
+            className={`w-9 h-9 rounded-full flex items-center justify-center shadow-soft backdrop-blur-sm ${
+              followMe ? "bg-primary text-primary-foreground" : "bg-black/60 hover:bg-black/80 text-white"
+            }`}
+          >
+            <Locate className="w-4 h-4" />
+          </button>
+        </div>
       </div>
+
 
       {/* Compose note dialog */}
       <Dialog
