@@ -63,6 +63,7 @@ export function useRtcMesh(myId: string | null, desiredPeers: string[]): RtcMesh
   const localStreamRef = useRef<MediaStream | null>(null);
   const audioTrackRef = useRef<MediaStreamTrack | null>(null);
   const videoTrackRef = useRef<MediaStreamTrack | null>(null);
+  const screenTrackRef = useRef<MediaStreamTrack | null>(null);
   const desiredRef = useRef<Set<string>>(new Set());
 
   const sendSignal = useCallback((msg: Omit<SignalMsg, "from">) => {
