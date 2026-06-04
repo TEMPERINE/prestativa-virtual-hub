@@ -5,6 +5,7 @@ import {
   SPAWN,
   collides,
   zoneAtWithOverrides as zoneAt,
+  findZoneById,
   type Point,
   type ZoneId,
 } from "@/lib/office-map";
