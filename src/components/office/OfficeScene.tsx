@@ -762,35 +762,36 @@ export function OfficeScene() {
           </div>
 
           <div className="flex items-center gap-2">
+            {rtc.connectedPeers.length > 0 && (
+              <div className="text-xs text-muted-foreground px-2 hidden sm:block">
+                Em chamada com {rtc.connectedPeers.length}
+              </div>
+            )}
             <IconButton
-              active={micOn}
+              active={rtc.micOn}
               onClick={() => {
-                setMicOn(!micOn);
-                toast.info(micOn ? "Microfone desligado" : "Microfone ligado (áudio chega na próxima fase)");
+                rtc.toggleMic().catch(() => toast.error("Não foi possível acessar o microfone"));
               }}
               title="Microfone"
             >
-              {micOn ? <Mic className="w-4 h-4" /> : <MicOff className="w-4 h-4" />}
+              {rtc.micOn ? <Mic className="w-4 h-4" /> : <MicOff className="w-4 h-4" />}
+            </IconButton>
+            <IconButton
+              active={rtc.camOn}
+              onClick={() => {
+                rtc.toggleCam().catch(() => toast.error("Não foi possível acessar a câmera"));
+              }}
+              title="Câmera"
+            >
+              {rtc.camOn ? <Video className="w-4 h-4" /> : <VideoOff className="w-4 h-4" />}
             </IconButton>
             {currentZone.supportsVideo && (
-              <>
-                <IconButton
-                  active={camOn}
-                  onClick={() => {
-                    setCamOn(!camOn);
-                    toast.info("Vídeo chega na próxima fase");
-                  }}
-                  title="Câmera"
-                >
-                  {camOn ? <Video className="w-4 h-4" /> : <VideoOff className="w-4 h-4" />}
-                </IconButton>
-                <IconButton
-                  onClick={() => toast.info("Compartilhamento de tela chega na próxima fase")}
-                  title="Compartilhar tela"
-                >
-                  <MonitorUp className="w-4 h-4" />
-                </IconButton>
-              </>
+              <IconButton
+                onClick={() => toast.info("Compartilhamento de tela chega na próxima fase")}
+                title="Compartilhar tela"
+              >
+                <MonitorUp className="w-4 h-4" />
+              </IconButton>
             )}
             <IconButton active={showTeam} onClick={() => setShowTeam(!showTeam)} title="Equipe">
               <Users className="w-4 h-4" />
