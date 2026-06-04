@@ -369,10 +369,10 @@ export function OfficeScene() {
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
       const key = e.key.toLowerCase();
-      // Ctrl/Cmd + D — teleport to claimed workspace
+      // Ctrl/Cmd + D — auto-walk to claimed workspace
       if (key === "d" && (e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey) {
         e.preventDefault();
-        teleportToMyClaim();
+        walkToMyClaim();
         return;
       }
       const emoji = EMOJI_MAP[key];
@@ -389,10 +389,13 @@ export function OfficeScene() {
       if (!dir) return;
       e.preventDefault();
       if (e.repeat) return;
+      // Manual movement cancels auto-walk
+      autoWalkRef.current = null;
       keysDown.current.add(dir);
       lastDir.current = dir;
       setLocalFacing(dir);
     };
+
     const up = (e: KeyboardEvent) => {
       const dir = dirFromKey(e.key.toLowerCase());
       if (!dir) return;
