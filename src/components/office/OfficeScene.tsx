@@ -313,8 +313,8 @@ export function OfficeScene() {
         ref={stageRef}
         className="relative h-full shrink-0"
         style={{ aspectRatio: "1536 / 1024" }}
-        onPointerDown={walkToPoint}
       >
+
         <img
           src={officeMap}
           alt="Escritório Prestativa Virtual"
