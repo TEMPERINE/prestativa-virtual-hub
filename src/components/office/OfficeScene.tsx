@@ -646,7 +646,7 @@ function TeamRow({
   online: boolean;
   isMe?: boolean;
 }) {
-  const zoneLabel = zone ? ZONES.find((z) => z.id === zone)?.label : undefined;
+  const zoneLabel = zone ? findZoneById(zone)?.label : undefined;
   return (
     <div
       className={`flex items-center gap-3 px-2.5 py-2 rounded-lg ${
