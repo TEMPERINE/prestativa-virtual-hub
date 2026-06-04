@@ -811,85 +811,27 @@ export function OfficeScene() {
     <div
       ref={sceneRef}
       tabIndex={0}
-      className="relative w-screen h-screen overflow-hidden bg-black outline-none flex flex-col"
+      className="relative w-screen h-screen overflow-hidden bg-black outline-none flex items-stretch"
       onMouseDown={() => sceneRef.current?.focus()}
     >
-      {/* Topbar (fixed strip above the map — no overlay) */}
-      <div className="relative z-[100] p-3 shrink-0">
-        <div className="glass-panel rounded-2xl shadow-soft px-4 py-2 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl gradient-primary flex items-center justify-center shadow-glow">
-              <span className="text-sm font-bold text-primary-foreground">P</span>
-            </div>
-          </div>
+      {/* Extended scenery — park on the left */}
+      <div
+        className="flex-1 h-full"
+        style={{
+          backgroundImage: `url(${parkLeft})`,
+          backgroundSize: "auto 100%",
+          backgroundPosition: "right center",
+          backgroundRepeat: "repeat-x",
+        }}
+        aria-hidden
+      />
 
-          <div className="flex items-center gap-2">
-            {rtc.connectedPeers.length > 0 && (
-              <div className="text-xs text-muted-foreground px-2 hidden sm:block">
-                Em chamada com {rtc.connectedPeers.length}
-              </div>
-            )}
-            <IconButton
-              active={rtc.micOn}
-              onClick={() => {
-                rtc.toggleMic().catch(() => toast.error("Não foi possível acessar o microfone"));
-              }}
-              title="Microfone"
-            >
-              {rtc.micOn ? <Mic className="w-4 h-4" /> : <MicOff className="w-4 h-4" />}
-            </IconButton>
-            <IconButton
-              active={rtc.camOn}
-              onClick={() => {
-                rtc.toggleCam().catch(() => toast.error("Não foi possível acessar a câmera"));
-              }}
-              title="Câmera"
-            >
-              {rtc.camOn ? <Video className="w-4 h-4" /> : <VideoOff className="w-4 h-4" />}
-            </IconButton>
-            <CamPreviewAndPicker
-              stream={rtc.localVideoStream}
-              devices={rtc.videoDevices}
-              selectedId={rtc.selectedVideoDeviceId}
-              onSelect={(id) => rtc.setVideoDevice(id).catch(() => toast.error("Falha ao trocar câmera"))}
-              visible={rtc.camOn}
-            />
-            {currentZone.id !== "lobby" && (
-              <IconButton
-                active={rtc.screenOn}
-                onClick={() => {
-                  rtc.toggleScreen().catch(() => toast.error("Não foi possível compartilhar a tela"));
-                }}
-                title={rtc.screenOn ? "Parar compartilhamento" : "Compartilhar tela (janela, aba ou tela inteira)"}
-              >
-                <MonitorUp className="w-4 h-4" />
-              </IconButton>
-            )}
-            <IconButton active={showTeam} onClick={() => setShowTeam(!showTeam)} title="Equipe">
-              <Users className="w-4 h-4" />
-            </IconButton>
-            <Link
-              to="/office/editor"
-              title="Editor de mapa"
-              className="inline-flex items-center justify-center w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 text-white"
-            >
-              <Pencil className="w-4 h-4" />
-            </Link>
-            <IconButton onClick={signOut} title="Sair">
-              <LogOut className="w-4 h-4" />
-            </IconButton>
-          </div>
-        </div>
-      </div>
-
-      {/* Map row (office stage centered, fills viewport) */}
-      <div className="relative flex-1 flex items-center justify-center min-h-0 overflow-hidden bg-black">
-
-      {/* Office stage — preserves aspect ratio, fills as much as possible */}
+      {/* Office stage — fixed aspect, full height */}
       <div
         ref={stageRef}
-        className="relative overflow-hidden select-none"
-        style={{ aspectRatio: "1536 / 1024", height: "100%", width: "100%", maxWidth: "calc(100vh * 1536 / 1024)", maxHeight: "calc(100vw * 1024 / 1536)" }}
+        className="relative h-full shrink-0 overflow-hidden select-none"
+        style={{ aspectRatio: "1536 / 1024" }}
+
 
 
         onWheel={(e) => {
