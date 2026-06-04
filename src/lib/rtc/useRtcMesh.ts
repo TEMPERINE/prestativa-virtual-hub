@@ -261,7 +261,7 @@ export function useRtcMesh(myId: string | null, desiredPeers: string[]): RtcMesh
   // Speaking detection (simple: analyse remote audio levels)
   useEffect(() => {
     const ctxRef: { ctx?: AudioContext } = {};
-    const analysers: { peerId: string; analyser: AnalyserNode; data: Uint8Array }[] = [];
+    const analysers: { peerId: string; analyser: AnalyserNode; data: Uint8Array<ArrayBuffer> }[] = [];
     try {
       ctxRef.ctx = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
     } catch { /* noop */ }
