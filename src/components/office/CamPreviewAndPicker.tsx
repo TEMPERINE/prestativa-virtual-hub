@@ -24,11 +24,18 @@ export function CamPreviewAndPicker({
   useEffect(() => {
     if (videoRef.current && stream && videoRef.current.srcObject !== stream) {
       videoRef.current.srcObject = stream;
+      videoRef.current.play?.().catch(() => {});
     }
-    if (expandedVideoRef.current && stream && expandedVideoRef.current.srcObject !== stream) {
-      expandedVideoRef.current.srcObject = stream;
+  }, [stream, expanded]);
+
+  useEffect(() => {
+    if (!expanded) return;
+    const el = expandedVideoRef.current;
+    if (el && stream && el.srcObject !== stream) {
+      el.srcObject = stream;
+      el.play?.().catch(() => {});
     }
-  }, [stream]);
+  }, [expanded, stream]);
 
   useEffect(() => {
     if (!open) return;
