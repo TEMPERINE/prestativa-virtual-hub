@@ -1090,6 +1090,23 @@ function SpriteAvatar({
         aspectRatio: `${FRAME_W} / ${sheetH}`,
       }}
     >
+      {/* Contact shadow — anchors the character to the floor */}
+      <div
+        aria-hidden
+        style={{
+          position: "absolute",
+          left: "50%",
+          bottom: "-2%",
+          width: "62%",
+          height: "10%",
+          transform: "translateX(-50%)",
+          background:
+            "radial-gradient(ellipse at center, rgba(0,0,0,0.45) 0%, rgba(0,0,0,0.28) 45%, rgba(0,0,0,0) 72%)",
+          filter: "blur(1.5px)",
+          pointerEvents: "none",
+          zIndex: 0,
+        }}
+      />
       {(Object.keys(AVATAR_SPRITES) as Facing[]).map((f) => {
         const h = SHEET_HEIGHT[f];
         const active = f === facing;
@@ -1107,8 +1124,10 @@ function SpriteAvatar({
               backgroundRepeat: "no-repeat",
               backgroundSize: `${FRAMES * 100}% 100%`,
               backgroundPosition: `${(frame / (FRAMES - 1)) * 100}% 0`,
-              imageRendering: "pixelated",
+              imageRendering: "auto",
               visibility: active ? "visible" : "hidden",
+              filter: "drop-shadow(0 2px 1px rgba(0,0,0,0.25))",
+              zIndex: 1,
             }}
           />
         );
