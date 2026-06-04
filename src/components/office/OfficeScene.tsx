@@ -60,7 +60,7 @@ const EMOJI_MAP: Record<string, string> = {
 };
 const REACTION_DURATION_MS = 3000;
 import { toast } from "sonner";
-import { LogOut, Mic, MicOff, Video, VideoOff, MonitorUp, Users, Pencil, User as UserIcon, Hand, MessageCircle, StickyNote, X as XIcon, Plus, Minus, Locate } from "lucide-react";
+import { LogOut, Mic, MicOff, Video, VideoOff, MonitorUp, Users, Pencil, User as UserIcon, Hand, MessageCircle, StickyNote, X as XIcon, Plus, Minus, Locate, ChevronLeft, ChevronRight } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import { useRtcMesh } from "@/lib/rtc/useRtcMesh";
 import { RemoteVideoTiles } from "./RemoteVideoTiles";
@@ -126,7 +126,8 @@ export function OfficeScene() {
   const [positions, setPositions] = useState<Record<string, RemotePos>>({});
   const [pos, setPos] = useState<Point>(SPAWN);
   const [zone, setZone] = useState<ZoneId>("lobby");
-  const [showTeam, setShowTeam] = useState(true);
+  const [showTeam, setShowTeam] = useState(false);
+  const [showHint, setShowHint] = useState(true);
   const [facing, setFacing] = useState<Facing>("down");
   const facingRef = useRef<Facing>("down");
   const [reactions, setReactions] = useState<Record<string, { emoji: string; ts: number }>>({});
@@ -148,6 +149,12 @@ export function OfficeScene() {
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 }); // pixel offset of scaled content in stage
   const [followMe, setFollowMe] = useState(true);
+
+  // Auto-hide the welcome hint after 5s.
+  useEffect(() => {
+    const t = window.setTimeout(() => setShowHint(false), 5000);
+    return () => window.clearTimeout(t);
+  }, []);
   const zoomRef = useRef(1);
   const panRef = useRef({ x: 0, y: 0 });
   const followRef = useRef(true);
@@ -1340,10 +1347,6 @@ export function OfficeScene() {
             <div className="w-9 h-9 rounded-xl gradient-primary flex items-center justify-center shadow-glow">
               <span className="text-sm font-bold text-primary-foreground">P</span>
             </div>
-            <div>
-              <div className="text-xs text-muted-foreground leading-tight">Você está em</div>
-              <div className="text-sm font-semibold leading-tight">{currentZone.label}</div>
-            </div>
           </div>
 
           <div className="flex items-center gap-2">
@@ -1421,9 +1424,20 @@ export function OfficeScene() {
         </div>
       )}
 
+      {/* Team panel side toggle — always visible on right edge */}
+      <button
+        type="button"
+        onClick={() => setShowTeam((v) => !v)}
+        title={showTeam ? "Ocultar equipe" : "Mostrar equipe"}
+        className="absolute top-1/2 -translate-y-1/2 z-[85] w-7 h-14 rounded-l-lg bg-black/60 hover:bg-black/80 text-white flex items-center justify-center shadow-soft backdrop-blur-sm transition-all"
+        style={{ right: showTeam ? "18rem" : "0" }}
+      >
+        {showTeam ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
+      </button>
+
       {/* Team panel */}
       {showTeam && (
-        <div className="absolute right-4 top-24 bottom-24 w-72 pointer-events-auto z-[80]">
+        <div className="absolute right-4 top-24 bottom-4 w-72 pointer-events-auto z-[80]">
           <div className="glass-panel rounded-2xl shadow-soft h-full flex flex-col overflow-hidden">
             <div className="px-4 py-3 border-b">
               <div className="text-sm font-semibold">Equipe</div>
@@ -1454,14 +1468,16 @@ export function OfficeScene() {
         </div>
       )}
 
-      {/* Movement hint */}
-      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 pointer-events-none z-[100]">
-        <div className="glass-panel rounded-full px-4 py-2 shadow-soft text-xs text-muted-foreground">
-          Use <kbd className="px-1.5 py-0.5 bg-muted rounded text-[10px] font-mono">WASD</kbd> ou{" "}
-          <kbd className="px-1.5 py-0.5 bg-muted rounded text-[10px] font-mono">setas</kbd> para se mover ·{" "}
-          <kbd className="px-1.5 py-0.5 bg-muted rounded text-[10px] font-mono">Ctrl+D</kbd> teleporta para seu espaço ✨
+      {/* Welcome hint — auto-hides after 5s */}
+      {showHint && (
+        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 pointer-events-none z-[100] animate-in fade-in slide-in-from-bottom-2 duration-300">
+          <div className="glass-panel rounded-full px-4 py-2 shadow-soft text-xs text-muted-foreground">
+            Use <kbd className="px-1.5 py-0.5 bg-muted rounded text-[10px] font-mono">WASD</kbd> ou{" "}
+            <kbd className="px-1.5 py-0.5 bg-muted rounded text-[10px] font-mono">setas</kbd> para se mover ·{" "}
+            <kbd className="px-1.5 py-0.5 bg-muted rounded text-[10px] font-mono">Ctrl+D</kbd> teleporta para seu espaço ✨
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
