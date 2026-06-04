@@ -24,6 +24,17 @@ const AVATAR_SPRITES: Record<Facing, string> = {
   left: avatarLeft,
   right: avatarRight,
 };
+// Each sheet: 1536px wide, 6 frames of 256px wide. Heights vary per direction.
+const SHEET_HEIGHT: Record<Facing, number> = {
+  down: 255,
+  up: 240,
+  left: 229,
+  right: 244,
+};
+const FRAME_W = 256;
+const FRAMES = 6; // frame 0 = idle, frames 1..5 = walk cycle
+const WALK_FRAME_MS = 110;
+
 function dirFromKey(k: string): Facing | null {
   if (k === "arrowup" || k === "w") return "up";
   if (k === "arrowdown" || k === "s") return "down";
@@ -38,7 +49,7 @@ import { Link } from "@tanstack/react-router";
 type Profile = { id: string; display_name: string; avatar_color: string };
 type RemotePos = { user_id: string; x: number; y: number; zone: string; is_online: boolean; facing?: Facing };
 
-const SPEED = 0.0048;
+const SPEED = 0.0042;
 const SEND_INTERVAL_MS = 120;
 
 export function OfficeScene() {
