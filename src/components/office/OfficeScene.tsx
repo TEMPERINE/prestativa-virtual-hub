@@ -27,12 +27,18 @@ const AVATAR_SPRITES: Record<Facing, string> = {
 };
 // Each sheet: 1536px wide, 6 frames of 256px wide. Heights vary per direction.
 const SHEET_HEIGHT: Record<Facing, number> = {
-  down: 237,
-  up: 231,
-  left: 221,
-  right: 218,
+  down: 246,
+  up: 241,
+  left: 231,
+  right: 227,
 };
-const FRAME_W = 256;
+const FRAME_WIDTHS: Record<Facing, number> = {
+  down: 118,
+  up: 108,
+  left: 115,
+  right: 121,
+};
+const FRAME_W = 118; // legacy fallback aspect (down)
 const FRAMES = 6; // frame 0 = idle, frames 1..5 = walk cycle
 const WALK_FRAME_MS = 110;
 
@@ -1082,16 +1088,35 @@ function SpriteAvatar({
   glowColor?: string;
 }) {
   const sheetH = SHEET_HEIGHT[facing];
+  const frameW = FRAME_WIDTHS[facing];
   return (
     <div
       style={{
         position: "relative",
         height: "min(9vh, 94px)",
-        aspectRatio: `${FRAME_W} / ${sheetH}`,
+        aspectRatio: `${frameW} / ${sheetH}`,
       }}
     >
+      {/* Contact shadow — anchors the character to the floor */}
+      <div
+        aria-hidden
+        style={{
+          position: "absolute",
+          left: "50%",
+          bottom: "-2%",
+          width: "62%",
+          height: "10%",
+          transform: "translateX(-50%)",
+          background:
+            "radial-gradient(ellipse at center, rgba(0,0,0,0.45) 0%, rgba(0,0,0,0.28) 45%, rgba(0,0,0,0) 72%)",
+          filter: "blur(1.5px)",
+          pointerEvents: "none",
+          zIndex: 0,
+        }}
+      />
       {(Object.keys(AVATAR_SPRITES) as Facing[]).map((f) => {
         const h = SHEET_HEIGHT[f];
+        const w = FRAME_WIDTHS[f];
         const active = f === facing;
         return (
           <div
@@ -1102,13 +1127,15 @@ function SpriteAvatar({
               bottom: 0,
               transform: "translateX(-50%)",
               height: "100%",
-              aspectRatio: `${FRAME_W} / ${h}`,
+              aspectRatio: `${w} / ${h}`,
               backgroundImage: `url(${AVATAR_SPRITES[f]})`,
               backgroundRepeat: "no-repeat",
               backgroundSize: `${FRAMES * 100}% 100%`,
               backgroundPosition: `${(frame / (FRAMES - 1)) * 100}% 0`,
-              imageRendering: "pixelated",
+              imageRendering: "auto",
               visibility: active ? "visible" : "hidden",
+              filter: "drop-shadow(0 2px 1px rgba(0,0,0,0.25))",
+              zIndex: 1,
             }}
           />
         );
