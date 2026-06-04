@@ -9,7 +9,7 @@ import {
   type Point,
   type ZoneId,
 } from "@/lib/office-map";
-import { zoneRectFromOverrides } from "@/lib/map-overrides";
+import { zoneRectFromOverrides, getZoneKind } from "@/lib/map-overrides";
 import officeMap from "@/assets/office-map.jpg";
 import parkLeft from "@/assets/scene-park-left.jpg";
 import roadRight from "@/assets/scene-road-right.jpg";
