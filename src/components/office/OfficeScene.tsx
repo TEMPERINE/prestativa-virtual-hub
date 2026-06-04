@@ -198,6 +198,26 @@ export function OfficeScene() {
       )
       .subscribe();
 
+    const reactionCh = supabase
+      .channel("reactions-room")
+      .on("broadcast", { event: "reaction" }, (payload) => {
+        const { user_id, emoji } = (payload.payload ?? {}) as { user_id?: string; emoji?: string };
+        if (!user_id || !emoji) return;
+        const ts = Date.now();
+        setReactions((prev) => ({ ...prev, [user_id]: { emoji, ts } }));
+        setTimeout(() => {
+          setReactions((prev) => {
+            const cur = prev[user_id];
+            if (!cur || cur.ts !== ts) return prev;
+            const next = { ...prev };
+            delete next[user_id];
+            return next;
+          });
+        }, REACTION_DURATION_MS);
+      })
+      .subscribe();
+    reactionChannelRef.current = reactionCh;
+
     const offline = async () => {
       const { data: u } = await supabase.auth.getUser();
       if (u.user) {
