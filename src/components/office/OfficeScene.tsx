@@ -157,9 +157,33 @@ export function OfficeScene() {
       const pmap: Record<string, RemotePos> = {};
       (posData ?? []).forEach((p) => (pmap[p.user_id] = p as RemotePos));
 
-      const existing = pmap[userData.user.id];
-      const savedStart = { x: existing?.x ?? SPAWN.x, y: existing?.y ?? SPAWN.y };
-      const safeStart = collides(savedStart) ? SPAWN : savedStart;
+      // Load workspace claims
+      const { data: claimData } = await supabase
+        .from("workspace_claims")
+        .select("zone_id, user_id");
+      const cmap: Record<string, string> = {};
+      (claimData ?? []).forEach((c: { zone_id: string; user_id: string }) => {
+        cmap[c.zone_id] = c.user_id;
+      });
+      setClaims(cmap);
+
+      // If I have a claim, always spawn at that workstation (center of its rect).
+      const myClaimZone = Object.entries(cmap).find(([, uid]) => uid === userData.user!.id)?.[0];
+      let startPoint: Point;
+      if (myClaimZone) {
+        const z = findZoneById(myClaimZone);
+        const rect = zoneRectFromOverrides(myClaimZone as ZoneId) ?? z?.rect ?? null;
+        if (rect) {
+          startPoint = { x: (rect.x1 + rect.x2) / 2, y: (rect.y1 + rect.y2) / 2 };
+        } else {
+          startPoint = SPAWN;
+        }
+      } else {
+        const existing = pmap[userData.user.id];
+        const savedStart = { x: existing?.x ?? SPAWN.x, y: existing?.y ?? SPAWN.y };
+        startPoint = collides(savedStart) ? SPAWN : savedStart;
+      }
+      const safeStart = collides(startPoint) ? SPAWN : startPoint;
       setPos(safeStart);
       const startZone = zoneAt(safeStart).id;
       setZone(startZone);
