@@ -113,6 +113,24 @@ export type Database = {
         }
         Relationships: []
       }
+      workspace_claims: {
+        Row: {
+          claimed_at: string
+          user_id: string
+          zone_id: string
+        }
+        Insert: {
+          claimed_at?: string
+          user_id: string
+          zone_id: string
+        }
+        Update: {
+          claimed_at?: string
+          user_id?: string
+          zone_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

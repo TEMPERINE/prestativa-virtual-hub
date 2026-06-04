@@ -9,7 +9,7 @@ import {
   type Point,
   type ZoneId,
 } from "@/lib/office-map";
-import { zoneRectFromOverrides } from "@/lib/map-overrides";
+import { zoneRectFromOverrides, getZoneKind } from "@/lib/map-overrides";
 import officeMap from "@/assets/office-map.jpg";
 import parkLeft from "@/assets/scene-park-left.jpg";
 import roadRight from "@/assets/scene-road-right.jpg";
@@ -77,6 +77,9 @@ export function OfficeScene() {
   const [facing, setFacing] = useState<Facing>("down");
   const facingRef = useRef<Facing>("down");
   const [reactions, setReactions] = useState<Record<string, { emoji: string; ts: number }>>({});
+  // zone_id -> user_id (claims)
+  const [claims, setClaims] = useState<Record<string, string>>({});
+  const [hoveredZone, setHoveredZone] = useState<string | null>(null);
   const reactionChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const meIdRef = useRef<string | null>(null);
 
@@ -154,9 +157,33 @@ export function OfficeScene() {
       const pmap: Record<string, RemotePos> = {};
       (posData ?? []).forEach((p) => (pmap[p.user_id] = p as RemotePos));
 
-      const existing = pmap[userData.user.id];
-      const savedStart = { x: existing?.x ?? SPAWN.x, y: existing?.y ?? SPAWN.y };
-      const safeStart = collides(savedStart) ? SPAWN : savedStart;
+      // Load workspace claims
+      const { data: claimData } = await supabase
+        .from("workspace_claims")
+        .select("zone_id, user_id");
+      const cmap: Record<string, string> = {};
+      (claimData ?? []).forEach((c: { zone_id: string; user_id: string }) => {
+        cmap[c.zone_id] = c.user_id;
+      });
+      setClaims(cmap);
+
+      // If I have a claim, always spawn at that workstation (center of its rect).
+      const myClaimZone = Object.entries(cmap).find(([, uid]) => uid === userData.user!.id)?.[0];
+      let startPoint: Point;
+      if (myClaimZone) {
+        const z = findZoneById(myClaimZone);
+        const rect = zoneRectFromOverrides(myClaimZone as ZoneId) ?? z?.rect ?? null;
+        if (rect) {
+          startPoint = { x: (rect.x1 + rect.x2) / 2, y: (rect.y1 + rect.y2) / 2 };
+        } else {
+          startPoint = SPAWN;
+        }
+      } else {
+        const existing = pmap[userData.user.id];
+        const savedStart = { x: existing?.x ?? SPAWN.x, y: existing?.y ?? SPAWN.y };
+        startPoint = collides(savedStart) ? SPAWN : savedStart;
+      }
+      const safeStart = collides(startPoint) ? SPAWN : startPoint;
       setPos(safeStart);
       const startZone = zoneAt(safeStart).id;
       setZone(startZone);
@@ -218,6 +245,24 @@ export function OfficeScene() {
       .subscribe();
     reactionChannelRef.current = reactionCh;
 
+    const claimsCh = supabase
+      .channel("claims-room")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "workspace_claims" },
+        (payload) => {
+          const row = (payload.new ?? payload.old) as { zone_id: string; user_id: string };
+          if (!row) return;
+          setClaims((prev) => {
+            const next = { ...prev };
+            if (payload.eventType === "DELETE") delete next[row.zone_id];
+            else next[row.zone_id] = row.user_id;
+            return next;
+          });
+        }
+      )
+      .subscribe();
+
     const offline = async () => {
       const { data: u } = await supabase.auth.getUser();
       if (u.user) {
@@ -229,11 +274,35 @@ export function OfficeScene() {
     return () => {
       supabase.removeChannel(ch);
       supabase.removeChannel(reactionCh);
+      supabase.removeChannel(claimsCh);
       reactionChannelRef.current = null;
       window.removeEventListener("beforeunload", offline);
       offline();
     };
   }, []);
+
+  const claimZone = useCallback(async (zoneId: string) => {
+    const uid = meIdRef.current;
+    if (!uid) return;
+    // Release any previous claim by this user (one workstation per user).
+    await supabase.from("workspace_claims").delete().eq("user_id", uid);
+    const { error } = await supabase
+      .from("workspace_claims")
+      .insert({ zone_id: zoneId, user_id: uid });
+    if (error) {
+      toast.error("Não foi possível reivindicar esse espaço.");
+      return;
+    }
+    const label = findZoneById(zoneId)?.label ?? zoneId;
+    toast.success(`Você reivindicou ${label}. Esta é a sua posição oficial.`);
+    setClaims((prev) => {
+      const next: Record<string, string> = {};
+      for (const [k, v] of Object.entries(prev)) if (v !== uid) next[k] = v;
+      next[zoneId] = uid;
+      return next;
+    });
+  }, []);
+
 
   const sendReaction = useCallback((emoji: string) => {
     const uid = meIdRef.current;
@@ -352,6 +421,21 @@ export function OfficeScene() {
       : currentZone;
   }, [currentZone]);
 
+  // All workspace zones with their effective rect for hover overlays.
+  const workspaceZones = useMemo(() => {
+    const out: { id: string; label: string; rect: { x1: number; y1: number; x2: number; y2: number } }[] = [];
+    for (const z of ZONES) {
+      if (z.id === "lobby") continue;
+      if (getZoneKind(z.id) !== "workspace") continue;
+      const rect = zoneRectFromOverrides(z.id) ?? z.rect;
+      out.push({ id: z.id, label: z.label, rect });
+    }
+    return out;
+  }, []);
+
+
+
+
   const onlineList = useMemo(() => {
     return Object.values(positions)
       .filter((p) => p.is_online)
@@ -408,7 +492,72 @@ export function OfficeScene() {
           <ZoneSpotlight rect={focusedZone.rect} />
         )}
 
+        {/* Workspace-zone hover overlays (claim button / owner tooltip) */}
+        {workspaceZones.map((wz) => {
+          const ownerId = claims[wz.id];
+          const owner = ownerId ? profiles[ownerId] : null;
+          const isMyClaim = ownerId && me && ownerId === me.id;
+          const isHovered = hoveredZone === wz.id;
+          return (
+            <div
+              key={`ws-${wz.id}`}
+              className="absolute"
+              style={{
+                left: `${wz.rect.x1 * 100}%`,
+                top: `${wz.rect.y1 * 100}%`,
+                width: `${(wz.rect.x2 - wz.rect.x1) * 100}%`,
+                height: `${(wz.rect.y2 - wz.rect.y1) * 100}%`,
+                zIndex: isHovered ? 55 : 15,
+              }}
+              onMouseEnter={() => setHoveredZone(wz.id)}
+              onMouseLeave={() => setHoveredZone((cur) => (cur === wz.id ? null : cur))}
+            >
+              {/* subtle highlight on hover */}
+              <div
+                className="absolute inset-0 rounded-md transition-all duration-150 pointer-events-none"
+                style={{
+                  background: isHovered
+                    ? ownerId
+                      ? "color-mix(in oklab, var(--primary) 10%, transparent)"
+                      : "color-mix(in oklab, var(--primary) 18%, transparent)"
+                    : "transparent",
+                  outline: isHovered
+                    ? `1.5px dashed color-mix(in oklab, var(--primary) 70%, transparent)`
+                    : "none",
+                }}
+              />
+              {isHovered && (
+                <div
+                  className="absolute left-1/2 -translate-x-1/2 -top-2 -translate-y-full whitespace-nowrap pointer-events-auto"
+                  style={{ zIndex: 70 }}
+                >
+                  {ownerId ? (
+                    <div className="glass-panel rounded-full px-3 py-1 shadow-soft text-xs font-medium flex items-center gap-2">
+                      <span
+                        className="inline-block w-2 h-2 rounded-full"
+                        style={{ background: owner?.avatar_color ?? "var(--primary)" }}
+                      />
+                      {owner?.display_name ?? "Reservado"}
+                      {isMyClaim && (
+                        <span className="text-[10px] text-muted-foreground">(seu espaço)</span>
+                      )}
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => claimZone(wz.id)}
+                      className="rounded-full px-3 py-1.5 text-xs font-semibold bg-primary text-primary-foreground shadow-soft hover:opacity-90"
+                    >
+                      Reivindicar espaço
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })}
+
         {/* Avatars */}
+
         {onlineList.map(({ pos: p, profile }) => {
           const isMe = me?.id === profile.id;
           const display = isMe ? pos : { x: p.x, y: p.y };

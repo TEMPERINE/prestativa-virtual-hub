@@ -10,11 +10,12 @@ import {
   clearOverrides,
   type MapOverrides,
   type CustomZone,
+  type ZoneKind,
 } from "@/lib/map-overrides";
 import { ZONES, COLLIDERS, FLOOR_POLY, type ZoneId } from "@/lib/office-map";
 import officeMap from "@/assets/office-map.jpg";
 import { toast } from "sonner";
-import { ArrowLeft, Eraser, Square, Download, Trash2, Eye, EyeOff, Undo, Plus, X } from "lucide-react";
+import { ArrowLeft, Eraser, Square, Download, Trash2, Eye, EyeOff, Undo, Plus, X, Briefcase, Users } from "lucide-react";
 
 type Tool =
   | { kind: "blocked" }
@@ -101,6 +102,34 @@ export function MapEditor() {
     },
     [customZones]
   );
+
+  // Default zone kinds shown in the editor (mirror map-overrides defaults).
+  const defaultKindOf = useCallback((id: string): ZoneKind => {
+    if (id === "lobby" || id === "reuniao" || id === "feedback" || id === "descompressao") return "common";
+    return "workspace";
+  }, []);
+
+  const kindOf = useCallback(
+    (id: string): ZoneKind => {
+      const ov = overrides.zoneKinds?.[id];
+      if (ov) return ov;
+      const custom = customZones.find((c) => c.id === id);
+      if (custom?.kind) return custom.kind;
+      return defaultKindOf(id);
+    },
+    [overrides.zoneKinds, customZones, defaultKindOf]
+  );
+
+  const toggleKind = useCallback((id: string) => {
+    setOverrides((prev) => {
+      const cur = prev.zoneKinds?.[id]
+        ?? prev.customZones?.find((c) => c.id === id)?.kind
+        ?? defaultKindOf(id);
+      const next: ZoneKind = cur === "workspace" ? "common" : "workspace";
+      return { ...prev, zoneKinds: { ...(prev.zoneKinds ?? {}), [id]: next } };
+    });
+    setDirty(true);
+  }, [defaultKindOf]);
 
   const addCustomZone = useCallback(() => {
     const label = window.prompt("Nome da nova zona:");
@@ -442,20 +471,32 @@ export function MapEditor() {
             {paintableZones.map((z) => {
               const color = ZONE_COLORS[z.id] ?? "#888";
               const active = tool.kind === "zone" && tool.zone === z.id;
+              const k = kindOf(z.id);
               return (
-                <button
+                <div
                   key={z.id}
-                  onClick={() => setTool({ kind: "zone", zone: z.id })}
-                  className={`flex items-center gap-2 px-2 py-1.5 rounded text-left text-sm ${
+                  className={`group flex items-center gap-2 px-2 py-1.5 rounded text-sm ${
                     active ? "ring-2 ring-primary bg-muted" : "hover:bg-muted"
                   }`}
                 >
-                  <span
-                    className="w-4 h-4 rounded shrink-0"
-                    style={{ backgroundColor: color, opacity: 0.7 }}
-                  />
-                  <span className="truncate">{z.label}</span>
-                </button>
+                  <button
+                    onClick={() => setTool({ kind: "zone", zone: z.id })}
+                    className="flex items-center gap-2 flex-1 min-w-0 text-left"
+                  >
+                    <span
+                      className="w-4 h-4 rounded shrink-0"
+                      style={{ backgroundColor: color, opacity: 0.7 }}
+                    />
+                    <span className="truncate">{z.label}</span>
+                  </button>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); toggleKind(z.id); }}
+                    title={k === "workspace" ? "Local de trabalho (reivindicável). Clique para tornar Espaço comum." : "Espaço comum. Clique para tornar Local de trabalho."}
+                    className={`shrink-0 p-1 rounded ${k === "workspace" ? "text-primary" : "text-muted-foreground"} hover:bg-muted`}
+                  >
+                    {k === "workspace" ? <Briefcase size={12} /> : <Users size={12} />}
+                  </button>
+                </div>
               );
             })}
             {customZones.length > 0 && (
@@ -463,6 +504,7 @@ export function MapEditor() {
                 <span className="text-[10px] uppercase text-muted-foreground px-1">Personalizadas</span>
                 {customZones.map((z) => {
                   const active = tool.kind === "zone" && tool.zone === (z.id as ZoneId);
+                  const k = kindOf(z.id);
                   return (
                     <div
                       key={z.id}
@@ -479,6 +521,13 @@ export function MapEditor() {
                           style={{ backgroundColor: z.color, opacity: 0.7 }}
                         />
                         <span className="truncate">{z.label}</span>
+                      </button>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); toggleKind(z.id); }}
+                        title={k === "workspace" ? "Local de trabalho (reivindicável)" : "Espaço comum"}
+                        className={`shrink-0 p-1 rounded ${k === "workspace" ? "text-primary" : "text-muted-foreground"} hover:bg-muted`}
+                      >
+                        {k === "workspace" ? <Briefcase size={12} /> : <Users size={12} />}
                       </button>
                       <button
                         onClick={() => removeCustomZone(z.id)}
