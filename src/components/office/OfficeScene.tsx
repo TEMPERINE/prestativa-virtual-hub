@@ -757,13 +757,6 @@ export function OfficeScene() {
         speakingPeers={rtc.speakingPeers}
       />
 
-      <ScreenShareViewer
-        localStream={rtc.localScreenStream}
-        remoteStreams={rtc.remoteScreenStreams}
-        profiles={profiles}
-        onStopLocal={() => { rtc.toggleScreen().catch(() => {}); }}
-        anchorRect={focusedZone?.rect ?? null}
-      />
 
       {/* Topbar */}
       <div className="absolute top-0 left-0 right-0 p-4 pointer-events-none z-[100]">
