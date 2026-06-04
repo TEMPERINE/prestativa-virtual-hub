@@ -1765,16 +1765,20 @@ function TeamRow({
 function OccupantCard({
   profile,
   online,
+  isMe,
   onLeaveNote,
+  onLeaveDesk,
 }: {
   profile: Profile | null;
   online: boolean;
+  isMe?: boolean;
   onLeaveNote?: () => void;
+  onLeaveDesk?: () => void;
 }) {
   const initials = (profile?.display_name ?? "?").charAt(0).toUpperCase();
   return (
     <div
-      className="rounded-xl shadow-soft px-4 pt-3 pb-2.5 text-white flex flex-col items-center gap-2 min-w-[180px]"
+      className="rounded-xl shadow-soft px-4 pt-3 pb-2.5 text-white flex flex-col items-center gap-2 min-w-[200px]"
       style={{
         background: "rgba(20, 22, 38, 0.95)",
         border: "1px solid rgba(255,255,255,0.08)",
@@ -1790,6 +1794,7 @@ function OccupantCard({
       <div className="text-center leading-tight">
         <div className="text-sm font-semibold flex items-center justify-center gap-1.5">
           {profile?.display_name ?? "Reservado"}
+          {isMe && <span className="text-[10px] opacity-60">(você)</span>}
           <span
             className={`inline-block w-1.5 h-1.5 rounded-full ${online ? "bg-emerald-400" : "bg-zinc-400"}`}
           />
@@ -1806,15 +1811,27 @@ function OccupantCard({
         <CardIconBtn title="Chat (em breve)" disabled>
           <MessageCircle className="w-3.5 h-3.5" />
         </CardIconBtn>
-        <CardIconBtn
-          title="Deixar recadinho"
-          onClick={onLeaveNote}
-          disabled={!onLeaveNote}
-          active
-        >
-          <StickyNote className="w-3.5 h-3.5" />
-        </CardIconBtn>
+        {!isMe && (
+          <CardIconBtn
+            title="Deixar recadinho"
+            onClick={onLeaveNote}
+            disabled={!onLeaveNote}
+            active
+          >
+            <StickyNote className="w-3.5 h-3.5" />
+          </CardIconBtn>
+        )}
       </div>
+      {isMe && onLeaveDesk && (
+        <button
+          type="button"
+          onClick={onLeaveDesk}
+          className="mt-1 w-full rounded-md px-3 py-1.5 text-xs font-semibold bg-white/10 hover:bg-destructive/80 text-white transition flex items-center justify-center gap-1.5"
+        >
+          <LogOut className="w-3 h-3" />
+          Deixar mesa
+        </button>
+      )}
     </div>
   );
 }
