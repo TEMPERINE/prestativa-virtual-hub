@@ -260,8 +260,14 @@ export function OfficeScene() {
         startPoint = sp ?? (rect ? seatPointForRect(rect) : SPAWN);
       } else {
         const existing = pmap[userData.user.id];
-        const savedStart = { x: existing?.x ?? SPAWN.x, y: existing?.y ?? SPAWN.y };
-        startPoint = collides(savedStart) ? SPAWN : savedStart;
+        if (existing && typeof existing.x === "number" && typeof existing.y === "number") {
+          const savedStart = { x: existing.x, y: existing.y };
+          startPoint = collides(savedStart) ? randomCorridorPoint() : savedStart;
+        } else {
+          // First time in: drop somewhere random in the corridors so people
+          // don't all pile on top of each other at the default spawn.
+          startPoint = randomCorridorPoint();
+        }
       }
       const safeStart = collides(startPoint) ? SPAWN : startPoint;
       setPos(safeStart);
