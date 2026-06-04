@@ -281,6 +281,29 @@ export function OfficeScene() {
     };
   }, []);
 
+  const claimZone = useCallback(async (zoneId: string) => {
+    const uid = meIdRef.current;
+    if (!uid) return;
+    // Release any previous claim by this user (one workstation per user).
+    await supabase.from("workspace_claims").delete().eq("user_id", uid);
+    const { error } = await supabase
+      .from("workspace_claims")
+      .insert({ zone_id: zoneId, user_id: uid });
+    if (error) {
+      toast.error("Não foi possível reivindicar esse espaço.");
+      return;
+    }
+    const label = findZoneById(zoneId)?.label ?? zoneId;
+    toast.success(`Você reivindicou ${label}. Esta é a sua posição oficial.`);
+    setClaims((prev) => {
+      const next: Record<string, string> = {};
+      for (const [k, v] of Object.entries(prev)) if (v !== uid) next[k] = v;
+      next[zoneId] = uid;
+      return next;
+    });
+  }, []);
+
+
   const sendReaction = useCallback((emoji: string) => {
     const uid = meIdRef.current;
     if (!uid) return;
