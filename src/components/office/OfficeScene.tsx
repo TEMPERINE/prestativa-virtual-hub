@@ -303,6 +303,33 @@ export function OfficeScene() {
     });
   }, []);
 
+  // Live ref to claims so the keyboard handler can read latest values.
+  const claimsRef = useRef<Record<string, string>>({});
+  useEffect(() => { claimsRef.current = claims; }, [claims]);
+
+  const teleportToMyClaim = useCallback(() => {
+    const uid = meIdRef.current;
+    if (!uid) return;
+    const myZone = Object.entries(claimsRef.current).find(([, u]) => u === uid)?.[0];
+    if (!myZone) {
+      toast.info("Você ainda não reivindicou nenhum espaço.");
+      return;
+    }
+    const rect = zoneRectFromOverrides(myZone as ZoneId) ?? findZoneById(myZone)?.rect;
+    if (!rect) return;
+    const target: Point = { x: (rect.x1 + rect.x2) / 2, y: (rect.y1 + rect.y2) / 2 };
+    const safe = collides(target) ? SPAWN : target;
+    posRef.current = safe;
+    setPos(safe);
+    const z = zoneAt(safe);
+    setZone(z.id);
+    setLocalFacing("down");
+    sendPos(safe.x, safe.y, z.id, "down");
+    toast.success(`Teleportado para ${findZoneById(myZone)?.label ?? myZone}.`);
+  }, [sendPos, setLocalFacing]);
+
+
+
 
   const sendReaction = useCallback((emoji: string) => {
     const uid = meIdRef.current;
