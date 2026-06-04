@@ -434,9 +434,6 @@ export function OfficeScene() {
               }}
             >
               <div className="flex flex-col items-center">
-                {reactions[profile.id] && (
-                  <ReactionBubble emoji={reactions[profile.id].emoji} />
-                )}
                 <div
                   className={`px-2 py-0.5 rounded-full text-[10px] font-medium whitespace-nowrap mb-0.5 ${
                     isMe ? "bg-primary text-primary-foreground" : "bg-card/95 text-foreground"
@@ -448,6 +445,11 @@ export function OfficeScene() {
                   {profile.display_name}
                 </div>
                 <div className="relative">
+                  {reactions[profile.id] && (
+                    <div className="absolute left-1/2 -translate-x-1/2 -top-2 z-10 pointer-events-none">
+                      <ReactionBubble emoji={reactions[profile.id].emoji} />
+                    </div>
+                  )}
                   <SpriteAvatar
                     facing={isMe ? facing : (p.facing ?? "down")}
                     frame={isMe ? frame : 0}
@@ -643,21 +645,14 @@ function SpriteAvatar({
 function ReactionBubble({ emoji }: { emoji: string }) {
   return (
     <div
-      className="mb-1 select-none"
-      style={{
-        animation: "fade-in 180ms ease-out",
-      }}
+      className="select-none"
+      style={{ animation: "fade-in 180ms ease-out" }}
     >
       <div
-        className="relative px-2.5 py-1 rounded-2xl bg-white shadow-soft border border-black/5"
+        className="px-2.5 py-1 rounded-2xl bg-white shadow-soft border border-black/5 whitespace-nowrap"
         style={{ fontSize: "clamp(16px, 2.6vh, 28px)", lineHeight: 1 }}
       >
-        <span>{emoji}</span>
-        <span
-          className="absolute left-1/2 -bottom-1.5 w-3 h-3 bg-white border-r border-b border-black/5 rotate-45"
-          style={{ transform: "translateX(-50%) rotate(45deg)" }}
-          aria-hidden
-        />
+        {emoji}
       </div>
     </div>
   );
