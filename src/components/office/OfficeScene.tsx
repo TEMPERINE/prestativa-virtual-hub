@@ -894,7 +894,6 @@ export function OfficeScene() {
             style={{
               transform: `scale(${zoom})`,
               transformOrigin: "0 0",
-              transition: "transform 0.25s cubic-bezier(0.25, 0.1, 0.25, 1)",
               willChange: "transform",
             }}
           >
