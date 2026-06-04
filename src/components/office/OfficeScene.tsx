@@ -1429,7 +1429,7 @@ export function OfficeScene() {
         type="button"
         onClick={() => setShowTeam((v) => !v)}
         title={showTeam ? "Ocultar equipe" : "Mostrar equipe"}
-        className="absolute top-1/2 -translate-y-1/2 z-[85] w-7 h-14 rounded-l-lg bg-black/60 hover:bg-black/80 text-white flex items-center justify-center shadow-soft backdrop-blur-sm transition-all"
+        className="absolute top-1/2 -translate-y-1/2 z-[85] w-7 h-14 rounded-l-lg bg-rose-500/90 hover:bg-rose-600 text-white flex items-center justify-center shadow-soft backdrop-blur-sm transition-all"
         style={{ right: showTeam ? "18rem" : "0" }}
       >
         {showTeam ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
