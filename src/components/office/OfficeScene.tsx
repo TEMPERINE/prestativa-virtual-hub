@@ -9,7 +9,7 @@ import {
   type Point,
   type ZoneId,
 } from "@/lib/office-map";
-import { zoneRectFromOverrides, getZoneKind } from "@/lib/map-overrides";
+import { zoneRectFromOverrides, getZoneKind, customZonesFromOverrides } from "@/lib/map-overrides";
 import officeMap from "@/assets/office-map.jpg";
 import parkLeft from "@/assets/scene-park-left.jpg";
 import roadRight from "@/assets/scene-road-right.jpg";
@@ -421,7 +421,7 @@ export function OfficeScene() {
       : currentZone;
   }, [currentZone]);
 
-  // All workspace zones with their effective rect for hover overlays.
+  // All workspace zones (built-in + custom) with their effective rect for hover overlays.
   const workspaceZones = useMemo(() => {
     const out: { id: string; label: string; rect: { x1: number; y1: number; x2: number; y2: number } }[] = [];
     for (const z of ZONES) {
@@ -430,8 +430,15 @@ export function OfficeScene() {
       const rect = zoneRectFromOverrides(z.id) ?? z.rect;
       out.push({ id: z.id, label: z.label, rect });
     }
+    // Custom zones from the editor — only include those marked as workspace and with painted tiles.
+    for (const c of customZonesFromOverrides()) {
+      if (getZoneKind(c.id) !== "workspace") continue;
+      const rect = zoneRectFromOverrides(c.id as ZoneId);
+      if (!rect) continue;
+      out.push({ id: c.id, label: c.label, rect });
+    }
     return out;
-  }, []);
+  }, [claims]);
 
 
 
@@ -528,7 +535,7 @@ export function OfficeScene() {
               />
               {isHovered && (
                 <div
-                  className="absolute left-1/2 -translate-x-1/2 -top-2 -translate-y-full whitespace-nowrap pointer-events-auto"
+                  className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 whitespace-nowrap pointer-events-auto"
                   style={{ zIndex: 70 }}
                 >
                   {ownerId ? (
