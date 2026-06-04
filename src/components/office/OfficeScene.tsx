@@ -882,25 +882,14 @@ export function OfficeScene() {
         </div>
       </div>
 
-      {/* Map row (park + office stage) */}
-      <div className="relative flex-1 flex items-stretch min-h-0 overflow-hidden">
+      {/* Map row (office stage fills full viewport width) */}
+      <div className="relative flex-1 flex items-stretch min-h-0 overflow-hidden bg-black">
 
-      <div
-        className="flex-1 h-full"
-        style={{
-          backgroundImage: `url(${parkLeft})`,
-          backgroundSize: "auto 100%",
-          backgroundPosition: "right center",
-          backgroundRepeat: "repeat-x",
-        }}
-        aria-hidden
-      />
-
-      {/* Office stage — fixed aspect, full height */}
+      {/* Office stage — fills available space */}
       <div
         ref={stageRef}
-        className="relative h-full shrink-0 overflow-hidden select-none"
-        style={{ aspectRatio: "1536 / 1024" }}
+        className="relative flex-1 h-full overflow-hidden select-none"
+
         onWheel={(e) => {
           e.preventDefault();
           const stage = stageRef.current;
