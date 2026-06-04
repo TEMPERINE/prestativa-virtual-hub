@@ -169,6 +169,11 @@ export function useRtcMesh(myId: string | null, desiredPeers: string[]): RtcMesh
       delete next[peerId];
       return next;
     });
+    setRemoteScreenStreams((prev) => {
+      const next = { ...prev };
+      delete next[peerId];
+      return next;
+    });
     setConnectedPeers((prev) => prev.filter((p) => p !== peerId));
     setSpeakingPeers((prev) => {
       const next = { ...prev };
