@@ -1592,7 +1592,7 @@ function WorkspaceZoneHover({
       const el = anchorRef.current;
       if (el) {
         const r = el.getBoundingClientRect();
-        setPos({ left: r.left + r.width / 2, top: r.top });
+        setPos({ left: r.left + r.width / 2, top: r.top + r.height / 2 });
       }
       raf = window.requestAnimationFrame(tick);
     };
