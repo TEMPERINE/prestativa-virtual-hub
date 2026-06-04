@@ -389,9 +389,10 @@ export function OfficeScene() {
       toast.info("Você ainda não reivindicou nenhum espaço.");
       return;
     }
+    const sp = spawnPointForZone(myZone);
     const rect = zoneRectFromOverrides(myZone as ZoneId) ?? findZoneById(myZone)?.rect;
-    if (!rect) return;
-    const target = seatPointForRect(rect);
+    const target = sp ?? (rect ? seatPointForRect(rect) : null);
+    if (!target) return;
     const from = { ...posRef.current };
 
     // Cancel any pending auto-walk and clear stale timers
