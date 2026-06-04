@@ -245,6 +245,24 @@ export function OfficeScene() {
       .subscribe();
     reactionChannelRef.current = reactionCh;
 
+    const claimsCh = supabase
+      .channel("claims-room")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "workspace_claims" },
+        (payload) => {
+          const row = (payload.new ?? payload.old) as { zone_id: string; user_id: string };
+          if (!row) return;
+          setClaims((prev) => {
+            const next = { ...prev };
+            if (payload.eventType === "DELETE") delete next[row.zone_id];
+            else next[row.zone_id] = row.user_id;
+            return next;
+          });
+        }
+      )
+      .subscribe();
+
     const offline = async () => {
       const { data: u } = await supabase.auth.getUser();
       if (u.user) {
@@ -256,6 +274,7 @@ export function OfficeScene() {
     return () => {
       supabase.removeChannel(ch);
       supabase.removeChannel(reactionCh);
+      supabase.removeChannel(claimsCh);
       reactionChannelRef.current = null;
       window.removeEventListener("beforeunload", offline);
       offline();
