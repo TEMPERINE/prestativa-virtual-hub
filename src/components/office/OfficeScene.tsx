@@ -393,7 +393,7 @@ export function OfficeScene() {
                     draggable={false}
                     className="select-none"
                     style={{
-                      width: "min(8vh, 100px)",
+                      width: "min(4vh, 50px)",
                       height: "auto",
                       filter: isMe
                         ? `drop-shadow(0 0 8px ${profile.avatar_color}) drop-shadow(0 3px 4px rgba(0,0,0,0.35))`
