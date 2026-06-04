@@ -142,6 +142,55 @@ export function OfficeScene() {
   const reactionChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const meIdRef = useRef<string | null>(null);
 
+  // ===== Camera (zoom + pan + follow) =====
+  const MIN_ZOOM = 1;
+  const MAX_ZOOM = 7; // ~roughly one workspace fills the screen
+  const [zoom, setZoom] = useState(1);
+  const [pan, setPan] = useState({ x: 0, y: 0 }); // pixel offset of scaled content in stage
+  const [followMe, setFollowMe] = useState(true);
+  const zoomRef = useRef(1);
+  const panRef = useRef({ x: 0, y: 0 });
+  const followRef = useRef(true);
+  zoomRef.current = zoom;
+  panRef.current = pan;
+  followRef.current = followMe;
+  const dragRef = useRef<{ startX: number; startY: number; panX: number; panY: number; moved: boolean } | null>(null);
+  const wasDragRef = useRef(false);
+
+  const clampPan = useCallback((s: number, p: { x: number; y: number }) => {
+    const stage = stageRef.current;
+    if (!stage) return p;
+    const W = stage.clientWidth, H = stage.clientHeight;
+    const minX = W - W * s, minY = H - H * s;
+    return {
+      x: Math.min(0, Math.max(minX, p.x)),
+      y: Math.min(0, Math.max(minY, p.y)),
+    };
+  }, []);
+
+  const centerOn = useCallback((nx: number, ny: number, s = zoomRef.current) => {
+    const stage = stageRef.current;
+    if (!stage) return;
+    const W = stage.clientWidth, H = stage.clientHeight;
+    const tx = W / 2 - nx * W * s;
+    const ty = H / 2 - ny * H * s;
+    setPan(clampPan(s, { x: tx, y: ty }));
+  }, [clampPan]);
+
+  // Follow avatar smoothly when enabled
+  useEffect(() => {
+    if (!followMe) return;
+    centerOn(pos.x, pos.y, zoom);
+  }, [pos.x, pos.y, zoom, followMe, centerOn]);
+
+  // Re-clamp pan on window resize
+  useEffect(() => {
+    const onResize = () => setPan((p) => clampPan(zoomRef.current, p));
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, [clampPan]);
+
+
   const keysDown = useRef<Set<Facing>>(new Set());
   const lastDir = useRef<Facing | null>(null);
   const lastSent = useRef(0);
