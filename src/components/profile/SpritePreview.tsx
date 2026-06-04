@@ -41,6 +41,7 @@ export function SpritePreview({ spriteId, facing = "down", size = 96, animate = 
         overflow: "hidden",
         position: "relative",
         imageRendering: "pixelated",
+        transform: useMirror ? "scaleX(-1)" : undefined,
       }}
     >
       <img
@@ -50,8 +51,7 @@ export function SpritePreview({ spriteId, facing = "down", size = 96, animate = 
           height: h,
           width: w * SPRITE_FRAMES,
           maxWidth: "none",
-          transform: `translateX(-${frame * w}px) ${useMirror ? "scaleX(-1)" : ""}`,
-          transformOrigin: useMirror ? "center" : "left top",
+          transform: `translateX(-${frame * w}px)`,
           imageRendering: "pixelated",
           objectFit: "cover",
         }}
