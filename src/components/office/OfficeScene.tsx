@@ -270,7 +270,7 @@ export function OfficeScene() {
   }, [tryMove, sendPos]);
 
 
-  const currentZone = useMemo(() => ZONES.find((z) => z.id === zone) ?? ZONES[ZONES.length - 1], [zone]);
+  const currentZone = useMemo(() => findZoneById(zone) ?? ZONES[ZONES.length - 1], [zone]);
   // Prefer the painted bounding box (editor overrides) over the hardcoded rect
   // so the spotlight visually matches exactly what the user painted.
   const focusedZone = useMemo(() => {
