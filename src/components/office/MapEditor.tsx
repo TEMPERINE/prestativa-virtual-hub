@@ -221,6 +221,7 @@ export function MapEditor() {
   );
 
   const spawnPoints = overrides.spawnPoints ?? {};
+  const draggingPin = useRef<string | null>(null);
 
   const removeSpawn = useCallback((zoneId: string) => {
     setOverrides((prev) => {
@@ -228,6 +229,18 @@ export function MapEditor() {
       delete cur[zoneId];
       return { ...prev, spawnPoints: cur };
     });
+    setDirty(true);
+  }, []);
+
+  const moveSpawnToPointer = useCallback((e: React.PointerEvent, zoneId: string) => {
+    if (!stageRef.current) return;
+    const rect = stageRef.current.getBoundingClientRect();
+    const x = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+    const y = Math.max(0, Math.min(1, (e.clientY - rect.top) / rect.height));
+    setOverrides((prev) => ({
+      ...prev,
+      spawnPoints: { ...(prev.spawnPoints ?? {}), [zoneId]: { x, y } },
+    }));
     setDirty(true);
   }, []);
 
@@ -638,6 +651,7 @@ export function MapEditor() {
             className="relative mx-auto select-none cursor-crosshair"
             style={{ aspectRatio: "1536 / 1024", width: "min(100%, calc((100vh - 110px) * 1.5))" }}
             onPointerDown={(e) => {
+              if (draggingPin.current) return;
               (e.target as Element).setPointerCapture?.(e.pointerId);
               painting.current = true;
               pushHistory({
@@ -648,10 +662,14 @@ export function MapEditor() {
               handlePointer(e);
             }}
             onPointerMove={(e) => {
+              if (draggingPin.current) {
+                moveSpawnToPointer(e, draggingPin.current);
+                return;
+              }
               if (painting.current) handlePointer(e);
             }}
-            onPointerUp={() => (painting.current = false)}
-            onPointerCancel={() => (painting.current = false)}
+            onPointerUp={() => { painting.current = false; draggingPin.current = null; }}
+            onPointerCancel={() => { painting.current = false; draggingPin.current = null; }}
           >
             {showImage && (
               <img
@@ -700,6 +718,12 @@ export function MapEditor() {
                     top: `${p.y * 100}%`,
                     transform: "translate(-50%, -100%)",
                   }}
+                  onPointerDown={(e) => {
+                    e.stopPropagation();
+                    if ((e.target as HTMLElement).closest("button")) return;
+                    draggingPin.current = zid;
+                    (stageRef.current as Element | null)?.setPointerCapture?.(e.pointerId);
+                  }}
                 >
                   <div className="flex flex-col items-center -mb-1">
                     <div
@@ -708,7 +732,7 @@ export function MapEditor() {
                     >
                       {label}
                     </div>
-                    <div className="relative">
+                    <div className="relative" style={{ cursor: "grab" }}>
                       <MapPin
                         size={active ? 24 : 20}
                         className="drop-shadow"
@@ -716,6 +740,7 @@ export function MapEditor() {
                       />
                       <button
                         type="button"
+                        onPointerDown={(e) => e.stopPropagation()}
                         onClick={(e) => { e.stopPropagation(); removeSpawn(zid); }}
                         title="Remover ponto"
                         className="absolute -top-1 -right-2 bg-card border border-border rounded-full p-0.5 text-muted-foreground hover:text-destructive"
@@ -729,7 +754,7 @@ export function MapEditor() {
             })}
             {tool.kind === "spawn" && (
               <div className="absolute top-2 left-1/2 -translate-x-1/2 pointer-events-none bg-primary text-primary-foreground text-xs px-3 py-1 rounded-full shadow-soft">
-                Clique no mapa para fixar o ponto de teleporte
+                Clique no mapa para fixar o ponto · arraste o pino para ajustes finos
               </div>
             )}
           </div>
