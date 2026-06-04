@@ -1116,6 +1116,7 @@ function SpriteAvatar({
       />
       {(Object.keys(AVATAR_SPRITES) as Facing[]).map((f) => {
         const h = SHEET_HEIGHT[f];
+        const w = FRAME_WIDTHS[f];
         const active = f === facing;
         return (
           <div
