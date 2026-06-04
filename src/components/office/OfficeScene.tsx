@@ -24,6 +24,17 @@ const AVATAR_SPRITES: Record<Facing, string> = {
   left: avatarLeft,
   right: avatarRight,
 };
+// Each sheet: 1536px wide, 6 frames of 256px wide. Heights vary per direction.
+const SHEET_HEIGHT: Record<Facing, number> = {
+  down: 255,
+  up: 240,
+  left: 229,
+  right: 244,
+};
+const FRAME_W = 256;
+const FRAMES = 6; // frame 0 = idle, frames 1..5 = walk cycle
+const WALK_FRAME_MS = 110;
+
 function dirFromKey(k: string): Facing | null {
   if (k === "arrowup" || k === "w") return "up";
   if (k === "arrowdown" || k === "s") return "down";
@@ -38,7 +49,7 @@ import { Link } from "@tanstack/react-router";
 type Profile = { id: string; display_name: string; avatar_color: string };
 type RemotePos = { user_id: string; x: number; y: number; zone: string; is_online: boolean; facing?: Facing };
 
-const SPEED = 0.0048;
+const SPEED = 0.0042;
 const SEND_INTERVAL_MS = 120;
 
 export function OfficeScene() {
@@ -55,11 +66,16 @@ export function OfficeScene() {
   const [facing, setFacing] = useState<Facing>("down");
   const facingRef = useRef<Facing>("down");
 
-  const activeMoveDirection = useRef<Facing | null>(null);
+  const keysDown = useRef<Set<Facing>>(new Set());
+  const lastDir = useRef<Facing | null>(null);
   const lastSent = useRef(0);
-  const walkTarget = useRef<Point | null>(null);
   const posRef = useRef(pos);
   posRef.current = pos;
+
+  // Walk animation frame (0 = idle, 1..5 = walk cycle)
+  const [frame, setFrame] = useState(0);
+  const frameRef = useRef(0);
+  const lastFrameTick = useRef(0);
 
   const setLocalFacing = useCallback((nextFacing: Facing) => {
     if (facingRef.current === nextFacing) return;
@@ -67,106 +83,38 @@ export function OfficeScene() {
     setFacing(nextFacing);
   }, []);
 
-  const turnAvatar = useCallback(
-    (nextFacing: Facing) => {
-      setLocalFacing(nextFacing);
-      const current = posRef.current;
-      const z = zoneAt(current);
-      void supabase.auth.getUser().then(({ data }) => {
-        if (!data.user) return;
-        void supabase.from("positions").upsert({
-          user_id: data.user.id,
-          x: current.x,
-          y: current.y,
-          zone: z.id,
-          facing: nextFacing,
-          is_online: true,
-        });
+  const sendPos = useCallback((x: number, y: number, z: ZoneId, f: Facing) => {
+    void supabase.auth.getUser().then(({ data }) => {
+      if (!data.user) return;
+      void supabase.from("positions").upsert({
+        user_id: data.user.id,
+        x, y, zone: z, facing: f, is_online: true,
       });
-    },
-    [setLocalFacing]
-  );
+    });
+  }, []);
 
-  const moveAvatar = useCallback((rawDx: number, rawDy: number, speed = SPEED) => {
-    if (!rawDx && !rawDy) return;
-    const len = Math.hypot(rawDx, rawDy);
-    if (!len) return;
-    const dx = (rawDx / len) * speed;
-    const dy = (rawDy / len) * speed;
+  const tryMove = useCallback((dir: Facing) => {
     const cur = posRef.current;
-
+    const dx = dir === "left" ? -SPEED : dir === "right" ? SPEED : 0;
+    const dy = dir === "up" ? -SPEED : dir === "down" ? SPEED : 0;
     let nx = cur.x + dx;
-    let ny = cur.y;
-    if (collides({ x: nx, y: ny })) nx = cur.x;
-    ny += dy;
+    let ny = cur.y + dy;
+    if (collides({ x: nx, y: cur.y })) nx = cur.x;
     if (collides({ x: nx, y: ny })) ny = cur.y;
-    if (nx === cur.x && ny === cur.y) return;
-
+    if (nx === cur.x && ny === cur.y) return false;
     const np = { x: nx, y: ny };
     posRef.current = np;
     setPos(np);
     const z = zoneAt(np);
     setZone((prev) => (prev !== z.id ? z.id : prev));
-
-    const newFacing: Facing =
-      Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? "right" : "left") : dy > 0 ? "down" : "up";
-    setLocalFacing(newFacing);
-
     const now = performance.now();
     if (now - lastSent.current > SEND_INTERVAL_MS) {
       lastSent.current = now;
-      void supabase.auth.getUser().then(({ data }) => {
-        if (!data.user) return;
-        void supabase.from("positions").upsert({
-          user_id: data.user.id,
-          x: np.x,
-          y: np.y,
-          zone: z.id,
-          facing: newFacing,
-          is_online: true,
-        });
-      });
+      sendPos(np.x, np.y, z.id, dir);
     }
-  }, [setLocalFacing]);
+    return true;
+  }, [sendPos]);
 
-  const handleMoveKey = useCallback(
-    (key: string, pressed: boolean, step = false) => {
-      const k = key.toLowerCase();
-      const dir = dirFromKey(k);
-      if (!dir) return false;
-      if (!pressed) {
-        if (activeMoveDirection.current === dir) activeMoveDirection.current = null;
-        return true;
-      }
-
-      walkTarget.current = null;
-      if (facingRef.current !== dir) {
-        activeMoveDirection.current = null;
-        turnAvatar(dir);
-        return true;
-      }
-
-      activeMoveDirection.current = dir;
-      if (pressed && step) {
-        if (dir === "up") moveAvatar(0, -1, SPEED * 6);
-        else if (dir === "down") moveAvatar(0, 1, SPEED * 6);
-        else if (dir === "left") moveAvatar(-1, 0, SPEED * 6);
-        else if (dir === "right") moveAvatar(1, 0, SPEED * 6);
-      }
-      return true;
-    },
-    [moveAvatar, turnAvatar]
-  );
-
-  const walkToPoint = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
-    sceneRef.current?.focus();
-    const bounds = event.currentTarget.getBoundingClientRect();
-    const next = {
-      x: Math.max(0.11, Math.min(0.95, (event.clientX - bounds.left) / bounds.width)),
-      y: Math.max(0.05, Math.min(0.95, (event.clientY - bounds.top) / bounds.height)),
-    };
-    walkTarget.current = next;
-  }, []);
 
   // Load me + all profiles + initial positions
   useEffect(() => {
@@ -242,60 +190,76 @@ export function OfficeScene() {
     };
   }, []);
 
-  // keyboard input
+  // keyboard input — standard 2D game movement (hold to walk, release to idle)
   useEffect(() => {
-    const MOVE_KEYS = new Set(["arrowup", "arrowdown", "arrowleft", "arrowright", "w", "a", "s", "d"]);
     const down = (e: KeyboardEvent) => {
-      if (MOVE_KEYS.has(e.key.toLowerCase())) {
-        e.preventDefault();
-        handleMoveKey(e.key, true, true);
-      }
+      const dir = dirFromKey(e.key.toLowerCase());
+      if (!dir) return;
+      e.preventDefault();
+      if (e.repeat) return;
+      keysDown.current.add(dir);
+      lastDir.current = dir;
+      setLocalFacing(dir);
     };
     const up = (e: KeyboardEvent) => {
-      if (MOVE_KEYS.has(e.key.toLowerCase())) {
-        e.preventDefault();
-        handleMoveKey(e.key, false);
+      const dir = dirFromKey(e.key.toLowerCase());
+      if (!dir) return;
+      e.preventDefault();
+      keysDown.current.delete(dir);
+      if (lastDir.current === dir) {
+        // Fall back to any other key still held
+        const remaining = Array.from(keysDown.current);
+        lastDir.current = remaining[remaining.length - 1] ?? null;
+        if (lastDir.current) setLocalFacing(lastDir.current);
       }
+    };
+    const blur = () => {
+      keysDown.current.clear();
+      lastDir.current = null;
     };
     window.addEventListener("keydown", down, { passive: false });
     window.addEventListener("keyup", up, { passive: false });
+    window.addEventListener("blur", blur);
     return () => {
       window.removeEventListener("keydown", down);
       window.removeEventListener("keyup", up);
+      window.removeEventListener("blur", blur);
     };
-  }, [handleMoveKey]);
+  }, [setLocalFacing]);
 
-  // movement loop
+  // movement + animation loop
   useEffect(() => {
     let raf = 0;
-    const tick = () => {
-      let dx = 0;
-      let dy = 0;
-      if (activeMoveDirection.current === "up") dy = -1;
-      else if (activeMoveDirection.current === "down") dy = 1;
-      else if (activeMoveDirection.current === "left") dx = -1;
-      else if (activeMoveDirection.current === "right") dx = 1;
-
-      if (dx || dy) {
-        moveAvatar(dx, dy);
-      } else if (walkTarget.current) {
-        const target = walkTarget.current;
-        const cur = posRef.current;
-        const tx = target.x - cur.x;
-        const ty = target.y - cur.y;
-        if (Math.hypot(tx, ty) < SPEED * 1.5) {
-          walkTarget.current = null;
-        } else {
-          // Click-to-walk also goes one axis at a time (dominant first).
-          if (Math.abs(tx) >= Math.abs(ty)) moveAvatar(tx, 0, SPEED * 1.5);
-          else moveAvatar(0, ty, SPEED * 1.5);
+    const tick = (t: number) => {
+      const dir = lastDir.current;
+      if (dir) {
+        const moved = tryMove(dir);
+        if (moved) {
+          if (t - lastFrameTick.current > WALK_FRAME_MS) {
+            lastFrameTick.current = t;
+            // cycle frames 1..5
+            const next = frameRef.current >= 5 || frameRef.current < 1 ? 1 : frameRef.current + 1;
+            frameRef.current = next;
+            setFrame(next);
+          }
+        } else if (frameRef.current !== 0) {
+          frameRef.current = 0;
+          setFrame(0);
         }
+      } else if (frameRef.current !== 0) {
+        frameRef.current = 0;
+        setFrame(0);
+        // send final idle position so remotes see exact pose
+        const cur = posRef.current;
+        const z = zoneAt(cur);
+        sendPos(cur.x, cur.y, z.id, facingRef.current);
       }
       raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [moveAvatar]);
+  }, [tryMove, sendPos]);
+
 
   const currentZone = useMemo(() => ZONES.find((z) => z.id === zone) ?? ZONES[ZONES.length - 1], [zone]);
   // Prefer the painted bounding box (editor overrides) over the hardcoded rect
@@ -349,8 +313,8 @@ export function OfficeScene() {
         ref={stageRef}
         className="relative h-full shrink-0"
         style={{ aspectRatio: "1536 / 1024" }}
-        onPointerDown={walkToPoint}
       >
+
         <img
           src={officeMap}
           alt="Escritório Prestativa Virtual"
@@ -401,18 +365,10 @@ export function OfficeScene() {
                   {profile.display_name}
                 </div>
                 <div className="relative">
-                  <img
-                    src={AVATAR_SPRITES[isMe ? facing : (p.facing ?? "down")]}
-                    alt=""
-                    draggable={false}
-                    className="select-none"
-                    style={{
-                      width: "min(4vh, 50px)",
-                      height: "auto",
-                      filter: isMe
-                        ? `drop-shadow(0 0 8px ${profile.avatar_color}) drop-shadow(0 3px 4px rgba(0,0,0,0.35))`
-                        : "drop-shadow(0 3px 4px rgba(0,0,0,0.35))",
-                    }}
+                  <SpriteAvatar
+                    facing={isMe ? facing : (p.facing ?? "down")}
+                    frame={isMe ? frame : 0}
+                    glowColor={isMe ? profile.avatar_color : undefined}
                   />
                 </div>
               </div>
@@ -546,13 +502,43 @@ export function OfficeScene() {
       {/* Movement hint */}
       <div className="absolute bottom-4 left-1/2 -translate-x-1/2 pointer-events-none z-[70]">
         <div className="glass-panel rounded-full px-4 py-2 shadow-soft text-xs text-muted-foreground">
-          Use <kbd className="px-1.5 py-0.5 bg-muted rounded text-[10px] font-mono">WASD</kbd>,{" "}
-          <kbd className="px-1.5 py-0.5 bg-muted rounded text-[10px] font-mono">setas</kbd> ou clique no mapa
+          Use <kbd className="px-1.5 py-0.5 bg-muted rounded text-[10px] font-mono">WASD</kbd> ou{" "}
+          <kbd className="px-1.5 py-0.5 bg-muted rounded text-[10px] font-mono">setas</kbd> para se mover
         </div>
       </div>
     </div>
   );
 }
+
+/** Animated sprite avatar — 6-frame horizontal sheet per direction. */
+function SpriteAvatar({
+  facing,
+  frame,
+  glowColor,
+}: {
+  facing: Facing;
+  frame: number;
+  glowColor?: string;
+}) {
+  const sheetH = SHEET_HEIGHT[facing];
+  return (
+    <div
+      style={{
+        height: "min(7vh, 72px)",
+        aspectRatio: `${FRAME_W} / ${sheetH}`,
+        backgroundImage: `url(${AVATAR_SPRITES[facing]})`,
+        backgroundRepeat: "no-repeat",
+        backgroundSize: `${FRAMES * 100}% 100%`,
+        backgroundPosition: `${(frame / (FRAMES - 1)) * 100}% 0`,
+        filter: glowColor
+          ? `drop-shadow(0 0 6px ${glowColor}) drop-shadow(0 3px 4px rgba(0,0,0,0.35))`
+          : "drop-shadow(0 3px 4px rgba(0,0,0,0.35))",
+      }}
+    />
+  );
+}
+
+
 
 /** Darkens everything outside the given zone rect within the office stage. */
 function ZoneSpotlight({ rect }: { rect: { x1: number; y1: number; x2: number; y2: number } }) {
