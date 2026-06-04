@@ -1114,6 +1114,7 @@ export function OfficeScene() {
           anchorRect={focusedZone?.rect ?? null}
         />
         </div>
+        </div>
         {/* /Camera transform layer */}
 
         {/* Map navigation controls (right side) */}
