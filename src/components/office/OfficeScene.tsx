@@ -568,10 +568,17 @@ export function OfficeScene() {
   const teleportToZone = useCallback((zoneId: ZoneId, label?: string) => {
     const z = findZoneById(zoneId);
     if (!z) return;
+    // If already inside the target zone, do nothing.
+    const currentZone = zoneAt(posRef.current);
+    if (currentZone.id === zoneId) {
+      toast.info(`Você já está em ${label ?? z.label}.`);
+      return;
+    }
     const sp = spawnPointForZone(zoneId);
     const rect = zoneRectFromOverrides(zoneId) ?? z.rect;
     const target = sp ?? seatPointForRect(rect);
     const from = { ...posRef.current };
+
 
     // Cancel any pending auto-walk and clear stale timers
     autoWalkRef.current = null;
