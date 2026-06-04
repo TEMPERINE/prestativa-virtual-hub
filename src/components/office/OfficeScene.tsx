@@ -44,6 +44,10 @@ import { ScreenShareViewer } from "./ScreenShareViewer";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
+import { ProfileMenu } from "@/components/profile/ProfileMenu";
+import { EditCharacterModal } from "@/components/profile/EditCharacterModal";
+import { EditProfileModal } from "@/components/profile/EditProfileModal";
+import { OnboardingWizard } from "@/components/onboarding/OnboardingWizard";
 
 type Profile = {
   id: string;
@@ -125,6 +129,20 @@ export function OfficeScene() {
   const [openingNote, setOpeningNote] = useState<DeskNote | null>(null);
   const reactionChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const meIdRef = useRef<string | null>(null);
+  const [myEmail, setMyEmail] = useState<string>("");
+  const [editCharOpen, setEditCharOpen] = useState(false);
+  const [editProfOpen, setEditProfOpen] = useState(false);
+  const [forceOnboarding, setForceOnboarding] = useState(false);
+
+  const refreshMe = useCallback(async () => {
+    const uid = meIdRef.current;
+    if (!uid) return;
+    const { data } = await supabase.from("profiles").select("id, display_name, avatar_color, sprite_id, tagline, status, onboarded_at").eq("id", uid).maybeSingle();
+    if (data) {
+      setMe(data as Profile);
+      setProfiles((prev) => ({ ...prev, [uid]: data as Profile }));
+    }
+  }, []);
 
   // ===== Camera (zoom + pan + follow) =====
   const MIN_ZOOM = 1;
@@ -330,6 +348,7 @@ export function OfficeScene() {
       const { data: userData } = await supabase.auth.getUser();
       if (!userData.user) return;
       meIdRef.current = userData.user.id;
+      setMyEmail(userData.user.email ?? "");
       const { data: profs } = await supabase.from("profiles").select("id, display_name, avatar_color, sprite_id, tagline, status, onboarded_at");
       const map: Record<string, Profile> = {};
       (profs ?? []).forEach((p) => (map[p.id] = p as Profile));
