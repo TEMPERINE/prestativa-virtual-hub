@@ -11,7 +11,6 @@ export const Route = createFileRoute("/auth")({
     ],
   }),
   beforeLoad: async () => {
-    // If already signed in, send to office
     if (typeof window !== "undefined") {
       const { data } = await supabase.auth.getSession();
       if (data.session) throw redirect({ to: "/office" });
@@ -21,22 +20,43 @@ export const Route = createFileRoute("/auth")({
 });
 
 function AuthPage() {
+  const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [name, setName] = useState("");
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    setLoading(false);
-    if (error) {
-      toast.error(error.message);
-      return;
+    if (mode === "signin") {
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      setLoading(false);
+      if (error) { toast.error(error.message); return; }
+      toast.success("Bem-vindo(a) ao escritório!");
+      window.location.href = "/office";
+    } else {
+      const displayName = (name.trim() || email.split("@")[0] || "Novo membro").slice(0, 24);
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          emailRedirectTo: `${window.location.origin}/office`,
+          data: { display_name: displayName },
+        },
+      });
+      setLoading(false);
+      if (error) { toast.error(error.message); return; }
+      if (!data.session) {
+        toast.success("Confira seu e-mail para confirmar o cadastro.");
+        return;
+      }
+      toast.success("Conta criada! Vamos personalizar seu avatar.");
+      window.location.href = "/office";
     }
-    toast.success("Bem-vinda ao escritório!");
-    window.location.href = "/office";
   };
+
+  const isSignup = mode === "signup";
 
   return (
     <div className="min-h-screen flex items-center justify-center p-6 bg-gradient-to-br from-background via-accent/30 to-background">
@@ -52,7 +72,36 @@ function AuthPage() {
         </div>
 
         <div className="glass-panel rounded-2xl p-8 shadow-soft">
+          <div className="flex gap-1 p-1 bg-muted rounded-lg mb-5">
+            <button
+              type="button"
+              onClick={() => setMode("signin")}
+              className={`flex-1 py-2 rounded-md text-sm font-medium transition ${!isSignup ? "bg-background shadow-sm" : "text-muted-foreground"}`}
+            >
+              Entrar
+            </button>
+            <button
+              type="button"
+              onClick={() => setMode("signup")}
+              className={`flex-1 py-2 rounded-md text-sm font-medium transition ${isSignup ? "bg-background shadow-sm" : "text-muted-foreground"}`}
+            >
+              Criar conta
+            </button>
+          </div>
+
           <form onSubmit={handleSubmit} className="space-y-4">
+            {isSignup && (
+              <div>
+                <label className="block text-sm font-medium mb-1.5">Como devemos te chamar?</label>
+                <input
+                  type="text"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  className="w-full rounded-lg border bg-background px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                  placeholder="Seu primeiro nome"
+                />
+              </div>
+            )}
             <div>
               <label className="block text-sm font-medium mb-1.5">Email</label>
               <input
@@ -69,6 +118,7 @@ function AuthPage() {
               <input
                 type="password"
                 required
+                minLength={6}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="w-full rounded-lg border bg-background px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
@@ -80,11 +130,11 @@ function AuthPage() {
               disabled={loading}
               className="w-full rounded-lg gradient-primary text-primary-foreground font-medium py-2.5 hover:opacity-90 transition disabled:opacity-50"
             >
-              {loading ? "Entrando…" : "Entrar"}
+              {loading ? (isSignup ? "Criando…" : "Entrando…") : isSignup ? "Criar conta e entrar" : "Entrar"}
             </button>
           </form>
           <p className="text-xs text-muted-foreground text-center mt-6">
-            Acesso por convite. Fale com a administração para receber seu login.
+            {isSignup ? "Após criar a conta, personalize seu avatar em 4 passos." : "Acesso por convite. Fale com a administração para receber seu login."}
           </p>
         </div>
 
