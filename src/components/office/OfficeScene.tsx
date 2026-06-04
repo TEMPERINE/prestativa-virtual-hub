@@ -493,6 +493,22 @@ export function OfficeScene() {
     });
   }, []);
 
+  const releaseClaim = useCallback(async () => {
+    const uid = meIdRef.current;
+    if (!uid) return;
+    const { error } = await supabase.from("workspace_claims").delete().eq("user_id", uid);
+    if (error) {
+      toast.error("Não foi possível deixar a mesa.");
+      return;
+    }
+    toast.success("Você deixou sua mesa. Escolha um novo espaço quando quiser.");
+    setClaims((prev) => {
+      const next: Record<string, string> = {};
+      for (const [k, v] of Object.entries(prev)) if (v !== uid) next[k] = v;
+      return next;
+    });
+  }, []);
+
   // Live ref to claims so the keyboard handler can read latest values.
   const claimsRef = useRef<Record<string, string>>({});
   useEffect(() => { claimsRef.current = claims; }, [claims]);
@@ -904,11 +920,13 @@ export function OfficeScene() {
           const ownerId = claims[wz.id];
           const owner = ownerId ? profiles[ownerId] : null;
           const ownerOnline = ownerId ? positions[ownerId]?.is_online ?? false : false;
-          const isMyClaim = ownerId && me && ownerId === me.id;
-          const iHaveAClaim = me && Object.values(claims).includes(me.id);
+          const isMyClaim = !!(ownerId && me && ownerId === me.id);
+          const iHaveAClaim = !!(me && Object.values(claims).includes(me.id));
           const isHovered = hoveredZone === wz.id;
-          const canHover = !isMyClaim; // allow hover on others' desks even if I have my own
-          const showCompose = ownerId && !isMyClaim;
+          // Skip entirely when there's no function available here:
+          // - empty zone but I already have a claim → can't claim, nothing to do
+          if (!ownerId && iHaveAClaim) return null;
+          const showCompose = !!ownerId && !isMyClaim;
           return (
             <div
               key={`ws-${wz.id}`}
@@ -918,28 +936,22 @@ export function OfficeScene() {
                 top: `${wz.rect.y1 * 100}%`,
                 width: `${(wz.rect.x2 - wz.rect.x1) * 100}%`,
                 height: `${(wz.rect.y2 - wz.rect.y1) * 100}%`,
-                zIndex: isHovered && canHover ? 55 : 15,
+                zIndex: isHovered ? 55 : 15,
               }}
-              onMouseEnter={() => canHover && setHoveredZone(wz.id)}
+              onMouseEnter={() => setHoveredZone(wz.id)}
               onMouseLeave={() => setHoveredZone((cur) => (cur === wz.id ? null : cur))}
             >
-              {/* subtle highlight on hover */}
-              {canHover && (
-                <div
-                  className="absolute inset-0 rounded-md transition-all duration-150 pointer-events-none"
-                  style={{
-                    background: isHovered
-                      ? ownerId
-                        ? "color-mix(in oklab, var(--primary) 10%, transparent)"
-                        : "color-mix(in oklab, var(--primary) 18%, transparent)"
-                      : "transparent",
-                    outline: isHovered
-                      ? `1.5px dashed color-mix(in oklab, var(--primary) 70%, transparent)`
-                      : "none",
-                  }}
-                />
-              )}
-              {isHovered && canHover && (
+              {/* Hover outline only — no fill */}
+              <div
+                className="absolute inset-0 rounded-md transition-all duration-150 pointer-events-none"
+                style={{
+                  outline: isHovered
+                    ? `1.5px dashed color-mix(in oklab, var(--destructive) 80%, transparent)`
+                    : "none",
+                  outlineOffset: "-1px",
+                }}
+              />
+              {isHovered && (
                 <div
                   className="absolute left-1/2 -translate-x-1/2 pointer-events-auto"
                   style={{ zIndex: 70, bottom: "100%", marginBottom: 8 }}
@@ -948,6 +960,7 @@ export function OfficeScene() {
                     <OccupantCard
                       profile={owner}
                       online={ownerOnline}
+                      isMe={isMyClaim}
                       onLeaveNote={
                         showCompose
                           ? () => {
@@ -961,16 +974,22 @@ export function OfficeScene() {
                             }
                           : undefined
                       }
+                      onLeaveDesk={
+                        isMyClaim
+                          ? () => {
+                              releaseClaim();
+                              setHoveredZone(null);
+                            }
+                          : undefined
+                      }
                     />
                   ) : (
-                    !iHaveAClaim && (
-                      <button
-                        onClick={() => claimZone(wz.id)}
-                        className="rounded-full px-3 py-1.5 text-xs font-semibold bg-primary text-primary-foreground shadow-soft hover:opacity-90 whitespace-nowrap"
-                      >
-                        Reivindicar espaço
-                      </button>
-                    )
+                    <button
+                      onClick={() => claimZone(wz.id)}
+                      className="rounded-full px-3 py-1.5 text-xs font-semibold bg-primary text-primary-foreground shadow-soft hover:opacity-90 whitespace-nowrap"
+                    >
+                      Reivindicar espaço
+                    </button>
                   )}
                 </div>
               )}
@@ -1134,8 +1153,8 @@ export function OfficeScene() {
         </div>
         {/* /Camera transform layer */}
 
-        {/* Map navigation controls (right side) */}
-        <div className="absolute right-3 top-1/2 -translate-y-1/2 flex flex-col gap-2 z-[90] pointer-events-auto">
+        {/* Map navigation controls (bottom-right corner) */}
+        <div className="absolute right-3 bottom-3 flex flex-col gap-2 z-[90] pointer-events-auto">
           <button
             type="button"
             title="Aproximar"
@@ -1746,16 +1765,20 @@ function TeamRow({
 function OccupantCard({
   profile,
   online,
+  isMe,
   onLeaveNote,
+  onLeaveDesk,
 }: {
   profile: Profile | null;
   online: boolean;
+  isMe?: boolean;
   onLeaveNote?: () => void;
+  onLeaveDesk?: () => void;
 }) {
   const initials = (profile?.display_name ?? "?").charAt(0).toUpperCase();
   return (
     <div
-      className="rounded-xl shadow-soft px-4 pt-3 pb-2.5 text-white flex flex-col items-center gap-2 min-w-[180px]"
+      className="rounded-xl shadow-soft px-4 pt-3 pb-2.5 text-white flex flex-col items-center gap-2 min-w-[200px]"
       style={{
         background: "rgba(20, 22, 38, 0.95)",
         border: "1px solid rgba(255,255,255,0.08)",
@@ -1771,6 +1794,7 @@ function OccupantCard({
       <div className="text-center leading-tight">
         <div className="text-sm font-semibold flex items-center justify-center gap-1.5">
           {profile?.display_name ?? "Reservado"}
+          {isMe && <span className="text-[10px] opacity-60">(você)</span>}
           <span
             className={`inline-block w-1.5 h-1.5 rounded-full ${online ? "bg-emerald-400" : "bg-zinc-400"}`}
           />
@@ -1787,15 +1811,27 @@ function OccupantCard({
         <CardIconBtn title="Chat (em breve)" disabled>
           <MessageCircle className="w-3.5 h-3.5" />
         </CardIconBtn>
-        <CardIconBtn
-          title="Deixar recadinho"
-          onClick={onLeaveNote}
-          disabled={!onLeaveNote}
-          active
-        >
-          <StickyNote className="w-3.5 h-3.5" />
-        </CardIconBtn>
+        {!isMe && (
+          <CardIconBtn
+            title="Deixar recadinho"
+            onClick={onLeaveNote}
+            disabled={!onLeaveNote}
+            active
+          >
+            <StickyNote className="w-3.5 h-3.5" />
+          </CardIconBtn>
+        )}
       </div>
+      {isMe && onLeaveDesk && (
+        <button
+          type="button"
+          onClick={onLeaveDesk}
+          className="mt-1 w-full rounded-md px-3 py-1.5 text-xs font-semibold bg-white/10 hover:bg-destructive/80 text-white transition flex items-center justify-center gap-1.5"
+        >
+          <LogOut className="w-3 h-3" />
+          Deixar mesa
+        </button>
+      )}
     </div>
   );
 }
