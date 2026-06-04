@@ -436,7 +436,7 @@ export function MapEditor() {
         }
         if (blocked) {
           // Yellow outline-style — distinct from the red paint layer.
-          ctx.fillStyle = "rgba(250, 204, 21, 0.35)";
+          ctx.fillStyle = "rgba(250, 204, 21, 0.55)";
           ctx.fillRect(c, r, 1, 1);
         }
       }
