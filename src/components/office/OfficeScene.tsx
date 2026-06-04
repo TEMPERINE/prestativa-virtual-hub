@@ -14,33 +14,7 @@ import { zoneRectFromOverrides, getZoneKind, customZonesFromOverrides, pullOverr
 import officeMap from "@/assets/office-map.jpg";
 import parkLeft from "@/assets/scene-park-left.jpg";
 import roadRight from "@/assets/scene-road-right.jpg";
-import avatarDown from "@/assets/avatar-down.png";
-import avatarUp from "@/assets/avatar-up.png";
-import avatarLeft from "@/assets/avatar-left.png";
-import avatarRight from "@/assets/avatar-right.png";
-
-type Facing = "up" | "down" | "left" | "right";
-const AVATAR_SPRITES: Record<Facing, string> = {
-  up: avatarUp,
-  down: avatarDown,
-  left: avatarLeft,
-  right: avatarRight,
-};
-// Each sheet: 1536px wide, 6 frames of 256px wide. Heights vary per direction.
-const SHEET_HEIGHT: Record<Facing, number> = {
-  down: 245,
-  up: 235,
-  left: 235,
-  right: 235,
-};
-const FRAME_WIDTHS: Record<Facing, number> = {
-  down: 151,
-  up: 136,
-  left: 142,
-  right: 139,
-};
-const FRAME_W = 151; // legacy fallback aspect (down)
-const FRAMES = 6; // frame 0 = idle, frames 1..5 = walk cycle
+import { SPRITES, getSprite, SPRITE_FRAMES as FRAMES, type Facing } from "@/lib/sprite-catalog";
 const WALK_FRAME_MS = 110;
 
 function dirFromKey(k: string): Facing | null {
