@@ -974,6 +974,79 @@ export function OfficeScene() {
   );
 }
 
+/** Magic teleport effect — pink sparkles + halo at the given normalized point. */
+function TeleportFx({ point, phase }: { point: Point; phase: "out" | "in" }) {
+  const particles = useMemo(() => {
+    return Array.from({ length: 18 }).map((_, i) => {
+      const angle = (i / 18) * Math.PI * 2 + Math.random() * 0.4;
+      const dist = 30 + Math.random() * 40;
+      const delay = Math.random() * 180;
+      const size = 4 + Math.random() * 6;
+      return {
+        i,
+        dx: Math.cos(angle) * dist,
+        dy: Math.sin(angle) * dist - 10,
+        delay,
+        size,
+        duration: 600 + Math.random() * 300,
+      };
+    });
+  }, [point.x, point.y, phase]);
+
+  return (
+    <div
+      className="absolute pointer-events-none z-[80]"
+      style={{
+        left: `${point.x * 100}%`,
+        top: `${point.y * 100}%`,
+        transform: "translate(-50%, -70%)",
+      }}
+    >
+      <div
+        className="absolute left-1/2 top-1/2 rounded-full"
+        style={{
+          width: 90,
+          height: 90,
+          transform: "translate(-50%, -50%)",
+          background:
+            "radial-gradient(circle, color-mix(in oklab, var(--primary) 70%, transparent) 0%, transparent 70%)",
+          animation: `tp-halo-${phase} 600ms ease-out forwards`,
+          filter: "blur(2px)",
+        }}
+      />
+      <div
+        className="absolute left-1/2 top-1/2 rounded-full border-2"
+        style={{
+          width: 30,
+          height: 30,
+          transform: "translate(-50%, -50%)",
+          borderColor: "var(--primary)",
+          boxShadow: "0 0 24px var(--primary-glow)",
+          animation: `tp-ring 700ms ease-out forwards`,
+        }}
+      />
+      {particles.map((p) => (
+        <div
+          key={p.i}
+          className="absolute left-1/2 top-1/2 rounded-full"
+          style={{
+            width: p.size,
+            height: p.size,
+            background: "var(--primary)",
+            boxShadow: "0 0 8px var(--primary), 0 0 14px var(--primary-glow)",
+            ["--tp-dx" as string]: `${p.dx}px`,
+            ["--tp-dy" as string]: `${p.dy}px`,
+            animation: `tp-particle-${phase} ${p.duration}ms ease-out ${p.delay}ms forwards`,
+            opacity: 0,
+          }}
+        />
+      ))}
+    </div>
+  );
+}
+
+
+
 /** Animated sprite avatar — 6-frame horizontal sheet per direction. */
 function SpriteAvatar({
   facing,
