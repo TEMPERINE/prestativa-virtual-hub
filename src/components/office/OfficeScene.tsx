@@ -330,7 +330,7 @@ export function OfficeScene() {
       const { data: userData } = await supabase.auth.getUser();
       if (!userData.user) return;
       meIdRef.current = userData.user.id;
-      const { data: profs } = await supabase.from("profiles").select("id, display_name, avatar_color");
+      const { data: profs } = await supabase.from("profiles").select("id, display_name, avatar_color, sprite_id, tagline, status, onboarded_at");
       const map: Record<string, Profile> = {};
       (profs ?? []).forEach((p) => (map[p.id] = p as Profile));
       setProfiles(map);
