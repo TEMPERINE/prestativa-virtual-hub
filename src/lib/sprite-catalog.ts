@@ -16,6 +16,16 @@ import curlyUp from "@/assets/sprites/curly-up.png";
 import curlyLeft from "@/assets/sprites/curly-left.png";
 import curlyRight from "@/assets/sprites/curly-right.png";
 
+import redheadDown from "@/assets/sprites/redhead-down.png";
+import redheadUp from "@/assets/sprites/redhead-up.png";
+import redheadLeft from "@/assets/sprites/redhead-left.png";
+import redheadRight from "@/assets/sprites/redhead-right.png";
+
+import afroDown from "@/assets/sprites/afro-down.png";
+import afroUp from "@/assets/sprites/afro-up.png";
+import afroLeft from "@/assets/sprites/afro-left.png";
+import afroRight from "@/assets/sprites/afro-right.png";
+
 export type Facing = "up" | "down" | "left" | "right";
 
 export type SpriteSheets = Record<Facing, string>;
@@ -64,6 +74,30 @@ export const SPRITES: SpriteDef[] = [
       up: { w: 255, h: 251 },
       left: { w: 255, h: 249 },
       right: { w: 255, h: 205 },
+    },
+  },
+  {
+    id: "redhead",
+    label: "Ruiva",
+    gender: "f",
+    sheets: { up: redheadUp, down: redheadDown, left: redheadLeft, right: redheadRight },
+    dims: {
+      down: { w: 255, h: 228 },
+      up: { w: 255, h: 222 },
+      left: { w: 255, h: 208 },
+      right: { w: 255, h: 213 },
+    },
+  },
+  {
+    id: "afro",
+    label: "Afro",
+    gender: "f",
+    sheets: { up: afroUp, down: afroDown, left: afroLeft, right: afroRight },
+    dims: {
+      down: { w: 255, h: 243 },
+      up: { w: 255, h: 242 },
+      left: { w: 255, h: 229 },
+      right: { w: 255, h: 227 },
     },
   },
 ];
