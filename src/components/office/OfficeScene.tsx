@@ -736,6 +736,14 @@ export function OfficeScene() {
             </div>
           );
         })}
+
+        <ScreenShareViewer
+          localStream={rtc.localScreenStream}
+          remoteStreams={rtc.remoteScreenStreams}
+          profiles={profiles}
+          onStopLocal={() => { rtc.toggleScreen().catch(() => {}); }}
+          anchorRect={focusedZone?.rect ?? null}
+        />
       </div>
 
       {/* Extended scenery — road on the right */}
