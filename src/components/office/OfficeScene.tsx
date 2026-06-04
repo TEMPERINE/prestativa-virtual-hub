@@ -1142,7 +1142,7 @@ export function OfficeScene() {
             title="Afastar"
             onClick={() => {
               const s = zoomRef.current;
-              const ns = Math.max(MIN_ZOOM, s / 1.25);
+              const ns = Math.max(MIN_ZOOM, s / 1.15);
               const stage = stageRef.current;
               if (!stage || ns === s) return;
               const W = stage.clientWidth, H = stage.clientHeight;
