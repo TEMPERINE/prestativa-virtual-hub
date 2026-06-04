@@ -142,12 +142,13 @@ export async function pullOverridesFromCloud(): Promise<MapOverrides | null> {
     if (!parsed?.cols || !parsed?.rows || !Array.isArray(parsed.blocked)) {
       return loadOverrides();
     }
-    cache = parsed;
+    const resampled = resampleOverrides(parsed);
+    cache = resampled;
     try {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(resampled));
     } catch {}
     window.dispatchEvent(new CustomEvent("map-overrides-changed"));
-    return parsed;
+    return resampled;
   } catch {
     return loadOverrides();
   }
