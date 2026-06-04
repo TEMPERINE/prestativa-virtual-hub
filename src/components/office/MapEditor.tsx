@@ -204,11 +204,20 @@ export function MapEditor() {
       const rect = stageRef.current.getBoundingClientRect();
       const x = (e.clientX - rect.left) / rect.width;
       const y = (e.clientY - rect.top) / rect.height;
+      if (tool.kind === "spawn") {
+        const zoneId = tool.zone;
+        setOverrides((prev) => ({
+          ...prev,
+          spawnPoints: { ...(prev.spawnPoints ?? {}), [zoneId]: { x, y } },
+        }));
+        setDirty(true);
+        return;
+      }
       const col = Math.max(0, Math.min(GRID_COLS - 1, Math.floor(x * GRID_COLS)));
       const row = Math.max(0, Math.min(GRID_ROWS - 1, Math.floor(y * GRID_ROWS)));
       paintCell(col, row);
     },
-    [paintCell]
+    [paintCell, tool]
   );
 
   // On mount: pull the latest map from Lovable Cloud so a fresh browser /
