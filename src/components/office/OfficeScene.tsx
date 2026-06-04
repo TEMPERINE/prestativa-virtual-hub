@@ -434,9 +434,6 @@ export function OfficeScene() {
               }}
             >
               <div className="flex flex-col items-center">
-                {reactions[profile.id] && (
-                  <ReactionBubble emoji={reactions[profile.id].emoji} />
-                )}
                 <div
                   className={`px-2 py-0.5 rounded-full text-[10px] font-medium whitespace-nowrap mb-0.5 ${
                     isMe ? "bg-primary text-primary-foreground" : "bg-card/95 text-foreground"
@@ -448,6 +445,11 @@ export function OfficeScene() {
                   {profile.display_name}
                 </div>
                 <div className="relative">
+                  {reactions[profile.id] && (
+                    <div className="absolute left-1/2 -translate-x-1/2 -top-2 z-10 pointer-events-none">
+                      <ReactionBubble emoji={reactions[profile.id].emoji} />
+                    </div>
+                  )}
                   <SpriteAvatar
                     facing={isMe ? facing : (p.facing ?? "down")}
                     frame={isMe ? frame : 0}
