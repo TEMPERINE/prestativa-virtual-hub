@@ -78,6 +78,8 @@ const ZONE_COLORS: Record<string, string> = {
 
 export function MapEditor() {
   const stageRef = useRef<HTMLDivElement | null>(null);
+  const mainRef = useRef<HTMLElement | null>(null);
+  const [zoom, setZoom] = useState(1);
   const [overrides, setOverrides] = useState<MapOverrides>(() => {
     return loadOverrides() ?? seedFromDefaults();
   });
@@ -90,6 +92,35 @@ export function MapEditor() {
   const painting = useRef(false);
   const historyRef = useRef<MapOverrides[]>([]);
   const [canUndo, setCanUndo] = useState(false);
+
+  // Mouse-wheel zoom (anchored to cursor) for precise painting.
+  useEffect(() => {
+    const main = mainRef.current;
+    if (!main) return;
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const stage = stageRef.current;
+      if (!stage) return;
+      const rect = stage.getBoundingClientRect();
+      // Position of cursor within the (already scaled) stage, in stage-local px.
+      const sx = e.clientX - rect.left;
+      const sy = e.clientY - rect.top;
+      const factor = e.deltaY < 0 ? 1.15 : 1 / 1.15;
+      setZoom((z) => {
+        const next = Math.max(1, Math.min(8, z * factor));
+        const ratio = next / z;
+        // Adjust scroll so the point under the cursor stays put.
+        requestAnimationFrame(() => {
+          main.scrollLeft += sx * (ratio - 1);
+          main.scrollTop += sy * (ratio - 1);
+        });
+        return next;
+      });
+    };
+    main.addEventListener("wheel", onWheel, { passive: false });
+    return () => main.removeEventListener("wheel", onWheel);
+  }, []);
+
 
   const customZones = overrides.customZones ?? [];
 
