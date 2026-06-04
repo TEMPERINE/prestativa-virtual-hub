@@ -94,6 +94,113 @@ export function clearOverrides() {
   window.dispatchEvent(new CustomEvent("map-overrides-changed"));
 }
 
+// ---- Cloud sync (Lovable Cloud) ----------------------------------------
+// The map editor used to live only in localStorage, so clearing the browser
+// cache or switching device wiped the layout. We mirror the doc into the
+// `map_overrides` table (id = 'global') so it's shared and persistent.
+
+const CLOUD_ID = "global";
+
+export async function pullOverridesFromCloud(): Promise<MapOverrides | null> {
+  if (typeof window === "undefined") return null;
+  try {
+    const { supabase } = await import("@/integrations/supabase/client");
+    const { data, error } = await supabase
+      .from("map_overrides")
+      .select("data")
+      .eq("id", CLOUD_ID)
+      .maybeSingle();
+    if (error || !data) return loadOverrides();
+    const parsed = (data.data as unknown) as MapOverrides;
+    if (!parsed?.cols || !parsed?.rows || !Array.isArray(parsed.blocked)) {
+      return loadOverrides();
+    }
+    cache = parsed;
+    try {
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
+    } catch {}
+    window.dispatchEvent(new CustomEvent("map-overrides-changed"));
+    return parsed;
+  } catch {
+    return loadOverrides();
+  }
+}
+
+export async function pushOverridesToCloud(
+  o: MapOverrides
+): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const { supabase } = await import("@/integrations/supabase/client");
+    const { data: userData } = await supabase.auth.getUser();
+    const { error } = await supabase.from("map_overrides").upsert(
+      {
+        id: CLOUD_ID,
+        data: JSON.parse(JSON.stringify(o)),
+        updated_by: userData.user?.id ?? null,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "id" }
+    );
+    if (error) return { ok: false, error: error.message };
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : String(e) };
+  }
+}
+
+export async function clearOverridesInCloud(): Promise<void> {
+  try {
+    const { supabase } = await import("@/integrations/supabase/client");
+    await supabase.from("map_overrides").delete().eq("id", CLOUD_ID);
+  } catch {}
+}
+
+export function subscribeOverridesFromCloud(
+  onChange: (o: MapOverrides | null) => void
+) {
+  let cleanup = () => {};
+  (async () => {
+    const { supabase } = await import("@/integrations/supabase/client");
+    const channel = supabase
+      .channel("map_overrides:global")
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "map_overrides",
+          filter: `id=eq.${CLOUD_ID}`,
+        },
+        (payload) => {
+          const next =
+            (payload.new as { data?: MapOverrides } | null)?.data ?? null;
+          if (next) {
+            cache = next;
+            if (typeof window !== "undefined") {
+              try {
+                window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+              } catch {}
+              window.dispatchEvent(new CustomEvent("map-overrides-changed"));
+            }
+            onChange(next);
+          } else {
+            cache = null;
+            if (typeof window !== "undefined") {
+              window.localStorage.removeItem(STORAGE_KEY);
+              window.dispatchEvent(new CustomEvent("map-overrides-changed"));
+            }
+            onChange(null);
+          }
+        }
+      )
+      .subscribe();
+    cleanup = () => {
+      supabase.removeChannel(channel);
+    };
+  })();
+  return () => cleanup();
+}
+
 export function newOverrides(): MapOverrides {
   return emptyOverrides();
 }

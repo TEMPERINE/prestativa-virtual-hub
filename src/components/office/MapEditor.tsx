@@ -8,6 +8,9 @@ import {
   newOverrides,
   saveOverrides,
   clearOverrides,
+  pullOverridesFromCloud,
+  pushOverridesToCloud,
+  clearOverridesInCloud,
   type MapOverrides,
   type CustomZone,
   type ZoneKind,
@@ -207,10 +210,32 @@ export function MapEditor() {
     [paintCell]
   );
 
-  const save = useCallback(() => {
+  // On mount: pull the latest map from Lovable Cloud so a fresh browser /
+  // device sees the same layout instead of falling back to the defaults.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const cloud = await pullOverridesFromCloud();
+      if (cancelled) return;
+      if (cloud) {
+        setOverrides(cloud);
+        setDirty(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  const save = useCallback(async () => {
     saveOverrides(overrides);
     setDirty(false);
-    toast.success("Mapa salvo. Volte ao escritório para ver as mudanças.");
+    const res = await pushOverridesToCloud(overrides);
+    if (res.ok) {
+      toast.success("Mapa salvo na nuvem. Visível para todos os usuários.");
+    } else {
+      toast.error(
+        `Salvo localmente, mas falhou ao enviar pra nuvem: ${res.error ?? "erro desconhecido"}`
+      );
+    }
   }, [overrides]);
 
   const reset = useCallback(() => {
@@ -225,9 +250,10 @@ export function MapEditor() {
     setDirty(true);
   }, []);
 
-  const clearSaved = useCallback(() => {
-    if (!confirm("Remover overrides salvos? O mapa voltará ao padrão.")) return;
+  const clearSaved = useCallback(async () => {
+    if (!confirm("Remover overrides salvos (local e nuvem)? O mapa voltará ao padrão.")) return;
     clearOverrides();
+    await clearOverridesInCloud();
     setOverrides(seedFromDefaults());
     setDirty(true);
     toast.success("Overrides removidos.");
