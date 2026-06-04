@@ -938,73 +938,51 @@ export function OfficeScene() {
           if (!ownerId && iHaveAClaim) return null;
           const showCompose = !!ownerId && !isMyClaim;
           return (
-            <div
+            <WorkspaceZoneHover
               key={`ws-${wz.id}`}
-              className="absolute"
-              style={{
-                left: `${wz.rect.x1 * 100}%`,
-                top: `${wz.rect.y1 * 100}%`,
-                width: `${(wz.rect.x2 - wz.rect.x1) * 100}%`,
-                height: `${(wz.rect.y2 - wz.rect.y1) * 100}%`,
-                zIndex: isHovered ? 55 : 15,
-              }}
-              onMouseEnter={() => setHoveredZone(wz.id)}
-              onMouseLeave={() => setHoveredZone((cur) => (cur === wz.id ? null : cur))}
+              rect={wz.rect}
+              isHovered={isHovered}
+              onEnter={() => setHoveredZone(wz.id)}
+              onLeave={() => setHoveredZone((cur) => (cur === wz.id ? null : cur))}
             >
-              {/* Hover outline only — no fill */}
-              <div
-                className="absolute inset-0 rounded-md transition-all duration-150 pointer-events-none"
-                style={{
-                  outline: isHovered
-                    ? `1.5px dashed color-mix(in oklab, var(--destructive) 80%, transparent)`
-                    : "none",
-                  outlineOffset: "-1px",
-                }}
-              />
-              {isHovered && (
-                <div
-                  className="absolute left-1/2 -translate-x-1/2 pointer-events-auto"
-                  style={{ zIndex: 9999, bottom: "100%", marginBottom: 8 }}
+              {ownerId ? (
+                <OccupantCard
+                  profile={owner}
+                  online={ownerOnline}
+                  isMe={isMyClaim}
+                  onLeaveNote={
+                    showCompose
+                      ? () => {
+                          setComposeFor({
+                            zoneId: wz.id,
+                            recipientId: ownerId,
+                            recipientName: owner?.display_name ?? "colega",
+                          });
+                          setComposeText("");
+                          setHoveredZone(null);
+                        }
+                      : undefined
+                  }
+                  onLeaveDesk={
+                    isMyClaim
+                      ? () => {
+                          releaseClaim();
+                          setHoveredZone(null);
+                        }
+                      : undefined
+                  }
+                />
+              ) : (
+                <button
+                  onClick={() => claimZone(wz.id)}
+                  className="rounded-full px-3 py-1.5 text-xs font-semibold bg-primary text-primary-foreground shadow-soft hover:opacity-90 whitespace-nowrap"
                 >
-                  {ownerId ? (
-                    <OccupantCard
-                      profile={owner}
-                      online={ownerOnline}
-                      isMe={isMyClaim}
-                      onLeaveNote={
-                        showCompose
-                          ? () => {
-                              setComposeFor({
-                                zoneId: wz.id,
-                                recipientId: ownerId,
-                                recipientName: owner?.display_name ?? "colega",
-                              });
-                              setComposeText("");
-                              setHoveredZone(null);
-                            }
-                          : undefined
-                      }
-                      onLeaveDesk={
-                        isMyClaim
-                          ? () => {
-                              releaseClaim();
-                              setHoveredZone(null);
-                            }
-                          : undefined
-                      }
-                    />
-                  ) : (
-                    <button
-                      onClick={() => claimZone(wz.id)}
-                      className="rounded-full px-3 py-1.5 text-xs font-semibold bg-primary text-primary-foreground shadow-soft hover:opacity-90 whitespace-nowrap"
-                    >
-                      Reivindicar espaço
-                    </button>
-                  )}
-                </div>
+                  Reivindicar espaço
+                </button>
               )}
-            </div>
+            </WorkspaceZoneHover>
           );
+
         })}
 
         {/* Avatars */}
