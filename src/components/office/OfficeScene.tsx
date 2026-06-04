@@ -802,8 +802,11 @@ export function OfficeScene() {
             />
             {currentZone.supportsVideo && (
               <IconButton
-                onClick={() => toast.info("Compartilhamento de tela chega na próxima fase")}
-                title="Compartilhar tela"
+                active={rtc.screenOn}
+                onClick={() => {
+                  rtc.toggleScreen().catch(() => toast.error("Não foi possível compartilhar a tela"));
+                }}
+                title={rtc.screenOn ? "Parar compartilhamento" : "Compartilhar tela (janela, aba ou tela inteira)"}
               >
                 <MonitorUp className="w-4 h-4" />
               </IconButton>
