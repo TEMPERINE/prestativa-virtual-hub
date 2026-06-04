@@ -144,7 +144,7 @@ export function OfficeScene() {
 
   // ===== Camera (zoom + pan + follow) =====
   const MIN_ZOOM = 1;
-  const MAX_ZOOM = 7; // ~roughly one workspace fills the screen
+  const MAX_ZOOM = 4; // ~roughly one workspace fills the screen
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 }); // pixel offset of scaled content in stage
   const [followMe, setFollowMe] = useState(true);
@@ -799,7 +799,7 @@ export function OfficeScene() {
           const cx = e.clientX - rect.left;
           const cy = e.clientY - rect.top;
           const s = zoomRef.current;
-          const factor = e.deltaY < 0 ? 1.15 : 1 / 1.15;
+          const factor = e.deltaY < 0 ? 1.10 : 1 / 1.10;
           const ns = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, s * factor));
           if (ns === s) return;
           const p = panRef.current;
@@ -846,16 +846,25 @@ export function OfficeScene() {
           }
         }}
       >
-        {/* Camera transform layer */}
+        {/* Camera pan layer */}
         <div
           className="absolute inset-0"
           style={{
-            transform: `translate3d(${pan.x}px, ${pan.y}px, 0) scale(${zoom})`,
-            transformOrigin: "0 0",
+            transform: `translate3d(${pan.x}px, ${pan.y}px, 0)`,
             willChange: "transform",
             cursor: dragRef.current?.moved ? "grabbing" : "grab",
           }}
         >
+          {/* Camera zoom layer */}
+          <div
+            className="absolute inset-0"
+            style={{
+              transform: `scale(${zoom})`,
+              transformOrigin: "0 0",
+              transition: "transform 0.25s cubic-bezier(0.25, 0.1, 0.25, 1)",
+              willChange: "transform",
+            }}
+          >
 
         <img
           src={officeMap}
@@ -1105,6 +1114,7 @@ export function OfficeScene() {
           anchorRect={focusedZone?.rect ?? null}
         />
         </div>
+        </div>
         {/* /Camera transform layer */}
 
         {/* Map navigation controls (right side) */}
@@ -1114,7 +1124,7 @@ export function OfficeScene() {
             title="Aproximar"
             onClick={() => {
               const s = zoomRef.current;
-              const ns = Math.min(MAX_ZOOM, s * 1.25);
+              const ns = Math.min(MAX_ZOOM, s * 1.15);
               const stage = stageRef.current;
               if (!stage || ns === s) return;
               const W = stage.clientWidth, H = stage.clientHeight;
@@ -1132,7 +1142,7 @@ export function OfficeScene() {
             title="Afastar"
             onClick={() => {
               const s = zoomRef.current;
-              const ns = Math.max(MIN_ZOOM, s / 1.25);
+              const ns = Math.max(MIN_ZOOM, s / 1.15);
               const stage = stageRef.current;
               if (!stage || ns === s) return;
               const W = stage.clientWidth, H = stage.clientHeight;
@@ -1150,7 +1160,7 @@ export function OfficeScene() {
             title={followMe ? "Câmera seguindo você" : "Centralizar em mim"}
             onClick={() => {
               setFollowMe(true);
-              const targetZoom = Math.max(zoomRef.current, 2.2);
+              const targetZoom = Math.max(zoomRef.current, 2.0);
               setZoom(targetZoom);
               centerOn(posRef.current.x, posRef.current.y, targetZoom);
             }}
