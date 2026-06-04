@@ -3,8 +3,8 @@
 
 import type { ZoneId } from "./office-map";
 
-export const GRID_COLS = 64;
-export const GRID_ROWS = 40;
+export const GRID_COLS = 128;
+export const GRID_ROWS = 80;
 const STORAGE_KEY = "office-map-overrides:v1";
 
 export type ZoneKind = "workspace" | "common";
