@@ -14,8 +14,11 @@ type PeerEntry = {
   pc: RTCPeerConnection;
   audioSender: RTCRtpSender | null;
   videoSender: RTCRtpSender | null;
+  screenTransceiver: RTCRtpTransceiver | null;
+  screenSender: RTCRtpSender | null;
   makingOffer: boolean;
   remoteStream: MediaStream;
+  remoteScreenStream: MediaStream;
 };
 
 const ICE_CONFIG: RTCConfiguration = {
