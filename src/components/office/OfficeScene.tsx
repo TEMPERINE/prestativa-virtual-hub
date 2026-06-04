@@ -12,13 +12,31 @@ import { zoneRectFromOverrides } from "@/lib/map-overrides";
 import officeMap from "@/assets/office-map.jpg";
 import parkLeft from "@/assets/scene-park-left.jpg";
 import roadRight from "@/assets/scene-road-right.jpg";
-import avatarSprite from "@/assets/avatar-sprite.png";
+import avatarDown from "@/assets/avatar-down.png";
+import avatarUp from "@/assets/avatar-up.png";
+import avatarLeft from "@/assets/avatar-left.png";
+import avatarRight from "@/assets/avatar-right.png";
+
+type Facing = "up" | "down" | "left" | "right";
+const AVATAR_SPRITES: Record<Facing, string> = {
+  up: avatarUp,
+  down: avatarDown,
+  left: avatarLeft,
+  right: avatarRight,
+};
+function dirFromKey(k: string): Facing | null {
+  if (k === "arrowup" || k === "w") return "up";
+  if (k === "arrowdown" || k === "s") return "down";
+  if (k === "arrowleft" || k === "a") return "left";
+  if (k === "arrowright" || k === "d") return "right";
+  return null;
+}
 import { toast } from "sonner";
 import { LogOut, Mic, MicOff, Video, VideoOff, MonitorUp, Users, Pencil } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 
 type Profile = { id: string; display_name: string; avatar_color: string };
-type RemotePos = { user_id: string; x: number; y: number; zone: string; is_online: boolean };
+type RemotePos = { user_id: string; x: number; y: number; zone: string; is_online: boolean; facing?: Facing };
 
 const SPEED = 0.0048;
 const SEND_INTERVAL_MS = 120;
@@ -34,6 +52,8 @@ export function OfficeScene() {
   const [micOn, setMicOn] = useState(false);
   const [camOn, setCamOn] = useState(false);
   const [showTeam, setShowTeam] = useState(true);
+  const [facing, setFacing] = useState<Facing>("down");
+  const facingRef = useRef<Facing>("down");
 
   const keys = useRef<Record<string, boolean>>({});
   const lastSent = useRef(0);
