@@ -66,11 +66,16 @@ export function OfficeScene() {
   const [facing, setFacing] = useState<Facing>("down");
   const facingRef = useRef<Facing>("down");
 
-  const activeMoveDirection = useRef<Facing | null>(null);
+  const keysDown = useRef<Set<Facing>>(new Set());
+  const lastDir = useRef<Facing | null>(null);
   const lastSent = useRef(0);
-  const walkTarget = useRef<Point | null>(null);
   const posRef = useRef(pos);
   posRef.current = pos;
+
+  // Walk animation frame (0 = idle, 1..5 = walk cycle)
+  const [frame, setFrame] = useState(0);
+  const frameRef = useRef(0);
+  const lastFrameTick = useRef(0);
 
   const setLocalFacing = useCallback((nextFacing: Facing) => {
     if (facingRef.current === nextFacing) return;
@@ -78,106 +83,38 @@ export function OfficeScene() {
     setFacing(nextFacing);
   }, []);
 
-  const turnAvatar = useCallback(
-    (nextFacing: Facing) => {
-      setLocalFacing(nextFacing);
-      const current = posRef.current;
-      const z = zoneAt(current);
-      void supabase.auth.getUser().then(({ data }) => {
-        if (!data.user) return;
-        void supabase.from("positions").upsert({
-          user_id: data.user.id,
-          x: current.x,
-          y: current.y,
-          zone: z.id,
-          facing: nextFacing,
-          is_online: true,
-        });
+  const sendPos = useCallback((x: number, y: number, z: ZoneId, f: Facing) => {
+    void supabase.auth.getUser().then(({ data }) => {
+      if (!data.user) return;
+      void supabase.from("positions").upsert({
+        user_id: data.user.id,
+        x, y, zone: z, facing: f, is_online: true,
       });
-    },
-    [setLocalFacing]
-  );
+    });
+  }, []);
 
-  const moveAvatar = useCallback((rawDx: number, rawDy: number, speed = SPEED) => {
-    if (!rawDx && !rawDy) return;
-    const len = Math.hypot(rawDx, rawDy);
-    if (!len) return;
-    const dx = (rawDx / len) * speed;
-    const dy = (rawDy / len) * speed;
+  const tryMove = useCallback((dir: Facing) => {
     const cur = posRef.current;
-
+    const dx = dir === "left" ? -SPEED : dir === "right" ? SPEED : 0;
+    const dy = dir === "up" ? -SPEED : dir === "down" ? SPEED : 0;
     let nx = cur.x + dx;
-    let ny = cur.y;
-    if (collides({ x: nx, y: ny })) nx = cur.x;
-    ny += dy;
+    let ny = cur.y + dy;
+    if (collides({ x: nx, y: cur.y })) nx = cur.x;
     if (collides({ x: nx, y: ny })) ny = cur.y;
-    if (nx === cur.x && ny === cur.y) return;
-
+    if (nx === cur.x && ny === cur.y) return false;
     const np = { x: nx, y: ny };
     posRef.current = np;
     setPos(np);
     const z = zoneAt(np);
     setZone((prev) => (prev !== z.id ? z.id : prev));
-
-    const newFacing: Facing =
-      Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? "right" : "left") : dy > 0 ? "down" : "up";
-    setLocalFacing(newFacing);
-
     const now = performance.now();
     if (now - lastSent.current > SEND_INTERVAL_MS) {
       lastSent.current = now;
-      void supabase.auth.getUser().then(({ data }) => {
-        if (!data.user) return;
-        void supabase.from("positions").upsert({
-          user_id: data.user.id,
-          x: np.x,
-          y: np.y,
-          zone: z.id,
-          facing: newFacing,
-          is_online: true,
-        });
-      });
+      sendPos(np.x, np.y, z.id, dir);
     }
-  }, [setLocalFacing]);
+    return true;
+  }, [sendPos]);
 
-  const handleMoveKey = useCallback(
-    (key: string, pressed: boolean, step = false) => {
-      const k = key.toLowerCase();
-      const dir = dirFromKey(k);
-      if (!dir) return false;
-      if (!pressed) {
-        if (activeMoveDirection.current === dir) activeMoveDirection.current = null;
-        return true;
-      }
-
-      walkTarget.current = null;
-      if (facingRef.current !== dir) {
-        activeMoveDirection.current = null;
-        turnAvatar(dir);
-        return true;
-      }
-
-      activeMoveDirection.current = dir;
-      if (pressed && step) {
-        if (dir === "up") moveAvatar(0, -1, SPEED * 6);
-        else if (dir === "down") moveAvatar(0, 1, SPEED * 6);
-        else if (dir === "left") moveAvatar(-1, 0, SPEED * 6);
-        else if (dir === "right") moveAvatar(1, 0, SPEED * 6);
-      }
-      return true;
-    },
-    [moveAvatar, turnAvatar]
-  );
-
-  const walkToPoint = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
-    sceneRef.current?.focus();
-    const bounds = event.currentTarget.getBoundingClientRect();
-    const next = {
-      x: Math.max(0.11, Math.min(0.95, (event.clientX - bounds.left) / bounds.width)),
-      y: Math.max(0.05, Math.min(0.95, (event.clientY - bounds.top) / bounds.height)),
-    };
-    walkTarget.current = next;
-  }, []);
 
   // Load me + all profiles + initial positions
   useEffect(() => {
