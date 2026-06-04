@@ -792,6 +792,13 @@ export function OfficeScene() {
             >
               {rtc.camOn ? <Video className="w-4 h-4" /> : <VideoOff className="w-4 h-4" />}
             </IconButton>
+            <CamPreviewAndPicker
+              stream={rtc.localVideoStream}
+              devices={rtc.videoDevices}
+              selectedId={rtc.selectedVideoDeviceId}
+              onSelect={(id) => rtc.setVideoDevice(id).catch(() => toast.error("Falha ao trocar câmera"))}
+              visible={rtc.camOn}
+            />
             {currentZone.supportsVideo && (
               <IconButton
                 onClick={() => toast.info("Compartilhamento de tela chega na próxima fase")}
