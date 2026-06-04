@@ -676,11 +676,19 @@ export function MapEditor() {
         </aside>
 
         {/* Stage */}
-        <main className="flex-1 overflow-auto bg-neutral-900 p-4">
+        <main
+          ref={mainRef}
+          className="flex-1 overflow-auto bg-neutral-900 p-4 relative"
+          style={{ overscrollBehavior: "contain" }}
+        >
           <div
             ref={stageRef}
             className="relative mx-auto select-none cursor-crosshair"
-            style={{ aspectRatio: "1536 / 1024", width: "min(100%, calc((100vh - 110px) * 1.5))" }}
+            style={{
+              aspectRatio: "1536 / 1024",
+              width: `calc(${zoom} * min(100%, calc((100vh - 110px) * 1.5)))`,
+            }}
+
             onPointerDown={(e) => {
               if (draggingPin.current) return;
               (e.target as Element).setPointerCapture?.(e.pointerId);
