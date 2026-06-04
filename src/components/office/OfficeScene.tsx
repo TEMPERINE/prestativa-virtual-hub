@@ -333,7 +333,7 @@ export function OfficeScene() {
 
         {/* Private-area overlay (Gather-style): darken everything outside the active zone */}
         {focusedZone && (
-          <ZoneSpotlight rect={focusedZone.rect} />
+          <ZoneSpotlight rect={focusedZone.rect} accent={focusedZone.accent} />
         )}
 
         {/* Avatars */}
