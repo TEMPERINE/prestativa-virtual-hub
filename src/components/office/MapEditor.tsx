@@ -103,6 +103,34 @@ export function MapEditor() {
     [customZones]
   );
 
+  // Default zone kinds shown in the editor (mirror map-overrides defaults).
+  const defaultKindOf = useCallback((id: string): ZoneKind => {
+    if (id === "lobby" || id === "reuniao" || id === "feedback" || id === "descompressao") return "common";
+    return "workspace";
+  }, []);
+
+  const kindOf = useCallback(
+    (id: string): ZoneKind => {
+      const ov = overrides.zoneKinds?.[id];
+      if (ov) return ov;
+      const custom = customZones.find((c) => c.id === id);
+      if (custom?.kind) return custom.kind;
+      return defaultKindOf(id);
+    },
+    [overrides.zoneKinds, customZones, defaultKindOf]
+  );
+
+  const toggleKind = useCallback((id: string) => {
+    setOverrides((prev) => {
+      const cur = prev.zoneKinds?.[id]
+        ?? prev.customZones?.find((c) => c.id === id)?.kind
+        ?? defaultKindOf(id);
+      const next: ZoneKind = cur === "workspace" ? "common" : "workspace";
+      return { ...prev, zoneKinds: { ...(prev.zoneKinds ?? {}), [id]: next } };
+    });
+    setDirty(true);
+  }, [defaultKindOf]);
+
   const addCustomZone = useCallback(() => {
     const label = window.prompt("Nome da nova zona:");
     if (!label || !label.trim()) return;
