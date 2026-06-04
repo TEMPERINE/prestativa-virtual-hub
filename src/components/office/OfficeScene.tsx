@@ -903,6 +903,82 @@ export function OfficeScene() {
           />
         )}
 
+        {/* Desk notes (post-it gifts) sitting on workstations */}
+        {notes.map((n) => {
+          const isForMe = me?.id === n.recipient_id;
+          const sender = profiles[n.sender_id];
+          return (
+            <button
+              key={n.id}
+              type="button"
+              onClick={() => isForMe && setOpeningNote(n)}
+              className="absolute"
+              style={{
+                left: `${n.x * 100}%`,
+                top: `${n.y * 100}%`,
+                transform: "translate(-50%, -85%)",
+                zIndex: Math.round(n.y * 1000) + 5,
+                cursor: isForMe ? "pointer" : "default",
+                pointerEvents: isForMe ? "auto" : "none",
+              }}
+              title={
+                isForMe
+                  ? `Recadinho de ${sender?.display_name ?? "alguém"} — clique para abrir`
+                  : `Recadinho para ${profiles[n.recipient_id]?.display_name ?? ""}`
+              }
+            >
+              <GiftSprite color={sender?.avatar_color} bounce={isForMe} />
+            </button>
+          );
+        })}
+
+        {/* Placement layer — appears after composing a note */}
+        {placing && (
+          <PlacementLayer
+            placing={placing}
+            workspaceZones={workspaceZones}
+            onMove={(p) => setCursor(p)}
+            onCancel={() => {
+              setPlacing(null);
+              setCursor(null);
+            }}
+            onConfirm={async (p) => {
+              const uid = meIdRef.current;
+              if (!uid) return;
+              const { error } = await supabase.from("desk_notes").insert({
+                zone_id: placing.zoneId,
+                sender_id: uid,
+                recipient_id: placing.recipientId,
+                body: placing.body,
+                x: p.x,
+                y: p.y,
+              });
+              if (error) {
+                toast.error("Não foi possível deixar o recadinho.");
+                return;
+              }
+              toast.success("✨ Recadinho deixado na mesa!");
+              setPlacing(null);
+              setCursor(null);
+            }}
+          />
+        )}
+        {placing && cursor && (
+          <div
+            className="absolute pointer-events-none"
+            style={{
+              left: `${cursor.x * 100}%`,
+              top: `${cursor.y * 100}%`,
+              transform: "translate(-50%, -85%)",
+              zIndex: 95,
+              opacity: 0.95,
+              filter: "drop-shadow(0 4px 10px rgba(0,0,0,0.35))",
+            }}
+          >
+            <GiftSprite color={me?.avatar_color} bounce />
+          </div>
+        )}
+
         <ScreenShareViewer
           localStream={rtc.localScreenStream}
           remoteStreams={rtc.remoteScreenStreams}
@@ -911,6 +987,110 @@ export function OfficeScene() {
           anchorRect={focusedZone?.rect ?? null}
         />
       </div>
+
+      {/* Compose note dialog */}
+      <Dialog
+        open={!!composeFor}
+        onOpenChange={(o) => {
+          if (!o) setComposeFor(null);
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-center">Deixar um recado</DialogTitle>
+          </DialogHeader>
+          <div className="relative">
+            <div className="absolute -top-3 left-1/2 -translate-x-1/2 text-3xl">🎁</div>
+            <div
+              className="rounded-lg p-4 shadow-soft"
+              style={{
+                background: "linear-gradient(180deg, #FFE680 0%, #FFD84D 100%)",
+                color: "#3a2e00",
+                minHeight: 180,
+              }}
+            >
+              <Textarea
+                value={composeText}
+                onChange={(e) => setComposeText(e.target.value.slice(0, 280))}
+                placeholder="Escreva uma mensagem!"
+                className="bg-transparent border-0 focus-visible:ring-0 resize-none text-sm placeholder:text-amber-900/50 min-h-[150px]"
+                autoFocus
+              />
+            </div>
+            <div className="text-[10px] text-muted-foreground text-right mt-1">
+              {composeText.length}/280
+            </div>
+          </div>
+          <DialogFooter className="gap-2 sm:gap-2">
+            <Button variant="ghost" onClick={() => setComposeFor(null)}>
+              Cancelar
+            </Button>
+            <Button
+              disabled={!composeText.trim()}
+              onClick={() => {
+                if (!composeFor) return;
+                setPlacing({
+                  zoneId: composeFor.zoneId,
+                  recipientId: composeFor.recipientId,
+                  body: composeText.trim(),
+                });
+                setCursor(null);
+                setComposeFor(null);
+                toast.info(`Clique na mesa de ${composeFor.recipientName} para deixar o presentinho 🎁`);
+              }}
+              className="bg-emerald-500 hover:bg-emerald-600 text-white"
+            >
+              Colocar na mesa dele(a)
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Read note dialog */}
+      <Dialog
+        open={!!openingNote}
+        onOpenChange={(o) => {
+          if (!o && openingNote) {
+            const id = openingNote.id;
+            // Mark as read (which removes it for everyone via realtime + filter)
+            void supabase.from("desk_notes").update({ read_at: new Date().toISOString() }).eq("id", id);
+            setNotes((prev) => prev.filter((n) => n.id !== id));
+            setOpeningNote(null);
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-center">
+              Recadinho de {openingNote ? profiles[openingNote.sender_id]?.display_name ?? "alguém" : ""}
+            </DialogTitle>
+          </DialogHeader>
+          <div
+            className="rounded-lg p-4 shadow-soft whitespace-pre-wrap text-sm"
+            style={{
+              background: "linear-gradient(180deg, #FFE680 0%, #FFD84D 100%)",
+              color: "#3a2e00",
+              minHeight: 140,
+            }}
+          >
+            {openingNote?.body}
+          </div>
+          <DialogFooter>
+            <Button
+              onClick={() => {
+                if (!openingNote) return;
+                const id = openingNote.id;
+                void supabase.from("desk_notes").update({ read_at: new Date().toISOString() }).eq("id", id);
+                setNotes((prev) => prev.filter((n) => n.id !== id));
+                setOpeningNote(null);
+              }}
+            >
+              Lido (some o recadinho)
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
 
       {/* Extended scenery — road on the right */}
       <div
