@@ -787,16 +787,83 @@ export function OfficeScene() {
       {/* Office stage — fixed aspect, full height */}
       <div
         ref={stageRef}
-        className="relative h-full shrink-0"
+        className="relative h-full shrink-0 overflow-hidden select-none"
         style={{ aspectRatio: "1536 / 1024" }}
+        onWheel={(e) => {
+          e.preventDefault();
+          const stage = stageRef.current;
+          if (!stage) return;
+          const rect = stage.getBoundingClientRect();
+          const cx = e.clientX - rect.left;
+          const cy = e.clientY - rect.top;
+          const s = zoomRef.current;
+          const factor = e.deltaY < 0 ? 1.15 : 1 / 1.15;
+          const ns = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, s * factor));
+          if (ns === s) return;
+          const p = panRef.current;
+          const np = { x: cx - (cx - p.x) * (ns / s), y: cy - (cy - p.y) * (ns / s) };
+          setZoom(ns);
+          setPan(clampPan(ns, np));
+          setFollowMe(false);
+        }}
+        onPointerDown={(e) => {
+          if (e.button !== 0) return;
+          // Don't start a drag on interactive children (buttons, etc.)
+          const tgt = e.target as HTMLElement;
+          if (tgt.closest("button, a, input, textarea, [role='button']")) return;
+          (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+          dragRef.current = {
+            startX: e.clientX,
+            startY: e.clientY,
+            panX: panRef.current.x,
+            panY: panRef.current.y,
+            moved: false,
+          };
+        }}
+        onPointerMove={(e) => {
+          const d = dragRef.current;
+          if (!d) return;
+          const dx = e.clientX - d.startX;
+          const dy = e.clientY - d.startY;
+          if (!d.moved && Math.hypot(dx, dy) < 4) return;
+          d.moved = true;
+          setFollowMe(false);
+          setPan(clampPan(zoomRef.current, { x: d.panX + dx, y: d.panY + dy }));
+        }}
+        onPointerUp={(e) => {
+          const d = dragRef.current;
+          dragRef.current = null;
+          wasDragRef.current = !!d?.moved;
+          try { (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId); } catch {}
+        }}
+        onClickCapture={(e) => {
+          if (wasDragRef.current) {
+            e.stopPropagation();
+            e.preventDefault();
+            wasDragRef.current = false;
+          }
+        }}
       >
+        {/* Camera transform layer */}
+        <div
+          className="absolute inset-0"
+          style={{
+            transform: `translate3d(${pan.x}px, ${pan.y}px, 0) scale(${zoom})`,
+            transformOrigin: "0 0",
+            willChange: "transform",
+            cursor: dragRef.current?.moved ? "grabbing" : "grab",
+          }}
+        >
 
         <img
           src={officeMap}
           alt="Escritório Prestativa Virtual"
           className="absolute inset-0 w-full h-full object-cover select-none pointer-events-none"
           draggable={false}
+          style={{ imageRendering: "pixelated" }}
         />
+
+
 
 
         {/* Private-area overlay (Gather-style): darken everything outside the active zone */}
