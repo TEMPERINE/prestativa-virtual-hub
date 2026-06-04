@@ -811,10 +811,80 @@ export function OfficeScene() {
     <div
       ref={sceneRef}
       tabIndex={0}
-      className="relative w-screen h-screen overflow-hidden bg-black outline-none flex items-stretch"
+      className="relative w-screen h-screen overflow-hidden bg-black outline-none flex flex-col"
       onMouseDown={() => sceneRef.current?.focus()}
     >
-      {/* Extended scenery — park on the left */}
+      {/* Topbar (fixed strip above the map — no overlay) */}
+      <div className="relative z-[100] p-3 shrink-0">
+        <div className="glass-panel rounded-2xl shadow-soft px-4 py-2 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl gradient-primary flex items-center justify-center shadow-glow">
+              <span className="text-sm font-bold text-primary-foreground">P</span>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            {rtc.connectedPeers.length > 0 && (
+              <div className="text-xs text-muted-foreground px-2 hidden sm:block">
+                Em chamada com {rtc.connectedPeers.length}
+              </div>
+            )}
+            <IconButton
+              active={rtc.micOn}
+              onClick={() => {
+                rtc.toggleMic().catch(() => toast.error("Não foi possível acessar o microfone"));
+              }}
+              title="Microfone"
+            >
+              {rtc.micOn ? <Mic className="w-4 h-4" /> : <MicOff className="w-4 h-4" />}
+            </IconButton>
+            <IconButton
+              active={rtc.camOn}
+              onClick={() => {
+                rtc.toggleCam().catch(() => toast.error("Não foi possível acessar a câmera"));
+              }}
+              title="Câmera"
+            >
+              {rtc.camOn ? <Video className="w-4 h-4" /> : <VideoOff className="w-4 h-4" />}
+            </IconButton>
+            <CamPreviewAndPicker
+              stream={rtc.localVideoStream}
+              devices={rtc.videoDevices}
+              selectedId={rtc.selectedVideoDeviceId}
+              onSelect={(id) => rtc.setVideoDevice(id).catch(() => toast.error("Falha ao trocar câmera"))}
+              visible={rtc.camOn}
+            />
+            {currentZone.id !== "lobby" && (
+              <IconButton
+                active={rtc.screenOn}
+                onClick={() => {
+                  rtc.toggleScreen().catch(() => toast.error("Não foi possível compartilhar a tela"));
+                }}
+                title={rtc.screenOn ? "Parar compartilhamento" : "Compartilhar tela (janela, aba ou tela inteira)"}
+              >
+                <MonitorUp className="w-4 h-4" />
+              </IconButton>
+            )}
+            <IconButton active={showTeam} onClick={() => setShowTeam(!showTeam)} title="Equipe">
+              <Users className="w-4 h-4" />
+            </IconButton>
+            <Link
+              to="/office/editor"
+              title="Editor de mapa"
+              className="inline-flex items-center justify-center w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 text-white"
+            >
+              <Pencil className="w-4 h-4" />
+            </Link>
+            <IconButton onClick={signOut} title="Sair">
+              <LogOut className="w-4 h-4" />
+            </IconButton>
+          </div>
+        </div>
+      </div>
+
+      {/* Map row (park + office stage) */}
+      <div className="relative flex-1 flex items-stretch min-h-0 overflow-hidden">
+
       <div
         className="flex-1 h-full"
         style={{
@@ -1214,6 +1284,8 @@ export function OfficeScene() {
           </button>
         </div>
       </div>
+      </div>{/* /Map row */}
+
 
 
       {/* Compose note dialog */}
@@ -1340,73 +1412,8 @@ export function OfficeScene() {
       />
 
 
-      {/* Topbar */}
-      <div className="absolute top-0 left-0 right-0 p-4 pointer-events-none z-[100]">
-        <div className="glass-panel rounded-2xl shadow-soft px-4 py-2.5 flex items-center justify-between pointer-events-auto">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl gradient-primary flex items-center justify-center shadow-glow">
-              <span className="text-sm font-bold text-primary-foreground">P</span>
-            </div>
-          </div>
+      {/* Topbar moved to top of component */}
 
-          <div className="flex items-center gap-2">
-            {rtc.connectedPeers.length > 0 && (
-              <div className="text-xs text-muted-foreground px-2 hidden sm:block">
-                Em chamada com {rtc.connectedPeers.length}
-              </div>
-            )}
-            <IconButton
-              active={rtc.micOn}
-              onClick={() => {
-                rtc.toggleMic().catch(() => toast.error("Não foi possível acessar o microfone"));
-              }}
-              title="Microfone"
-            >
-              {rtc.micOn ? <Mic className="w-4 h-4" /> : <MicOff className="w-4 h-4" />}
-            </IconButton>
-            <IconButton
-              active={rtc.camOn}
-              onClick={() => {
-                rtc.toggleCam().catch(() => toast.error("Não foi possível acessar a câmera"));
-              }}
-              title="Câmera"
-            >
-              {rtc.camOn ? <Video className="w-4 h-4" /> : <VideoOff className="w-4 h-4" />}
-            </IconButton>
-            <CamPreviewAndPicker
-              stream={rtc.localVideoStream}
-              devices={rtc.videoDevices}
-              selectedId={rtc.selectedVideoDeviceId}
-              onSelect={(id) => rtc.setVideoDevice(id).catch(() => toast.error("Falha ao trocar câmera"))}
-              visible={rtc.camOn}
-            />
-            {currentZone.id !== "lobby" && (
-              <IconButton
-                active={rtc.screenOn}
-                onClick={() => {
-                  rtc.toggleScreen().catch(() => toast.error("Não foi possível compartilhar a tela"));
-                }}
-                title={rtc.screenOn ? "Parar compartilhamento" : "Compartilhar tela (janela, aba ou tela inteira)"}
-              >
-                <MonitorUp className="w-4 h-4" />
-              </IconButton>
-            )}
-            <IconButton active={showTeam} onClick={() => setShowTeam(!showTeam)} title="Equipe">
-              <Users className="w-4 h-4" />
-            </IconButton>
-            <Link
-              to="/office/editor"
-              title="Editor de mapa"
-              className="inline-flex items-center justify-center w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 text-white"
-            >
-              <Pencil className="w-4 h-4" />
-            </Link>
-            <IconButton onClick={signOut} title="Sair">
-              <LogOut className="w-4 h-4" />
-            </IconButton>
-          </div>
-        </div>
-      </div>
 
       {/* Zone enter-toast (Gather style) */}
       {focusedZone && (
@@ -1437,7 +1444,7 @@ export function OfficeScene() {
 
       {/* Team panel */}
       {showTeam && (
-        <div className="absolute right-4 top-24 bottom-4 w-72 pointer-events-auto z-[80]">
+        <div className="absolute right-4 top-4 bottom-4 w-72 pointer-events-auto z-[80]">
           <div className="glass-panel rounded-2xl shadow-soft h-full flex flex-col overflow-hidden">
             <div className="px-4 py-3 border-b">
               <div className="text-sm font-semibold">Equipe</div>
