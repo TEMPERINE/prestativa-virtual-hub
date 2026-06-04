@@ -1,25 +1,38 @@
-## Criar primeiro usuário admin
+# Voz e vídeo entre avatares
 
-Vou criar o usuário `marciotemperine@gmail.com` com a senha `Criativo@2026` já confirmado (sem precisar de verificação de email) e atribuir a ele a role `admin`.
+## Objetivo
+Avatares conversam por áudio/vídeo quando:
+- Entram na **mesma zona reivindicada** (sala/mesa), ou
+- Se **aproximam** de outro avatar no lobby (raio configurável).
 
-### Passos
+Mic e câmera ficam **desligados por padrão**, mas o navegador sempre **escuta** os streams remotos (recebe áudio dos outros). Cada usuário tem botões para **mutar/desmutar mic** e **abrir/fechar vídeo**.
 
-1. **Criar usuário no Auth** via `supabase.auth.admin.createUser` (email confirmado automaticamente).
-   - O trigger `handle_new_user` já existente vai criar automaticamente:
-     - Linha em `profiles` com `display_name = "marciotemperine"`
-     - Linha em `user_roles` com role `member`
+## UX
+- HUD fixo no canto inferior (controles do próprio avatar): botão Mic, botão Câmera, indicador "Em chamada com N".
+- Pequenos tiles de vídeo flutuantes (PiP grid) no canto superior direito para cada par conectado que ativou câmera. Áudio toca sem UI.
+- Sobre cada avatar remoto que está falando: anel/ícone pulsando (usa Web Audio analyser).
+- Toast quando entra/sai de uma "sala de conversa".
 
-2. **Promover para admin**: atualizar o registro em `user_roles` trocando `member` por `admin` para esse `user_id`.
+## Regras de pareamento
+- **Mesma zona reivindicada** (`workspace_claims.zone_id` igual) → conecta com todos os outros na zona.
+- **Proximidade no lobby/livre**: distância euclidiana (em coords normalizadas) ≤ `0.08`. Histerese: desconecta só a > `0.12` para evitar flicker.
+- Limite: até 6 pares simultâneos.
 
-3. **Confirmar**: você poderá fazer login imediatamente em `/auth` com essas credenciais.
+## Arquitetura técnica
+- **Sinalização** via Supabase Realtime (canal `rtc:<userId>`). Mensagens: `offer`, `answer`, `ice`, `bye`.
+- **WebRTC P2P mesh** (RTCPeerConnection por par). STUN público `stun:stun.l.google.com:19302`.
+- Sempre adiciona transceivers `audio` e `video` em `sendrecv`, mas tracks locais começam com `enabled = false` (mic mudo, câmera off). Trocar enabled em vez de renegociar.
+- Tie-breaker para quem cria offer: `userId` menor é "polite/impolite" — quem tem id maior envia offer.
 
-### Observação de segurança
+## Arquivos
+- `src/lib/rtc/useRtcMesh.ts` — hook principal: gerencia peers, sinalização, streams remotos, controles.
+- `src/lib/rtc/signaling.ts` — wrapper de Realtime para envio/recebimento.
+- `src/components/office/RtcHud.tsx` — botões Mic/Cam + grid de vídeos remotos.
+- Integração em `src/components/office/OfficeScene.tsx`: calcula set de pares desejados (mesma zona OU proximidade) a cada tick e passa pro hook; renderiza `<RtcHud />`.
 
-A senha `Criativo@2026` ficará registrada nesta conversa. Recomendo trocá-la após o primeiro login (posso adicionar uma tela de "trocar senha" depois, se quiser).
+## Permissões
+- `getUserMedia` é solicitado **apenas** ao primeiro clique em Mic ou Câmera (não no load). Antes disso, o usuário ainda recebe áudio dos outros (recvonly via transceivers vazios).
 
-### Próximos passos sugeridos (não fazem parte deste turno)
-
-- Tela admin para convidar/criar novos usuários da equipe (já que o login é "convite manual pelo admin").
-- Painel para promover/rebaixar roles.
-
-Posso prosseguir?
+## Observações
+- Sem backend novo, sem tabela nova — Realtime já está ativo.
+- Não mexe em lógica de claim/movimento existente.
