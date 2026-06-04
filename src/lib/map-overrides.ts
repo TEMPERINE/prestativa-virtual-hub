@@ -7,6 +7,8 @@ export const GRID_COLS = 64;
 export const GRID_ROWS = 40;
 const STORAGE_KEY = "office-map-overrides:v1";
 
+export type CustomZone = { id: string; label: string; color: string };
+
 export type MapOverrides = {
   cols: number;
   rows: number;
@@ -14,6 +16,8 @@ export type MapOverrides = {
   blocked: number[];
   // length = cols*rows. zone id or null.
   zones: (ZoneId | null)[];
+  // User-defined zones added in the editor.
+  customZones?: CustomZone[];
 };
 
 function emptyOverrides(): MapOverrides {
@@ -23,6 +27,7 @@ function emptyOverrides(): MapOverrides {
     rows: GRID_ROWS,
     blocked: new Array(size).fill(0),
     zones: new Array(size).fill(null),
+    customZones: [],
   };
 }
 

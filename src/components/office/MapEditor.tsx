@@ -9,11 +9,12 @@ import {
   saveOverrides,
   clearOverrides,
   type MapOverrides,
+  type CustomZone,
 } from "@/lib/map-overrides";
 import { ZONES, COLLIDERS, FLOOR_POLY, type ZoneId } from "@/lib/office-map";
 import officeMap from "@/assets/office-map.jpg";
 import { toast } from "sonner";
-import { ArrowLeft, Eraser, Square, Download, Trash2, Eye, EyeOff, Undo } from "lucide-react";
+import { ArrowLeft, Eraser, Square, Download, Trash2, Eye, EyeOff, Undo, Plus, X } from "lucide-react";
 
 type Tool =
   | { kind: "blocked" }
@@ -85,8 +86,50 @@ export function MapEditor() {
   const historyRef = useRef<MapOverrides[]>([]);
   const [canUndo, setCanUndo] = useState(false);
 
+  const customZones = overrides.customZones ?? [];
+
   const paintableZones = useMemo(
     () => ZONES.filter((z) => z.id !== "lobby"),
+    []
+  );
+
+  const zoneColorOf = useCallback(
+    (id: string) => {
+      const custom = customZones.find((c) => c.id === id);
+      if (custom) return custom.color;
+      return ZONE_COLORS[id] ?? "#888";
+    },
+    [customZones]
+  );
+
+  const addCustomZone = useCallback(() => {
+    const label = window.prompt("Nome da nova zona:");
+    if (!label || !label.trim()) return;
+    const palette = ["#22d3ee", "#fb7185", "#a3e635", "#fbbf24", "#c084fc", "#34d399", "#f472b6", "#60a5fa"];
+    setOverrides((prev) => {
+      const existing = prev.customZones ?? [];
+      const id = `custom-${Date.now().toString(36)}`;
+      const color = palette[existing.length % palette.length];
+      const zone: CustomZone = { id, label: label.trim(), color };
+      return { ...prev, customZones: [...existing, zone] };
+    });
+    setDirty(true);
+  }, []);
+
+  const removeCustomZone = useCallback(
+    (id: string) => {
+      if (!confirm("Remover esta zona e apagar suas células pintadas?")) return;
+      setOverrides((prev) => {
+        const next: MapOverrides = {
+          ...prev,
+          zones: prev.zones.map((z) => (z === (id as ZoneId) ? null : z)),
+          customZones: (prev.customZones ?? []).filter((c) => c.id !== id),
+        };
+        return next;
+      });
+      setTool((t) => (t.kind === "zone" && t.zone === (id as ZoneId) ? { kind: "blocked" } : t));
+      setDirty(true);
+    },
     []
   );
 
@@ -216,7 +259,7 @@ export function MapEditor() {
         const i = cellIndex(c, r, cols);
         const zid = overrides.zones[i];
         if (zid) {
-          ctx.fillStyle = (ZONE_COLORS[zid] ?? "#fff") + "66"; // ~40% alpha
+          ctx.fillStyle = zoneColorOf(zid) + "66"; // ~40% alpha
           ctx.fillRect(c, r, 1, 1);
         }
         if (overrides.blocked[i]) {
@@ -225,7 +268,7 @@ export function MapEditor() {
         }
       }
     }
-  }, [overrides]);
+  }, [overrides, zoneColorOf]);
 
   // Effective-collision overlay: shows EXACTLY what the game blocks for
   // the avatar (FLOOR_POLY + painted blocked OR default COLLIDERS).
@@ -385,7 +428,16 @@ export function MapEditor() {
       <div className="flex flex-1 overflow-hidden">
         {/* Zone palette */}
         <aside className="w-56 border-r border-border bg-card p-3 overflow-y-auto">
-          <h3 className="text-xs font-semibold uppercase text-muted-foreground mb-2">Zonas (Áreas privadas)</h3>
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-xs font-semibold uppercase text-muted-foreground">Zonas (Áreas privadas)</h3>
+            <button
+              onClick={addCustomZone}
+              title="Adicionar nova zona"
+              className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded bg-primary/20 text-primary hover:bg-primary/30"
+            >
+              <Plus size={12} /> Nova
+            </button>
+          </div>
           <div className="flex flex-col gap-1">
             {paintableZones.map((z) => {
               const color = ZONE_COLORS[z.id] ?? "#888";
@@ -406,7 +458,48 @@ export function MapEditor() {
                 </button>
               );
             })}
+            {customZones.length > 0 && (
+              <div className="mt-2 pt-2 border-t border-border/50 flex flex-col gap-1">
+                <span className="text-[10px] uppercase text-muted-foreground px-1">Personalizadas</span>
+                {customZones.map((z) => {
+                  const active = tool.kind === "zone" && tool.zone === (z.id as ZoneId);
+                  return (
+                    <div
+                      key={z.id}
+                      className={`group flex items-center gap-2 px-2 py-1.5 rounded text-left text-sm ${
+                        active ? "ring-2 ring-primary bg-muted" : "hover:bg-muted"
+                      }`}
+                    >
+                      <button
+                        onClick={() => setTool({ kind: "zone", zone: z.id as ZoneId })}
+                        className="flex items-center gap-2 flex-1 min-w-0"
+                      >
+                        <span
+                          className="w-4 h-4 rounded shrink-0"
+                          style={{ backgroundColor: z.color, opacity: 0.7 }}
+                        />
+                        <span className="truncate">{z.label}</span>
+                      </button>
+                      <button
+                        onClick={() => removeCustomZone(z.id)}
+                        title="Remover zona"
+                        className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive"
+                      >
+                        <X size={12} />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+            <button
+              onClick={addCustomZone}
+              className="mt-2 inline-flex items-center justify-center gap-1 text-xs px-2 py-1.5 rounded border border-dashed border-border hover:bg-muted text-muted-foreground"
+            >
+              <Plus size={12} /> Adicionar zona
+            </button>
           </div>
+
 
           <h3 className="text-xs font-semibold uppercase text-muted-foreground mt-4 mb-2">Legenda</h3>
           <div className="text-xs text-muted-foreground space-y-1">
