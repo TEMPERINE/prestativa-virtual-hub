@@ -1088,6 +1088,7 @@ function SpriteAvatar({
   glowColor?: string;
 }) {
   const sheetH = SHEET_HEIGHT[facing];
+  const frameW = FRAME_WIDTHS[facing];
   return (
     <div
       style={{
