@@ -549,6 +549,7 @@ export function OfficeScene() {
           const ownerId = claims[wz.id];
           const owner = ownerId ? profiles[ownerId] : null;
           const isMyClaim = ownerId && me && ownerId === me.id;
+          const iHaveAClaim = me && Object.values(claims).includes(me.id);
           const isHovered = hoveredZone === wz.id;
           return (
             <div
@@ -594,7 +595,7 @@ export function OfficeScene() {
                         <span className="text-[10px] text-muted-foreground">(seu espaço)</span>
                       )}
                     </div>
-                  ) : (
+                  ) : iHaveAClaim ? null : (
                     <button
                       onClick={() => claimZone(wz.id)}
                       className="rounded-full px-3 py-1.5 text-xs font-semibold bg-primary text-primary-foreground shadow-soft hover:opacity-90"
