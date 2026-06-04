@@ -275,7 +275,6 @@ export function OfficeScene() {
       else if (activeMoveDirection.current === "down") dy = 1;
       else if (activeMoveDirection.current === "left") dx = -1;
       else if (activeMoveDirection.current === "right") dx = 1;
-      }
 
       if (dx || dy) {
         moveAvatar(dx, dy);
