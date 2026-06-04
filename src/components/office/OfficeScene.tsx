@@ -268,10 +268,12 @@ export function OfficeScene() {
 
   // Preload all directional sprites so swapping facing never shows a blank frame
   useEffect(() => {
-    (Object.values(AVATAR_SPRITES) as string[]).forEach((src) => {
-      const img = new Image();
-      img.src = src;
-    });
+    SPRITES.forEach((sp) =>
+      Object.values(sp.sheets).forEach((src) => {
+        const img = new Image();
+        img.src = src;
+      }),
+    );
   }, []);
 
   // Hydrate the office map from Lovable Cloud on mount so the layout drawn
