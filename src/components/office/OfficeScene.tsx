@@ -1044,7 +1044,7 @@ export function OfficeScene() {
           const myTeleporting = isMe && teleport;
           const meOpacity = myTeleporting
             ? teleport!.phase === "out" ? 0 : 1
-            : (inFocus ? 1 : 0.35);
+            : 1;
           return (
             <div
               key={profile.id}
@@ -1057,10 +1057,10 @@ export function OfficeScene() {
                   ? (myTeleporting ? "opacity 420ms ease-in-out, filter 420ms ease-in-out" : "none")
                   : "left 120ms linear, top 120ms linear",
                 zIndex: focusedZone ? (inFocus ? 60 : 20) : Math.round(display.y * 1000),
-                opacity: isMe ? meOpacity : (inFocus ? 1 : 0.35),
+                opacity: isMe ? meOpacity : 1,
                 filter: myTeleporting
                   ? `drop-shadow(0 0 18px var(--primary)) drop-shadow(0 0 36px var(--primary-glow)) brightness(${teleport!.phase === "out" ? 1.8 : 1.4})`
-                  : (inFocus ? "none" : "grayscale(0.5)"),
+                  : "none",
               }}
             >
               <div className="flex flex-col items-center">
