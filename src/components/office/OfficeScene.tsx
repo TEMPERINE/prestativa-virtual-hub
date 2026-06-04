@@ -45,7 +45,15 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 
-type Profile = { id: string; display_name: string; avatar_color: string };
+type Profile = {
+  id: string;
+  display_name: string;
+  avatar_color: string;
+  sprite_id?: string | null;
+  tagline?: string | null;
+  status?: "available" | "busy" | "away" | null;
+  onboarded_at?: string | null;
+};
 type RemotePos = { user_id: string; x: number; y: number; zone: string; is_online: boolean; facing?: Facing };
 type DeskNote = {
   id: string;
