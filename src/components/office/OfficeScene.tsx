@@ -614,6 +614,8 @@ export function OfficeScene() {
       keysDown.current.add(dir);
       lastDir.current = dir;
       setLocalFacing(dir);
+      // Re-enable camera follow as soon as the user starts moving
+      if (!followRef.current) setFollowMe(true);
     };
 
     const up = (e: KeyboardEvent) => {
