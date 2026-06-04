@@ -259,7 +259,7 @@ export function MapEditor() {
         const i = cellIndex(c, r, cols);
         const zid = overrides.zones[i];
         if (zid) {
-          ctx.fillStyle = (ZONE_COLORS[zid] ?? "#fff") + "66"; // ~40% alpha
+          ctx.fillStyle = zoneColorOf(zid) + "66"; // ~40% alpha
           ctx.fillRect(c, r, 1, 1);
         }
         if (overrides.blocked[i]) {
