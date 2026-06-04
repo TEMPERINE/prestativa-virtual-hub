@@ -93,6 +93,14 @@ export function OfficeScene() {
     });
   }, []);
 
+  // Preload all directional sprites so swapping facing never shows a blank frame
+  useEffect(() => {
+    (Object.values(AVATAR_SPRITES) as string[]).forEach((src) => {
+      const img = new Image();
+      img.src = src;
+    });
+  }, []);
+
   const tryMove = useCallback((dir: Facing) => {
     const cur = posRef.current;
     const dx = dir === "left" ? -SPEED : dir === "right" ? SPEED : 0;
