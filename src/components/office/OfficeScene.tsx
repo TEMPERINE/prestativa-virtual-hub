@@ -645,21 +645,14 @@ function SpriteAvatar({
 function ReactionBubble({ emoji }: { emoji: string }) {
   return (
     <div
-      className="mb-1 select-none"
-      style={{
-        animation: "fade-in 180ms ease-out",
-      }}
+      className="select-none"
+      style={{ animation: "fade-in 180ms ease-out" }}
     >
       <div
-        className="relative px-2.5 py-1 rounded-2xl bg-white shadow-soft border border-black/5"
+        className="px-2.5 py-1 rounded-2xl bg-white shadow-soft border border-black/5 whitespace-nowrap"
         style={{ fontSize: "clamp(16px, 2.6vh, 28px)", lineHeight: 1 }}
       >
-        <span>{emoji}</span>
-        <span
-          className="absolute left-1/2 -bottom-1.5 w-3 h-3 bg-white border-r border-b border-black/5 rotate-45"
-          style={{ transform: "translateX(-50%) rotate(45deg)" }}
-          aria-hidden
-        />
+        {emoji}
       </div>
     </div>
   );
