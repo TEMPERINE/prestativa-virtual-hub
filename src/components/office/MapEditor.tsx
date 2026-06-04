@@ -718,6 +718,12 @@ export function MapEditor() {
                     top: `${p.y * 100}%`,
                     transform: "translate(-50%, -100%)",
                   }}
+                  onPointerDown={(e) => {
+                    e.stopPropagation();
+                    if ((e.target as HTMLElement).closest("button")) return;
+                    draggingPin.current = zid;
+                    (stageRef.current as Element | null)?.setPointerCapture?.(e.pointerId);
+                  }}
                 >
                   <div className="flex flex-col items-center -mb-1">
                     <div
@@ -726,7 +732,7 @@ export function MapEditor() {
                     >
                       {label}
                     </div>
-                    <div className="relative">
+                    <div className="relative" style={{ cursor: "grab" }}>
                       <MapPin
                         size={active ? 24 : 20}
                         className="drop-shadow"
@@ -734,6 +740,7 @@ export function MapEditor() {
                       />
                       <button
                         type="button"
+                        onPointerDown={(e) => e.stopPropagation()}
                         onClick={(e) => { e.stopPropagation(); removeSpawn(zid); }}
                         title="Remover ponto"
                         className="absolute -top-1 -right-2 bg-card border border-border rounded-full p-0.5 text-muted-foreground hover:text-destructive"
@@ -747,7 +754,7 @@ export function MapEditor() {
             })}
             {tool.kind === "spawn" && (
               <div className="absolute top-2 left-1/2 -translate-x-1/2 pointer-events-none bg-primary text-primary-foreground text-xs px-3 py-1 rounded-full shadow-soft">
-                Clique no mapa para fixar o ponto de teleporte
+                Clique no mapa para fixar o ponto · arraste o pino para ajustes finos
               </div>
             )}
           </div>
