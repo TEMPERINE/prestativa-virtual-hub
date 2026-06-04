@@ -1646,13 +1646,16 @@ function SpriteAvatar({
   facing,
   frame,
   glowColor,
+  spriteId,
 }: {
   facing: Facing;
   frame: number;
   glowColor?: string;
+  spriteId?: string | null;
 }) {
-  const sheetH = SHEET_HEIGHT[facing];
-  const frameW = FRAME_WIDTHS[facing];
+  const sprite = getSprite(spriteId);
+  const sheetH = sprite.dims[facing].h;
+  const frameW = sprite.dims[facing].w;
   // Para laterais, substitui o frame 3 pelo idle (frame 0) — quebra a sensação de deslizar.
   const displayFrame = (facing === "left" || facing === "right") && frame === 3 ? 0 : frame;
   return (
@@ -1680,9 +1683,9 @@ function SpriteAvatar({
           zIndex: 0,
         }}
       />
-      {(Object.keys(AVATAR_SPRITES) as Facing[]).map((f) => {
-        const h = SHEET_HEIGHT[f];
-        const w = FRAME_WIDTHS[f];
+      {(Object.keys(sprite.sheets) as Facing[]).map((f) => {
+        const h = sprite.dims[f].h;
+        const w = sprite.dims[f].w;
         const active = f === facing;
         return (
           <div
@@ -1694,7 +1697,7 @@ function SpriteAvatar({
               transform: "translateX(-50%)",
               height: "100%",
               aspectRatio: `${w} / ${h}`,
-              backgroundImage: `url(${AVATAR_SPRITES[f]})`,
+              backgroundImage: `url(${sprite.sheets[f]})`,
               backgroundRepeat: "no-repeat",
               backgroundSize: `${FRAMES * 100}% 100%`,
               backgroundPosition: `${(displayFrame / (FRAMES - 1)) * 100}% 0`,
