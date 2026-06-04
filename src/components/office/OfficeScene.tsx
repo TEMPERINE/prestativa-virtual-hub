@@ -420,7 +420,7 @@ export function OfficeScene() {
       window.removeEventListener("keyup", up);
       window.removeEventListener("blur", blur);
     };
-  }, [setLocalFacing, sendReaction, teleportToMyClaim]);
+  }, [setLocalFacing, sendReaction, walkToMyClaim]);
 
   // movement + animation loop
   useEffect(() => {
