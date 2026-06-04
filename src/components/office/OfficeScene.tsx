@@ -521,28 +521,23 @@ function SpriteAvatar({
   glowColor?: string;
 }) {
   const sheetH = SHEET_HEIGHT[facing];
-  const aspect = FRAME_W / sheetH; // width/height of one frame
-  // Display: ~64px tall
-  const heightCss = "min(7vh, 72px)";
   return (
     <div
       style={{
-        height: heightCss,
+        height: "min(7vh, 72px)",
         aspectRatio: `${FRAME_W} / ${sheetH}`,
         backgroundImage: `url(${AVATAR_SPRITES[facing]})`,
         backgroundRepeat: "no-repeat",
         backgroundSize: `${FRAMES * 100}% 100%`,
         backgroundPosition: `${(frame / (FRAMES - 1)) * 100}% 0`,
-        imageRendering: "auto",
         filter: glowColor
           ? `drop-shadow(0 0 6px ${glowColor}) drop-shadow(0 3px 4px rgba(0,0,0,0.35))`
           : "drop-shadow(0 3px 4px rgba(0,0,0,0.35))",
-        // eslint-disable-next-line @typescript-eslint/no-unused-expressions
-        ...(aspect ? {} : {}),
       }}
     />
   );
 }
+
 
 
 /** Darkens everything outside the given zone rect within the office stage. */
