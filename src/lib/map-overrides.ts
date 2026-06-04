@@ -286,3 +286,28 @@ export function zoneRectFromOverrides(
   };
 }
 
+
+// Spawn point overrides — exact teleport landing per zone.
+export function spawnPointForZone(id: string): SpawnPoint | null {
+  const o = loadOverrides();
+  const p = o?.spawnPoints?.[id];
+  if (p && typeof p.x === "number" && typeof p.y === "number") return p;
+  return null;
+}
+
+export function setSpawnPoint(id: string, point: SpawnPoint) {
+  const o = loadOverrides() ?? emptyOverrides();
+  const next: MapOverrides = {
+    ...o,
+    spawnPoints: { ...(o.spawnPoints ?? {}), [id]: point },
+  };
+  saveOverrides(next);
+}
+
+export function clearSpawnPoint(id: string) {
+  const o = loadOverrides();
+  if (!o?.spawnPoints) return;
+  const next = { ...o.spawnPoints };
+  delete next[id];
+  saveOverrides({ ...o, spawnPoints: next });
+}
