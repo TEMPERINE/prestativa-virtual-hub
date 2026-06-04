@@ -220,6 +220,17 @@ export function MapEditor() {
     [paintCell, tool]
   );
 
+  const spawnPoints = overrides.spawnPoints ?? {};
+
+  const removeSpawn = useCallback((zoneId: string) => {
+    setOverrides((prev) => {
+      const cur = { ...(prev.spawnPoints ?? {}) };
+      delete cur[zoneId];
+      return { ...prev, spawnPoints: cur };
+    });
+    setDirty(true);
+  }, []);
+
   // On mount: pull the latest map from Lovable Cloud so a fresh browser /
   // device sees the same layout instead of falling back to the defaults.
   useEffect(() => {
