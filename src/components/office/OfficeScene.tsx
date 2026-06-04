@@ -228,9 +228,35 @@ export function OfficeScene() {
 
     return () => {
       supabase.removeChannel(ch);
+      supabase.removeChannel(reactionCh);
+      reactionChannelRef.current = null;
       window.removeEventListener("beforeunload", offline);
       offline();
     };
+  }, []);
+
+  const sendReaction = useCallback((emoji: string) => {
+    const uid = meIdRef.current;
+    if (!uid) return;
+    const ts = Date.now();
+    setReactions((prev) => ({ ...prev, [uid]: { emoji, ts } }));
+    setTimeout(() => {
+      setReactions((prev) => {
+        const cur = prev[uid];
+        if (!cur || cur.ts !== ts) return prev;
+        const next = { ...prev };
+        delete next[uid];
+        return next;
+      });
+    }, REACTION_DURATION_MS);
+    const ch = reactionChannelRef.current;
+    if (ch) {
+      void ch.send({
+        type: "broadcast",
+        event: "reaction",
+        payload: { user_id: uid, emoji },
+      });
+    }
   }, []);
 
   // keyboard input — standard 2D game movement (hold to walk, release to idle)
