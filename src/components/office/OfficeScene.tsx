@@ -502,13 +502,48 @@ export function OfficeScene() {
       {/* Movement hint */}
       <div className="absolute bottom-4 left-1/2 -translate-x-1/2 pointer-events-none z-[70]">
         <div className="glass-panel rounded-full px-4 py-2 shadow-soft text-xs text-muted-foreground">
-          Use <kbd className="px-1.5 py-0.5 bg-muted rounded text-[10px] font-mono">WASD</kbd>,{" "}
-          <kbd className="px-1.5 py-0.5 bg-muted rounded text-[10px] font-mono">setas</kbd> ou clique no mapa
+          Use <kbd className="px-1.5 py-0.5 bg-muted rounded text-[10px] font-mono">WASD</kbd> ou{" "}
+          <kbd className="px-1.5 py-0.5 bg-muted rounded text-[10px] font-mono">setas</kbd> para se mover
         </div>
       </div>
     </div>
   );
 }
+
+/** Animated sprite avatar — 6-frame horizontal sheet per direction. */
+function SpriteAvatar({
+  facing,
+  frame,
+  glowColor,
+}: {
+  facing: Facing;
+  frame: number;
+  glowColor?: string;
+}) {
+  const sheetH = SHEET_HEIGHT[facing];
+  const aspect = FRAME_W / sheetH; // width/height of one frame
+  // Display: ~64px tall
+  const heightCss = "min(7vh, 72px)";
+  return (
+    <div
+      style={{
+        height: heightCss,
+        aspectRatio: `${FRAME_W} / ${sheetH}`,
+        backgroundImage: `url(${AVATAR_SPRITES[facing]})`,
+        backgroundRepeat: "no-repeat",
+        backgroundSize: `${FRAMES * 100}% 100%`,
+        backgroundPosition: `${(frame / (FRAMES - 1)) * 100}% 0`,
+        imageRendering: "auto",
+        filter: glowColor
+          ? `drop-shadow(0 0 6px ${glowColor}) drop-shadow(0 3px 4px rgba(0,0,0,0.35))`
+          : "drop-shadow(0 3px 4px rgba(0,0,0,0.35))",
+        // eslint-disable-next-line @typescript-eslint/no-unused-expressions
+        ...(aspect ? {} : {}),
+      }}
+    />
+  );
+}
+
 
 /** Darkens everything outside the given zone rect within the office stage. */
 function ZoneSpotlight({ rect }: { rect: { x1: number; y1: number; x2: number; y2: number } }) {
