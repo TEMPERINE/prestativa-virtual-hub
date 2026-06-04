@@ -1431,9 +1431,28 @@ export function OfficeScene() {
             >
               <Pencil className="w-4 h-4" />
             </Link>
-            <IconButton onClick={signOut} title="Sair">
-              <LogOut className="w-4 h-4" />
-            </IconButton>
+            {me && (
+              <ProfileMenu
+                me={me}
+                email={myEmail}
+                hasClaim={Object.values(claims).includes(me.id)}
+                onEditCharacter={() => setEditCharOpen(true)}
+                onEditProfile={() => setEditProfOpen(true)}
+                onGoToMyDesk={teleportToMyClaim}
+                onGoToLobby={() => {
+                  if (zoneAt(posRef.current).id === "lobby") { toast.info("Você já está no saguão."); return; }
+                  const target = randomCorridorPoint();
+                  posRef.current = target;
+                  setPos(target);
+                  setZone("lobby");
+                  sendPos(target.x, target.y, "lobby", facingRef.current);
+                  toast.success("✨ Te levei ao saguão.");
+                }}
+                onRestartOnboarding={() => setForceOnboarding(true)}
+                onSignOut={signOut}
+                onStatusChanged={refreshMe}
+              />
+            )}
           </div>
         </div>
       </div>
