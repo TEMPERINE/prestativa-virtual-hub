@@ -1443,7 +1443,7 @@ export function OfficeScene() {
 
       {/* Team panel */}
       {showTeam && (
-        <div className="absolute right-4 top-4 bottom-4 w-72 pointer-events-auto z-[80]">
+        <div className="absolute right-4 top-24 bottom-4 w-72 pointer-events-auto z-[80]">
           <div className="glass-panel rounded-2xl shadow-soft h-full flex flex-col overflow-hidden">
             <div className="px-4 py-3 border-b">
               <div className="text-sm font-semibold">Equipe</div>
