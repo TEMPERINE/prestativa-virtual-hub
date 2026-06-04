@@ -684,6 +684,54 @@ export function MapEditor() {
                 }}
               />
             )}
+            {/* Spawn point pins */}
+            {Object.entries(spawnPoints).map(([zid, p]) => {
+              const color = zoneColorOf(zid);
+              const label = ZONES.find((z) => z.id === zid)?.label
+                ?? customZones.find((c) => c.id === zid)?.label
+                ?? zid;
+              const active = tool.kind === "spawn" && tool.zone === zid;
+              return (
+                <div
+                  key={zid}
+                  className="absolute pointer-events-auto"
+                  style={{
+                    left: `${p.x * 100}%`,
+                    top: `${p.y * 100}%`,
+                    transform: "translate(-50%, -100%)",
+                  }}
+                >
+                  <div className="flex flex-col items-center -mb-1">
+                    <div
+                      className="px-1.5 py-0.5 rounded text-[9px] font-medium whitespace-nowrap shadow-soft"
+                      style={{ background: color, color: "#0a0a0a" }}
+                    >
+                      {label}
+                    </div>
+                    <div className="relative">
+                      <MapPin
+                        size={active ? 24 : 20}
+                        className="drop-shadow"
+                        style={{ color, fill: color, stroke: "#0a0a0a", strokeWidth: 1.5 }}
+                      />
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); removeSpawn(zid); }}
+                        title="Remover ponto"
+                        className="absolute -top-1 -right-2 bg-card border border-border rounded-full p-0.5 text-muted-foreground hover:text-destructive"
+                      >
+                        <X size={10} />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+            {tool.kind === "spawn" && (
+              <div className="absolute top-2 left-1/2 -translate-x-1/2 pointer-events-none bg-primary text-primary-foreground text-xs px-3 py-1 rounded-full shadow-soft">
+                Clique no mapa para fixar o ponto de teleporte
+              </div>
+            )}
           </div>
         </main>
       </div>
