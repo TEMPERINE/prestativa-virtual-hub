@@ -421,7 +421,7 @@ export function OfficeScene() {
       : currentZone;
   }, [currentZone]);
 
-  // All workspace zones (built-in + custom) with their effective rect for hover overlays.
+  // All workspace zones with their effective rect for hover overlays.
   const workspaceZones = useMemo(() => {
     const out: { id: string; label: string; rect: { x1: number; y1: number; x2: number; y2: number } }[] = [];
     for (const z of ZONES) {
@@ -430,10 +430,9 @@ export function OfficeScene() {
       const rect = zoneRectFromOverrides(z.id) ?? z.rect;
       out.push({ id: z.id, label: z.label, rect });
     }
-    // Custom zones from editor overrides.
-    import("@/lib/map-overrides").then(() => {}); // no-op (kept dep tree honest)
     return out;
   }, []);
+
 
 
 
