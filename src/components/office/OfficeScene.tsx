@@ -846,16 +846,25 @@ export function OfficeScene() {
           }
         }}
       >
-        {/* Camera transform layer */}
+        {/* Camera pan layer */}
         <div
           className="absolute inset-0"
           style={{
-            transform: `translate3d(${pan.x}px, ${pan.y}px, 0) scale(${zoom})`,
-            transformOrigin: "0 0",
+            transform: `translate3d(${pan.x}px, ${pan.y}px, 0)`,
             willChange: "transform",
             cursor: dragRef.current?.moved ? "grabbing" : "grab",
           }}
         >
+          {/* Camera zoom layer */}
+          <div
+            className="absolute inset-0"
+            style={{
+              transform: `scale(${zoom})`,
+              transformOrigin: "0 0",
+              transition: "transform 0.25s cubic-bezier(0.25, 0.1, 0.25, 1)",
+              willChange: "transform",
+            }}
+          >
 
         <img
           src={officeMap}
