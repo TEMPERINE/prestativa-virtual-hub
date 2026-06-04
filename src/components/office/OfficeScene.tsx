@@ -1127,7 +1127,7 @@ function SpriteAvatar({
               bottom: 0,
               transform: "translateX(-50%)",
               height: "100%",
-              aspectRatio: `${FRAME_W} / ${h}`,
+              aspectRatio: `${w} / ${h}`,
               backgroundImage: `url(${AVATAR_SPRITES[f]})`,
               backgroundRepeat: "no-repeat",
               backgroundSize: `${FRAMES * 100}% 100%`,
