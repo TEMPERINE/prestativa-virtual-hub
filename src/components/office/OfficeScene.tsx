@@ -314,7 +314,7 @@ export function OfficeScene() {
     }
     const rect = zoneRectFromOverrides(myZone as ZoneId) ?? findZoneById(myZone)?.rect;
     if (!rect) return;
-    const target: Point = { x: (rect.x1 + rect.x2) / 2, y: (rect.y1 + rect.y2) / 2 };
+    const target = seatPointForRect(rect);
     const safe = collides(target) ? SPAWN : target;
     posRef.current = safe;
     setPos(safe);
