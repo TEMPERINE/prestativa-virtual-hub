@@ -274,7 +274,7 @@ export function useRtcMesh(myId: string | null, desiredPeers: string[]): RtcMesh
         const analyser = ctxRef.ctx.createAnalyser();
         analyser.fftSize = 512;
         src.connect(analyser);
-        analysers.push({ peerId, analyser, data: new Uint8Array(analyser.frequencyBinCount) });
+        analysers.push({ peerId, analyser, data: new Uint8Array(new ArrayBuffer(analyser.frequencyBinCount)) });
       } catch { /* noop */ }
     });
 
