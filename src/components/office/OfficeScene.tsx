@@ -43,6 +43,16 @@ function dirFromKey(k: string): Facing | null {
   if (k === "arrowright" || k === "d") return "right";
   return null;
 }
+
+const EMOJI_MAP: Record<string, string> = {
+  "1": "❤️",
+  "2": "👏",
+  "3": "🤣",
+  "4": "🙌",
+  "5": "🤯",
+  "6": "💩",
+};
+const REACTION_DURATION_MS = 3000;
 import { toast } from "sonner";
 import { LogOut, Mic, MicOff, Video, VideoOff, MonitorUp, Users, Pencil } from "lucide-react";
 import { Link } from "@tanstack/react-router";
