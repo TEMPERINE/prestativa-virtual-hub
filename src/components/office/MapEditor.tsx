@@ -221,6 +221,7 @@ export function MapEditor() {
   );
 
   const spawnPoints = overrides.spawnPoints ?? {};
+  const draggingPin = useRef<string | null>(null);
 
   const removeSpawn = useCallback((zoneId: string) => {
     setOverrides((prev) => {
@@ -228,6 +229,18 @@ export function MapEditor() {
       delete cur[zoneId];
       return { ...prev, spawnPoints: cur };
     });
+    setDirty(true);
+  }, []);
+
+  const moveSpawnToPointer = useCallback((e: React.PointerEvent, zoneId: string) => {
+    if (!stageRef.current) return;
+    const rect = stageRef.current.getBoundingClientRect();
+    const x = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+    const y = Math.max(0, Math.min(1, (e.clientY - rect.top) / rect.height));
+    setOverrides((prev) => ({
+      ...prev,
+      spawnPoints: { ...(prev.spawnPoints ?? {}), [zoneId]: { x, y } },
+    }));
     setDirty(true);
   }, []);
 
