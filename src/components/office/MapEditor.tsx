@@ -581,6 +581,17 @@ export function MapEditor() {
                         <span className="truncate">{z.label}</span>
                       </button>
                       <button
+                        onClick={(e) => { e.stopPropagation(); setTool({ kind: "spawn", zone: z.id }); }}
+                        title={spawnPoints[z.id] ? "Ponto de teleporte definido" : "Definir ponto de teleporte (GPS)"}
+                        className={`shrink-0 p-1 rounded ${
+                          tool.kind === "spawn" && tool.zone === z.id
+                            ? "ring-2 ring-primary text-primary"
+                            : spawnPoints[z.id] ? "text-primary" : "text-muted-foreground"
+                        } hover:bg-muted`}
+                      >
+                        <MapPin size={12} />
+                      </button>
+                      <button
                         onClick={(e) => { e.stopPropagation(); toggleKind(z.id); }}
                         title={k === "workspace" ? "Local de trabalho (reivindicável)" : "Espaço comum"}
                         className={`shrink-0 p-1 rounded ${k === "workspace" ? "text-primary" : "text-muted-foreground"} hover:bg-muted`}
