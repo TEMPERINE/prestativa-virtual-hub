@@ -464,7 +464,7 @@ export function OfficeScene() {
       // Ctrl/Cmd + D — auto-walk to claimed workspace
       if (key === "d" && (e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey) {
         e.preventDefault();
-        walkToMyClaim();
+        teleportToMyClaim();
         return;
       }
       const emoji = EMOJI_MAP[key];
@@ -512,7 +512,7 @@ export function OfficeScene() {
       window.removeEventListener("keyup", up);
       window.removeEventListener("blur", blur);
     };
-  }, [setLocalFacing, sendReaction, walkToMyClaim]);
+  }, [setLocalFacing, sendReaction, teleportToMyClaim]);
 
   // movement + animation loop
   useEffect(() => {
