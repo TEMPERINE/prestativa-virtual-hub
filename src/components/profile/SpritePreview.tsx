@@ -15,8 +15,10 @@ type Props = {
  */
 export function SpritePreview({ spriteId, facing = "down", size = 96, animate = false }: Props) {
   const sprite = getSprite(spriteId);
-  const dim = sprite.dims[facing];
-  const sheet = sprite.sheets[facing];
+  const useMirror = facing === "left" && sprite.mirrorLeftFromRight;
+  const srcFacing: Facing = useMirror ? "right" : facing;
+  const dim = sprite.dims[srcFacing];
+  const sheet = sprite.sheets[srcFacing];
 
   const [frame, setFrame] = useState(0);
   useEffect(() => {
@@ -39,6 +41,7 @@ export function SpritePreview({ spriteId, facing = "down", size = 96, animate = 
         overflow: "hidden",
         position: "relative",
         imageRendering: "pixelated",
+        transform: useMirror ? "scaleX(-1)" : undefined,
       }}
     >
       <img
