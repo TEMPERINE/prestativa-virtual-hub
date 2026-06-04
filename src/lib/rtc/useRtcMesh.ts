@@ -449,6 +449,50 @@ export function useRtcMesh(myId: string | null, desiredPeers: string[]): RtcMesh
     }
   }, [camOn, acquireCam]);
 
+  // ---------- Screen share ----------
+  const stopScreenInternal = useCallback(() => {
+    const track = screenTrackRef.current;
+    if (track) {
+      try { track.stop(); } catch { /* noop */ }
+    }
+    if (localScreenStream) {
+      localScreenStream.getTracks().forEach((t) => { try { t.stop(); } catch { /* noop */ } });
+    }
+    screenTrackRef.current = null;
+    for (const entry of peersRef.current.values()) {
+      if (entry.screenSender) void entry.screenSender.replaceTrack(null);
+    }
+    setLocalScreenStream(null);
+    setScreenOn(false);
+  }, [localScreenStream]);
+
+  const enableScreen = useCallback(async () => {
+    try {
+      const md = navigator.mediaDevices as MediaDevices & {
+        getDisplayMedia?: (c?: DisplayMediaStreamOptions) => Promise<MediaStream>;
+      };
+      if (!md.getDisplayMedia) throw new Error("getDisplayMedia not supported");
+      const stream = await md.getDisplayMedia({ video: true, audio: true });
+      const track = stream.getVideoTracks()[0];
+      if (!track) throw new Error("no screen track");
+      screenTrackRef.current = track;
+      setLocalScreenStream(stream);
+      for (const entry of peersRef.current.values()) {
+        if (entry.screenSender) await entry.screenSender.replaceTrack(track);
+      }
+      track.onended = () => { stopScreenInternal(); };
+      setScreenOn(true);
+    } catch (err) {
+      console.error("screen share failed", err);
+      throw err;
+    }
+  }, [stopScreenInternal]);
+
+  const toggleScreen = useCallback(async () => {
+    if (screenOn) stopScreenInternal();
+    else await enableScreen();
+  }, [screenOn, enableScreen, stopScreenInternal]);
+
   // Initial device list (labels are blank until permission granted)
   useEffect(() => {
     void refreshDevices();
@@ -460,12 +504,16 @@ export function useRtcMesh(myId: string | null, desiredPeers: string[]): RtcMesh
   return {
     micOn,
     camOn,
+    screenOn,
     toggleMic,
     toggleCam,
+    toggleScreen,
     remoteStreams,
+    remoteScreenStreams,
     connectedPeers,
     speakingPeers,
     localVideoStream,
+    localScreenStream,
     videoDevices,
     selectedVideoDeviceId,
     setVideoDevice,
