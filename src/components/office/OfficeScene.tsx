@@ -1670,6 +1670,8 @@ function SpriteAvatar({
 }) {
   const sheetH = SHEET_HEIGHT[facing];
   const frameW = FRAME_WIDTHS[facing];
+  // Para laterais, substitui o frame 3 pelo idle (frame 0) — quebra a sensação de deslizar.
+  const displayFrame = (facing === "left" || facing === "right") && frame === 3 ? 0 : frame;
   return (
     <div
       style={{
@@ -1712,7 +1714,7 @@ function SpriteAvatar({
               backgroundImage: `url(${AVATAR_SPRITES[f]})`,
               backgroundRepeat: "no-repeat",
               backgroundSize: `${FRAMES * 100}% 100%`,
-              backgroundPosition: `${(frame / (FRAMES - 1)) * 100}% 0`,
+              backgroundPosition: `${(displayFrame / (FRAMES - 1)) * 100}% 0`,
               imageRendering: "auto",
               visibility: active ? "visible" : "hidden",
               filter: "drop-shadow(0 2px 1px rgba(0,0,0,0.25))",
