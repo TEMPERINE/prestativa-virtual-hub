@@ -538,9 +538,7 @@ function SpriteAvatar({
         backgroundRepeat: "no-repeat",
         backgroundSize: `${FRAMES * 100}% 100%`,
         backgroundPosition: `${(frame / (FRAMES - 1)) * 100}% 0`,
-        filter: glowColor
-          ? `drop-shadow(0 0 6px ${glowColor}) drop-shadow(0 3px 4px rgba(0,0,0,0.35))`
-          : "drop-shadow(0 3px 4px rgba(0,0,0,0.35))",
+        imageRendering: "pixelated",
       }}
     />
   );
