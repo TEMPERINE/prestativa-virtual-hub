@@ -12,13 +12,31 @@ import { zoneRectFromOverrides } from "@/lib/map-overrides";
 import officeMap from "@/assets/office-map.jpg";
 import parkLeft from "@/assets/scene-park-left.jpg";
 import roadRight from "@/assets/scene-road-right.jpg";
-import avatarSprite from "@/assets/avatar-sprite.png";
+import avatarDown from "@/assets/avatar-down.png";
+import avatarUp from "@/assets/avatar-up.png";
+import avatarLeft from "@/assets/avatar-left.png";
+import avatarRight from "@/assets/avatar-right.png";
+
+type Facing = "up" | "down" | "left" | "right";
+const AVATAR_SPRITES: Record<Facing, string> = {
+  up: avatarUp,
+  down: avatarDown,
+  left: avatarLeft,
+  right: avatarRight,
+};
+function dirFromKey(k: string): Facing | null {
+  if (k === "arrowup" || k === "w") return "up";
+  if (k === "arrowdown" || k === "s") return "down";
+  if (k === "arrowleft" || k === "a") return "left";
+  if (k === "arrowright" || k === "d") return "right";
+  return null;
+}
 import { toast } from "sonner";
 import { LogOut, Mic, MicOff, Video, VideoOff, MonitorUp, Users, Pencil } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 
 type Profile = { id: string; display_name: string; avatar_color: string };
-type RemotePos = { user_id: string; x: number; y: number; zone: string; is_online: boolean };
+type RemotePos = { user_id: string; x: number; y: number; zone: string; is_online: boolean; facing?: Facing };
 
 const SPEED = 0.0048;
 const SEND_INTERVAL_MS = 120;
@@ -34,6 +52,8 @@ export function OfficeScene() {
   const [micOn, setMicOn] = useState(false);
   const [camOn, setCamOn] = useState(false);
   const [showTeam, setShowTeam] = useState(true);
+  const [facing, setFacing] = useState<Facing>("down");
+  const facingRef = useRef<Facing>("down");
 
   const keys = useRef<Record<string, boolean>>({});
   const lastSent = useRef(0);
@@ -62,6 +82,13 @@ export function OfficeScene() {
     const z = zoneAt(np);
     setZone((prev) => (prev !== z.id ? z.id : prev));
 
+    const newFacing: Facing =
+      Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? "right" : "left") : dy > 0 ? "down" : "up";
+    if (facingRef.current !== newFacing) {
+      facingRef.current = newFacing;
+      setFacing(newFacing);
+    }
+
     const now = performance.now();
     if (now - lastSent.current > SEND_INTERVAL_MS) {
       lastSent.current = now;
@@ -72,7 +99,7 @@ export function OfficeScene() {
           x: np.x,
           y: np.y,
           zone: z.id,
-          facing: Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? "right" : "left") : dy > 0 ? "down" : "up",
+          facing: newFacing,
           is_online: true,
         });
       });
@@ -82,15 +109,22 @@ export function OfficeScene() {
   const handleMoveKey = useCallback(
     (key: string, pressed: boolean, step = false) => {
       const k = key.toLowerCase();
-      if (!["arrowup", "arrowdown", "arrowleft", "arrowright", "w", "a", "s", "d"].includes(k))
-        return false;
+      const dir = dirFromKey(k);
+      if (!dir) return false;
       keys.current[k] = pressed;
       if (pressed) walkTarget.current = null;
       if (pressed && step) {
-        if (k === "arrowup" || k === "w") moveAvatar(0, -1, SPEED * 6);
-        if (k === "arrowdown" || k === "s") moveAvatar(0, 1, SPEED * 6);
-        if (k === "arrowleft" || k === "a") moveAvatar(-1, 0, SPEED * 6);
-        if (k === "arrowright" || k === "d") moveAvatar(1, 0, SPEED * 6);
+        // Platformer feel: first tap only turns; subsequent press (or hold)
+        // actually moves the avatar.
+        if (facingRef.current !== dir) {
+          facingRef.current = dir;
+          setFacing(dir);
+          return true;
+        }
+        if (dir === "up") moveAvatar(0, -1, SPEED * 6);
+        else if (dir === "down") moveAvatar(0, 1, SPEED * 6);
+        else if (dir === "left") moveAvatar(-1, 0, SPEED * 6);
+        else if (dir === "right") moveAvatar(1, 0, SPEED * 6);
       }
       return true;
     },
@@ -354,12 +388,12 @@ export function OfficeScene() {
                 </div>
                 <div className="relative">
                   <img
-                    src={avatarSprite}
+                    src={AVATAR_SPRITES[isMe ? facing : (p.facing ?? "down")]}
                     alt=""
                     draggable={false}
                     className="select-none"
                     style={{
-                      width: "min(16vh, 200px)",
+                      width: "min(8vh, 100px)",
                       height: "auto",
                       filter: isMe
                         ? `drop-shadow(0 0 8px ${profile.avatar_color}) drop-shadow(0 3px 4px rgba(0,0,0,0.35))`
