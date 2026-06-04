@@ -371,8 +371,6 @@ export function OfficeScene() {
                     glowColor={isMe ? profile.avatar_color : undefined}
                   />
                 </div>
-
-                </div>
               </div>
             </div>
           );
