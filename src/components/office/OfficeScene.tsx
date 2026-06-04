@@ -1729,8 +1729,11 @@ function SpriteAvatar({
   spriteId?: string | null;
 }) {
   const sprite = getSprite(spriteId);
-  const sheetH = sprite.dims[facing].h;
-  const frameW = sprite.dims[facing].w;
+  // Reference dims = max H across sheets, max W across sheets.
+  // Container size is fixed regardless of facing → no "samba" vertical.
+  const facings: Facing[] = ["down", "up", "left", "right"];
+  const refH = Math.max(...facings.map((f) => sprite.dims[f].h));
+  const refW = Math.max(...facings.map((f) => sprite.dims[f].w));
   // Para laterais, substitui o frame 3 pelo idle (frame 0) — quebra a sensação de deslizar.
   const displayFrame = (facing === "left" || facing === "right") && frame === 3 ? 0 : frame;
   return (
@@ -1738,7 +1741,7 @@ function SpriteAvatar({
       style={{
         position: "relative",
         height: "min(9vh, 94px)",
-        aspectRatio: `${frameW} / ${sheetH}`,
+        aspectRatio: `${refW} / ${refH}`,
       }}
     >
       {/* Contact shadow — anchors the character to the floor */}
@@ -1758,10 +1761,15 @@ function SpriteAvatar({
           zIndex: 0,
         }}
       />
-      {(Object.keys(sprite.sheets) as Facing[]).map((f) => {
-        const h = sprite.dims[f].h;
-        const w = sprite.dims[f].w;
+      {facings.map((f) => {
+        // For mirrored-left sprites, render right sheet flipped when facing left.
+        const useMirror = f === "left" && sprite.mirrorLeftFromRight;
+        const srcFacing: Facing = useMirror ? "right" : f;
+        const h = sprite.dims[srcFacing].h;
+        const w = sprite.dims[srcFacing].w;
         const active = f === facing;
+        const heightPct = (h / refH) * 100;
+        const widthPct = (w / refH) * (refH / refW) * 100; // = (w/refW)*100, kept symmetric
         return (
           <div
             key={f}
@@ -1769,10 +1777,10 @@ function SpriteAvatar({
               position: "absolute",
               left: "50%",
               bottom: 0,
-              transform: "translateX(-50%)",
-              height: "100%",
-              aspectRatio: `${w} / ${h}`,
-              backgroundImage: `url(${sprite.sheets[f]})`,
+              transform: `translateX(-50%) ${useMirror ? "scaleX(-1)" : ""}`,
+              height: `${heightPct}%`,
+              width: `${(w / refW) * 100}%`,
+              backgroundImage: `url(${sprite.sheets[srcFacing]})`,
               backgroundRepeat: "no-repeat",
               backgroundSize: `${FRAMES * 100}% 100%`,
               backgroundPosition: `${(displayFrame / (FRAMES - 1)) * 100}% 0`,
