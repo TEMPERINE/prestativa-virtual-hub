@@ -532,15 +532,35 @@ function SpriteAvatar({
   return (
     <div
       style={{
+        position: "relative",
         height: "min(9vh, 94px)",
         aspectRatio: `${FRAME_W} / ${sheetH}`,
-        backgroundImage: `url(${AVATAR_SPRITES[facing]})`,
-        backgroundRepeat: "no-repeat",
-        backgroundSize: `${FRAMES * 100}% 100%`,
-        backgroundPosition: `${(frame / (FRAMES - 1)) * 100}% 0`,
-        imageRendering: "pixelated",
       }}
-    />
+    >
+      {(Object.keys(AVATAR_SPRITES) as Facing[]).map((f) => {
+        const h = SHEET_HEIGHT[f];
+        const active = f === facing;
+        return (
+          <div
+            key={f}
+            style={{
+              position: "absolute",
+              left: "50%",
+              bottom: 0,
+              transform: "translateX(-50%)",
+              height: "100%",
+              aspectRatio: `${FRAME_W} / ${h}`,
+              backgroundImage: `url(${AVATAR_SPRITES[f]})`,
+              backgroundRepeat: "no-repeat",
+              backgroundSize: `${FRAMES * 100}% 100%`,
+              backgroundPosition: `${(frame / (FRAMES - 1)) * 100}% 0`,
+              imageRendering: "pixelated",
+              visibility: active ? "visible" : "hidden",
+            }}
+          />
+        );
+      })}
+    </div>
   );
 }
 
