@@ -1160,7 +1160,7 @@ export function OfficeScene() {
             title={followMe ? "Câmera seguindo você" : "Centralizar em mim"}
             onClick={() => {
               setFollowMe(true);
-              const targetZoom = Math.max(zoomRef.current, 2.2);
+              const targetZoom = Math.max(zoomRef.current, 2.0);
               setZoom(targetZoom);
               centerOn(posRef.current.x, posRef.current.y, targetZoom);
             }}
