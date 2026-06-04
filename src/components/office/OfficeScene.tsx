@@ -27,9 +27,9 @@ const AVATAR_SPRITES: Record<Facing, string> = {
 };
 // Each sheet: 1536px wide, 6 frames of 256px wide. Heights vary per direction.
 const SHEET_HEIGHT: Record<Facing, number> = {
-  down: 228,
-  up: 256,
-  left: 255,
+  down: 237,
+  up: 231,
+  left: 221,
   right: 218,
 };
 const FRAME_W = 256;
