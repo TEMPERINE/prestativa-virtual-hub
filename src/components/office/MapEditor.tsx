@@ -428,7 +428,16 @@ export function MapEditor() {
       <div className="flex flex-1 overflow-hidden">
         {/* Zone palette */}
         <aside className="w-56 border-r border-border bg-card p-3 overflow-y-auto">
-          <h3 className="text-xs font-semibold uppercase text-muted-foreground mb-2">Zonas (Áreas privadas)</h3>
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-xs font-semibold uppercase text-muted-foreground">Zonas (Áreas privadas)</h3>
+            <button
+              onClick={addCustomZone}
+              title="Adicionar nova zona"
+              className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded bg-primary/20 text-primary hover:bg-primary/30"
+            >
+              <Plus size={12} /> Nova
+            </button>
+          </div>
           <div className="flex flex-col gap-1">
             {paintableZones.map((z) => {
               const color = ZONE_COLORS[z.id] ?? "#888";
@@ -449,7 +458,48 @@ export function MapEditor() {
                 </button>
               );
             })}
+            {customZones.length > 0 && (
+              <div className="mt-2 pt-2 border-t border-border/50 flex flex-col gap-1">
+                <span className="text-[10px] uppercase text-muted-foreground px-1">Personalizadas</span>
+                {customZones.map((z) => {
+                  const active = tool.kind === "zone" && tool.zone === (z.id as ZoneId);
+                  return (
+                    <div
+                      key={z.id}
+                      className={`group flex items-center gap-2 px-2 py-1.5 rounded text-left text-sm ${
+                        active ? "ring-2 ring-primary bg-muted" : "hover:bg-muted"
+                      }`}
+                    >
+                      <button
+                        onClick={() => setTool({ kind: "zone", zone: z.id as ZoneId })}
+                        className="flex items-center gap-2 flex-1 min-w-0"
+                      >
+                        <span
+                          className="w-4 h-4 rounded shrink-0"
+                          style={{ backgroundColor: z.color, opacity: 0.7 }}
+                        />
+                        <span className="truncate">{z.label}</span>
+                      </button>
+                      <button
+                        onClick={() => removeCustomZone(z.id)}
+                        title="Remover zona"
+                        className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive"
+                      >
+                        <X size={12} />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+            <button
+              onClick={addCustomZone}
+              className="mt-2 inline-flex items-center justify-center gap-1 text-xs px-2 py-1.5 rounded border border-dashed border-border hover:bg-muted text-muted-foreground"
+            >
+              <Plus size={12} /> Adicionar zona
+            </button>
           </div>
+
 
           <h3 className="text-xs font-semibold uppercase text-muted-foreground mt-4 mb-2">Legenda</h3>
           <div className="text-xs text-muted-foreground space-y-1">
