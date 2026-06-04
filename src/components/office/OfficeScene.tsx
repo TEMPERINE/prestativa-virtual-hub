@@ -239,8 +239,9 @@ export function OfficeScene() {
       let startPoint: Point;
       if (myClaimZone) {
         const z = findZoneById(myClaimZone);
+        const sp = spawnPointForZone(myClaimZone);
         const rect = zoneRectFromOverrides(myClaimZone as ZoneId) ?? z?.rect ?? null;
-        startPoint = rect ? seatPointForRect(rect) : SPAWN;
+        startPoint = sp ?? (rect ? seatPointForRect(rect) : SPAWN);
       } else {
         const existing = pmap[userData.user.id];
         const savedStart = { x: existing?.x ?? SPAWN.x, y: existing?.y ?? SPAWN.y };
