@@ -343,6 +343,40 @@ export function useRtcMesh(myId: string | null, desiredPeers: string[]): RtcMesh
     else await enableMic();
   }, [micOn, enableMic, disableMic]);
 
+  const refreshDevices = useCallback(async () => {
+    try {
+      const all = await navigator.mediaDevices.enumerateDevices();
+      setVideoDevices(all.filter((d) => d.kind === "videoinput"));
+    } catch { /* noop */ }
+  }, []);
+
+  const acquireCam = useCallback(async (deviceId?: string) => {
+    const constraints: MediaStreamConstraints = {
+      video: deviceId
+        ? { deviceId: { exact: deviceId }, width: 320, height: 240 }
+        : { width: 320, height: 240 },
+    };
+    const stream = await navigator.mediaDevices.getUserMedia(constraints);
+    const track = stream.getVideoTracks()[0];
+    // Tear down any previous video track
+    if (videoTrackRef.current) {
+      try { videoTrackRef.current.stop(); } catch { /* noop */ }
+      if (localStreamRef.current) {
+        localStreamRef.current.getVideoTracks().forEach((t) => localStreamRef.current!.removeTrack(t));
+      }
+    }
+    videoTrackRef.current = track;
+    if (!localStreamRef.current) localStreamRef.current = new MediaStream();
+    localStreamRef.current.addTrack(track);
+    setLocalVideoStream(new MediaStream([track]));
+    setSelectedVideoDeviceId(track.getSettings().deviceId ?? deviceId ?? null);
+    for (const entry of peersRef.current.values()) {
+      if (entry.videoSender) await entry.videoSender.replaceTrack(track);
+    }
+    // Now labels are available
+    void refreshDevices();
+  }, [refreshDevices]);
+
   const enableCam = useCallback(async () => {
     if (videoTrackRef.current) {
       videoTrackRef.current.enabled = true;
@@ -350,20 +384,13 @@ export function useRtcMesh(myId: string | null, desiredPeers: string[]): RtcMesh
       return;
     }
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 320, height: 240 } });
-      const track = stream.getVideoTracks()[0];
-      videoTrackRef.current = track;
-      if (!localStreamRef.current) localStreamRef.current = new MediaStream();
-      localStreamRef.current.addTrack(track);
-      for (const entry of peersRef.current.values()) {
-        if (entry.videoSender) await entry.videoSender.replaceTrack(track);
-      }
+      await acquireCam(selectedVideoDeviceId ?? undefined);
       setCamOn(true);
     } catch (err) {
       console.error("camera access denied", err);
       throw err;
     }
-  }, []);
+  }, [acquireCam, selectedVideoDeviceId]);
 
   const disableCam = useCallback(() => {
     if (videoTrackRef.current) {
@@ -373,6 +400,7 @@ export function useRtcMesh(myId: string | null, desiredPeers: string[]): RtcMesh
         if (entry.videoSender) void entry.videoSender.replaceTrack(null);
       }
     }
+    setLocalVideoStream(null);
     setCamOn(false);
   }, []);
 
@@ -381,7 +409,20 @@ export function useRtcMesh(myId: string | null, desiredPeers: string[]): RtcMesh
     else await enableCam();
   }, [camOn, enableCam, disableCam]);
 
-  const localPreview = useMemo(() => localStreamRef.current, []);
+  const setVideoDevice = useCallback(async (deviceId: string) => {
+    setSelectedVideoDeviceId(deviceId);
+    if (camOn) {
+      try { await acquireCam(deviceId); } catch (err) { console.error(err); }
+    }
+  }, [camOn, acquireCam]);
+
+  // Initial device list (labels are blank until permission granted)
+  useEffect(() => {
+    void refreshDevices();
+    const handler = () => { void refreshDevices(); };
+    navigator.mediaDevices?.addEventListener?.("devicechange", handler);
+    return () => navigator.mediaDevices?.removeEventListener?.("devicechange", handler);
+  }, [refreshDevices]);
 
   return {
     micOn,
@@ -391,6 +432,9 @@ export function useRtcMesh(myId: string | null, desiredPeers: string[]): RtcMesh
     remoteStreams,
     connectedPeers,
     speakingPeers,
-    localPreview,
+    localVideoStream,
+    videoDevices,
+    selectedVideoDeviceId,
+    setVideoDevice,
   };
 }
