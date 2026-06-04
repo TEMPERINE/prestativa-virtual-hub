@@ -144,7 +144,7 @@ export function OfficeScene() {
 
   // ===== Camera (zoom + pan + follow) =====
   const MIN_ZOOM = 1;
-  const MAX_ZOOM = 7; // ~roughly one workspace fills the screen
+  const MAX_ZOOM = 4; // ~roughly one workspace fills the screen
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 }); // pixel offset of scaled content in stage
   const [followMe, setFollowMe] = useState(true);
