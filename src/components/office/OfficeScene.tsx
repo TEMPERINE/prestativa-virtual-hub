@@ -1629,8 +1629,8 @@ function WorkspaceZoneHover({
             style={{
               position: "fixed",
               left: pos.left,
-              top: pos.top - 8,
-              transform: "translate(-50%, -100%)",
+              top: pos.top,
+              transform: "translate(-50%, -50%)",
               zIndex: 2147483647,
               pointerEvents: "auto",
             }}
