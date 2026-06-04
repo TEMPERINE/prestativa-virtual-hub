@@ -434,6 +434,9 @@ export function OfficeScene() {
               }}
             >
               <div className="flex flex-col items-center">
+                {reactions[profile.id] && (
+                  <ReactionBubble emoji={reactions[profile.id].emoji} />
+                )}
                 <div
                   className={`px-2 py-0.5 rounded-full text-[10px] font-medium whitespace-nowrap mb-0.5 ${
                     isMe ? "bg-primary text-primary-foreground" : "bg-card/95 text-foreground"
