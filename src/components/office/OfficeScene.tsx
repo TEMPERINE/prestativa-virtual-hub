@@ -112,15 +112,15 @@ export function OfficeScene() {
       const dir = dirFromKey(k);
       if (!dir) return false;
       keys.current[k] = pressed;
-      if (pressed) walkTarget.current = null;
-      if (pressed && step) {
-        // Platformer feel: first tap only turns; subsequent press (or hold)
-        // actually moves the avatar.
+      if (pressed) {
+        walkTarget.current = null;
+        // Always update facing immediately when a direction key is pressed.
         if (facingRef.current !== dir) {
           facingRef.current = dir;
           setFacing(dir);
-          return true;
         }
+      }
+      if (pressed && step) {
         if (dir === "up") moveAvatar(0, -1, SPEED * 6);
         else if (dir === "down") moveAvatar(0, 1, SPEED * 6);
         else if (dir === "left") moveAvatar(-1, 0, SPEED * 6);
@@ -393,7 +393,7 @@ export function OfficeScene() {
                     draggable={false}
                     className="select-none"
                     style={{
-                      width: "min(8vh, 100px)",
+                      width: "min(4vh, 50px)",
                       height: "auto",
                       filter: isMe
                         ? `drop-shadow(0 0 8px ${profile.avatar_color}) drop-shadow(0 3px 4px rgba(0,0,0,0.35))`
