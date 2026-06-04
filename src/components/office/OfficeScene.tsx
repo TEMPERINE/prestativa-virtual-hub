@@ -759,9 +759,12 @@ export function OfficeScene() {
         {workspaceZones.map((wz) => {
           const ownerId = claims[wz.id];
           const owner = ownerId ? profiles[ownerId] : null;
+          const ownerOnline = ownerId ? positions[ownerId]?.is_online ?? false : false;
           const isMyClaim = ownerId && me && ownerId === me.id;
           const iHaveAClaim = me && Object.values(claims).includes(me.id);
           const isHovered = hoveredZone === wz.id;
+          const canHover = !isMyClaim; // allow hover on others' desks even if I have my own
+          const showCompose = ownerId && !isMyClaim;
           return (
             <div
               key={`ws-${wz.id}`}
@@ -771,13 +774,13 @@ export function OfficeScene() {
                 top: `${wz.rect.y1 * 100}%`,
                 width: `${(wz.rect.x2 - wz.rect.x1) * 100}%`,
                 height: `${(wz.rect.y2 - wz.rect.y1) * 100}%`,
-                zIndex: isHovered && !iHaveAClaim ? 55 : 15,
+                zIndex: isHovered && canHover ? 55 : 15,
               }}
-              onMouseEnter={() => !iHaveAClaim && setHoveredZone(wz.id)}
+              onMouseEnter={() => canHover && setHoveredZone(wz.id)}
               onMouseLeave={() => setHoveredZone((cur) => (cur === wz.id ? null : cur))}
             >
               {/* subtle highlight on hover */}
-              {!iHaveAClaim && (
+              {canHover && (
                 <div
                   className="absolute inset-0 rounded-md transition-all duration-150 pointer-events-none"
                   style={{
@@ -792,29 +795,38 @@ export function OfficeScene() {
                   }}
                 />
               )}
-              {isHovered && !iHaveAClaim && (
+              {isHovered && canHover && (
                 <div
-                  className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 whitespace-nowrap pointer-events-auto"
-                  style={{ zIndex: 70 }}
+                  className="absolute left-1/2 -translate-x-1/2 pointer-events-auto"
+                  style={{ zIndex: 70, bottom: "100%", marginBottom: 8 }}
                 >
                   {ownerId ? (
-                    <div className="glass-panel rounded-full px-3 py-1 shadow-soft text-xs font-medium flex items-center gap-2">
-                      <span
-                        className="inline-block w-2 h-2 rounded-full"
-                        style={{ background: owner?.avatar_color ?? "var(--primary)" }}
-                      />
-                      {owner?.display_name ?? "Reservado"}
-                      {isMyClaim && (
-                        <span className="text-[10px] text-muted-foreground">(seu espaço)</span>
-                      )}
-                    </div>
+                    <OccupantCard
+                      profile={owner}
+                      online={ownerOnline}
+                      onLeaveNote={
+                        showCompose
+                          ? () => {
+                              setComposeFor({
+                                zoneId: wz.id,
+                                recipientId: ownerId,
+                                recipientName: owner?.display_name ?? "colega",
+                              });
+                              setComposeText("");
+                              setHoveredZone(null);
+                            }
+                          : undefined
+                      }
+                    />
                   ) : (
-                    <button
-                      onClick={() => claimZone(wz.id)}
-                      className="rounded-full px-3 py-1.5 text-xs font-semibold bg-primary text-primary-foreground shadow-soft hover:opacity-90"
-                    >
-                      Reivindicar espaço
-                    </button>
+                    !iHaveAClaim && (
+                      <button
+                        onClick={() => claimZone(wz.id)}
+                        className="rounded-full px-3 py-1.5 text-xs font-semibold bg-primary text-primary-foreground shadow-soft hover:opacity-90 whitespace-nowrap"
+                      >
+                        Reivindicar espaço
+                      </button>
+                    )
                   )}
                 </div>
               )}
