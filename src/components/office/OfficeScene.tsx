@@ -1528,6 +1528,34 @@ export function OfficeScene() {
           </div>
         </div>
       )}
+
+      {me && (
+        <>
+          <EditCharacterModal
+            open={editCharOpen}
+            onOpenChange={setEditCharOpen}
+            userId={me.id}
+            currentSpriteId={me.sprite_id ?? "marcio"}
+            avatarColor={me.avatar_color}
+            onSaved={refreshMe}
+          />
+          <EditProfileModal
+            open={editProfOpen}
+            onOpenChange={setEditProfOpen}
+            userId={me.id}
+            initial={{ display_name: me.display_name, avatar_color: me.avatar_color, tagline: me.tagline ?? null }}
+            onSaved={refreshMe}
+          />
+        </>
+      )}
+
+      {me && (forceOnboarding || !me.onboarded_at) && (
+        <OnboardingWizard
+          userId={me.id}
+          initialName={me.display_name || (myEmail.split("@")[0] ?? "")}
+          onDone={() => { setForceOnboarding(false); refreshMe(); }}
+        />
+      )}
     </div>
   );
 }
