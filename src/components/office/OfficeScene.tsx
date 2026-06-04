@@ -1284,6 +1284,8 @@ export function OfficeScene() {
           </button>
         </div>
       </div>
+      </div>{/* /Map row */}
+
 
 
       {/* Compose note dialog */}
