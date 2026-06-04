@@ -14,6 +14,42 @@ export type Database = {
   }
   public: {
     Tables: {
+      desk_notes: {
+        Row: {
+          body: string
+          created_at: string
+          id: string
+          read_at: string | null
+          recipient_id: string
+          sender_id: string
+          x: number
+          y: number
+          zone_id: string
+        }
+        Insert: {
+          body: string
+          created_at?: string
+          id?: string
+          read_at?: string | null
+          recipient_id: string
+          sender_id: string
+          x?: number
+          y?: number
+          zone_id: string
+        }
+        Update: {
+          body?: string
+          created_at?: string
+          id?: string
+          read_at?: string | null
+          recipient_id?: string
+          sender_id?: string
+          x?: number
+          y?: number
+          zone_id?: string
+        }
+        Relationships: []
+      }
       map_overrides: {
         Row: {
           data: Json
