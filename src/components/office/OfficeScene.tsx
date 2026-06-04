@@ -26,10 +26,10 @@ const AVATAR_SPRITES: Record<Facing, string> = {
 };
 // Each sheet: 1536px wide, 6 frames of 256px wide. Heights vary per direction.
 const SHEET_HEIGHT: Record<Facing, number> = {
-  down: 255,
-  up: 240,
-  left: 229,
-  right: 244,
+  down: 254,
+  up: 227,
+  left: 210,
+  right: 215,
 };
 const FRAME_W = 256;
 const FRAMES = 6; // frame 0 = idle, frames 1..5 = walk cycle
