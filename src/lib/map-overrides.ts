@@ -135,7 +135,7 @@ export async function pushOverridesToCloud(
     const { error } = await supabase.from("map_overrides").upsert(
       {
         id: CLOUD_ID,
-        data: o as unknown as Record<string, unknown>,
+        data: JSON.parse(JSON.stringify(o)),
         updated_by: userData.user?.id ?? null,
         updated_at: new Date().toISOString(),
       },
