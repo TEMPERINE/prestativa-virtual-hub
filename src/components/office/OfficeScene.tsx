@@ -58,6 +58,7 @@ import { LogOut, Mic, MicOff, Video, VideoOff, MonitorUp, Users, Pencil } from "
 import { Link } from "@tanstack/react-router";
 import { useRtcMesh } from "@/lib/rtc/useRtcMesh";
 import { RemoteVideoTiles } from "./RemoteVideoTiles";
+import { CamPreviewAndPicker } from "./CamPreviewAndPicker";
 
 type Profile = { id: string; display_name: string; avatar_color: string };
 type RemotePos = { user_id: string; x: number; y: number; zone: string; is_online: boolean; facing?: Facing };
@@ -792,6 +793,13 @@ export function OfficeScene() {
             >
               {rtc.camOn ? <Video className="w-4 h-4" /> : <VideoOff className="w-4 h-4" />}
             </IconButton>
+            <CamPreviewAndPicker
+              stream={rtc.localVideoStream}
+              devices={rtc.videoDevices}
+              selectedId={rtc.selectedVideoDeviceId}
+              onSelect={(id) => rtc.setVideoDevice(id).catch(() => toast.error("Falha ao trocar câmera"))}
+              visible={rtc.camOn}
+            />
             {currentZone.supportsVideo && (
               <IconButton
                 onClick={() => toast.info("Compartilhamento de tela chega na próxima fase")}
