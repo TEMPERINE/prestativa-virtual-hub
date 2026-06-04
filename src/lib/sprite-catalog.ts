@@ -62,9 +62,10 @@ export const SPRITES: SpriteDef[] = [
     dims: {
       down: { w: 255, h: 232 },
       up: { w: 255, h: 246 },
-      left: { w: 255, h: 249 },
+      left: { w: 255, h: 206 },
       right: { w: 255, h: 206 },
     },
+    mirrorLeftFromRight: true,
   },
   {
     id: "curly",
@@ -74,9 +75,10 @@ export const SPRITES: SpriteDef[] = [
     dims: {
       down: { w: 255, h: 226 },
       up: { w: 255, h: 251 },
-      left: { w: 255, h: 249 },
+      left: { w: 255, h: 205 },
       right: { w: 255, h: 205 },
     },
+    mirrorLeftFromRight: true,
   },
   {
     id: "redhead",
@@ -86,9 +88,10 @@ export const SPRITES: SpriteDef[] = [
     dims: {
       down: { w: 255, h: 228 },
       up: { w: 255, h: 222 },
-      left: { w: 255, h: 208 },
+      left: { w: 255, h: 213 },
       right: { w: 255, h: 213 },
     },
+    mirrorLeftFromRight: true,
   },
   {
     id: "afro",
@@ -98,9 +101,10 @@ export const SPRITES: SpriteDef[] = [
     dims: {
       down: { w: 255, h: 243 },
       up: { w: 255, h: 242 },
-      left: { w: 255, h: 229 },
+      left: { w: 255, h: 227 },
       right: { w: 255, h: 227 },
     },
+    mirrorLeftFromRight: true,
   },
 ];
 
