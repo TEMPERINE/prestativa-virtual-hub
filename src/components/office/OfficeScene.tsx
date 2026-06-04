@@ -560,26 +560,28 @@ export function OfficeScene() {
                 top: `${wz.rect.y1 * 100}%`,
                 width: `${(wz.rect.x2 - wz.rect.x1) * 100}%`,
                 height: `${(wz.rect.y2 - wz.rect.y1) * 100}%`,
-                zIndex: isHovered ? 55 : 15,
+                zIndex: isHovered && !iHaveAClaim ? 55 : 15,
               }}
-              onMouseEnter={() => setHoveredZone(wz.id)}
+              onMouseEnter={() => !iHaveAClaim && setHoveredZone(wz.id)}
               onMouseLeave={() => setHoveredZone((cur) => (cur === wz.id ? null : cur))}
             >
               {/* subtle highlight on hover */}
-              <div
-                className="absolute inset-0 rounded-md transition-all duration-150 pointer-events-none"
-                style={{
-                  background: isHovered
-                    ? ownerId
-                      ? "color-mix(in oklab, var(--primary) 10%, transparent)"
-                      : "color-mix(in oklab, var(--primary) 18%, transparent)"
-                    : "transparent",
-                  outline: isHovered
-                    ? `1.5px dashed color-mix(in oklab, var(--primary) 70%, transparent)`
-                    : "none",
-                }}
-              />
-              {isHovered && (
+              {!iHaveAClaim && (
+                <div
+                  className="absolute inset-0 rounded-md transition-all duration-150 pointer-events-none"
+                  style={{
+                    background: isHovered
+                      ? ownerId
+                        ? "color-mix(in oklab, var(--primary) 10%, transparent)"
+                        : "color-mix(in oklab, var(--primary) 18%, transparent)"
+                      : "transparent",
+                    outline: isHovered
+                      ? `1.5px dashed color-mix(in oklab, var(--primary) 70%, transparent)`
+                      : "none",
+                  }}
+                />
+              )}
+              {isHovered && !iHaveAClaim && (
                 <div
                   className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 whitespace-nowrap pointer-events-auto"
                   style={{ zIndex: 70 }}
@@ -595,7 +597,7 @@ export function OfficeScene() {
                         <span className="text-[10px] text-muted-foreground">(seu espaço)</span>
                       )}
                     </div>
-                  ) : iHaveAClaim ? null : (
+                  ) : (
                     <button
                       onClick={() => claimZone(wz.id)}
                       className="rounded-full px-3 py-1.5 text-xs font-semibold bg-primary text-primary-foreground shadow-soft hover:opacity-90"
