@@ -262,7 +262,18 @@ export function OfficeScene() {
   // keyboard input — standard 2D game movement (hold to walk, release to idle)
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
-      const dir = dirFromKey(e.key.toLowerCase());
+      const key = e.key.toLowerCase();
+      const emoji = EMOJI_MAP[key];
+      if (emoji && !e.repeat && !e.metaKey && !e.ctrlKey && !e.altKey) {
+        const target = e.target as HTMLElement | null;
+        const tag = target?.tagName;
+        if (tag !== "INPUT" && tag !== "TEXTAREA" && !target?.isContentEditable) {
+          e.preventDefault();
+          sendReaction(emoji);
+          return;
+        }
+      }
+      const dir = dirFromKey(key);
       if (!dir) return;
       e.preventDefault();
       if (e.repeat) return;
