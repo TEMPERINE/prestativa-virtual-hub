@@ -1347,10 +1347,6 @@ export function OfficeScene() {
             <div className="w-9 h-9 rounded-xl gradient-primary flex items-center justify-center shadow-glow">
               <span className="text-sm font-bold text-primary-foreground">P</span>
             </div>
-            <div>
-              <div className="text-xs text-muted-foreground leading-tight">Você está em</div>
-              <div className="text-sm font-semibold leading-tight">{currentZone.label}</div>
-            </div>
           </div>
 
           <div className="flex items-center gap-2">
