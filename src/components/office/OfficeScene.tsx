@@ -1538,3 +1538,206 @@ function TeamRow({
     </div>
   );
 }
+
+/** Gather-style hover card showing the occupant + 4 social action icons. */
+function OccupantCard({
+  profile,
+  online,
+  onLeaveNote,
+}: {
+  profile: Profile | null;
+  online: boolean;
+  onLeaveNote?: () => void;
+}) {
+  const initials = (profile?.display_name ?? "?").charAt(0).toUpperCase();
+  return (
+    <div
+      className="rounded-xl shadow-soft px-4 pt-3 pb-2.5 text-white flex flex-col items-center gap-2 min-w-[180px]"
+      style={{
+        background: "rgba(20, 22, 38, 0.95)",
+        border: "1px solid rgba(255,255,255,0.08)",
+        backdropFilter: "blur(8px)",
+      }}
+    >
+      <div
+        className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-semibold text-white shadow-soft"
+        style={{ background: profile?.avatar_color ?? "var(--primary)" }}
+      >
+        {initials}
+      </div>
+      <div className="text-center leading-tight">
+        <div className="text-sm font-semibold flex items-center justify-center gap-1.5">
+          {profile?.display_name ?? "Reservado"}
+          <span
+            className={`inline-block w-1.5 h-1.5 rounded-full ${online ? "bg-emerald-400" : "bg-zinc-400"}`}
+          />
+        </div>
+        <div className="text-[10px] opacity-70">{online ? "Online" : "Offline"}</div>
+      </div>
+      <div className="flex items-center gap-1.5 mt-1">
+        <CardIconBtn title="Perfil (em breve)" disabled>
+          <UserIcon className="w-3.5 h-3.5" />
+        </CardIconBtn>
+        <CardIconBtn title="Cumprimentar (em breve)" disabled>
+          <Hand className="w-3.5 h-3.5" />
+        </CardIconBtn>
+        <CardIconBtn title="Chat (em breve)" disabled>
+          <MessageCircle className="w-3.5 h-3.5" />
+        </CardIconBtn>
+        <CardIconBtn
+          title="Deixar recadinho"
+          onClick={onLeaveNote}
+          disabled={!onLeaveNote}
+          active
+        >
+          <StickyNote className="w-3.5 h-3.5" />
+        </CardIconBtn>
+      </div>
+    </div>
+  );
+}
+
+function CardIconBtn({
+  children,
+  title,
+  onClick,
+  disabled,
+  active,
+}: {
+  children: React.ReactNode;
+  title: string;
+  onClick?: () => void;
+  disabled?: boolean;
+  active?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      title={title}
+      disabled={disabled}
+      onClick={onClick}
+      className={`w-7 h-7 rounded-md flex items-center justify-center transition ${
+        disabled
+          ? "bg-white/5 text-white/30 cursor-not-allowed"
+          : active
+          ? "bg-primary text-primary-foreground hover:opacity-90"
+          : "bg-white/10 text-white/80 hover:bg-white/20"
+      }`}
+    >
+      {children}
+    </button>
+  );
+}
+
+/** Little pixel-art-ish gift box that sits on a desk. */
+function GiftSprite({ color, bounce }: { color?: string; bounce?: boolean }) {
+  const ribbon = color ?? "var(--primary)";
+  return (
+    <div
+      className={bounce ? "animate-bounce" : ""}
+      style={{
+        width: "min(4.2vh, 44px)",
+        height: "min(4.2vh, 44px)",
+        animationDuration: "1.6s",
+        filter: "drop-shadow(0 3px 4px rgba(0,0,0,0.4))",
+        imageRendering: "pixelated",
+      }}
+    >
+      <svg viewBox="0 0 32 32" width="100%" height="100%" shapeRendering="crispEdges">
+        {/* Lid */}
+        <rect x="4" y="10" width="24" height="6" fill="#E94B8C" />
+        <rect x="4" y="10" width="24" height="2" fill="#FF7AB0" />
+        <rect x="4" y="15" width="24" height="1" fill="#A02560" />
+        {/* Box body */}
+        <rect x="6" y="16" width="20" height="12" fill="#F06AA0" />
+        <rect x="6" y="27" width="20" height="1" fill="#A02560" />
+        {/* Vertical ribbon */}
+        <rect x="14" y="10" width="4" height="18" fill={ribbon} />
+        <rect x="14" y="10" width="1" height="18" fill="#FFF" opacity="0.35" />
+        {/* Bow */}
+        <rect x="11" y="6" width="4" height="4" fill={ribbon} />
+        <rect x="17" y="6" width="4" height="4" fill={ribbon} />
+        <rect x="14" y="7" width="4" height="3" fill={ribbon} />
+        <rect x="15" y="8" width="2" height="2" fill="#FFF" opacity="0.5" />
+        {/* Small note sticking out the top */}
+        <rect x="20" y="4" width="8" height="6" fill="#FFF7C2" />
+        <rect x="20" y="4" width="8" height="1" fill="#E6D98A" />
+        <rect x="21" y="6" width="6" height="1" fill="#C9B96A" />
+        <rect x="21" y="8" width="4" height="1" fill="#C9B96A" />
+      </svg>
+    </div>
+  );
+}
+
+/** Transparent overlay that captures mouse movement + click while placing a note. */
+function PlacementLayer({
+  placing,
+  workspaceZones,
+  onMove,
+  onCancel,
+  onConfirm,
+}: {
+  placing: { zoneId: string; recipientId: string; body: string };
+  workspaceZones: { id: string; rect: { x1: number; y1: number; x2: number; y2: number } }[];
+  onMove: (p: { x: number; y: number }) => void;
+  onCancel: () => void;
+  onConfirm: (p: { x: number; y: number }) => void;
+}) {
+  const targetRect = workspaceZones.find((wz) => wz.id === placing.zoneId)?.rect ?? null;
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onCancel();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onCancel]);
+  return (
+    <>
+      <div
+        className="absolute inset-0"
+        style={{ zIndex: 90, cursor: "crosshair", background: "rgba(0,0,0,0.18)" }}
+        onMouseMove={(e) => {
+          const rect = e.currentTarget.getBoundingClientRect();
+          const x = (e.clientX - rect.left) / rect.width;
+          const y = (e.clientY - rect.top) / rect.height;
+          onMove({ x, y });
+        }}
+        onClick={(e) => {
+          const rect = e.currentTarget.getBoundingClientRect();
+          const x = (e.clientX - rect.left) / rect.width;
+          const y = (e.clientY - rect.top) / rect.height;
+          if (!targetRect) return;
+          if (x < targetRect.x1 || x > targetRect.x2 || y < targetRect.y1 || y > targetRect.y2) {
+            toast.error("Clique sobre a mesa do destinatário.");
+            return;
+          }
+          onConfirm({ x, y });
+        }}
+      />
+      {/* Highlight target zone */}
+      {targetRect && (
+        <div
+          className="absolute pointer-events-none rounded-md"
+          style={{
+            left: `${targetRect.x1 * 100}%`,
+            top: `${targetRect.y1 * 100}%`,
+            width: `${(targetRect.x2 - targetRect.x1) * 100}%`,
+            height: `${(targetRect.y2 - targetRect.y1) * 100}%`,
+            zIndex: 91,
+            outline: "2px dashed color-mix(in oklab, var(--primary) 80%, transparent)",
+            background: "color-mix(in oklab, var(--primary) 12%, transparent)",
+            boxShadow: "0 0 0 9999px rgba(0,0,0,0.001)",
+          }}
+        />
+      )}
+      {/* Cancel pill */}
+      <button
+        type="button"
+        onClick={onCancel}
+        className="absolute left-1/2 -translate-x-1/2 bottom-6 z-[120] flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold bg-white text-foreground shadow-soft hover:bg-white/90"
+      >
+        <XIcon className="w-4 h-4" /> Cancelar (Esc)
+      </button>
+    </>
+  );
+}
