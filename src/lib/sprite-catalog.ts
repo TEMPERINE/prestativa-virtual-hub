@@ -37,6 +37,8 @@ export type SpriteDef = {
   gender: "m" | "f" | "n";
   sheets: SpriteSheets;
   dims: SpriteDims;
+  /** Quando true, a folha "left" é renderizada espelhando a "right" (mais consistente). */
+  mirrorLeftFromRight?: boolean;
 };
 
 export const SPRITES: SpriteDef[] = [
