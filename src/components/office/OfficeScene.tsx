@@ -762,6 +762,7 @@ export function OfficeScene() {
         remoteStreams={rtc.remoteScreenStreams}
         profiles={profiles}
         onStopLocal={() => { rtc.toggleScreen().catch(() => {}); }}
+        anchorRect={focusedZone?.rect ?? null}
       />
 
       {/* Topbar */}
