@@ -14,8 +14,11 @@ type PeerEntry = {
   pc: RTCPeerConnection;
   audioSender: RTCRtpSender | null;
   videoSender: RTCRtpSender | null;
+  screenTransceiver: RTCRtpTransceiver | null;
+  screenSender: RTCRtpSender | null;
   makingOffer: boolean;
   remoteStream: MediaStream;
+  remoteScreenStream: MediaStream;
 };
 
 const ICE_CONFIG: RTCConfiguration = {
@@ -27,12 +30,16 @@ const SIGNAL_CHANNEL = "rtc-mesh-v1";
 export type RtcMeshState = {
   micOn: boolean;
   camOn: boolean;
+  screenOn: boolean;
   toggleMic: () => Promise<void>;
   toggleCam: () => Promise<void>;
+  toggleScreen: () => Promise<void>;
   remoteStreams: Record<string, MediaStream>;
+  remoteScreenStreams: Record<string, MediaStream>;
   connectedPeers: string[];
   speakingPeers: Record<string, boolean>;
   localVideoStream: MediaStream | null;
+  localScreenStream: MediaStream | null;
   videoDevices: MediaDeviceInfo[];
   selectedVideoDeviceId: string | null;
   setVideoDevice: (deviceId: string) => Promise<void>;
@@ -41,10 +48,13 @@ export type RtcMeshState = {
 export function useRtcMesh(myId: string | null, desiredPeers: string[]): RtcMeshState {
   const [micOn, setMicOn] = useState(false);
   const [camOn, setCamOn] = useState(false);
+  const [screenOn, setScreenOn] = useState(false);
   const [remoteStreams, setRemoteStreams] = useState<Record<string, MediaStream>>({});
+  const [remoteScreenStreams, setRemoteScreenStreams] = useState<Record<string, MediaStream>>({});
   const [connectedPeers, setConnectedPeers] = useState<string[]>([]);
   const [speakingPeers, setSpeakingPeers] = useState<Record<string, boolean>>({});
   const [localVideoStream, setLocalVideoStream] = useState<MediaStream | null>(null);
+  const [localScreenStream, setLocalScreenStream] = useState<MediaStream | null>(null);
   const [videoDevices, setVideoDevices] = useState<MediaDeviceInfo[]>([]);
   const [selectedVideoDeviceId, setSelectedVideoDeviceId] = useState<string | null>(null);
 
@@ -53,6 +63,7 @@ export function useRtcMesh(myId: string | null, desiredPeers: string[]): RtcMesh
   const localStreamRef = useRef<MediaStream | null>(null);
   const audioTrackRef = useRef<MediaStreamTrack | null>(null);
   const videoTrackRef = useRef<MediaStreamTrack | null>(null);
+  const screenTrackRef = useRef<MediaStreamTrack | null>(null);
   const desiredRef = useRef<Set<string>>(new Set());
 
   const sendSignal = useCallback((msg: Omit<SignalMsg, "from">) => {
@@ -68,21 +79,27 @@ export function useRtcMesh(myId: string | null, desiredPeers: string[]): RtcMesh
 
     const pc = new RTCPeerConnection(ICE_CONFIG);
     const remoteStream = new MediaStream();
+    const remoteScreenStream = new MediaStream();
 
     // Always add transceivers so we can both send/recv without renegotiation later
     const audioTx = pc.addTransceiver("audio", { direction: "sendrecv" });
     const videoTx = pc.addTransceiver("video", { direction: "sendrecv" });
+    const screenTx = pc.addTransceiver("video", { direction: "sendrecv" });
 
     // If we already have local tracks, attach now
     if (audioTrackRef.current) void audioTx.sender.replaceTrack(audioTrackRef.current);
     if (videoTrackRef.current) void videoTx.sender.replaceTrack(videoTrackRef.current);
+    if (screenTrackRef.current) void screenTx.sender.replaceTrack(screenTrackRef.current);
 
     const entry: PeerEntry = {
       pc,
       audioSender: audioTx.sender,
       videoSender: videoTx.sender,
+      screenTransceiver: screenTx,
+      screenSender: screenTx.sender,
       makingOffer: false,
       remoteStream,
+      remoteScreenStream,
     };
 
     pc.onicecandidate = (e) => {
@@ -90,14 +107,25 @@ export function useRtcMesh(myId: string | null, desiredPeers: string[]): RtcMesh
     };
 
     pc.ontrack = (e) => {
-      e.streams[0]?.getTracks().forEach((t) => {
-        if (!remoteStream.getTracks().find((rt) => rt.id === t.id)) remoteStream.addTrack(t);
-      });
-      // Also handle the case where streams[0] is empty: add the bare track
-      if (!e.streams[0]) {
-        if (!remoteStream.getTracks().find((rt) => rt.id === e.track.id)) remoteStream.addTrack(e.track);
+      const isScreen = e.transceiver === entry.screenTransceiver;
+      const target = isScreen ? remoteScreenStream : remoteStream;
+      if (!target.getTracks().find((rt) => rt.id === e.track.id)) target.addTrack(e.track);
+      if (isScreen) {
+        setRemoteScreenStreams((prev) => ({ ...prev, [peerId]: remoteScreenStream }));
+        e.track.onended = () => {
+          target.removeTrack(e.track);
+          setRemoteScreenStreams((prev) => {
+            if (target.getVideoTracks().length === 0) {
+              const next = { ...prev };
+              delete next[peerId];
+              return next;
+            }
+            return { ...prev, [peerId]: target };
+          });
+        };
+      } else {
+        setRemoteStreams((prev) => ({ ...prev, [peerId]: remoteStream }));
       }
-      setRemoteStreams((prev) => ({ ...prev, [peerId]: remoteStream }));
     };
 
     pc.onconnectionstatechange = () => {
@@ -137,6 +165,11 @@ export function useRtcMesh(myId: string | null, desiredPeers: string[]): RtcMesh
     try { entry.pc.close(); } catch { /* noop */ }
     peersRef.current.delete(peerId);
     setRemoteStreams((prev) => {
+      const next = { ...prev };
+      delete next[peerId];
+      return next;
+    });
+    setRemoteScreenStreams((prev) => {
       const next = { ...prev };
       delete next[peerId];
       return next;
@@ -416,6 +449,50 @@ export function useRtcMesh(myId: string | null, desiredPeers: string[]): RtcMesh
     }
   }, [camOn, acquireCam]);
 
+  // ---------- Screen share ----------
+  const stopScreenInternal = useCallback(() => {
+    const track = screenTrackRef.current;
+    if (track) {
+      try { track.stop(); } catch { /* noop */ }
+    }
+    if (localScreenStream) {
+      localScreenStream.getTracks().forEach((t) => { try { t.stop(); } catch { /* noop */ } });
+    }
+    screenTrackRef.current = null;
+    for (const entry of peersRef.current.values()) {
+      if (entry.screenSender) void entry.screenSender.replaceTrack(null);
+    }
+    setLocalScreenStream(null);
+    setScreenOn(false);
+  }, [localScreenStream]);
+
+  const enableScreen = useCallback(async () => {
+    try {
+      const md = navigator.mediaDevices as MediaDevices & {
+        getDisplayMedia?: (c?: DisplayMediaStreamOptions) => Promise<MediaStream>;
+      };
+      if (!md.getDisplayMedia) throw new Error("getDisplayMedia not supported");
+      const stream = await md.getDisplayMedia({ video: true, audio: true });
+      const track = stream.getVideoTracks()[0];
+      if (!track) throw new Error("no screen track");
+      screenTrackRef.current = track;
+      setLocalScreenStream(stream);
+      for (const entry of peersRef.current.values()) {
+        if (entry.screenSender) await entry.screenSender.replaceTrack(track);
+      }
+      track.onended = () => { stopScreenInternal(); };
+      setScreenOn(true);
+    } catch (err) {
+      console.error("screen share failed", err);
+      throw err;
+    }
+  }, [stopScreenInternal]);
+
+  const toggleScreen = useCallback(async () => {
+    if (screenOn) stopScreenInternal();
+    else await enableScreen();
+  }, [screenOn, enableScreen, stopScreenInternal]);
+
   // Initial device list (labels are blank until permission granted)
   useEffect(() => {
     void refreshDevices();
@@ -427,12 +504,16 @@ export function useRtcMesh(myId: string | null, desiredPeers: string[]): RtcMesh
   return {
     micOn,
     camOn,
+    screenOn,
     toggleMic,
     toggleCam,
+    toggleScreen,
     remoteStreams,
+    remoteScreenStreams,
     connectedPeers,
     speakingPeers,
     localVideoStream,
+    localScreenStream,
     videoDevices,
     selectedVideoDeviceId,
     setVideoDevice,

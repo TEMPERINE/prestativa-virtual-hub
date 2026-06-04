@@ -59,6 +59,7 @@ import { Link } from "@tanstack/react-router";
 import { useRtcMesh } from "@/lib/rtc/useRtcMesh";
 import { RemoteVideoTiles } from "./RemoteVideoTiles";
 import { CamPreviewAndPicker } from "./CamPreviewAndPicker";
+import { ScreenShareViewer } from "./ScreenShareViewer";
 
 type Profile = { id: string; display_name: string; avatar_color: string };
 type RemotePos = { user_id: string; x: number; y: number; zone: string; is_online: boolean; facing?: Facing };
@@ -756,6 +757,13 @@ export function OfficeScene() {
         speakingPeers={rtc.speakingPeers}
       />
 
+      <ScreenShareViewer
+        localStream={rtc.localScreenStream}
+        remoteStreams={rtc.remoteScreenStreams}
+        profiles={profiles}
+        onStopLocal={() => { rtc.toggleScreen().catch(() => {}); }}
+      />
+
       {/* Topbar */}
       <div className="absolute top-0 left-0 right-0 p-4 pointer-events-none z-[100]">
         <div className="glass-panel rounded-2xl shadow-soft px-4 py-2.5 flex items-center justify-between pointer-events-auto">
@@ -802,8 +810,11 @@ export function OfficeScene() {
             />
             {currentZone.supportsVideo && (
               <IconButton
-                onClick={() => toast.info("Compartilhamento de tela chega na próxima fase")}
-                title="Compartilhar tela"
+                active={rtc.screenOn}
+                onClick={() => {
+                  rtc.toggleScreen().catch(() => toast.error("Não foi possível compartilhar a tela"));
+                }}
+                title={rtc.screenOn ? "Parar compartilhamento" : "Compartilhar tela (janela, aba ou tela inteira)"}
               >
                 <MonitorUp className="w-4 h-4" />
               </IconButton>
