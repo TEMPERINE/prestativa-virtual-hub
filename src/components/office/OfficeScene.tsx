@@ -5,6 +5,7 @@ import {
   SPAWN,
   collides,
   zoneAtWithOverrides as zoneAt,
+  findZoneById,
   type Point,
   type ZoneId,
 } from "@/lib/office-map";
@@ -269,7 +270,7 @@ export function OfficeScene() {
   }, [tryMove, sendPos]);
 
 
-  const currentZone = useMemo(() => ZONES.find((z) => z.id === zone) ?? ZONES[ZONES.length - 1], [zone]);
+  const currentZone = useMemo(() => findZoneById(zone) ?? ZONES[ZONES.length - 1], [zone]);
   // Prefer the painted bounding box (editor overrides) over the hardcoded rect
   // so the spotlight visually matches exactly what the user painted.
   const focusedZone = useMemo(() => {
@@ -645,7 +646,7 @@ function TeamRow({
   online: boolean;
   isMe?: boolean;
 }) {
-  const zoneLabel = zone ? ZONES.find((z) => z.id === zone)?.label : undefined;
+  const zoneLabel = zone ? findZoneById(zone)?.label : undefined;
   return (
     <div
       className={`flex items-center gap-3 px-2.5 py-2 rounded-lg ${
