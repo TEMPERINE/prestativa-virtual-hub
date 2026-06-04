@@ -1714,7 +1714,7 @@ function SpriteAvatar({
               backgroundImage: `url(${AVATAR_SPRITES[f]})`,
               backgroundRepeat: "no-repeat",
               backgroundSize: `${FRAMES * 100}% 100%`,
-              backgroundPosition: `${(frame / (FRAMES - 1)) * 100}% 0`,
+              backgroundPosition: `${(displayFrame / (FRAMES - 1)) * 100}% 0`,
               imageRendering: "auto",
               visibility: active ? "visible" : "hidden",
               filter: "drop-shadow(0 2px 1px rgba(0,0,0,0.25))",
