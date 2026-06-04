@@ -167,17 +167,14 @@ export function OfficeScene() {
       });
       setClaims(cmap);
 
-      // If I have a claim, always spawn at that workstation (center of its rect).
+      // If I have a claim, always spawn at that workstation's "seat" point
+      // (bottom-center of the zone — in front of the desk).
       const myClaimZone = Object.entries(cmap).find(([, uid]) => uid === userData.user!.id)?.[0];
       let startPoint: Point;
       if (myClaimZone) {
         const z = findZoneById(myClaimZone);
         const rect = zoneRectFromOverrides(myClaimZone as ZoneId) ?? z?.rect ?? null;
-        if (rect) {
-          startPoint = { x: (rect.x1 + rect.x2) / 2, y: (rect.y1 + rect.y2) / 2 };
-        } else {
-          startPoint = SPAWN;
-        }
+        startPoint = rect ? seatPointForRect(rect) : SPAWN;
       } else {
         const existing = pmap[userData.user.id];
         const savedStart = { x: existing?.x ?? SPAWN.x, y: existing?.y ?? SPAWN.y };
