@@ -1102,7 +1102,65 @@ export function OfficeScene() {
           onStopLocal={() => { rtc.toggleScreen().catch(() => {}); }}
           anchorRect={focusedZone?.rect ?? null}
         />
+        </div>
+        {/* /Camera transform layer */}
+
+        {/* Map navigation controls (right side) */}
+        <div className="absolute right-3 top-1/2 -translate-y-1/2 flex flex-col gap-2 z-[90] pointer-events-auto">
+          <button
+            type="button"
+            title="Aproximar"
+            onClick={() => {
+              const s = zoomRef.current;
+              const ns = Math.min(MAX_ZOOM, s * 1.25);
+              const stage = stageRef.current;
+              if (!stage || ns === s) return;
+              const W = stage.clientWidth, H = stage.clientHeight;
+              const cx = W / 2, cy = H / 2;
+              const p = panRef.current;
+              setZoom(ns);
+              setPan(clampPan(ns, { x: cx - (cx - p.x) * (ns / s), y: cy - (cy - p.y) * (ns / s) }));
+            }}
+            className="w-9 h-9 rounded-full bg-black/60 hover:bg-black/80 text-white flex items-center justify-center shadow-soft backdrop-blur-sm"
+          >
+            <Plus className="w-4 h-4" />
+          </button>
+          <button
+            type="button"
+            title="Afastar"
+            onClick={() => {
+              const s = zoomRef.current;
+              const ns = Math.max(MIN_ZOOM, s / 1.25);
+              const stage = stageRef.current;
+              if (!stage || ns === s) return;
+              const W = stage.clientWidth, H = stage.clientHeight;
+              const cx = W / 2, cy = H / 2;
+              const p = panRef.current;
+              setZoom(ns);
+              setPan(clampPan(ns, { x: cx - (cx - p.x) * (ns / s), y: cy - (cy - p.y) * (ns / s) }));
+            }}
+            className="w-9 h-9 rounded-full bg-black/60 hover:bg-black/80 text-white flex items-center justify-center shadow-soft backdrop-blur-sm"
+          >
+            <Minus className="w-4 h-4" />
+          </button>
+          <button
+            type="button"
+            title={followMe ? "Câmera seguindo você" : "Centralizar em mim"}
+            onClick={() => {
+              setFollowMe(true);
+              const targetZoom = Math.max(zoomRef.current, 2.2);
+              setZoom(targetZoom);
+              centerOn(posRef.current.x, posRef.current.y, targetZoom);
+            }}
+            className={`w-9 h-9 rounded-full flex items-center justify-center shadow-soft backdrop-blur-sm ${
+              followMe ? "bg-primary text-primary-foreground" : "bg-black/60 hover:bg-black/80 text-white"
+            }`}
+          >
+            <Locate className="w-4 h-4" />
+          </button>
+        </div>
       </div>
+
 
       {/* Compose note dialog */}
       <Dialog
