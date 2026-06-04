@@ -44,6 +44,10 @@ import { ScreenShareViewer } from "./ScreenShareViewer";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
+import { ProfileMenu } from "@/components/profile/ProfileMenu";
+import { EditCharacterModal } from "@/components/profile/EditCharacterModal";
+import { EditProfileModal } from "@/components/profile/EditProfileModal";
+import { OnboardingWizard } from "@/components/onboarding/OnboardingWizard";
 
 type Profile = {
   id: string;
@@ -125,6 +129,20 @@ export function OfficeScene() {
   const [openingNote, setOpeningNote] = useState<DeskNote | null>(null);
   const reactionChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const meIdRef = useRef<string | null>(null);
+  const [myEmail, setMyEmail] = useState<string>("");
+  const [editCharOpen, setEditCharOpen] = useState(false);
+  const [editProfOpen, setEditProfOpen] = useState(false);
+  const [forceOnboarding, setForceOnboarding] = useState(false);
+
+  const refreshMe = useCallback(async () => {
+    const uid = meIdRef.current;
+    if (!uid) return;
+    const { data } = await supabase.from("profiles").select("id, display_name, avatar_color, sprite_id, tagline, status, onboarded_at").eq("id", uid).maybeSingle();
+    if (data) {
+      setMe(data as Profile);
+      setProfiles((prev) => ({ ...prev, [uid]: data as Profile }));
+    }
+  }, []);
 
   // ===== Camera (zoom + pan + follow) =====
   const MIN_ZOOM = 1;
@@ -330,6 +348,7 @@ export function OfficeScene() {
       const { data: userData } = await supabase.auth.getUser();
       if (!userData.user) return;
       meIdRef.current = userData.user.id;
+      setMyEmail(userData.user.email ?? "");
       const { data: profs } = await supabase.from("profiles").select("id, display_name, avatar_color, sprite_id, tagline, status, onboarded_at");
       const map: Record<string, Profile> = {};
       (profs ?? []).forEach((p) => (map[p.id] = p as Profile));
@@ -1412,9 +1431,28 @@ export function OfficeScene() {
             >
               <Pencil className="w-4 h-4" />
             </Link>
-            <IconButton onClick={signOut} title="Sair">
-              <LogOut className="w-4 h-4" />
-            </IconButton>
+            {me && (
+              <ProfileMenu
+                me={me}
+                email={myEmail}
+                hasClaim={Object.values(claims).includes(me.id)}
+                onEditCharacter={() => setEditCharOpen(true)}
+                onEditProfile={() => setEditProfOpen(true)}
+                onGoToMyDesk={teleportToMyClaim}
+                onGoToLobby={() => {
+                  if (zoneAt(posRef.current).id === "lobby") { toast.info("Você já está no saguão."); return; }
+                  const target = randomCorridorPoint();
+                  posRef.current = target;
+                  setPos(target);
+                  setZone("lobby");
+                  sendPos(target.x, target.y, "lobby", facingRef.current);
+                  toast.success("✨ Te levei ao saguão.");
+                }}
+                onRestartOnboarding={() => setForceOnboarding(true)}
+                onSignOut={signOut}
+                onStatusChanged={refreshMe}
+              />
+            )}
           </div>
         </div>
       </div>
@@ -1489,6 +1527,34 @@ export function OfficeScene() {
             <kbd className="px-1.5 py-0.5 bg-muted rounded text-[10px] font-mono">Ctrl+D</kbd> teleporta para seu espaço ✨
           </div>
         </div>
+      )}
+
+      {me && (
+        <>
+          <EditCharacterModal
+            open={editCharOpen}
+            onOpenChange={setEditCharOpen}
+            userId={me.id}
+            currentSpriteId={me.sprite_id ?? "marcio"}
+            avatarColor={me.avatar_color}
+            onSaved={refreshMe}
+          />
+          <EditProfileModal
+            open={editProfOpen}
+            onOpenChange={setEditProfOpen}
+            userId={me.id}
+            initial={{ display_name: me.display_name, avatar_color: me.avatar_color, tagline: me.tagline ?? null }}
+            onSaved={refreshMe}
+          />
+        </>
+      )}
+
+      {me && (forceOnboarding || !me.onboarded_at) && (
+        <OnboardingWizard
+          userId={me.id}
+          initialName={me.display_name || (myEmail.split("@")[0] ?? "")}
+          onDone={() => { setForceOnboarding(false); refreshMe(); }}
+        />
       )}
     </div>
   );
