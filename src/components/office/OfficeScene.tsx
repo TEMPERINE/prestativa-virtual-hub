@@ -319,7 +319,10 @@ export function OfficeScene() {
   const claimsRef = useRef<Record<string, string>>({});
   useEffect(() => { claimsRef.current = claims; }, [claims]);
 
-  const teleportToMyClaim = useCallback(() => {
+  // Auto-walk target: when set, the avatar walks toward this point each tick.
+  const autoWalkRef = useRef<{ x: number; y: number } | null>(null);
+
+  const walkToMyClaim = useCallback(() => {
     const uid = meIdRef.current;
     if (!uid) return;
     const myZone = Object.entries(claimsRef.current).find(([, u]) => u === uid)?.[0];
@@ -330,15 +333,10 @@ export function OfficeScene() {
     const rect = zoneRectFromOverrides(myZone as ZoneId) ?? findZoneById(myZone)?.rect;
     if (!rect) return;
     const target = seatPointForRect(rect);
-    const safe = collides(target) ? SPAWN : target;
-    posRef.current = safe;
-    setPos(safe);
-    const z = zoneAt(safe);
-    setZone(z.id);
-    setLocalFacing("down");
-    sendPos(safe.x, safe.y, z.id, "down");
-    toast.success(`Teleportado para ${findZoneById(myZone)?.label ?? myZone}.`);
-  }, [sendPos, setLocalFacing]);
+    autoWalkRef.current = target;
+    toast.success(`Indo para ${findZoneById(myZone)?.label ?? myZone}...`);
+  }, []);
+
 
 
 
