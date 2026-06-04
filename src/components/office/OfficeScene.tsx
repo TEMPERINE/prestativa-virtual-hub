@@ -407,7 +407,7 @@ export function OfficeScene() {
       window.removeEventListener("keyup", up);
       window.removeEventListener("blur", blur);
     };
-  }, [setLocalFacing, sendReaction]);
+  }, [setLocalFacing, sendReaction, teleportToMyClaim]);
 
   // movement + animation loop
   useEffect(() => {
