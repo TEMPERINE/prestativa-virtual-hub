@@ -640,18 +640,39 @@ function SpriteAvatar({
 }
 
 /** Speech-bubble reaction shown above an avatar. */
-function ReactionBubble({ emoji }: { emoji: string }) {
+function ReactionBubble({ emoji }: { emoji: string | null }) {
+  const [visible, setVisible] = useState(false);
+  const [current, setCurrent] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (emoji) {
+      setCurrent(emoji);
+      // small delay so the DOM mount happens before the CSS transition kicks in
+      requestAnimationFrame(() => setVisible(true));
+    } else {
+      setVisible(false);
+    }
+  }, [emoji]);
+
+  const onTransitionEnd = () => {
+    if (!visible) setCurrent(null);
+  };
+
   return (
     <div
-      className="select-none"
-      style={{ animation: "fade-in 180ms ease-out" }}
+      className={`select-none transition-all duration-300 ease-out ${
+        visible ? "opacity-100 translate-y-0 scale-100" : "opacity-0 -translate-y-2 scale-90"
+      }`}
+      onTransitionEnd={onTransitionEnd}
     >
-      <div
-        className="px-2.5 py-1 rounded-2xl bg-white shadow-soft border border-black/5 whitespace-nowrap"
-        style={{ fontSize: "clamp(16px, 2.6vh, 28px)", lineHeight: 1 }}
-      >
-        {emoji}
-      </div>
+      {current && (
+        <div
+          className="px-2.5 py-1 rounded-2xl bg-white shadow-soft border border-black/5 whitespace-nowrap"
+          style={{ fontSize: "clamp(16px, 2.6vh, 28px)", lineHeight: 1 }}
+        >
+          {current}
+        </div>
+      )}
     </div>
   );
 }
