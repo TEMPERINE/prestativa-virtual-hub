@@ -7,17 +7,17 @@ export const GRID_COLS = 64;
 export const GRID_ROWS = 40;
 const STORAGE_KEY = "office-map-overrides:v1";
 
-export type CustomZone = { id: string; label: string; color: string };
+export type ZoneKind = "workspace" | "common";
+export type CustomZone = { id: string; label: string; color: string; kind?: ZoneKind };
 
 export type MapOverrides = {
   cols: number;
   rows: number;
-  // length = cols*rows. 1 = blocked, 0 = walkable.
   blocked: number[];
-  // length = cols*rows. zone id or null.
   zones: (ZoneId | null)[];
-  // User-defined zones added in the editor.
   customZones?: CustomZone[];
+  // Per-zone kind override (workspace=claimable, common=shared).
+  zoneKinds?: Record<string, ZoneKind>;
 };
 
 function emptyOverrides(): MapOverrides {
@@ -28,7 +28,37 @@ function emptyOverrides(): MapOverrides {
     blocked: new Array(size).fill(0),
     zones: new Array(size).fill(null),
     customZones: [],
+    zoneKinds: {},
   };
+}
+
+// Defaults for built-in zones — workstations are claimable, social rooms are common.
+const DEFAULT_ZONE_KINDS: Record<string, ZoneKind> = {
+  "atendente-1": "workspace", "atendente-2": "workspace", "atendente-3": "workspace",
+  "atendente-4": "workspace", "atendente-5": "workspace", "atendente-6": "workspace",
+  "atendente-7": "workspace", "atendente-8": "workspace", "atendente-9": "workspace",
+  "atendente-10": "workspace",
+  "supervisao": "workspace",
+  "diretoria": "workspace",
+  "reuniao": "common",
+  "feedback": "common",
+  "descompressao": "common",
+  "lobby": "common",
+};
+
+export function getZoneKind(id: string): ZoneKind {
+  const o = loadOverrides();
+  const override = o?.zoneKinds?.[id];
+  if (override) return override;
+  const custom = o?.customZones?.find((c) => c.id === id);
+  if (custom?.kind) return custom.kind;
+  return DEFAULT_ZONE_KINDS[id] ?? "common";
+}
+
+export function setZoneKind(id: string, kind: ZoneKind) {
+  const o = loadOverrides() ?? emptyOverrides();
+  const next: MapOverrides = { ...o, zoneKinds: { ...(o.zoneKinds ?? {}), [id]: kind } };
+  saveOverrides(next);
 }
 
 let cache: MapOverrides | null | undefined;
