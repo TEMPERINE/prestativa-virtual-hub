@@ -373,7 +373,14 @@ export function OfficeScene() {
   // Auto-walk target: when set, the avatar walks toward this point each tick.
   const autoWalkRef = useRef<{ x: number; y: number } | null>(null);
 
-  const walkToMyClaim = useCallback(() => {
+  // Magic teleport effect: avatar fades out at current spot, then fades in at seat.
+  const [teleport, setTeleport] = useState<
+    | { from: Point; to: Point; phase: "out" | "in"; id: number }
+    | null
+  >(null);
+  const teleportTimers = useRef<number[]>([]);
+
+  const teleportToMyClaim = useCallback(() => {
     const uid = meIdRef.current;
     if (!uid) return;
     const myZone = Object.entries(claimsRef.current).find(([, u]) => u === uid)?.[0];
@@ -384,8 +391,42 @@ export function OfficeScene() {
     const rect = zoneRectFromOverrides(myZone as ZoneId) ?? findZoneById(myZone)?.rect;
     if (!rect) return;
     const target = seatPointForRect(rect);
-    autoWalkRef.current = target;
-    toast.success(`Indo para ${findZoneById(myZone)?.label ?? myZone}...`);
+    const from = { ...posRef.current };
+
+    // Cancel any pending auto-walk and clear stale timers
+    autoWalkRef.current = null;
+    teleportTimers.current.forEach((t) => window.clearTimeout(t));
+    teleportTimers.current = [];
+
+    const id = Date.now();
+    setTeleport({ from, to: target, phase: "out", id });
+
+    // Phase 1: fade out + sparkle at origin
+    teleportTimers.current.push(
+      window.setTimeout(() => {
+        // Snap to destination
+        posRef.current = target;
+        setPos(target);
+        const z = zoneAt(target);
+        setZone(z.id);
+        sendPos(target.x, target.y, z.id, facingRef.current);
+        setTeleport({ from, to: target, phase: "in", id });
+      }, 450)
+    );
+    // Phase 2: clear effect
+    teleportTimers.current.push(
+      window.setTimeout(() => {
+        setTeleport((cur) => (cur && cur.id === id ? null : cur));
+      }, 1100)
+    );
+
+    toast.success(`✨ Teleportando para ${findZoneById(myZone)?.label ?? myZone}...`);
+  }, [sendPos]);
+
+  useEffect(() => {
+    return () => {
+      teleportTimers.current.forEach((t) => window.clearTimeout(t));
+    };
   }, []);
 
 
