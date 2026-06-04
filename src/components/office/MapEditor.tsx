@@ -86,8 +86,50 @@ export function MapEditor() {
   const historyRef = useRef<MapOverrides[]>([]);
   const [canUndo, setCanUndo] = useState(false);
 
+  const customZones = overrides.customZones ?? [];
+
   const paintableZones = useMemo(
     () => ZONES.filter((z) => z.id !== "lobby"),
+    []
+  );
+
+  const zoneColorOf = useCallback(
+    (id: string) => {
+      const custom = customZones.find((c) => c.id === id);
+      if (custom) return custom.color;
+      return ZONE_COLORS[id] ?? "#888";
+    },
+    [customZones]
+  );
+
+  const addCustomZone = useCallback(() => {
+    const label = window.prompt("Nome da nova zona:");
+    if (!label || !label.trim()) return;
+    const palette = ["#22d3ee", "#fb7185", "#a3e635", "#fbbf24", "#c084fc", "#34d399", "#f472b6", "#60a5fa"];
+    setOverrides((prev) => {
+      const existing = prev.customZones ?? [];
+      const id = `custom-${Date.now().toString(36)}`;
+      const color = palette[existing.length % palette.length];
+      const zone: CustomZone = { id, label: label.trim(), color };
+      return { ...prev, customZones: [...existing, zone] };
+    });
+    setDirty(true);
+  }, []);
+
+  const removeCustomZone = useCallback(
+    (id: string) => {
+      if (!confirm("Remover esta zona e apagar suas células pintadas?")) return;
+      setOverrides((prev) => {
+        const next: MapOverrides = {
+          ...prev,
+          zones: prev.zones.map((z) => (z === (id as ZoneId) ? null : z)),
+          customZones: (prev.customZones ?? []).filter((c) => c.id !== id),
+        };
+        return next;
+      });
+      setTool((t) => (t.kind === "zone" && t.zone === (id as ZoneId) ? { kind: "blocked" } : t));
+      setDirty(true);
+    },
     []
   );
 
