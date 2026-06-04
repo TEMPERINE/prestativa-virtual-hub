@@ -1,18 +1,21 @@
-import { useEffect, useRef, useState } from "react";
-import { Maximize2, Minimize2, X, MonitorUp } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Maximize2, Minimize2, MonitorUp } from "lucide-react";
 
 type Profile = { id: string; display_name: string; avatar_color: string };
+type Rect = { x1: number; y1: number; x2: number; y2: number };
 
 export function ScreenShareViewer({
   localStream,
   remoteStreams,
   profiles,
   onStopLocal,
+  anchorRect,
 }: {
   localStream: MediaStream | null;
   remoteStreams: Record<string, MediaStream>;
   profiles: Record<string, Profile>;
   onStopLocal: () => void;
+  anchorRect: Rect | null;
 }) {
   const remotes = Object.entries(remoteStreams).filter(([, s]) =>
     s.getVideoTracks().some((t) => t.readyState === "live"),
@@ -21,11 +24,57 @@ export function ScreenShareViewer({
   const [activeKey, setActiveKey] = useState<string | null>(null);
   const [expanded, setExpanded] = useState(false);
 
-  // Auto-pick first available stream
   useEffect(() => {
     const keys = [...(hasLocal ? ["__local__"] : []), ...remotes.map(([id]) => id)];
     if (!activeKey || !keys.includes(activeKey)) setActiveKey(keys[0] ?? null);
   }, [hasLocal, remotes, activeKey]);
+
+  // Compute consistent, zone-aligned placement inside the stage.
+  // We position the viewer above the zone (or centered for very tall zones)
+  // and size it relative to zone width with sane clamps so it remains
+  // responsive across viewports and zone sizes.
+  const placement = useMemo(() => {
+    if (expanded) {
+      return {
+        left: "2%",
+        top: "2%",
+        width: "96%",
+        height: "96%",
+        transform: "none",
+      } as const;
+    }
+    if (!anchorRect) {
+      return {
+        left: "50%",
+        top: "auto",
+        bottom: "4%",
+        width: "min(90%, 520px)",
+        aspectRatio: "16 / 9",
+        transform: "translateX(-50%)",
+      } as const;
+    }
+    const cx = (anchorRect.x1 + anchorRect.x2) / 2;
+    const zoneW = anchorRect.x2 - anchorRect.x1;
+    const zoneH = anchorRect.y2 - anchorRect.y1;
+    // Width: ~1.2× zone width, clamped between 22% and 46% of stage.
+    const widthPct = Math.max(22, Math.min(46, zoneW * 100 * 1.2));
+    // If zone is tall enough, dock viewer at top inside the zone.
+    // Otherwise float just above the zone top edge.
+    const dockInside = zoneH > 0.22;
+    const topPct = dockInside
+      ? (anchorRect.y1 + 0.015) * 100
+      : Math.max(2, anchorRect.y1 * 100 - 2);
+    // Clamp horizontal so it stays on-stage.
+    const halfW = widthPct / 2;
+    const leftPct = Math.min(100 - halfW - 1, Math.max(halfW + 1, cx * 100));
+    return {
+      left: `${leftPct}%`,
+      top: `${topPct}%`,
+      width: `${widthPct}%`,
+      aspectRatio: "16 / 9",
+      transform: dockInside ? "translateX(-50%)" : "translate(-50%, -100%)",
+    } as const;
+  }, [expanded, anchorRect]);
 
   if (!hasLocal && remotes.length === 0) return null;
 
@@ -44,14 +93,11 @@ export function ScreenShareViewer({
 
   return (
     <div
-      className={`absolute z-[115] pointer-events-auto transition-all ${
-        expanded
-          ? "inset-4"
-          : "bottom-4 left-1/2 -translate-x-1/2 w-[520px] max-w-[90vw] h-[300px]"
-      }`}
+      className="absolute z-[115] pointer-events-auto transition-all duration-300 ease-out"
+      style={placement}
     >
-      <div className="relative w-full h-full rounded-2xl overflow-hidden bg-black/80 border border-white/15 shadow-2xl flex flex-col">
-        <div className="flex items-center justify-between px-3 py-1.5 bg-black/60 text-white text-xs">
+      <div className="relative w-full h-full rounded-2xl overflow-hidden bg-black/85 border border-white/15 shadow-2xl flex flex-col min-h-0">
+        <div className="flex items-center justify-between px-3 py-1.5 bg-black/60 text-white text-xs shrink-0">
           <div className="flex items-center gap-2 min-w-0">
             <MonitorUp className="w-3.5 h-3.5 text-primary" />
             <span className="truncate">{activeLabel}</span>
@@ -77,11 +123,11 @@ export function ScreenShareViewer({
             </button>
           </div>
         </div>
-        <div className="flex-1 relative bg-black">
+        <div className="flex-1 relative bg-black min-h-0">
           {activeStream && <ScreenEl stream={activeStream} muted={activeKey === "__local__"} />}
         </div>
         {(hasLocal ? 1 : 0) + remotes.length > 1 && (
-          <div className="flex items-center gap-1 px-2 py-1 bg-black/60 overflow-x-auto">
+          <div className="flex items-center gap-1 px-2 py-1 bg-black/60 overflow-x-auto shrink-0">
             {hasLocal && (
               <Thumb
                 label="Você"
@@ -126,15 +172,13 @@ function ScreenEl({ stream, muted }: { stream: MediaStream; muted: boolean }) {
       ref.current.play?.().catch(() => {});
     }
   }, [stream]);
-  // suppress unused X import warning via referencing
-  void X;
   return (
     <video
       ref={ref}
       autoPlay
       playsInline
       muted={muted}
-      className="w-full h-full object-contain bg-black"
+      className="absolute inset-0 w-full h-full object-contain bg-black"
     />
   );
 }
