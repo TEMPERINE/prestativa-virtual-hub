@@ -82,6 +82,13 @@ export function OfficeScene() {
     const z = zoneAt(np);
     setZone((prev) => (prev !== z.id ? z.id : prev));
 
+    const newFacing: Facing =
+      Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? "right" : "left") : dy > 0 ? "down" : "up";
+    if (facingRef.current !== newFacing) {
+      facingRef.current = newFacing;
+      setFacing(newFacing);
+    }
+
     const now = performance.now();
     if (now - lastSent.current > SEND_INTERVAL_MS) {
       lastSent.current = now;
@@ -92,7 +99,7 @@ export function OfficeScene() {
           x: np.x,
           y: np.y,
           zone: z.id,
-          facing: Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? "right" : "left") : dy > 0 ? "down" : "up",
+          facing: newFacing,
           is_online: true,
         });
       });
@@ -102,15 +109,22 @@ export function OfficeScene() {
   const handleMoveKey = useCallback(
     (key: string, pressed: boolean, step = false) => {
       const k = key.toLowerCase();
-      if (!["arrowup", "arrowdown", "arrowleft", "arrowright", "w", "a", "s", "d"].includes(k))
-        return false;
+      const dir = dirFromKey(k);
+      if (!dir) return false;
       keys.current[k] = pressed;
       if (pressed) walkTarget.current = null;
       if (pressed && step) {
-        if (k === "arrowup" || k === "w") moveAvatar(0, -1, SPEED * 6);
-        if (k === "arrowdown" || k === "s") moveAvatar(0, 1, SPEED * 6);
-        if (k === "arrowleft" || k === "a") moveAvatar(-1, 0, SPEED * 6);
-        if (k === "arrowright" || k === "d") moveAvatar(1, 0, SPEED * 6);
+        // Platformer feel: first tap only turns; subsequent press (or hold)
+        // actually moves the avatar.
+        if (facingRef.current !== dir) {
+          facingRef.current = dir;
+          setFacing(dir);
+          return true;
+        }
+        if (dir === "up") moveAvatar(0, -1, SPEED * 6);
+        else if (dir === "down") moveAvatar(0, 1, SPEED * 6);
+        else if (dir === "left") moveAvatar(-1, 0, SPEED * 6);
+        else if (dir === "right") moveAvatar(1, 0, SPEED * 6);
       }
       return true;
     },
@@ -374,12 +388,12 @@ export function OfficeScene() {
                 </div>
                 <div className="relative">
                   <img
-                    src={avatarSprite}
+                    src={AVATAR_SPRITES[isMe ? facing : (p.facing ?? "down")]}
                     alt=""
                     draggable={false}
                     className="select-none"
                     style={{
-                      width: "min(16vh, 200px)",
+                      width: "min(8vh, 100px)",
                       height: "auto",
                       filter: isMe
                         ? `drop-shadow(0 0 8px ${profile.avatar_color}) drop-shadow(0 3px 4px rgba(0,0,0,0.35))`
