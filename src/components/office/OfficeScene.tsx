@@ -684,7 +684,7 @@ export function OfficeScene() {
 
       {/* Zone enter-toast (Gather style) */}
       {focusedZone && (
-        <div className="absolute bottom-20 left-1/2 -translate-x-1/2 pointer-events-none z-[70]">
+        <div className="absolute bottom-20 left-1/2 -translate-x-1/2 pointer-events-none z-[100]">
           <div
             className="px-4 py-2 rounded-full text-sm font-medium shadow-soft backdrop-blur-sm"
             style={{
