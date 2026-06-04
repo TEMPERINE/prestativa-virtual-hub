@@ -532,7 +532,7 @@ function SpriteAvatar({
   return (
     <div
       style={{
-        height: "min(7vh, 72px)",
+        height: "min(9vh, 94px)",
         aspectRatio: `${FRAME_W} / ${sheetH}`,
         backgroundImage: `url(${AVATAR_SPRITES[facing]})`,
         backgroundRepeat: "no-repeat",
