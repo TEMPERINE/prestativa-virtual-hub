@@ -269,18 +269,12 @@ export function OfficeScene() {
   useEffect(() => {
     let raf = 0;
     const tick = () => {
-      const k = keys.current;
       let dx = 0;
       let dy = 0;
-      if (k["arrowup"] || k["w"]) dy -= 1;
-      if (k["arrowdown"] || k["s"]) dy += 1;
-      if (k["arrowleft"] || k["a"]) dx -= 1;
-      if (k["arrowright"] || k["d"]) dx += 1;
-
-      // 4-directional movement only: if both axes pressed, prefer the dominant.
-      if (dx && dy) {
-        if (Math.abs(dx) >= Math.abs(dy)) dy = 0;
-        else dx = 0;
+      if (activeMoveDirection.current === "up") dy = -1;
+      else if (activeMoveDirection.current === "down") dy = 1;
+      else if (activeMoveDirection.current === "left") dx = -1;
+      else if (activeMoveDirection.current === "right") dx = 1;
       }
 
       if (dx || dy) {
@@ -338,12 +332,6 @@ export function OfficeScene() {
       tabIndex={0}
       className="relative w-screen h-screen overflow-hidden bg-black outline-none flex items-stretch"
       onMouseDown={() => sceneRef.current?.focus()}
-      onKeyDown={(e) => {
-        if (handleMoveKey(e.key, true, true)) e.preventDefault();
-      }}
-      onKeyUp={(e) => {
-        if (handleMoveKey(e.key, false)) e.preventDefault();
-      }}
     >
       {/* Extended scenery — park on the left */}
       <div
