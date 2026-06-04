@@ -1094,7 +1094,7 @@ function SpriteAvatar({
       style={{
         position: "relative",
         height: "min(9vh, 94px)",
-        aspectRatio: `${FRAME_W} / ${sheetH}`,
+        aspectRatio: `${frameW} / ${sheetH}`,
       }}
     >
       {/* Contact shadow — anchors the character to the floor */}
