@@ -43,6 +43,16 @@ function dirFromKey(k: string): Facing | null {
   if (k === "arrowright" || k === "d") return "right";
   return null;
 }
+
+const EMOJI_MAP: Record<string, string> = {
+  "1": "❤️",
+  "2": "👏",
+  "3": "🤣",
+  "4": "🙌",
+  "5": "🤯",
+  "6": "💩",
+};
+const REACTION_DURATION_MS = 3000;
 import { toast } from "sonner";
 import { LogOut, Mic, MicOff, Video, VideoOff, MonitorUp, Users, Pencil } from "lucide-react";
 import { Link } from "@tanstack/react-router";
@@ -66,6 +76,9 @@ export function OfficeScene() {
   const [showTeam, setShowTeam] = useState(true);
   const [facing, setFacing] = useState<Facing>("down");
   const facingRef = useRef<Facing>("down");
+  const [reactions, setReactions] = useState<Record<string, { emoji: string; ts: number }>>({});
+  const reactionChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  const meIdRef = useRef<string | null>(null);
 
   const keysDown = useRef<Set<Facing>>(new Set());
   const lastDir = useRef<Facing | null>(null);
@@ -130,6 +143,7 @@ export function OfficeScene() {
     (async () => {
       const { data: userData } = await supabase.auth.getUser();
       if (!userData.user) return;
+      meIdRef.current = userData.user.id;
       const { data: profs } = await supabase.from("profiles").select("id, display_name, avatar_color");
       const map: Record<string, Profile> = {};
       (profs ?? []).forEach((p) => (map[p.id] = p as Profile));
@@ -184,6 +198,26 @@ export function OfficeScene() {
       )
       .subscribe();
 
+    const reactionCh = supabase
+      .channel("reactions-room")
+      .on("broadcast", { event: "reaction" }, (payload) => {
+        const { user_id, emoji } = (payload.payload ?? {}) as { user_id?: string; emoji?: string };
+        if (!user_id || !emoji) return;
+        const ts = Date.now();
+        setReactions((prev) => ({ ...prev, [user_id]: { emoji, ts } }));
+        setTimeout(() => {
+          setReactions((prev) => {
+            const cur = prev[user_id];
+            if (!cur || cur.ts !== ts) return prev;
+            const next = { ...prev };
+            delete next[user_id];
+            return next;
+          });
+        }, REACTION_DURATION_MS);
+      })
+      .subscribe();
+    reactionChannelRef.current = reactionCh;
+
     const offline = async () => {
       const { data: u } = await supabase.auth.getUser();
       if (u.user) {
@@ -194,15 +228,52 @@ export function OfficeScene() {
 
     return () => {
       supabase.removeChannel(ch);
+      supabase.removeChannel(reactionCh);
+      reactionChannelRef.current = null;
       window.removeEventListener("beforeunload", offline);
       offline();
     };
   }, []);
 
+  const sendReaction = useCallback((emoji: string) => {
+    const uid = meIdRef.current;
+    if (!uid) return;
+    const ts = Date.now();
+    setReactions((prev) => ({ ...prev, [uid]: { emoji, ts } }));
+    setTimeout(() => {
+      setReactions((prev) => {
+        const cur = prev[uid];
+        if (!cur || cur.ts !== ts) return prev;
+        const next = { ...prev };
+        delete next[uid];
+        return next;
+      });
+    }, REACTION_DURATION_MS);
+    const ch = reactionChannelRef.current;
+    if (ch) {
+      void ch.send({
+        type: "broadcast",
+        event: "reaction",
+        payload: { user_id: uid, emoji },
+      });
+    }
+  }, []);
+
   // keyboard input — standard 2D game movement (hold to walk, release to idle)
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
-      const dir = dirFromKey(e.key.toLowerCase());
+      const key = e.key.toLowerCase();
+      const emoji = EMOJI_MAP[key];
+      if (emoji && !e.repeat && !e.metaKey && !e.ctrlKey && !e.altKey) {
+        const target = e.target as HTMLElement | null;
+        const tag = target?.tagName;
+        if (tag !== "INPUT" && tag !== "TEXTAREA" && !target?.isContentEditable) {
+          e.preventDefault();
+          sendReaction(emoji);
+          return;
+        }
+      }
+      const dir = dirFromKey(key);
       if (!dir) return;
       e.preventDefault();
       if (e.repeat) return;
@@ -234,7 +305,7 @@ export function OfficeScene() {
       window.removeEventListener("keyup", up);
       window.removeEventListener("blur", blur);
     };
-  }, [setLocalFacing]);
+  }, [setLocalFacing, sendReaction]);
 
   // movement + animation loop
   useEffect(() => {
@@ -363,6 +434,9 @@ export function OfficeScene() {
               }}
             >
               <div className="flex flex-col items-center">
+                {reactions[profile.id] && (
+                  <ReactionBubble emoji={reactions[profile.id].emoji} />
+                )}
                 <div
                   className={`px-2 py-0.5 rounded-full text-[10px] font-medium whitespace-nowrap mb-0.5 ${
                     isMe ? "bg-primary text-primary-foreground" : "bg-card/95 text-foreground"
@@ -564,6 +638,33 @@ function SpriteAvatar({
     </div>
   );
 }
+
+/** Speech-bubble reaction shown above an avatar. */
+function ReactionBubble({ emoji }: { emoji: string }) {
+  return (
+    <div
+      className="mb-1 select-none"
+      style={{
+        animation: "fade-in 180ms ease-out",
+      }}
+    >
+      <div
+        className="relative px-2.5 py-1 rounded-2xl bg-white shadow-soft border border-black/5"
+        style={{ fontSize: "clamp(16px, 2.6vh, 28px)", lineHeight: 1 }}
+      >
+        <span>{emoji}</span>
+        <span
+          className="absolute left-1/2 -bottom-1.5 w-3 h-3 bg-white border-r border-b border-black/5 rotate-45"
+          style={{ transform: "translateX(-50%) rotate(45deg)" }}
+          aria-hidden
+        />
+      </div>
+    </div>
+  );
+}
+
+
+
 
 
 
