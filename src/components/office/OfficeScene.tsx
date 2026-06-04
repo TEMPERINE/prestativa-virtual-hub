@@ -426,13 +426,52 @@ export function OfficeScene() {
   useEffect(() => {
     let raf = 0;
     const tick = (t: number) => {
-      const dir = lastDir.current;
+      let dir = lastDir.current;
+
+      // Auto-walk: if no manual key, compute a direction toward the target.
+      if (!dir && autoWalkRef.current) {
+        const cur = posRef.current;
+        const tgt = autoWalkRef.current;
+        const dx = tgt.x - cur.x;
+        const dy = tgt.y - cur.y;
+        const adx = Math.abs(dx);
+        const ady = Math.abs(dy);
+        if (adx < SPEED && ady < SPEED) {
+          // Arrived
+          autoWalkRef.current = null;
+          const z = zoneAt(cur);
+          sendPos(cur.x, cur.y, z.id, facingRef.current);
+        } else {
+          // Prefer the larger axis; if blocked, fall back to the other.
+          const primary: Facing = adx >= ady
+            ? (dx > 0 ? "right" : "left")
+            : (dy > 0 ? "down" : "up");
+          const secondary: Facing = adx >= ady
+            ? (dy > 0 ? "down" : "up")
+            : (dx > 0 ? "right" : "left");
+          setLocalFacing(primary);
+          if (tryMove(primary)) {
+            dir = primary;
+          } else {
+            setLocalFacing(secondary);
+            if (tryMove(secondary)) {
+              dir = secondary;
+            } else {
+              // Stuck — abort auto-walk
+              autoWalkRef.current = null;
+            }
+          }
+        }
+      }
+
       if (dir) {
-        const moved = tryMove(dir);
+        // For manual movement, tryMove was already called via keydown path below;
+        // when manual key is held we still need to advance position each frame.
+        const isManual = lastDir.current === dir;
+        const moved = isManual ? tryMove(dir) : true;
         if (moved) {
           if (t - lastFrameTick.current > WALK_FRAME_MS) {
             lastFrameTick.current = t;
-            // cycle frames 1..5
             const next = frameRef.current >= 5 || frameRef.current < 1 ? 1 : frameRef.current + 1;
             frameRef.current = next;
             setFrame(next);
@@ -444,7 +483,6 @@ export function OfficeScene() {
       } else if (frameRef.current !== 0) {
         frameRef.current = 0;
         setFrame(0);
-        // send final idle position so remotes see exact pose
         const cur = posRef.current;
         const z = zoneAt(cur);
         sendPos(cur.x, cur.y, z.id, facingRef.current);
@@ -453,7 +491,8 @@ export function OfficeScene() {
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [tryMove, sendPos]);
+  }, [tryMove, sendPos, setLocalFacing]);
+
 
 
   const currentZone = useMemo(() => findZoneById(zone) ?? ZONES[ZONES.length - 1], [zone]);
