@@ -507,18 +507,12 @@ export function OfficeScene() {
   >(null);
   const teleportTimers = useRef<number[]>([]);
 
-  const teleportToMyClaim = useCallback(() => {
-    const uid = meIdRef.current;
-    if (!uid) return;
-    const myZone = Object.entries(claimsRef.current).find(([, u]) => u === uid)?.[0];
-    if (!myZone) {
-      toast.info("Você ainda não reivindicou nenhum espaço.");
-      return;
-    }
-    const sp = spawnPointForZone(myZone);
-    const rect = zoneRectFromOverrides(myZone as ZoneId) ?? findZoneById(myZone)?.rect;
-    const target = sp ?? (rect ? seatPointForRect(rect) : null);
-    if (!target) return;
+  const teleportToZone = useCallback((zoneId: ZoneId, label?: string) => {
+    const z = findZoneById(zoneId);
+    if (!z) return;
+    const sp = spawnPointForZone(zoneId);
+    const rect = zoneRectFromOverrides(zoneId) ?? z.rect;
+    const target = sp ?? seatPointForRect(rect);
     const from = { ...posRef.current };
 
     // Cancel any pending auto-walk and clear stale timers
@@ -535,9 +529,9 @@ export function OfficeScene() {
         // Snap to destination
         posRef.current = target;
         setPos(target);
-        const z = zoneAt(target);
-        setZone(z.id);
-        sendPos(target.x, target.y, z.id, facingRef.current);
+        const z2 = zoneAt(target);
+        setZone(z2.id);
+        sendPos(target.x, target.y, z2.id, facingRef.current);
         setTeleport({ from, to: target, phase: "in", id });
       }, 450)
     );
@@ -548,8 +542,19 @@ export function OfficeScene() {
       }, 1100)
     );
 
-    toast.success(`✨ Teleportando para ${findZoneById(myZone)?.label ?? myZone}...`);
+    toast.success(`✨ Teleportando para ${label ?? z.label}...`);
   }, [sendPos]);
+
+  const teleportToMyClaim = useCallback(() => {
+    const uid = meIdRef.current;
+    if (!uid) return;
+    const myZone = Object.entries(claimsRef.current).find(([, u]) => u === uid)?.[0];
+    if (!myZone) {
+      toast.info("Você ainda não reivindicou nenhum espaço.");
+      return;
+    }
+    teleportToZone(myZone as ZoneId);
+  }, [teleportToZone]);
 
   useEffect(() => {
     return () => {
