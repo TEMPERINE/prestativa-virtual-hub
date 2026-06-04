@@ -1063,6 +1063,7 @@ export function OfficeScene() {
                     facing={isMe ? facing : (p.facing ?? "down")}
                     frame={isMe ? frame : 0}
                     glowColor={isMe ? profile.avatar_color : undefined}
+                    spriteId={profile.sprite_id}
                   />
                 </div>
               </div>
