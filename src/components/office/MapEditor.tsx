@@ -268,7 +268,7 @@ export function MapEditor() {
         }
       }
     }
-  }, [overrides]);
+  }, [overrides, zoneColorOf]);
 
   // Effective-collision overlay: shows EXACTLY what the game blocks for
   // the avatar (FLOOR_POLY + painted blocked OR default COLLIDERS).
