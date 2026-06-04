@@ -112,6 +112,11 @@ export function hasZoneOverrides(): boolean {
   return o.zones.some((z) => z !== null);
 }
 
+export function customZonesFromOverrides(): CustomZone[] {
+  const o = loadOverrides();
+  return o?.customZones ?? [];
+}
+
 // Bounding box (normalized 0..1) of all painted tiles for a given zone id.
 // Returns null when nothing is painted for that zone.
 export function zoneRectFromOverrides(
