@@ -967,7 +967,7 @@ export function OfficeScene() {
         <div className="glass-panel rounded-full px-4 py-2 shadow-soft text-xs text-muted-foreground">
           Use <kbd className="px-1.5 py-0.5 bg-muted rounded text-[10px] font-mono">WASD</kbd> ou{" "}
           <kbd className="px-1.5 py-0.5 bg-muted rounded text-[10px] font-mono">setas</kbd> para se mover ·{" "}
-          <kbd className="px-1.5 py-0.5 bg-muted rounded text-[10px] font-mono">Ctrl+D</kbd> volta ao seu espaço
+          <kbd className="px-1.5 py-0.5 bg-muted rounded text-[10px] font-mono">Ctrl+D</kbd> teleporta para seu espaço ✨
         </div>
       </div>
     </div>
