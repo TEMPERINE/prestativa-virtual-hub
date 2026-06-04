@@ -799,7 +799,7 @@ export function OfficeScene() {
           const cx = e.clientX - rect.left;
           const cy = e.clientY - rect.top;
           const s = zoomRef.current;
-          const factor = e.deltaY < 0 ? 1.15 : 1 / 1.15;
+          const factor = e.deltaY < 0 ? 1.10 : 1 / 1.10;
           const ns = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, s * factor));
           if (ns === s) return;
           const p = panRef.current;
