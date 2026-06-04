@@ -76,6 +76,9 @@ export function OfficeScene() {
   const [showTeam, setShowTeam] = useState(true);
   const [facing, setFacing] = useState<Facing>("down");
   const facingRef = useRef<Facing>("down");
+  const [reactions, setReactions] = useState<Record<string, { emoji: string; ts: number }>>({});
+  const reactionChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  const meIdRef = useRef<string | null>(null);
 
   const keysDown = useRef<Set<Facing>>(new Set());
   const lastDir = useRef<Facing | null>(null);
