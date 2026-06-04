@@ -303,6 +303,33 @@ export function OfficeScene() {
     });
   }, []);
 
+  // Live ref to claims so the keyboard handler can read latest values.
+  const claimsRef = useRef<Record<string, string>>({});
+  useEffect(() => { claimsRef.current = claims; }, [claims]);
+
+  const teleportToMyClaim = useCallback(() => {
+    const uid = meIdRef.current;
+    if (!uid) return;
+    const myZone = Object.entries(claimsRef.current).find(([, u]) => u === uid)?.[0];
+    if (!myZone) {
+      toast.info("Você ainda não reivindicou nenhum espaço.");
+      return;
+    }
+    const rect = zoneRectFromOverrides(myZone as ZoneId) ?? findZoneById(myZone)?.rect;
+    if (!rect) return;
+    const target: Point = { x: (rect.x1 + rect.x2) / 2, y: (rect.y1 + rect.y2) / 2 };
+    const safe = collides(target) ? SPAWN : target;
+    posRef.current = safe;
+    setPos(safe);
+    const z = zoneAt(safe);
+    setZone(z.id);
+    setLocalFacing("down");
+    sendPos(safe.x, safe.y, z.id, "down");
+    toast.success(`Teleportado para ${findZoneById(myZone)?.label ?? myZone}.`);
+  }, [sendPos, setLocalFacing]);
+
+
+
 
   const sendReaction = useCallback((emoji: string) => {
     const uid = meIdRef.current;
@@ -332,6 +359,12 @@ export function OfficeScene() {
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
       const key = e.key.toLowerCase();
+      // Ctrl/Cmd + D — teleport to claimed workspace
+      if (key === "d" && (e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey) {
+        e.preventDefault();
+        teleportToMyClaim();
+        return;
+      }
       const emoji = EMOJI_MAP[key];
       if (emoji && !e.repeat && !e.metaKey && !e.ctrlKey && !e.altKey) {
         const target = e.target as HTMLElement | null;
@@ -374,7 +407,7 @@ export function OfficeScene() {
       window.removeEventListener("keyup", up);
       window.removeEventListener("blur", blur);
     };
-  }, [setLocalFacing, sendReaction]);
+  }, [setLocalFacing, sendReaction, teleportToMyClaim]);
 
   // movement + animation loop
   useEffect(() => {
@@ -742,7 +775,8 @@ export function OfficeScene() {
       <div className="absolute bottom-4 left-1/2 -translate-x-1/2 pointer-events-none z-[100]">
         <div className="glass-panel rounded-full px-4 py-2 shadow-soft text-xs text-muted-foreground">
           Use <kbd className="px-1.5 py-0.5 bg-muted rounded text-[10px] font-mono">WASD</kbd> ou{" "}
-          <kbd className="px-1.5 py-0.5 bg-muted rounded text-[10px] font-mono">setas</kbd> para se mover
+          <kbd className="px-1.5 py-0.5 bg-muted rounded text-[10px] font-mono">setas</kbd> para se mover ·{" "}
+          <kbd className="px-1.5 py-0.5 bg-muted rounded text-[10px] font-mono">Ctrl+D</kbd> volta ao seu espaço
         </div>
       </div>
     </div>
