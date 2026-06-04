@@ -3,8 +3,8 @@
 
 import type { ZoneId } from "./office-map";
 
-export const GRID_COLS = 64;
-export const GRID_ROWS = 40;
+export const GRID_COLS = 128;
+export const GRID_ROWS = 80;
 const STORAGE_KEY = "office-map-overrides:v1";
 
 export type ZoneKind = "workspace" | "common";
@@ -68,6 +68,28 @@ export function setZoneKind(id: string, kind: ZoneKind) {
 
 let cache: MapOverrides | null | undefined;
 
+// Resample an overrides doc onto the current GRID_COLS×GRID_ROWS.
+// Used when we change the editor resolution: previously painted maps
+// stored at e.g. 64×40 are upscaled in-memory to the new resolution
+// (each old cell becomes an integer block of new cells) so nothing is lost.
+function resampleOverrides(o: MapOverrides): MapOverrides {
+  if (o.cols === GRID_COLS && o.rows === GRID_ROWS) return o;
+  const size = GRID_COLS * GRID_ROWS;
+  const blocked = new Array<number>(size).fill(0);
+  const zones = new Array<ZoneId | null>(size).fill(null);
+  for (let r = 0; r < GRID_ROWS; r++) {
+    const sr = Math.min(o.rows - 1, Math.floor((r / GRID_ROWS) * o.rows));
+    for (let c = 0; c < GRID_COLS; c++) {
+      const sc = Math.min(o.cols - 1, Math.floor((c / GRID_COLS) * o.cols));
+      const sIdx = sr * o.cols + sc;
+      const dIdx = r * GRID_COLS + c;
+      blocked[dIdx] = o.blocked[sIdx] ?? 0;
+      zones[dIdx] = o.zones[sIdx] ?? null;
+    }
+  }
+  return { ...o, cols: GRID_COLS, rows: GRID_ROWS, blocked, zones };
+}
+
 export function loadOverrides(): MapOverrides | null {
   if (cache !== undefined) return cache;
   if (typeof window === "undefined") return (cache = null);
@@ -78,7 +100,7 @@ export function loadOverrides(): MapOverrides | null {
     if (!parsed.cols || !parsed.rows || !Array.isArray(parsed.blocked)) {
       return (cache = null);
     }
-    cache = parsed;
+    cache = resampleOverrides(parsed);
     return cache;
   } catch {
     return (cache = null);
@@ -120,12 +142,13 @@ export async function pullOverridesFromCloud(): Promise<MapOverrides | null> {
     if (!parsed?.cols || !parsed?.rows || !Array.isArray(parsed.blocked)) {
       return loadOverrides();
     }
-    cache = parsed;
+    const resampled = resampleOverrides(parsed);
+    cache = resampled;
     try {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(resampled));
     } catch {}
     window.dispatchEvent(new CustomEvent("map-overrides-changed"));
-    return parsed;
+    return resampled;
   } catch {
     return loadOverrides();
   }
