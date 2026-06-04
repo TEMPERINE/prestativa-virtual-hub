@@ -373,7 +373,14 @@ export function OfficeScene() {
   // Auto-walk target: when set, the avatar walks toward this point each tick.
   const autoWalkRef = useRef<{ x: number; y: number } | null>(null);
 
-  const walkToMyClaim = useCallback(() => {
+  // Magic teleport effect: avatar fades out at current spot, then fades in at seat.
+  const [teleport, setTeleport] = useState<
+    | { from: Point; to: Point; phase: "out" | "in"; id: number }
+    | null
+  >(null);
+  const teleportTimers = useRef<number[]>([]);
+
+  const teleportToMyClaim = useCallback(() => {
     const uid = meIdRef.current;
     if (!uid) return;
     const myZone = Object.entries(claimsRef.current).find(([, u]) => u === uid)?.[0];
@@ -384,8 +391,42 @@ export function OfficeScene() {
     const rect = zoneRectFromOverrides(myZone as ZoneId) ?? findZoneById(myZone)?.rect;
     if (!rect) return;
     const target = seatPointForRect(rect);
-    autoWalkRef.current = target;
-    toast.success(`Indo para ${findZoneById(myZone)?.label ?? myZone}...`);
+    const from = { ...posRef.current };
+
+    // Cancel any pending auto-walk and clear stale timers
+    autoWalkRef.current = null;
+    teleportTimers.current.forEach((t) => window.clearTimeout(t));
+    teleportTimers.current = [];
+
+    const id = Date.now();
+    setTeleport({ from, to: target, phase: "out", id });
+
+    // Phase 1: fade out + sparkle at origin
+    teleportTimers.current.push(
+      window.setTimeout(() => {
+        // Snap to destination
+        posRef.current = target;
+        setPos(target);
+        const z = zoneAt(target);
+        setZone(z.id);
+        sendPos(target.x, target.y, z.id, facingRef.current);
+        setTeleport({ from, to: target, phase: "in", id });
+      }, 450)
+    );
+    // Phase 2: clear effect
+    teleportTimers.current.push(
+      window.setTimeout(() => {
+        setTeleport((cur) => (cur && cur.id === id ? null : cur));
+      }, 1100)
+    );
+
+    toast.success(`✨ Teleportando para ${findZoneById(myZone)?.label ?? myZone}...`);
+  }, [sendPos]);
+
+  useEffect(() => {
+    return () => {
+      teleportTimers.current.forEach((t) => window.clearTimeout(t));
+    };
   }, []);
 
 
@@ -423,7 +464,7 @@ export function OfficeScene() {
       // Ctrl/Cmd + D — auto-walk to claimed workspace
       if (key === "d" && (e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey) {
         e.preventDefault();
-        walkToMyClaim();
+        teleportToMyClaim();
         return;
       }
       const emoji = EMOJI_MAP[key];
@@ -471,7 +512,7 @@ export function OfficeScene() {
       window.removeEventListener("keyup", up);
       window.removeEventListener("blur", blur);
     };
-  }, [setLocalFacing, sendReaction, walkToMyClaim]);
+  }, [setLocalFacing, sendReaction, teleportToMyClaim]);
 
   // movement + animation loop
   useEffect(() => {
@@ -714,6 +755,10 @@ export function OfficeScene() {
               display.x <= focusedZone.rect.x2 &&
               display.y >= focusedZone.rect.y1 &&
               display.y <= focusedZone.rect.y2);
+          const myTeleporting = isMe && teleport;
+          const meOpacity = myTeleporting
+            ? teleport!.phase === "out" ? 0 : 1
+            : (inFocus ? 1 : 0.35);
           return (
             <div
               key={profile.id}
@@ -722,10 +767,14 @@ export function OfficeScene() {
                 left: `${display.x * 100}%`,
                 top: `${display.y * 100}%`,
                 transform: "translate(-50%, -90%)",
-                transition: isMe ? "none" : "left 120ms linear, top 120ms linear",
+                transition: isMe
+                  ? (myTeleporting ? "opacity 420ms ease-in-out, filter 420ms ease-in-out" : "none")
+                  : "left 120ms linear, top 120ms linear",
                 zIndex: focusedZone ? (inFocus ? 60 : 20) : Math.round(display.y * 1000),
-                opacity: inFocus ? 1 : 0.35,
-                filter: inFocus ? "none" : "grayscale(0.5)",
+                opacity: isMe ? meOpacity : (inFocus ? 1 : 0.35),
+                filter: myTeleporting
+                  ? `drop-shadow(0 0 18px var(--primary)) drop-shadow(0 0 36px var(--primary-glow)) brightness(${teleport!.phase === "out" ? 1.8 : 1.4})`
+                  : (inFocus ? "none" : "grayscale(0.5)"),
               }}
             >
               <div className="flex flex-col items-center">
@@ -753,6 +802,15 @@ export function OfficeScene() {
             </div>
           );
         })}
+
+        {/* Magic teleport particles */}
+        {teleport && (
+          <TeleportFx
+            point={teleport.phase === "out" ? teleport.from : teleport.to}
+            phase={teleport.phase}
+            key={`${teleport.id}-${teleport.phase}`}
+          />
+        )}
 
         <ScreenShareViewer
           localStream={rtc.localScreenStream}
@@ -909,12 +967,85 @@ export function OfficeScene() {
         <div className="glass-panel rounded-full px-4 py-2 shadow-soft text-xs text-muted-foreground">
           Use <kbd className="px-1.5 py-0.5 bg-muted rounded text-[10px] font-mono">WASD</kbd> ou{" "}
           <kbd className="px-1.5 py-0.5 bg-muted rounded text-[10px] font-mono">setas</kbd> para se mover ·{" "}
-          <kbd className="px-1.5 py-0.5 bg-muted rounded text-[10px] font-mono">Ctrl+D</kbd> volta ao seu espaço
+          <kbd className="px-1.5 py-0.5 bg-muted rounded text-[10px] font-mono">Ctrl+D</kbd> teleporta para seu espaço ✨
         </div>
       </div>
     </div>
   );
 }
+
+/** Magic teleport effect — pink sparkles + halo at the given normalized point. */
+function TeleportFx({ point, phase }: { point: Point; phase: "out" | "in" }) {
+  const particles = useMemo(() => {
+    return Array.from({ length: 18 }).map((_, i) => {
+      const angle = (i / 18) * Math.PI * 2 + Math.random() * 0.4;
+      const dist = 30 + Math.random() * 40;
+      const delay = Math.random() * 180;
+      const size = 4 + Math.random() * 6;
+      return {
+        i,
+        dx: Math.cos(angle) * dist,
+        dy: Math.sin(angle) * dist - 10,
+        delay,
+        size,
+        duration: 600 + Math.random() * 300,
+      };
+    });
+  }, [point.x, point.y, phase]);
+
+  return (
+    <div
+      className="absolute pointer-events-none z-[80]"
+      style={{
+        left: `${point.x * 100}%`,
+        top: `${point.y * 100}%`,
+        transform: "translate(-50%, -70%)",
+      }}
+    >
+      <div
+        className="absolute left-1/2 top-1/2 rounded-full"
+        style={{
+          width: 90,
+          height: 90,
+          transform: "translate(-50%, -50%)",
+          background:
+            "radial-gradient(circle, color-mix(in oklab, var(--primary) 70%, transparent) 0%, transparent 70%)",
+          animation: `tp-halo-${phase} 600ms ease-out forwards`,
+          filter: "blur(2px)",
+        }}
+      />
+      <div
+        className="absolute left-1/2 top-1/2 rounded-full border-2"
+        style={{
+          width: 30,
+          height: 30,
+          transform: "translate(-50%, -50%)",
+          borderColor: "var(--primary)",
+          boxShadow: "0 0 24px var(--primary-glow)",
+          animation: `tp-ring 700ms ease-out forwards`,
+        }}
+      />
+      {particles.map((p) => (
+        <div
+          key={p.i}
+          className="absolute left-1/2 top-1/2 rounded-full"
+          style={{
+            width: p.size,
+            height: p.size,
+            background: "var(--primary)",
+            boxShadow: "0 0 8px var(--primary), 0 0 14px var(--primary-glow)",
+            ["--tp-dx" as string]: `${p.dx}px`,
+            ["--tp-dy" as string]: `${p.dy}px`,
+            animation: `tp-particle-${phase} ${p.duration}ms ease-out ${p.delay}ms forwards`,
+            opacity: 0,
+          }}
+        />
+      ))}
+    </div>
+  );
+}
+
+
 
 /** Animated sprite avatar — 6-frame horizontal sheet per direction. */
 function SpriteAvatar({
