@@ -1468,7 +1468,90 @@ export function OfficeScene() {
 }
 
 /** Magic teleport effect — pink sparkles + halo at the given normalized point. */
+/**
+ * Hover wrapper for a workspace zone. The zone outline stays inside the
+ * scaled stage, but the popup card is rendered via portal at fixed
+ * screen coordinates so it escapes the stage's overflow/stacking context.
+ */
+function WorkspaceZoneHover({
+  rect,
+  isHovered,
+  onEnter,
+  onLeave,
+  children,
+}: {
+  rect: { x1: number; y1: number; x2: number; y2: number };
+  isHovered: boolean;
+  onEnter: () => void;
+  onLeave: () => void;
+  children: React.ReactNode;
+}) {
+  const anchorRef = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState<{ left: number; top: number } | null>(null);
+
+  useEffect(() => {
+    if (!isHovered) {
+      setPos(null);
+      return;
+    }
+    let raf = 0;
+    const tick = () => {
+      const el = anchorRef.current;
+      if (el) {
+        const r = el.getBoundingClientRect();
+        setPos({ left: r.left + r.width / 2, top: r.top });
+      }
+      raf = window.requestAnimationFrame(tick);
+    };
+    tick();
+    return () => window.cancelAnimationFrame(raf);
+  }, [isHovered]);
+
+  return (
+    <div
+      ref={anchorRef}
+      className="absolute"
+      style={{
+        left: `${rect.x1 * 100}%`,
+        top: `${rect.y1 * 100}%`,
+        width: `${(rect.x2 - rect.x1) * 100}%`,
+        height: `${(rect.y2 - rect.y1) * 100}%`,
+        zIndex: isHovered ? 55 : 15,
+      }}
+      onMouseEnter={onEnter}
+      onMouseLeave={onLeave}
+    >
+      <div
+        className="absolute inset-0 rounded-md transition-all duration-150 pointer-events-none"
+        style={{
+          outline: isHovered
+            ? `1.5px dashed color-mix(in oklab, var(--destructive) 80%, transparent)`
+            : "none",
+          outlineOffset: "-1px",
+        }}
+      />
+      {isHovered && pos && typeof document !== "undefined" &&
+        createPortal(
+          <div
+            style={{
+              position: "fixed",
+              left: pos.left,
+              top: pos.top - 8,
+              transform: "translate(-50%, -100%)",
+              zIndex: 2147483647,
+              pointerEvents: "auto",
+            }}
+          >
+            {children}
+          </div>,
+          document.body,
+        )}
+    </div>
+  );
+}
+
 function TeleportFx({ point, phase }: { point: Point; phase: "out" | "in" }) {
+
   const particles = useMemo(() => {
     return Array.from({ length: 18 }).map((_, i) => {
       const angle = (i / 18) * Math.PI * 2 + Math.random() * 0.4;
