@@ -63,6 +63,21 @@ type RemotePos = { user_id: string; x: number; y: number; zone: string; is_onlin
 const SPEED = 0.0042;
 const SEND_INTERVAL_MS = 120;
 
+// "Seat" point of a zone rect — bottom-center, in front of the desk.
+// If that point collides with furniture, walk it upward until it's walkable.
+function seatPointForRect(rect: { x1: number; y1: number; x2: number; y2: number }): Point {
+  const x = (rect.x1 + rect.x2) / 2;
+  const bottomMargin = 0.012;
+  let y = rect.y2 - bottomMargin;
+  for (let i = 0; i < 20; i++) {
+    if (!collides({ x, y })) return { x, y };
+    y -= 0.012;
+    if (y <= rect.y1) break;
+  }
+  // Fallback: rect center.
+  return { x, y: (rect.y1 + rect.y2) / 2 };
+}
+
 export function OfficeScene() {
   const sceneRef = useRef<HTMLDivElement | null>(null);
   const stageRef = useRef<HTMLDivElement | null>(null);
@@ -167,17 +182,14 @@ export function OfficeScene() {
       });
       setClaims(cmap);
 
-      // If I have a claim, always spawn at that workstation (center of its rect).
+      // If I have a claim, always spawn at that workstation's "seat" point
+      // (bottom-center of the zone — in front of the desk).
       const myClaimZone = Object.entries(cmap).find(([, uid]) => uid === userData.user!.id)?.[0];
       let startPoint: Point;
       if (myClaimZone) {
         const z = findZoneById(myClaimZone);
         const rect = zoneRectFromOverrides(myClaimZone as ZoneId) ?? z?.rect ?? null;
-        if (rect) {
-          startPoint = { x: (rect.x1 + rect.x2) / 2, y: (rect.y1 + rect.y2) / 2 };
-        } else {
-          startPoint = SPAWN;
-        }
+        startPoint = rect ? seatPointForRect(rect) : SPAWN;
       } else {
         const existing = pmap[userData.user.id];
         const savedStart = { x: existing?.x ?? SPAWN.x, y: existing?.y ?? SPAWN.y };
@@ -317,7 +329,7 @@ export function OfficeScene() {
     }
     const rect = zoneRectFromOverrides(myZone as ZoneId) ?? findZoneById(myZone)?.rect;
     if (!rect) return;
-    const target: Point = { x: (rect.x1 + rect.x2) / 2, y: (rect.y1 + rect.y2) / 2 };
+    const target = seatPointForRect(rect);
     const safe = collides(target) ? SPAWN : target;
     posRef.current = safe;
     setPos(safe);
