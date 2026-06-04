@@ -1153,8 +1153,8 @@ export function OfficeScene() {
         </div>
         {/* /Camera transform layer */}
 
-        {/* Map navigation controls (right side) */}
-        <div className="absolute right-3 top-1/2 -translate-y-1/2 flex flex-col gap-2 z-[90] pointer-events-auto">
+        {/* Map navigation controls (bottom-right corner) */}
+        <div className="absolute right-3 bottom-3 flex flex-col gap-2 z-[90] pointer-events-auto">
           <button
             type="button"
             title="Aproximar"
