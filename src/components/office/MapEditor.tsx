@@ -18,12 +18,13 @@ import {
 import { ZONES, COLLIDERS, FLOOR_POLY, type ZoneId } from "@/lib/office-map";
 import officeMap from "@/assets/office-map.jpg";
 import { toast } from "sonner";
-import { ArrowLeft, Eraser, Square, Download, Trash2, Eye, EyeOff, Undo, Plus, X, Briefcase, Users } from "lucide-react";
+import { ArrowLeft, Eraser, Square, Download, Trash2, Eye, EyeOff, Undo, Plus, X, Briefcase, Users, MapPin } from "lucide-react";
 
 type Tool =
   | { kind: "blocked" }
   | { kind: "erase" }
-  | { kind: "zone"; zone: ZoneId };
+  | { kind: "zone"; zone: ZoneId }
+  | { kind: "spawn"; zone: string };
 
 // Seed overrides from the hardcoded COLLIDERS + ZONES so the user starts
 // with the current layout already painted and can tweak from there.
@@ -203,12 +204,32 @@ export function MapEditor() {
       const rect = stageRef.current.getBoundingClientRect();
       const x = (e.clientX - rect.left) / rect.width;
       const y = (e.clientY - rect.top) / rect.height;
+      if (tool.kind === "spawn") {
+        const zoneId = tool.zone;
+        setOverrides((prev) => ({
+          ...prev,
+          spawnPoints: { ...(prev.spawnPoints ?? {}), [zoneId]: { x, y } },
+        }));
+        setDirty(true);
+        return;
+      }
       const col = Math.max(0, Math.min(GRID_COLS - 1, Math.floor(x * GRID_COLS)));
       const row = Math.max(0, Math.min(GRID_ROWS - 1, Math.floor(y * GRID_ROWS)));
       paintCell(col, row);
     },
-    [paintCell]
+    [paintCell, tool]
   );
+
+  const spawnPoints = overrides.spawnPoints ?? {};
+
+  const removeSpawn = useCallback((zoneId: string) => {
+    setOverrides((prev) => {
+      const cur = { ...(prev.spawnPoints ?? {}) };
+      delete cur[zoneId];
+      return { ...prev, spawnPoints: cur };
+    });
+    setDirty(true);
+  }, []);
 
   // On mount: pull the latest map from Lovable Cloud so a fresh browser /
   // device sees the same layout instead of falling back to the defaults.
@@ -516,6 +537,17 @@ export function MapEditor() {
                     <span className="truncate">{z.label}</span>
                   </button>
                   <button
+                    onClick={(e) => { e.stopPropagation(); setTool({ kind: "spawn", zone: z.id }); }}
+                    title={spawnPoints[z.id] ? "Ponto de teleporte definido. Clique para reposicionar." : "Definir ponto de teleporte (GPS)"}
+                    className={`shrink-0 p-1 rounded ${
+                      tool.kind === "spawn" && tool.zone === z.id
+                        ? "ring-2 ring-primary text-primary"
+                        : spawnPoints[z.id] ? "text-primary" : "text-muted-foreground"
+                    } hover:bg-muted`}
+                  >
+                    <MapPin size={12} />
+                  </button>
+                  <button
                     onClick={(e) => { e.stopPropagation(); toggleKind(z.id); }}
                     title={k === "workspace" ? "Local de trabalho (reivindicável). Clique para tornar Espaço comum." : "Espaço comum. Clique para tornar Local de trabalho."}
                     className={`shrink-0 p-1 rounded ${k === "workspace" ? "text-primary" : "text-muted-foreground"} hover:bg-muted`}
@@ -547,6 +579,17 @@ export function MapEditor() {
                           style={{ backgroundColor: z.color, opacity: 0.7 }}
                         />
                         <span className="truncate">{z.label}</span>
+                      </button>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setTool({ kind: "spawn", zone: z.id }); }}
+                        title={spawnPoints[z.id] ? "Ponto de teleporte definido" : "Definir ponto de teleporte (GPS)"}
+                        className={`shrink-0 p-1 rounded ${
+                          tool.kind === "spawn" && tool.zone === z.id
+                            ? "ring-2 ring-primary text-primary"
+                            : spawnPoints[z.id] ? "text-primary" : "text-muted-foreground"
+                        } hover:bg-muted`}
+                      >
+                        <MapPin size={12} />
                       </button>
                       <button
                         onClick={(e) => { e.stopPropagation(); toggleKind(z.id); }}
@@ -640,6 +683,54 @@ export function MapEditor() {
                   backgroundSize: `${100 / GRID_COLS}% ${100 / GRID_ROWS}%`,
                 }}
               />
+            )}
+            {/* Spawn point pins */}
+            {Object.entries(spawnPoints).map(([zid, p]) => {
+              const color = zoneColorOf(zid);
+              const label = ZONES.find((z) => z.id === zid)?.label
+                ?? customZones.find((c) => c.id === zid)?.label
+                ?? zid;
+              const active = tool.kind === "spawn" && tool.zone === zid;
+              return (
+                <div
+                  key={zid}
+                  className="absolute pointer-events-auto"
+                  style={{
+                    left: `${p.x * 100}%`,
+                    top: `${p.y * 100}%`,
+                    transform: "translate(-50%, -100%)",
+                  }}
+                >
+                  <div className="flex flex-col items-center -mb-1">
+                    <div
+                      className="px-1.5 py-0.5 rounded text-[9px] font-medium whitespace-nowrap shadow-soft"
+                      style={{ background: color, color: "#0a0a0a" }}
+                    >
+                      {label}
+                    </div>
+                    <div className="relative">
+                      <MapPin
+                        size={active ? 24 : 20}
+                        className="drop-shadow"
+                        style={{ color, fill: color, stroke: "#0a0a0a", strokeWidth: 1.5 }}
+                      />
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); removeSpawn(zid); }}
+                        title="Remover ponto"
+                        className="absolute -top-1 -right-2 bg-card border border-border rounded-full p-0.5 text-muted-foreground hover:text-destructive"
+                      >
+                        <X size={10} />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+            {tool.kind === "spawn" && (
+              <div className="absolute top-2 left-1/2 -translate-x-1/2 pointer-events-none bg-primary text-primary-foreground text-xs px-3 py-1 rounded-full shadow-soft">
+                Clique no mapa para fixar o ponto de teleporte
+              </div>
             )}
           </div>
         </main>

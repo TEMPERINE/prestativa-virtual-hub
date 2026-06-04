@@ -9,7 +9,7 @@ import {
   type Point,
   type ZoneId,
 } from "@/lib/office-map";
-import { zoneRectFromOverrides, getZoneKind, customZonesFromOverrides, pullOverridesFromCloud, subscribeOverridesFromCloud } from "@/lib/map-overrides";
+import { zoneRectFromOverrides, getZoneKind, customZonesFromOverrides, pullOverridesFromCloud, subscribeOverridesFromCloud, spawnPointForZone } from "@/lib/map-overrides";
 import officeMap from "@/assets/office-map.jpg";
 import parkLeft from "@/assets/scene-park-left.jpg";
 import roadRight from "@/assets/scene-road-right.jpg";
@@ -239,8 +239,9 @@ export function OfficeScene() {
       let startPoint: Point;
       if (myClaimZone) {
         const z = findZoneById(myClaimZone);
+        const sp = spawnPointForZone(myClaimZone);
         const rect = zoneRectFromOverrides(myClaimZone as ZoneId) ?? z?.rect ?? null;
-        startPoint = rect ? seatPointForRect(rect) : SPAWN;
+        startPoint = sp ?? (rect ? seatPointForRect(rect) : SPAWN);
       } else {
         const existing = pmap[userData.user.id];
         const savedStart = { x: existing?.x ?? SPAWN.x, y: existing?.y ?? SPAWN.y };
@@ -388,9 +389,10 @@ export function OfficeScene() {
       toast.info("Você ainda não reivindicou nenhum espaço.");
       return;
     }
+    const sp = spawnPointForZone(myZone);
     const rect = zoneRectFromOverrides(myZone as ZoneId) ?? findZoneById(myZone)?.rect;
-    if (!rect) return;
-    const target = seatPointForRect(rect);
+    const target = sp ?? (rect ? seatPointForRect(rect) : null);
+    if (!target) return;
     const from = { ...posRef.current };
 
     // Cancel any pending auto-walk and clear stale timers
