@@ -305,7 +305,7 @@ export function OfficeScene() {
       window.removeEventListener("keyup", up);
       window.removeEventListener("blur", blur);
     };
-  }, [setLocalFacing]);
+  }, [setLocalFacing, sendReaction]);
 
   // movement + animation loop
   useEffect(() => {
