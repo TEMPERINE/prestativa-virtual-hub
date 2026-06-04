@@ -359,6 +359,12 @@ export function OfficeScene() {
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
       const key = e.key.toLowerCase();
+      // Ctrl/Cmd + D — teleport to claimed workspace
+      if (key === "d" && (e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey) {
+        e.preventDefault();
+        teleportToMyClaim();
+        return;
+      }
       const emoji = EMOJI_MAP[key];
       if (emoji && !e.repeat && !e.metaKey && !e.ctrlKey && !e.altKey) {
         const target = e.target as HTMLElement | null;
