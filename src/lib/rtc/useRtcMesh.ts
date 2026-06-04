@@ -32,7 +32,10 @@ export type RtcMeshState = {
   remoteStreams: Record<string, MediaStream>;
   connectedPeers: string[];
   speakingPeers: Record<string, boolean>;
-  localPreview: MediaStream | null;
+  localVideoStream: MediaStream | null;
+  videoDevices: MediaDeviceInfo[];
+  selectedVideoDeviceId: string | null;
+  setVideoDevice: (deviceId: string) => Promise<void>;
 };
 
 export function useRtcMesh(myId: string | null, desiredPeers: string[]): RtcMeshState {
@@ -41,6 +44,9 @@ export function useRtcMesh(myId: string | null, desiredPeers: string[]): RtcMesh
   const [remoteStreams, setRemoteStreams] = useState<Record<string, MediaStream>>({});
   const [connectedPeers, setConnectedPeers] = useState<string[]>([]);
   const [speakingPeers, setSpeakingPeers] = useState<Record<string, boolean>>({});
+  const [localVideoStream, setLocalVideoStream] = useState<MediaStream | null>(null);
+  const [videoDevices, setVideoDevices] = useState<MediaDeviceInfo[]>([]);
+  const [selectedVideoDeviceId, setSelectedVideoDeviceId] = useState<string | null>(null);
 
   const peersRef = useRef<Map<string, PeerEntry>>(new Map());
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
