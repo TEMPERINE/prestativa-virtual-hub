@@ -167,6 +167,23 @@ export function OfficeScene() {
     });
   }, []);
 
+  // Hydrate the office map from Lovable Cloud on mount so the layout drawn
+  // in the editor (and saved to the `map_overrides` table) is visible to
+  // every user on every device. Subscribe to realtime updates and force a
+  // re-render when overrides change.
+  const [, setMapVersion] = useState(0);
+  useEffect(() => {
+    const bump = () => setMapVersion((v) => v + 1);
+    void pullOverridesFromCloud().then(bump);
+    const off = subscribeOverridesFromCloud(() => bump());
+    window.addEventListener("map-overrides-changed", bump);
+    return () => {
+      off();
+      window.removeEventListener("map-overrides-changed", bump);
+    };
+  }, []);
+
+
   const tryMove = useCallback((dir: Facing) => {
     const cur = posRef.current;
     const dx = dir === "left" ? -SPEED : dir === "right" ? SPEED : 0;
