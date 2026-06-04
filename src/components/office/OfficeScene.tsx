@@ -383,10 +383,39 @@ export function OfficeScene() {
     };
     window.addEventListener("beforeunload", offline);
 
+    // Load + subscribe to desk notes (post-it gifts left on workstations)
+    void (async () => {
+      const { data } = await supabase
+        .from("desk_notes")
+        .select("id, zone_id, sender_id, recipient_id, body, x, y, created_at, read_at")
+        .is("read_at", null);
+      if (data) setNotes(data as DeskNote[]);
+    })();
+    const notesCh = supabase
+      .channel("desk-notes-room")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "desk_notes" },
+        (payload) => {
+          setNotes((prev) => {
+            if (payload.eventType === "DELETE") {
+              const old = payload.old as { id: string };
+              return prev.filter((n) => n.id !== old.id);
+            }
+            const row = payload.new as DeskNote;
+            if (row.read_at) return prev.filter((n) => n.id !== row.id);
+            const without = prev.filter((n) => n.id !== row.id);
+            return [...without, row];
+          });
+        }
+      )
+      .subscribe();
+
     return () => {
       supabase.removeChannel(ch);
       supabase.removeChannel(reactionCh);
       supabase.removeChannel(claimsCh);
+      supabase.removeChannel(notesCh);
       reactionChannelRef.current = null;
       window.removeEventListener("beforeunload", offline);
       offline();
