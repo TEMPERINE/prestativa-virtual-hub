@@ -882,13 +882,15 @@ export function OfficeScene() {
         </div>
       </div>
 
-      {/* Map row (office stage fills full viewport width) */}
-      <div className="relative flex-1 flex items-stretch min-h-0 overflow-hidden bg-black">
+      {/* Map row (office stage centered, fills viewport) */}
+      <div className="relative flex-1 flex items-center justify-center min-h-0 overflow-hidden bg-black">
 
-      {/* Office stage — fills available space */}
+      {/* Office stage — preserves aspect ratio, fills as much as possible */}
       <div
         ref={stageRef}
-        className="relative flex-1 h-full overflow-hidden select-none"
+        className="relative overflow-hidden select-none"
+        style={{ aspectRatio: "1536 / 1024", height: "100%", width: "100%", maxWidth: "calc(100vh * 1536 / 1024)", maxHeight: "calc(100vw * 1024 / 1536)" }}
+
 
         onWheel={(e) => {
           e.preventDefault();
