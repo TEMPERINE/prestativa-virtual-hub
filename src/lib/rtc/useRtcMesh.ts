@@ -30,12 +30,16 @@ const SIGNAL_CHANNEL = "rtc-mesh-v1";
 export type RtcMeshState = {
   micOn: boolean;
   camOn: boolean;
+  screenOn: boolean;
   toggleMic: () => Promise<void>;
   toggleCam: () => Promise<void>;
+  toggleScreen: () => Promise<void>;
   remoteStreams: Record<string, MediaStream>;
+  remoteScreenStreams: Record<string, MediaStream>;
   connectedPeers: string[];
   speakingPeers: Record<string, boolean>;
   localVideoStream: MediaStream | null;
+  localScreenStream: MediaStream | null;
   videoDevices: MediaDeviceInfo[];
   selectedVideoDeviceId: string | null;
   setVideoDevice: (deviceId: string) => Promise<void>;
