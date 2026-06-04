@@ -133,6 +133,12 @@ export function OfficeScene() {
   // zone_id -> user_id (claims)
   const [claims, setClaims] = useState<Record<string, string>>({});
   const [hoveredZone, setHoveredZone] = useState<string | null>(null);
+  const [notes, setNotes] = useState<DeskNote[]>([]);
+  const [composeFor, setComposeFor] = useState<{ zoneId: string; recipientId: string; recipientName: string } | null>(null);
+  const [composeText, setComposeText] = useState("");
+  const [placing, setPlacing] = useState<{ zoneId: string; recipientId: string; body: string } | null>(null);
+  const [cursor, setCursor] = useState<{ x: number; y: number } | null>(null);
+  const [openingNote, setOpeningNote] = useState<DeskNote | null>(null);
   const reactionChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const meIdRef = useRef<string | null>(null);
 
