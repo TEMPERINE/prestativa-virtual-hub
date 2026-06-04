@@ -568,7 +568,7 @@ function SpriteAvatar({
 
 /** Darkens everything outside the given zone rect within the office stage. */
 function ZoneSpotlight({ rect }: { rect: { x1: number; y1: number; x2: number; y2: number } }) {
-  const overlay = "rgba(5, 6, 12, 0.72)";
+  const overlay = "rgba(5, 6, 12, 0.20)";
   return (
     <>
       {/* top */}
