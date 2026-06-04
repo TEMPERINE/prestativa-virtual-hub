@@ -365,19 +365,13 @@ export function OfficeScene() {
                   {profile.display_name}
                 </div>
                 <div className="relative">
-                  <img
-                    src={AVATAR_SPRITES[isMe ? facing : (p.facing ?? "down")]}
-                    alt=""
-                    draggable={false}
-                    className="select-none"
-                    style={{
-                      width: "min(4vh, 50px)",
-                      height: "auto",
-                      filter: isMe
-                        ? `drop-shadow(0 0 8px ${profile.avatar_color}) drop-shadow(0 3px 4px rgba(0,0,0,0.35))`
-                        : "drop-shadow(0 3px 4px rgba(0,0,0,0.35))",
-                    }}
+                  <SpriteAvatar
+                    facing={isMe ? facing : (p.facing ?? "down")}
+                    frame={isMe ? frame : 0}
+                    glowColor={isMe ? profile.avatar_color : undefined}
                   />
+                </div>
+
                 </div>
               </div>
             </div>
