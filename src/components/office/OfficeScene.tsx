@@ -185,6 +185,40 @@ export function OfficeScene() {
     setPan(clampPan(s, { x: tx, y: ty }));
   }, [clampPan]);
 
+  // Smoothly tween zoom + pan to center on a normalized point.
+  const tweenRafRef = useRef<number | null>(null);
+  const tweenCenterOn = useCallback((nx: number, ny: number, targetZoom: number, duration = 650, onDone?: () => void) => {
+    const stage = stageRef.current;
+    if (!stage) return;
+    if (tweenRafRef.current != null) cancelAnimationFrame(tweenRafRef.current);
+    const W = stage.clientWidth, H = stage.clientHeight;
+    const startZoom = zoomRef.current;
+    const startPan = { ...panRef.current };
+    const endZoom = targetZoom;
+    const endPan = clampPan(endZoom, {
+      x: W / 2 - nx * W * endZoom,
+      y: H / 2 - ny * H * endZoom,
+    });
+    const t0 = performance.now();
+    const ease = (t: number) => 1 - Math.pow(1 - t, 3); // easeOutCubic
+    const step = (now: number) => {
+      const t = Math.min(1, (now - t0) / duration);
+      const k = ease(t);
+      const z = startZoom + (endZoom - startZoom) * k;
+      const px = startPan.x + (endPan.x - startPan.x) * k;
+      const py = startPan.y + (endPan.y - startPan.y) * k;
+      setZoom(z);
+      setPan({ x: px, y: py });
+      if (t < 1) {
+        tweenRafRef.current = requestAnimationFrame(step);
+      } else {
+        tweenRafRef.current = null;
+        onDone?.();
+      }
+    };
+    tweenRafRef.current = requestAnimationFrame(step);
+  }, [clampPan]);
+
   // Follow avatar smoothly when enabled
   useEffect(() => {
     if (!followMe) return;
