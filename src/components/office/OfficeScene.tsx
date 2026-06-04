@@ -446,7 +446,7 @@ export function OfficeScene() {
                 </div>
                 <div className="relative">
                   {reactions[profile.id] && (
-                    <div className="absolute left-1/2 -translate-x-1/2 -top-2 z-10 pointer-events-none">
+                    <div className="absolute left-1/2 -translate-x-1/4 -top-5 z-10 pointer-events-none">
                       <ReactionBubble emoji={reactions[profile.id].emoji} />
                     </div>
                   )}
