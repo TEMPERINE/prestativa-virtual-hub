@@ -58,6 +58,7 @@ import { LogOut, Mic, MicOff, Video, VideoOff, MonitorUp, Users, Pencil } from "
 import { Link } from "@tanstack/react-router";
 import { useRtcMesh } from "@/lib/rtc/useRtcMesh";
 import { RemoteVideoTiles } from "./RemoteVideoTiles";
+import { CamPreviewAndPicker } from "./CamPreviewAndPicker";
 
 type Profile = { id: string; display_name: string; avatar_color: string };
 type RemotePos = { user_id: string; x: number; y: number; zone: string; is_online: boolean; facing?: Facing };
