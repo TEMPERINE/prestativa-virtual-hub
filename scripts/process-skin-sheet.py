@@ -173,7 +173,7 @@ def process(src_path: str, skin_id: str, rows: int, cols: int, out_dir: str, out
     # ------------------------------------------------------------------
     facing_frames: dict[str, list] = {}   # facing -> list[(crop, cx, foot_y) | None]
     for r, facing in enumerate(FACINGS[:rows]):
-        if facing == "right":
+        if facing == "right" and not include_right:
             continue
         frames = []
         # Bleed margin below the strict row to capture feet/shoes that the
