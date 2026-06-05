@@ -26,7 +26,9 @@ type Tool =
   | { kind: "blocked" }
   | { kind: "erase" }
   | { kind: "zone"; zone: ZoneId }
-  | { kind: "spawn"; zone: string };
+  | { kind: "spawn"; zone: string }
+  | { kind: "place-prop"; defId: string }
+  | { kind: "select" };
 
 // Seed overrides from the hardcoded COLLIDERS + ZONES so the user starts
 // with the current layout already painted and can tweak from there.
