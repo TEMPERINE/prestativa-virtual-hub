@@ -1719,7 +1719,7 @@ export function OfficeScene() {
               left: `${cursor.x * 100}%`,
               top: `${cursor.y * 100}%`,
               transform: "translate(-50%, -85%)",
-              zIndex: 95,
+              zIndex: 200002,
               opacity: 0.95,
               filter: "drop-shadow(0 4px 10px rgba(0,0,0,0.35))",
             }}
@@ -2623,7 +2623,7 @@ function PlacementLayer({
     <>
       <div
         className="absolute inset-0"
-        style={{ zIndex: 90, cursor: "crosshair", background: "rgba(0,0,0,0.18)" }}
+        style={{ zIndex: 200000, cursor: "crosshair", background: "rgba(0,0,0,0.18)" }}
         onMouseMove={(e) => {
           const rect = e.currentTarget.getBoundingClientRect();
           const x = (e.clientX - rect.left) / rect.width;
@@ -2651,7 +2651,7 @@ function PlacementLayer({
             top: `${targetRect.y1 * 100}%`,
             width: `${(targetRect.x2 - targetRect.x1) * 100}%`,
             height: `${(targetRect.y2 - targetRect.y1) * 100}%`,
-            zIndex: 91,
+            zIndex: 200001,
             outline: "2px dashed color-mix(in oklab, var(--primary) 80%, transparent)",
             background: "color-mix(in oklab, var(--primary) 12%, transparent)",
             boxShadow: "0 0 0 9999px rgba(0,0,0,0.001)",
