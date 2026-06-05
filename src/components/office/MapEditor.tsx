@@ -274,7 +274,7 @@ export function MapEditor() {
     [paintCell, tool]
   );
 
-  const spawnPoints = overrides.spawnPoints ?? {};
+  const spawnPoints: Record<string, { x: number; y: number }> = overrides.spawnPoints ?? {};
   const draggingPin = useRef<string | null>(null);
   const propsList = overrides.props ?? [];
   const [selectedPropId, setSelectedPropId] = useState<string | null>(null);
