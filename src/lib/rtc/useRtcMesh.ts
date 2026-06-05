@@ -75,7 +75,7 @@ export function useRtcMesh(myId: string | null, desiredPeers: string[]): RtcMesh
   const desiredRef = useRef<Set<string>>(new Set());
   const disconnectTimersRef = useRef<Map<string, number>>(new Map());
 
-  const sendSignal = useCallback((msg: Omit<SignalMsg, "from">) => {
+  const sendSignal = useCallback((msg: Omit<SignalMsg, "from" | "sessionId" | "targetSessionId">) => {
     const ch = channelRef.current;
     if (!ch || !myId) {
       pendingSignalsRef.current.push(msg);
@@ -85,7 +85,16 @@ export function useRtcMesh(myId: string | null, desiredPeers: string[]): RtcMesh
       pendingSignalsRef.current.push(msg);
       return;
     }
-    void ch.send({ type: "broadcast", event: "rtc", payload: { ...msg, from: myId } });
+    void ch.send({
+      type: "broadcast",
+      event: "rtc",
+      payload: {
+        ...msg,
+        from: myId,
+        sessionId: localSessionIdRef.current,
+        targetSessionId: remoteSessionsRef.current.get(msg.to),
+      },
+    });
   }, [myId]);
 
   const flushSignals = useCallback(() => {
@@ -93,7 +102,16 @@ export function useRtcMesh(myId: string | null, desiredPeers: string[]): RtcMesh
     if (!ch || !myId || !channelReadyRef.current) return;
     const pending = pendingSignalsRef.current.splice(0);
     for (const msg of pending) {
-      void ch.send({ type: "broadcast", event: "rtc", payload: { ...msg, from: myId } });
+      void ch.send({
+        type: "broadcast",
+        event: "rtc",
+        payload: {
+          ...msg,
+          from: myId,
+          sessionId: localSessionIdRef.current,
+          targetSessionId: remoteSessionsRef.current.get(msg.to),
+        },
+      });
     }
   }, [myId]);
 
@@ -123,6 +141,8 @@ export function useRtcMesh(myId: string | null, desiredPeers: string[]): RtcMesh
       screenTransceiver: screenTx,
       screenSender: screenTx.sender,
       makingOffer: false,
+      isOfferer: initiator,
+      pendingIce: [],
       remoteStream,
       remoteScreenStream,
     };
