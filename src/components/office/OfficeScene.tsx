@@ -625,6 +625,8 @@ export function OfficeScene() {
         (payload) => {
           const row = (payload.new ?? payload.old) as RemotePos & { updated_at?: string };
           if (!row) return;
+          const rowTs = timestampForPosition(row) || Date.now();
+          if (row.is_online) maybeStartRemoteTeleportFromCurrent(row.user_id, { x: row.x, y: row.y }, rowTs);
           setPositions((prev) => {
             const next = { ...prev };
             if (payload.eventType === "DELETE") {
@@ -673,6 +675,7 @@ export function OfficeScene() {
         const row = payload.payload as RemotePos;
         if (!row?.user_id) return;
         const incomingTs = timestampForPosition(row) || Date.now();
+        maybeStartRemoteTeleportFromCurrent(row.user_id, { x: row.x, y: row.y }, incomingTs);
         setPositions((prev) => {
           const curTs = timestampForPosition(prev[row.user_id] ?? {}) || (positionFreshTs.current.get(row.user_id) ?? 0);
           if (incomingTs < curTs) return prev;
@@ -686,32 +689,7 @@ export function OfficeScene() {
           from?: Point;
           to?: Point;
         };
-        if (!user_id || user_id === meIdRef.current || !from || !to) return;
-        const id = Date.now() + Math.random();
-        // Clear any previous timers for this user
-        const prevTimers = remoteTeleportTimers.current.get(user_id) ?? [];
-        prevTimers.forEach((t) => window.clearTimeout(t));
-        const timers: number[] = [];
-        setRemoteTeleports((p) => ({ ...p, [user_id]: { from, to, phase: "out", id } }));
-        timers.push(
-          window.setTimeout(() => {
-            setRemoteTeleports((p) =>
-              p[user_id]?.id === id ? { ...p, [user_id]: { ...p[user_id], phase: "in" } } : p
-            );
-          }, 450)
-        );
-        timers.push(
-          window.setTimeout(() => {
-            setRemoteTeleports((p) => {
-              if (p[user_id]?.id !== id) return p;
-              const next = { ...p };
-              delete next[user_id];
-              return next;
-            });
-            remoteTeleportTimers.current.delete(user_id);
-          }, 1100)
-        );
-        remoteTeleportTimers.current.set(user_id, timers);
+        startRemoteTeleport(user_id, from, to);
       });
     positionBroadcastChannelRef.current = positionBroadcastCh;
 
