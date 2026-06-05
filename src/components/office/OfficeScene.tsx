@@ -514,6 +514,7 @@ export function OfficeScene() {
       .on("broadcast", { event: "position" }, (payload) => {
         const row = payload.payload as RemotePos;
         if (!row?.user_id) return;
+        positionFreshTs.current.set(row.user_id, Date.now());
         setPositions((prev) => ({ ...prev, [row.user_id]: row }));
       });
     positionBroadcastChannelRef.current = positionBroadcastCh;
