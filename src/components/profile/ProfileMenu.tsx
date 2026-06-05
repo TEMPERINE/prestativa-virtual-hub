@@ -99,6 +99,7 @@ export function ProfileMenu(p: Props) {
           <MenuItem icon={<UserIcon className="w-4 h-4" />} label="Editar perfil" onClick={() => { setOpen(false); p.onEditProfile(); }} />
           <MenuItem icon={<MapPin className="w-4 h-4" />} label="Ir até minha mesa" hint="Ctrl+D" disabled={!p.hasClaim} onClick={() => { setOpen(false); p.onGoToMyDesk(); }} />
           <MenuItem icon={<Home className="w-4 h-4" />} label="Me leve ao saguão" onClick={() => { setOpen(false); p.onGoToLobby(); }} />
+          <MenuItem icon={<StickyNote className="w-4 h-4" />} label="Recadinhos guardados" onClick={() => { setOpen(false); p.onOpenSavedNotes(); }} />
           <MenuItem icon={<RefreshCcw className="w-4 h-4" />} label="Refazer onboarding" onClick={() => { setOpen(false); p.onRestartOnboarding(); }} />
         </div>
 
