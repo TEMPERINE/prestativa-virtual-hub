@@ -119,6 +119,9 @@ export function OfficeScene() {
   // LWW tracker — wall-clock ts of the freshest known sample per user (broadcast/presence).
   // Lets us discard stale DB poll rows that would otherwise snap remote avatars back.
   const positionFreshTs = useRef<Map<string, number>>(new Map());
+  // Prevents the initial SPAWN placeholder from being advertised/persisted before
+  // the user's real saved position has loaded.
+  const positionHydratedRef = useRef(false);
   const [pos, setPos] = useState<Point>(SPAWN);
   const [zone, setZone] = useState<ZoneId>("lobby");
   const [showTeam, setShowTeam] = useState(false);
@@ -325,6 +328,7 @@ export function OfficeScene() {
   }, []);
 
   const sendPos = useCallback((x: number, y: number, z: ZoneId, f: Facing, persistNow = false) => {
+    if (!positionHydratedRef.current) return;
     const knownId = meIdRef.current;
     const write = (userId: string) => {
       const payload = { user_id: userId, x, y, zone: z, facing: f, is_online: true };
@@ -431,8 +435,10 @@ export function OfficeScene() {
       const existing = pmap[userData.user.id];
       const hasSavedPos = existing && typeof existing.x === "number" && typeof existing.y === "number";
       if (hasSavedPos) {
-        const savedStart = { x: existing.x, y: existing.y };
-        startPoint = collides(savedStart) ? randomCorridorPoint() : savedStart;
+        // Current DB/presence position is authoritative for returning users.
+        // Do not collision-correct it here: map overrides can still be loading,
+        // and "fixing" it would clobber the live position with a spawn point.
+        startPoint = { x: existing.x, y: existing.y };
       } else if (myClaimZone) {
         // First entry with a claim → spawn at the workstation seat.
         const z = findZoneById(myClaimZone);
@@ -444,16 +450,22 @@ export function OfficeScene() {
         // don't all pile on top of each other at the default spawn.
         startPoint = randomCorridorPoint();
       }
-      const safeStart = collides(startPoint) ? SPAWN : startPoint;
+      const safeStart = hasSavedPos ? startPoint : (collides(startPoint) ? SPAWN : startPoint);
+      posRef.current = safeStart;
       setPos(safeStart);
       const startZone = zoneAt(safeStart).id;
       setZone(startZone);
+      const startFacing = (existing?.facing as Facing | undefined) ?? facingRef.current;
+      facingRef.current = startFacing;
+      setFacing(startFacing);
+      positionHydratedRef.current = true;
 
       pmap[userData.user.id] = {
         user_id: userData.user.id,
         x: safeStart.x,
         y: safeStart.y,
         zone: startZone,
+        facing: startFacing,
         is_online: true,
       };
       setPositions(pmap);
@@ -463,7 +475,7 @@ export function OfficeScene() {
         x: safeStart.x,
         y: safeStart.y,
         zone: startZone,
-        facing: "down",
+        facing: startFacing,
         is_online: true,
       });
     })();
@@ -610,7 +622,7 @@ export function OfficeScene() {
       presenceCh.subscribe(async (status) => {
         if (status !== "SUBSCRIBED") return;
         const uid = meIdRef.current;
-        if (!uid) return;
+        if (!uid || !positionHydratedRef.current) return;
         const cur = posRef.current;
         try {
           await presenceCh.track({
@@ -626,7 +638,7 @@ export function OfficeScene() {
     // postgres_changes and broadcasts get dropped on flaky networks.
     const presenceHeartbeat = window.setInterval(() => {
       const uid = meIdRef.current;
-      if (!uid) return;
+      if (!uid || !positionHydratedRef.current) return;
       const cur = posRef.current;
       void presenceCh.track({
         user_id: uid, x: cur.x, y: cur.y,
@@ -642,7 +654,7 @@ export function OfficeScene() {
     const onVisible = () => {
       if (document.visibilityState !== "visible") return;
       const uid = meIdRef.current;
-      if (!uid) return;
+      if (!uid || !positionHydratedRef.current) return;
       const cur = posRef.current;
       const curZone = zoneAt(cur).id;
       // 1) Re-attach the latest JWT to the realtime socket
@@ -723,7 +735,7 @@ export function OfficeScene() {
     // can't snap our avatar back to a previous spot.
     const persistHeartbeat = window.setInterval(() => {
       const uid = meIdRef.current;
-      if (!uid) return;
+      if (!uid || !positionHydratedRef.current) return;
       const cur = posRef.current;
       // Don't persist while we're still on the default SPAWN sentinel —
       // the init effect hasn't hydrated the saved position yet, and writing
