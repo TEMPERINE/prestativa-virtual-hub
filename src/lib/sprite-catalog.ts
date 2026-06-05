@@ -26,6 +26,11 @@ import afroUp from "@/assets/sprites/afro-up.png";
 import afroLeft from "@/assets/sprites/afro-left.png";
 import afroRight from "@/assets/sprites/afro-right.png";
 
+import japaDown from "@/assets/sprites/japa-down.png";
+import japaUp from "@/assets/sprites/japa-up.png";
+import japaLeft from "@/assets/sprites/japa-left.png";
+import japaRight from "@/assets/sprites/japa-right.png";
+
 export type Facing = "up" | "down" | "left" | "right";
 
 export type SpriteSheets = Record<Facing, string>;
@@ -105,6 +110,19 @@ export const SPRITES: SpriteDef[] = [
       right: { w: 255, h: 227 },
     },
     mirrorLeftFromRight: true,
+  },
+  {
+    id: "japa",
+    label: "Japa",
+    gender: "f",
+    sheets: { up: japaUp, down: japaDown, left: japaLeft, right: japaRight },
+    dims: {
+      down: { w: 255, h: 268 },
+      up: { w: 255, h: 277 },
+      left: { w: 255, h: 283 },
+      right: { w: 255, h: 218 },
+    },
+    mirrorLeftFromRight: false,
   },
 ];
 
