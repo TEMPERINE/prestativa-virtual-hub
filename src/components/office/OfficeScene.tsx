@@ -1318,7 +1318,15 @@ export function OfficeScene() {
   // movement + animation loop
   useEffect(() => {
     let raf = 0;
+    let lastT = 0;
     const tick = (t: number) => {
+      // Delta-time: torna a velocidade independente do FPS. Quando a aba
+      // perde frames, o passo cresce proporcionalmente para que o
+      // personagem continue parecendo fluido em vez de "arrastado".
+      const dtMs = lastT ? t - lastT : 16.667;
+      lastT = t;
+      const stepFactor = dtMs / 16.667;
+
       let dir = lastDir.current;
 
       // Auto-walk: if no manual key, compute a direction toward the target.
@@ -1342,12 +1350,12 @@ export function OfficeScene() {
           const secondary: Facing = adx >= ady
             ? (dy > 0 ? "down" : "up")
             : (dx > 0 ? "right" : "left");
-          setLocalFacing(primary);
-          if (tryMove(primary)) {
+          if (facingRef.current !== primary) setLocalFacing(primary);
+          if (tryMove(primary, stepFactor)) {
             dir = primary;
           } else {
-            setLocalFacing(secondary);
-            if (tryMove(secondary)) {
+            if (facingRef.current !== secondary) setLocalFacing(secondary);
+            if (tryMove(secondary, stepFactor)) {
               dir = secondary;
             } else {
               // Stuck — abort auto-walk
@@ -1361,7 +1369,7 @@ export function OfficeScene() {
         // For manual movement, tryMove was already called via keydown path below;
         // when manual key is held we still need to advance position each frame.
         const isManual = lastDir.current === dir;
-        const moved = isManual ? tryMove(dir) : true;
+        const moved = isManual ? tryMove(dir, stepFactor) : true;
         if (moved) {
           if (t - lastFrameTick.current > WALK_FRAME_MS) {
             lastFrameTick.current = t;
