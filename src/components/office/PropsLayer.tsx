@@ -4,7 +4,7 @@ import { loadOverrides, subscribeOverridesFromCloud, type PropInstance } from "@
 import { getPropDef } from "@/lib/prop-catalog";
 import { publishProps, publishFrames } from "@/lib/prop-gates";
 
-const INTERACT_RADIUS = 0.06; // distância (em fração do mapa) para o avatar poder interagir
+const INTERACT_RADIUS = 0.1; // distância (em fração do mapa) para o avatar poder interagir
 
 type Props = {
   /** posição normalizada (0..1) do avatar local; usada para gating de tecla */
@@ -196,7 +196,7 @@ export function PropsLayer({ selfX, selfY, focusedRect = null }: Props) {
               e.stopPropagation();
               triggerInteract(nearestInteractive);
             }}
-            className="absolute -translate-x-1/2 -translate-y-full flex items-center gap-1 text-[11px] text-white/90 tracking-wide drop-shadow-[0_1px_2px_rgba(0,0,0,0.7)] hover:text-white transition-colors"
+            className="absolute -translate-x-1/2 -translate-y-full flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-black/70 backdrop-blur-sm text-[11px] text-white/90 shadow-lg hover:bg-black/80 transition-colors"
             style={{
               left: `${nearestInteractive.x * 100}%`,
               top: `${topPct}%`,
@@ -205,11 +205,10 @@ export function PropsLayer({ selfX, selfY, focusedRect = null }: Props) {
             }}
             aria-label={`Interagir com ${def.label}`}
           >
-            <span className="font-medium opacity-80">Aperte</span>
-            <kbd className="font-bold text-white/100">
+            <span className="opacity-80">Aperte</span>
+            <kbd className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded bg-white/15 border border-white/20 font-bold text-white text-[10px] leading-none">
               {keyLabel}
             </kbd>
-            <span className="font-medium opacity-80">para interagir</span>
           </button>
         );
       })()}
