@@ -9,11 +9,14 @@ type Props = {
   /** posição normalizada (0..1) do avatar local; usada para gating de tecla */
   selfX: number;
   selfY: number;
+  /** quando uma zona está focada, props dentro dela recebem o mesmo boost de
+   *  z-index dos avatares para se intercalarem corretamente. */
+  focusedRect?: { x1: number; y1: number; x2: number; y2: number } | null;
 };
 
 type PropStateRow = { prop_id: string; frame: number };
 
-export function PropsLayer({ selfX, selfY }: Props) {
+export function PropsLayer({ selfX, selfY, focusedRect = null }: Props) {
   const [propsList, setPropsList] = useState<PropInstance[]>(
     () => loadOverrides()?.props ?? []
   );
