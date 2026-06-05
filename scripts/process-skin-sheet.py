@@ -156,8 +156,14 @@ def process(src_path: str, skin_id: str, rows: int, cols: int, out_dir: str, out
         if facing == "right":
             continue
         frames = []
+        # Bleed margin below the strict row to capture feet/shoes that the
+        # source art lets dangle past the grid line (e.g. heels under pants).
+        # The connected-components bbox will only keep them when they sit
+        # directly under the main blob (see bbox()).
+        bleed_bottom = int(cell_h * 0.18)
         for c in range(cols):
-            cell = arr[r*cell_h:(r+1)*cell_h, c*cell_w:(c+1)*cell_w].copy()
+            y_end = min(H, (r + 1) * cell_h + bleed_bottom)
+            cell = arr[r*cell_h:y_end, c*cell_w:(c+1)*cell_w].copy()
             bb = bbox(cell[..., 3])
             if bb is None:
                 frames.append(None)
