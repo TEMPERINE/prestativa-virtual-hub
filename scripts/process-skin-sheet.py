@@ -130,18 +130,18 @@ def process(src_path: str, skin_id: str, rows: int, cols: int, out_dir: str, out
 
     os.makedirs(out_dir, exist_ok=True)
 
-    # Skip the "right" row: by convention we mirror "left" at render time
-    # (smaller bundle + guaranteed symmetry). Process only down/up/left.
-    facings_to_emit = [f for f in FACINGS[:rows] if f != "right"]
+    # ------------------------------------------------------------------
+    # Pass 1 (all facings): collect per-frame crops + metrics.
+    # Source AI sheets often draw the "down" pose noticeably bigger than the
+    # side/up poses. We capture each facing's raw character height so we can
+    # normalize them in pass 2 — otherwise the front view renders chunkier
+    # than the side view in-scene.
+    # ------------------------------------------------------------------
+    facing_frames: dict[str, list] = {}   # facing -> list[(crop, cx, foot_y) | None]
     for r, facing in enumerate(FACINGS[:rows]):
         if facing == "right":
             continue
-        # Pass 1: per-frame bbox and center metrics within each row cell.
-        frames = []   # list of (frame_rgba, cx_in_frame, foot_y_in_frame)
-        max_w_left = 0
-        max_w_right = 0
-        max_above_foot = 0
-
+        frames = []
         for c in range(cols):
             cell = arr[r*cell_h:(r+1)*cell_h, c*cell_w:(c+1)*cell_w].copy()
             bb = bbox(cell[..., 3])
@@ -154,15 +154,54 @@ def process(src_path: str, skin_id: str, rows: int, cols: int, out_dir: str, out
             cx = robust_center_x(mask)
             foot_y = crop.shape[0]
             frames.append((crop, cx, foot_y))
-            max_w_left  = max(max_w_left,  int(np.ceil(cx)))
-            max_w_right = max(max_w_right, int(np.ceil(crop.shape[1] - cx)))
-            max_above_foot = max(max_above_foot, foot_y)
+        facing_frames[facing] = frames
 
-        # Pad output to out_cols by repeating the idle frame (frame 0).
+    # ------------------------------------------------------------------
+    # Normalize character height across facings.
+    # Use the median character height across ALL facings as the target.
+    # Each facing is uniformly rescaled so its own median height matches
+    # the global target — keeps the silhouette intact while making front
+    # / side / back views render at the same visual size.
+    # ------------------------------------------------------------------
+    all_heights = [f[2] for fs in facing_frames.values() for f in fs if f is not None]
+    if all_heights:
+        target_h = float(np.median(all_heights))
+        for facing, frames in facing_frames.items():
+            heights = [f[2] for f in frames if f is not None]
+            if not heights:
+                continue
+            cur = float(np.median(heights))
+            scale = target_h / cur if cur > 0 else 1.0
+            if abs(scale - 1.0) < 0.02:
+                continue
+            for i, fr in enumerate(frames):
+                if fr is None:
+                    continue
+                crop, cx, foot_y = fr
+                new_w = max(1, int(round(crop.shape[1] * scale)))
+                new_h = max(1, int(round(crop.shape[0] * scale)))
+                resized = np.array(
+                    Image.fromarray(crop, "RGBA").resize((new_w, new_h), Image.LANCZOS)
+                )
+                frames[i] = (resized, cx * scale, foot_y * scale)
+
+    # ------------------------------------------------------------------
+    # Pass 2 (per facing): pad to out_cols, compute uniform cell, blit.
+    # ------------------------------------------------------------------
+    for facing, frames in facing_frames.items():
         first_real = next((f for f in frames if f is not None), None)
         while len(frames) < out_cols:
             frames.append(first_real)
         frames = frames[:out_cols]
+
+        max_w_left = max((int(np.ceil(f[1])) for f in frames if f is not None), default=0)
+        max_w_right = max(
+            (int(np.ceil(f[0].shape[1] - f[1])) for f in frames if f is not None),
+            default=0,
+        )
+        max_above_foot = max(
+            (int(np.ceil(f[2])) for f in frames if f is not None), default=0
+        )
 
         pad_x = 6
         pad_top = 6
@@ -182,7 +221,7 @@ def process(src_path: str, skin_id: str, rows: int, cols: int, out_dir: str, out
             cell_cx = out_cw // 2
             dst_x = c * out_cw + cell_cx - int(round(cx))
             baseline = out_ch - pad_bottom
-            dst_y = baseline - foot_y
+            dst_y = baseline - int(round(foot_y))
             sx0 = max(0, -dst_x); sy0 = max(0, -dst_y)
             dx0 = max(0, dst_x);  dy0 = max(0, dst_y)
             paste_w = min(cw - sx0, out_cw * out_cols - dx0)
