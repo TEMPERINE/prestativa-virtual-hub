@@ -77,9 +77,43 @@ export function PropsLayer({ selfX, selfY, focusedRect = null }: Props) {
     };
   }, []);
 
+  // Ação de interação reutilizável (chamada pelo teclado e pelo botão flutuante)
+  const triggerInteract = useCallback((prop: PropInstance) => {
+    const def = getPropDef(prop.defId);
+    if (!def?.interactive) return;
+    setFrames((p) => {
+      const cur = p[prop.id] ?? 0;
+      const next = (cur + 1) % def.frames.length;
+      void (async () => {
+        const { data: u } = await supabase.auth.getUser();
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        await (supabase as any).from("prop_states").upsert(
+          { prop_id: prop.id, frame: next, updated_by: u.user?.id ?? null, updated_at: new Date().toISOString() },
+          { onConflict: "prop_id" }
+        );
+      })();
+      return { ...p, [prop.id]: next };
+    });
+  }, []);
+
+  // Prop interativo mais próximo dentro do raio — usado pelo botão flutuante
+  const nearestInteractive = useMemo(() => {
+    let best: { prop: PropInstance; dist: number } | null = null;
+    for (const prop of propsList) {
+      if (!prop.interactive) continue;
+      const def = getPropDef(prop.defId);
+      if (!def?.interactive) continue;
+      const d = Math.hypot(prop.x - selfX, prop.y - selfY);
+      if (d <= INTERACT_RADIUS && (!best || d < best.dist)) {
+        best = { prop, dist: d };
+      }
+    }
+    return best?.prop ?? null;
+  }, [propsList, selfX, selfY]);
+
   // Tecla de interação — alterna o frame do prop interativo mais próximo
   useEffect(() => {
-    const onKey = async (e: KeyboardEvent) => {
+    const onKey = (e: KeyboardEvent) => {
       if (e.ctrlKey || e.metaKey || e.altKey) return;
       const target = e.target as HTMLElement | null;
       const tag = target?.tagName;
@@ -98,25 +132,11 @@ export function PropsLayer({ selfX, selfY, focusedRect = null }: Props) {
       }
       if (!best) return;
       e.preventDefault();
-      const def = getPropDef(best.prop.defId)!;
-      setFrames((p) => {
-        const cur = p[best!.prop.id] ?? 0;
-        const next = (cur + 1) % def.frames.length;
-        // fire-and-forget upsert
-        void (async () => {
-          const { data: u } = await supabase.auth.getUser();
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          await (supabase as any).from("prop_states").upsert(
-            { prop_id: best!.prop.id, frame: next, updated_by: u.user?.id ?? null, updated_at: new Date().toISOString() },
-            { onConflict: "prop_id" }
-          );
-        })();
-        return { ...p, [best!.prop.id]: next };
-      });
+      triggerInteract(best.prop);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, []);
+  }, [triggerInteract]);
 
   const rendered = useMemo(() => propsList, [propsList]);
 
@@ -129,15 +149,8 @@ export function PropsLayer({ selfX, selfY, focusedRect = null }: Props) {
         const src = def.frames[frame] ?? def.frames[0];
         const wPct = p.w * 100;
         const hPct = (p.w / def.aspectRatio) * 100;
-        // Ponto de comparação de profundidade: por padrão é a base do
-        // bounding box (p.y); em assets com muito alfa transparente abaixo
-        // usamos o meio do conteúdo visível (depthRefY). É esse ponto que
-        // dita quando o avatar passa "na frente" da porta.
         const hNorm = p.w / def.aspectRatio;
         const refY = p.y - hNorm * (1 - (def.depthRefY ?? 1));
-        // Quando há uma sala focada, props "de sala" (porta) entram no
-        // mesmo plano dos avatares em foco (que recebem +60000), pra que
-        // a ordenação por Y intercale corretamente porta vs personagem.
         const focusOffset = focusedRect && def.foregroundWhenFocused ? 60000 : 0;
         const zIndex = focusOffset + Math.max(1, Math.round(refY * 1000));
         return (
@@ -161,6 +174,36 @@ export function PropsLayer({ selfX, selfY, focusedRect = null }: Props) {
           />
         );
       })}
+
+      {nearestInteractive && (() => {
+        const def = getPropDef(nearestInteractive.defId);
+        if (!def?.interactive) return null;
+        const hNorm = nearestInteractive.w / def.aspectRatio;
+        const topPct = (nearestInteractive.y - hNorm) * 100; // topo do bounding box
+        const keyLabel = (def.interactKey ?? "x").toUpperCase();
+        return (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              triggerInteract(nearestInteractive);
+            }}
+            className="absolute -translate-x-1/2 -translate-y-full flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-background/90 border border-border shadow-md text-xs font-medium text-foreground hover:bg-accent hover:text-accent-foreground transition-colors backdrop-blur-sm"
+            style={{
+              left: `${nearestInteractive.x * 100}%`,
+              top: `${topPct}%`,
+              zIndex: 1_000_000,
+            }}
+            aria-label={`Interagir com ${def.label}`}
+          >
+            <kbd className="inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1 rounded bg-primary text-primary-foreground font-mono text-[10px]">
+              {keyLabel}
+            </kbd>
+            <span>Interagir</span>
+          </button>
+        );
+      })()}
     </>
   );
 }
+
