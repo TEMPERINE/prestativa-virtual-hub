@@ -818,13 +818,21 @@ export function MapEditor() {
 
             onPointerDown={(e) => {
               if (draggingPin.current) return;
+              if (draggingPropRef.current) return;
+              // No modo seleção, clique no fundo só desseleciona
+              if (tool.kind === "select") {
+                setSelectedPropId(null);
+                return;
+              }
               (e.target as Element).setPointerCapture?.(e.pointerId);
-              painting.current = true;
-              pushHistory({
-                ...overrides,
-                blocked: overrides.blocked.slice(),
-                zones: overrides.zones.slice(),
-              });
+              if (tool.kind === "blocked" || tool.kind === "erase" || tool.kind === "zone") {
+                painting.current = true;
+                pushHistory({
+                  ...overrides,
+                  blocked: overrides.blocked.slice(),
+                  zones: overrides.zones.slice(),
+                });
+              }
               handlePointer(e);
             }}
             onPointerMove={(e) => {
@@ -832,10 +840,27 @@ export function MapEditor() {
                 moveSpawnToPointer(e, draggingPin.current);
                 return;
               }
+              if (draggingPropRef.current && stageRef.current) {
+                const rect = stageRef.current.getBoundingClientRect();
+                const nx = (e.clientX - rect.left) / rect.width;
+                const ny = (e.clientY - rect.top) / rect.height;
+                const drag = draggingPropRef.current;
+                if (drag.mode === "move") {
+                  updateProp(drag.id, {
+                    x: Math.max(0, Math.min(1, nx)),
+                    y: Math.max(0, Math.min(1, ny)),
+                  });
+                } else {
+                  const dx = nx - drag.startX;
+                  const nextW = Math.max(0.01, Math.min(0.6, drag.startW + dx * 2));
+                  updateProp(drag.id, { w: nextW });
+                }
+                return;
+              }
               if (painting.current) handlePointer(e);
             }}
-            onPointerUp={() => { painting.current = false; draggingPin.current = null; }}
-            onPointerCancel={() => { painting.current = false; draggingPin.current = null; }}
+            onPointerUp={() => { painting.current = false; draggingPin.current = null; draggingPropRef.current = null; }}
+            onPointerCancel={() => { painting.current = false; draggingPin.current = null; draggingPropRef.current = null; }}
           >
             {showImage && (
               <img
