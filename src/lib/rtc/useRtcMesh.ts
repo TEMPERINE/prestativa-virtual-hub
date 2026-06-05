@@ -5,6 +5,8 @@ type SignalType = "offer" | "answer" | "ice" | "bye" | "hello";
 type SignalMsg = {
   from: string;
   to: string;
+  sessionId?: string;
+  targetSessionId?: string;
   type: SignalType;
   sdp?: RTCSessionDescriptionInit;
   candidate?: RTCIceCandidateInit | null;
@@ -17,6 +19,8 @@ type PeerEntry = {
   screenTransceiver: RTCRtpTransceiver | null;
   screenSender: RTCRtpSender | null;
   makingOffer: boolean;
+  isOfferer: boolean;
+  pendingIce: RTCIceCandidateInit[];
   remoteStream: MediaStream;
   remoteScreenStream: MediaStream;
 };
@@ -61,7 +65,9 @@ export function useRtcMesh(myId: string | null, desiredPeers: string[]): RtcMesh
   const peersRef = useRef<Map<string, PeerEntry>>(new Map());
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const channelReadyRef = useRef(false);
-  const pendingSignalsRef = useRef<Omit<SignalMsg, "from">[]>([]);
+  const pendingSignalsRef = useRef<Omit<SignalMsg, "from" | "sessionId" | "targetSessionId">[]>([]);
+  const localSessionIdRef = useRef(`${Date.now()}:${Math.random().toString(36).slice(2)}`);
+  const remoteSessionsRef = useRef<Map<string, string>>(new Map());
   const localStreamRef = useRef<MediaStream | null>(null);
   const audioTrackRef = useRef<MediaStreamTrack | null>(null);
   const videoTrackRef = useRef<MediaStreamTrack | null>(null);
@@ -69,7 +75,7 @@ export function useRtcMesh(myId: string | null, desiredPeers: string[]): RtcMesh
   const desiredRef = useRef<Set<string>>(new Set());
   const disconnectTimersRef = useRef<Map<string, number>>(new Map());
 
-  const sendSignal = useCallback((msg: Omit<SignalMsg, "from">) => {
+  const sendSignal = useCallback((msg: Omit<SignalMsg, "from" | "sessionId" | "targetSessionId">) => {
     const ch = channelRef.current;
     if (!ch || !myId) {
       pendingSignalsRef.current.push(msg);
@@ -79,7 +85,16 @@ export function useRtcMesh(myId: string | null, desiredPeers: string[]): RtcMesh
       pendingSignalsRef.current.push(msg);
       return;
     }
-    void ch.send({ type: "broadcast", event: "rtc", payload: { ...msg, from: myId } });
+    void ch.send({
+      type: "broadcast",
+      event: "rtc",
+      payload: {
+        ...msg,
+        from: myId,
+        sessionId: localSessionIdRef.current,
+        targetSessionId: remoteSessionsRef.current.get(msg.to),
+      },
+    });
   }, [myId]);
 
   const flushSignals = useCallback(() => {
@@ -87,7 +102,16 @@ export function useRtcMesh(myId: string | null, desiredPeers: string[]): RtcMesh
     if (!ch || !myId || !channelReadyRef.current) return;
     const pending = pendingSignalsRef.current.splice(0);
     for (const msg of pending) {
-      void ch.send({ type: "broadcast", event: "rtc", payload: { ...msg, from: myId } });
+      void ch.send({
+        type: "broadcast",
+        event: "rtc",
+        payload: {
+          ...msg,
+          from: myId,
+          sessionId: localSessionIdRef.current,
+          targetSessionId: remoteSessionsRef.current.get(msg.to),
+        },
+      });
     }
   }, [myId]);
 
@@ -117,6 +141,8 @@ export function useRtcMesh(myId: string | null, desiredPeers: string[]): RtcMesh
       screenTransceiver: screenTx,
       screenSender: screenTx.sender,
       makingOffer: false,
+      isOfferer: initiator,
+      pendingIce: [],
       remoteStream,
       remoteScreenStream,
     };
@@ -157,9 +183,11 @@ export function useRtcMesh(myId: string | null, desiredPeers: string[]): RtcMesh
     };
 
     pc.onnegotiationneeded = async () => {
+      if (!entry.isOfferer || pc.signalingState !== "stable") return;
       try {
         entry.makingOffer = true;
         const offer = await pc.createOffer();
+        if (pc.signalingState !== "stable") return;
         await pc.setLocalDescription(offer);
         sendSignal({ to: peerId, type: "offer", sdp: pc.localDescription! });
       } catch (err) {
@@ -188,6 +216,7 @@ export function useRtcMesh(myId: string | null, desiredPeers: string[]): RtcMesh
     if (!entry) return;
     try { entry.pc.close(); } catch { /* noop */ }
     peersRef.current.delete(peerId);
+    remoteSessionsRef.current.delete(peerId);
     setRemoteStreams((prev) => {
       const next = { ...prev };
       delete next[peerId];
@@ -209,7 +238,12 @@ export function useRtcMesh(myId: string | null, desiredPeers: string[]): RtcMesh
   // Handle incoming signaling
   const handleSignal = useCallback(async (msg: SignalMsg) => {
     if (!myId || msg.to !== myId || msg.from === myId) return;
+    if (msg.targetSessionId && msg.targetSessionId !== localSessionIdRef.current) return;
     const peerId = msg.from;
+    const knownSessionId = remoteSessionsRef.current.get(peerId);
+    const sessionChanged = !!msg.sessionId && !!knownSessionId && msg.sessionId !== knownSessionId;
+    if (sessionChanged) destroyPeer(peerId);
+    if (msg.sessionId) remoteSessionsRef.current.set(peerId, msg.sessionId);
 
     if (msg.type === "bye") {
       destroyPeer(peerId);
@@ -238,28 +272,32 @@ export function useRtcMesh(myId: string | null, desiredPeers: string[]): RtcMesh
 
     try {
       if (msg.type === "offer" && msg.sdp) {
-        // Polite peer: if we're making an offer and our id is lower, rollback
-        const polite = myId < peerId;
-        const offerCollision = entry.makingOffer || pc.signalingState !== "stable";
-        if (offerCollision && !polite) return;
-        if (offerCollision && polite) {
-          await Promise.all([
-            pc.setLocalDescription({ type: "rollback" }),
-            pc.setRemoteDescription(msg.sdp),
-          ]);
-        } else {
-          await pc.setRemoteDescription(msg.sdp);
+        if (entry.isOfferer || pc.signalingState !== "stable") {
+          destroyPeer(peerId);
+          const fresh = createPeer(peerId, false);
+          if (!fresh) return;
+          entry = fresh;
         }
-        const answer = await pc.createAnswer();
-        await pc.setLocalDescription(answer);
-        sendSignal({ to: peerId, type: "answer", sdp: pc.localDescription! });
+        await entry.pc.setRemoteDescription(msg.sdp);
+        for (const candidate of entry.pendingIce.splice(0)) {
+          try { await entry.pc.addIceCandidate(candidate); } catch { /* noop */ }
+        }
+        const answer = await entry.pc.createAnswer();
+        await entry.pc.setLocalDescription(answer);
+        sendSignal({ to: peerId, type: "answer", sdp: entry.pc.localDescription! });
       } else if (msg.type === "answer" && msg.sdp) {
-        if (pc.signalingState === "have-local-offer") {
+        if (entry.isOfferer && pc.signalingState === "have-local-offer") {
           await pc.setRemoteDescription(msg.sdp);
+          for (const candidate of entry.pendingIce.splice(0)) {
+            try { await pc.addIceCandidate(candidate); } catch { /* noop */ }
+          }
         }
       } else if (msg.type === "ice") {
         try {
-          if (msg.candidate) await pc.addIceCandidate(msg.candidate);
+          if (msg.candidate) {
+            if (pc.remoteDescription) await pc.addIceCandidate(msg.candidate);
+            else entry.pendingIce.push(msg.candidate);
+          }
         } catch (err) {
           console.warn("addIceCandidate failed", err);
         }
