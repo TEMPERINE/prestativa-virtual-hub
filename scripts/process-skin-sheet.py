@@ -25,24 +25,47 @@ from scipy import ndimage
 
 FACINGS = ["down", "up", "left", "right"]
 ALPHA_T = 24          # treat as transparent below this
-WHITE_T = 238         # near-white threshold for halo cleanup
-HALO_ALPHA_T = 200    # only clean halo where alpha is already partial
-
+WHITE_T = 232         # near-white threshold (becomes fully transparent)
+HALO_ALPHA_T = 240    # halo cleanup applies to pixels with alpha below this
+EDGE_ERODE_PASSES = 2 # how many 1-px halo rings to erode around the silhouette
 
 
 def remove_white_bg(arr: np.ndarray) -> np.ndarray:
-    """Make near-white pixels transparent and clean halo (semi-transparent whites)."""
+    """Remove near-white background AND erode the white halo around the figure.
+
+    Passes:
+      1. Solid near-white -> fully transparent.
+      2. Semi-transparent whitish pixels -> alpha killed (anti-aliased halo).
+      3. Edge erosion: opaque whitish pixels that touch a transparent pixel get
+         killed. Repeated EDGE_ERODE_PASSES times to remove the 1-2px white
+         fringe left over from generative AI sheets.
+    """
     rgb = arr[..., :3].astype(np.int16)
     a = arr[..., 3].astype(np.int16) if arr.shape[2] == 4 else np.full(arr.shape[:2], 255, np.int16)
-    # Solid white -> fully transparent
+
     near_white = (rgb[..., 0] >= WHITE_T) & (rgb[..., 1] >= WHITE_T) & (rgb[..., 2] >= WHITE_T)
     a = np.where(near_white, 0, a)
-    # Halo cleanup: semi-transparent whitish pixels get their alpha killed too,
-    # avoiding the jagged white fringe that ruined left/right frames.
-    whitish = (rgb.min(axis=-1) >= 215)
-    a = np.where((a < HALO_ALPHA_T) & whitish, 0, a)
+
+    whitish_soft = (rgb.min(axis=-1) >= 205)
+    a = np.where((a < HALO_ALPHA_T) & whitish_soft, 0, a)
+
+    # Edge erosion: peel off whitish pixels right at the silhouette boundary.
+    whitish_edge = rgb.min(axis=-1) >= 210
+    for _ in range(EDGE_ERODE_PASSES):
+        opaque = a > 0
+        transparent = ~opaque
+        neighbor_transparent = (
+            np.pad(transparent[:-1, :], ((1, 0), (0, 0))) |
+            np.pad(transparent[1:, :],  ((0, 1), (0, 0))) |
+            np.pad(transparent[:, :-1], ((0, 0), (1, 0))) |
+            np.pad(transparent[:, 1:],  ((0, 0), (0, 1)))
+        )
+        edge_halo = opaque & neighbor_transparent & whitish_edge
+        a = np.where(edge_halo, 0, a)
+
     out = np.dstack([arr[..., :3], a.astype(np.uint8)])
     return out
+
 
 
 def bbox(alpha: np.ndarray) -> tuple[int, int, int, int] | None:

@@ -141,8 +141,8 @@ export const SPRITES: SpriteDef[] = [
     dims: {
       down: { w: 154, h: 254 },
       up: { w: 142, h: 252 },
-      left: { w: 138, h: 236 },
-      right: { w: 138, h: 236 },
+      left: { w: 136, h: 234 },
+      right: { w: 136, h: 234 },
     },
     mirrorRightFromLeft: true,
   },
@@ -153,9 +153,9 @@ export const SPRITES: SpriteDef[] = [
     sheets: { up: latinaUp, down: latinaDown, left: latinaLeft, right: latinaLeft },
     dims: {
       down: { w: 200, h: 242 },
-      up: { w: 174, h: 214 },
-      left: { w: 146, h: 210 },
-      right: { w: 146, h: 210 },
+      up: { w: 172, h: 214 },
+      left: { w: 146, h: 208 },
+      right: { w: 146, h: 208 },
     },
     mirrorRightFromLeft: true,
   },
