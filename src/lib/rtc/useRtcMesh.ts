@@ -314,6 +314,11 @@ export function useRtcMesh(myId: string | null, desiredPeers: string[]): RtcMesh
     // Connect to new peers
     for (const peerId of desiredPeers) {
       if (peerId === myId) continue;
+      const pending = disconnectTimersRef.current.get(peerId);
+      if (pending) {
+        window.clearTimeout(pending);
+        disconnectTimersRef.current.delete(peerId);
+      }
       if (peersRef.current.has(peerId)) continue;
       // Send hello — and if our id wins, create offer immediately
       sendSignal({ to: peerId, type: "hello" });
@@ -323,8 +328,15 @@ export function useRtcMesh(myId: string | null, desiredPeers: string[]): RtcMesh
     // Disconnect from peers no longer desired
     for (const peerId of Array.from(peersRef.current.keys())) {
       if (!desiredPeers.includes(peerId)) {
-        sendSignal({ to: peerId, type: "bye" });
-        destroyPeer(peerId);
+        if (disconnectTimersRef.current.has(peerId)) continue;
+        const timer = window.setTimeout(() => {
+          disconnectTimersRef.current.delete(peerId);
+          if (!desiredRef.current.has(peerId)) {
+            sendSignal({ to: peerId, type: "bye" });
+            destroyPeer(peerId);
+          }
+        }, 8000);
+        disconnectTimersRef.current.set(peerId, timer);
       }
     }
   }, [desiredPeers, myId, createPeer, destroyPeer, sendSignal]);
