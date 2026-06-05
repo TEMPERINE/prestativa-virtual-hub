@@ -137,7 +137,7 @@ function computeOffsets(img: HTMLImageElement): FrameOffset[] {
     const fx = Number.isFinite(headX[f]) ? headX[f] : refX;
     const fy = Number.isFinite(headTopY[f]) ? headTopY[f] : refY;
     // dx > 0 means this frame's head is RIGHT of reference → renderer must
-    // shift the image LEFT (subtract dx from background-position).
+    // move the crop window RIGHT (add dx to background-position).
     // dy > 0 means this frame's head is BELOW reference → renderer must
     // shift the image UP (subtract dy from background-position).
     out.push({
