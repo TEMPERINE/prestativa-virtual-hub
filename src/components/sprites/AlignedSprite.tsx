@@ -11,8 +11,8 @@ import { ensureFrameOffsets, getFrameOffsets, subscribeFrameOffsets } from "@/li
  *      horizontal e bob vertical entre frames.
  *   2. Sombra de referência no chão — âncora visual; a cabeça permanece
  *      travada no centro da sombra independente do frame.
- *   3. Espelhamento (mirrorLeftFromRight) — quando a skin tem só a sheet
- *      "right", renderiza espelhada para "left" sem inverter o sinal do dx.
+ *   3. Espelhamento — skins novas usam só a sheet "left" e renderizam
+ *      "right" espelhada, sem inverter o sinal do dx.
  *   4. Escala consistente entre skins via altura/largura de referência.
  *
  * Para adicionar nova skin: basta registrar em `sprite-catalog.ts`.
@@ -74,6 +74,24 @@ const SHADOW_STYLES: Record<Mode, CSSProperties> = {
   },
 };
 
+function shouldMirrorFacing(
+  facing: Facing,
+  mirrorLeftFromRight?: boolean,
+  mirrorRightFromLeft?: boolean,
+) {
+  return (facing === "left" && mirrorLeftFromRight) || (facing === "right" && mirrorRightFromLeft);
+}
+
+function getSourceFacing(
+  facing: Facing,
+  mirrorLeftFromRight?: boolean,
+  mirrorRightFromLeft?: boolean,
+): Facing {
+  if (facing === "left" && mirrorLeftFromRight) return "right";
+  if (facing === "right" && mirrorRightFromLeft) return "left";
+  return facing;
+}
+
 export function AlignedSprite({
   spriteId,
   facing,
@@ -110,12 +128,12 @@ export function AlignedSprite({
     const sheetsToLoad =
       mode === "scene"
         ? facings.map((f) => {
-            const useMirror = f === "left" && sprite.mirrorLeftFromRight;
-            return sprite.sheets[useMirror ? "right" : f];
+            const srcFacing = getSourceFacing(f, sprite.mirrorLeftFromRight, sprite.mirrorRightFromLeft);
+            return sprite.sheets[srcFacing];
           })
         : [
             sprite.sheets[
-              facing === "left" && sprite.mirrorLeftFromRight ? "right" : facing
+              getSourceFacing(facing, sprite.mirrorLeftFromRight, sprite.mirrorRightFromLeft)
             ],
           ];
     sheetsToLoad.forEach((s) => void ensureFrameOffsets(s));
@@ -151,8 +169,8 @@ export function AlignedSprite({
     <div className={className} style={wrapperStyle}>
       <div aria-hidden style={SHADOW_STYLES[mode]} />
       {layers.map((f) => {
-        const useMirror = f === "left" && sprite.mirrorLeftFromRight;
-        const srcFacing: Facing = useMirror ? "right" : f;
+        const useMirror = shouldMirrorFacing(f, sprite.mirrorLeftFromRight, sprite.mirrorRightFromLeft);
+        const srcFacing = getSourceFacing(f, sprite.mirrorLeftFromRight, sprite.mirrorRightFromLeft);
         const sheet = sprite.sheets[srcFacing];
         const dim = sprite.dims[srcFacing];
         const offsets = getFrameOffsets(sheet);
