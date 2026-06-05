@@ -1402,8 +1402,9 @@ export function OfficeScene() {
       if (!dir) return;
       e.preventDefault();
       if (e.repeat) return;
-      // Manual movement cancels auto-walk
+      // Manual movement cancels auto-walk and any active follow
       autoWalkRef.current = null;
+      if (followingUidRef.current) stopFollowing(true);
       keysDown.current.add(dir);
       lastDir.current = dir;
       setLocalFacing(dir);
