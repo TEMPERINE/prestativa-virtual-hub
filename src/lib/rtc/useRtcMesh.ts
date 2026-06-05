@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { getIceServers, type IceServer } from "@/lib/rtc/ice.functions";
 
 type SignalType = "offer" | "answer" | "ice" | "bye" | "hello";
 type SignalMsg = {
@@ -25,9 +26,9 @@ type PeerEntry = {
   remoteScreenStream: MediaStream;
 };
 
-const ICE_CONFIG: RTCConfiguration = {
-  iceServers: [{ urls: ["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302"] }],
-};
+const DEFAULT_ICE_SERVERS: IceServer[] = [
+  { urls: ["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302"] },
+];
 
 const SIGNAL_CHANNEL = "rtc-mesh-v1";
 
@@ -95,6 +96,20 @@ export function useRtcMesh(myId: string | null, desiredPeers: string[]): RtcMesh
   const screenTrackRef = useRef<MediaStreamTrack | null>(null);
   const desiredRef = useRef<Set<string>>(new Set());
   const disconnectTimersRef = useRef<Map<string, number>>(new Map());
+  const iceServersRef = useRef<IceServer[]>(DEFAULT_ICE_SERVERS);
+
+  // Load TURN credentials once on mount (from server fn).
+  useEffect(() => {
+    let cancelled = false;
+    void getIceServers()
+      .then((servers) => {
+        if (!cancelled && Array.isArray(servers) && servers.length) {
+          iceServersRef.current = servers;
+        }
+      })
+      .catch(() => { /* keep defaults */ });
+    return () => { cancelled = true; };
+  }, []);
 
   const sendSignal = useCallback((msg: Omit<SignalMsg, "from" | "sessionId" | "targetSessionId">) => {
     const ch = channelRef.current;
@@ -141,7 +156,10 @@ export function useRtcMesh(myId: string | null, desiredPeers: string[]): RtcMesh
     if (!myId) return null;
     if (peersRef.current.has(peerId)) return peersRef.current.get(peerId)!;
 
-    const pc = new RTCPeerConnection(ICE_CONFIG);
+    const pc = new RTCPeerConnection({
+      iceServers: iceServersRef.current as RTCIceServer[],
+      iceTransportPolicy: "all",
+    });
     const remoteStream = new MediaStream();
     const remoteScreenStream = new MediaStream();
 
