@@ -1755,6 +1755,16 @@ export function OfficeScene() {
                         }
                       : undefined
                   }
+                  onFollow={
+                    !isMyClaim && ownerId && ownerOnline
+                      ? () => { startFollowing(ownerId); setHoveredZone(null); }
+                      : undefined
+                  }
+                  onLead={
+                    !isMyClaim && ownerId && ownerOnline
+                      ? () => { requestLead(ownerId); setHoveredZone(null); }
+                      : undefined
+                  }
                 />
               ) : (
                 <button
