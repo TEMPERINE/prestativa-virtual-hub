@@ -1158,7 +1158,7 @@ export function OfficeScene() {
       toast.info("Você ainda não reivindicou nenhum espaço.");
       return;
     }
-    teleportToZone(myZone as ZoneId);
+    teleportToZone(myZone as ZoneId, undefined, true);
   }, [teleportToZone]);
 
   useEffect(() => {
