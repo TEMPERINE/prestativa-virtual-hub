@@ -205,6 +205,14 @@ export function MapEditor() {
     []
   );
 
+  // Effective tool: ALT held swaps paint tools to their eraser counterpart.
+  const effectiveTool: Tool = useMemo(() => {
+    if (!altDown) return tool;
+    if (tool.kind === "blocked") return { kind: "erase" };
+    if (tool.kind === "zone") return { kind: "erase-zone" };
+    return tool;
+  }, [tool, altDown]);
+
   const paintCell = useCallback(
     (col: number, row: number) => {
       setOverrides((prev) => {
@@ -220,13 +228,15 @@ export function MapEditor() {
             const c = col + dc;
             if (r < 0 || r >= next.rows || c < 0 || c >= next.cols) continue;
             const idx = cellIndex(c, r, next.cols);
-            if (tool.kind === "blocked") {
+            if (effectiveTool.kind === "blocked") {
               next.blocked[idx] = 1;
-            } else if (tool.kind === "erase") {
+            } else if (effectiveTool.kind === "erase") {
               next.blocked[idx] = 0;
               next.zones[idx] = null;
-            } else if (tool.kind === "zone") {
-              next.zones[idx] = tool.zone;
+            } else if (effectiveTool.kind === "erase-zone") {
+              next.zones[idx] = null;
+            } else if (effectiveTool.kind === "zone") {
+              next.zones[idx] = effectiveTool.zone;
             }
           }
         }
@@ -234,7 +244,7 @@ export function MapEditor() {
       });
       setDirty(true);
     },
-    [brush, tool]
+    [brush, effectiveTool]
   );
 
   const handlePointer = useCallback(
