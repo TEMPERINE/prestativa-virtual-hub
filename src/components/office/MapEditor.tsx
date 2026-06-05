@@ -89,6 +89,7 @@ export function MapEditor() {
     return loadOverrides() ?? seedFromDefaults();
   });
   const [tool, setTool] = useState<Tool>({ kind: "blocked" });
+  const [editorTab, setEditorTab] = useState<"map" | "zones" | "elements">("map");
   const [brush, setBrush] = useState(1);
   const [showGrid, setShowGrid] = useState(true);
   const [showImage, setShowImage] = useState(true);
