@@ -948,6 +948,102 @@ export function MapEditor() {
                 Clique no mapa para fixar o ponto · arraste o pino para ajustes finos
               </div>
             )}
+
+            {/* Props (elementos) — render + handles de edição */}
+            {propsList.map((pi) => {
+              const def = getPropDef(pi.defId);
+              if (!def) return null;
+              const sel = selectedPropId === pi.id;
+              const wPct = pi.w * 100;
+              const hPct = (pi.w / def.aspectRatio) * 100;
+              return (
+                <div
+                  key={pi.id}
+                  className="absolute"
+                  style={{
+                    left: `${pi.x * 100}%`,
+                    top: `${pi.y * 100}%`,
+                    width: `${wPct}%`,
+                    height: `${hPct}%`,
+                    transform: "translate(-50%, -100%)",
+                    zIndex: 30000 + Math.round(pi.y * 5000),
+                    cursor: tool.kind === "select" ? "move" : "default",
+                    pointerEvents: tool.kind === "select" ? "auto" : "none",
+                  }}
+                  onPointerDown={(e) => {
+                    if (tool.kind !== "select") return;
+                    e.stopPropagation();
+                    setSelectedPropId(pi.id);
+                    draggingPropRef.current = {
+                      id: pi.id,
+                      mode: "move",
+                      startX: pi.x,
+                      startY: pi.y,
+                      startW: pi.w,
+                    };
+                    (stageRef.current as Element | null)?.setPointerCapture?.(e.pointerId);
+                  }}
+                >
+                  <img
+                    src={def.frames[0]}
+                    alt=""
+                    className="w-full h-full object-contain pointer-events-none select-none"
+                    draggable={false}
+                    style={{ imageRendering: "pixelated" }}
+                  />
+                  {sel && tool.kind === "select" && (
+                    <>
+                      <div className="absolute inset-0 ring-2 ring-primary rounded pointer-events-none" />
+                      {/* Resize handle (canto inferior direito) */}
+                      <div
+                        className="absolute -right-1 -bottom-1 w-3 h-3 bg-primary border border-card rounded-sm cursor-nwse-resize"
+                        onPointerDown={(e) => {
+                          e.stopPropagation();
+                          if (!stageRef.current) return;
+                          const rect = stageRef.current.getBoundingClientRect();
+                          draggingPropRef.current = {
+                            id: pi.id,
+                            mode: "resize",
+                            startX: (e.clientX - rect.left) / rect.width,
+                            startY: (e.clientY - rect.top) / rect.height,
+                            startW: pi.w,
+                          };
+                          (stageRef.current as Element | null)?.setPointerCapture?.(e.pointerId);
+                        }}
+                      />
+                      {/* Toolbar flutuante */}
+                      <div
+                        className="absolute left-1/2 -translate-x-1/2 -top-7 flex items-center gap-1 bg-card border border-border rounded px-1 py-0.5 shadow-soft text-xs"
+                        onPointerDown={(e) => e.stopPropagation()}
+                      >
+                        {def.interactive && (
+                          <button
+                            onClick={() => togglePropInteractive(pi.id)}
+                            title={pi.interactive ? "Interativo (clique para desativar)" : "Não interativo (clique para ativar)"}
+                            className={`p-1 rounded ${pi.interactive ? "text-primary" : "text-muted-foreground"} hover:bg-muted`}
+                          >
+                            {pi.interactive ? <Zap size={12} /> : <ZapOff size={12} />}
+                          </button>
+                        )}
+                        <button
+                          onClick={() => removeProp(pi.id)}
+                          title="Remover"
+                          className="p-1 rounded text-muted-foreground hover:text-destructive hover:bg-muted"
+                        >
+                          <Trash2 size={12} />
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              );
+            })}
+
+            {tool.kind === "place-prop" && (
+              <div className="absolute top-2 left-1/2 -translate-x-1/2 pointer-events-none bg-primary text-primary-foreground text-xs px-3 py-1 rounded-full shadow-soft">
+                Clique no mapa para colocar · Esc para cancelar
+              </div>
+            )}
           </div>
           {/* Zoom HUD */}
           <div className="sticky bottom-2 ml-auto mr-2 w-fit flex items-center gap-1 bg-card/90 border border-border rounded-full px-2 py-1 text-xs shadow-soft backdrop-blur" style={{ float: "right" }}>
