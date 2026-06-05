@@ -47,7 +47,28 @@ export type RtcMeshState = {
   videoDevices: MediaDeviceInfo[];
   selectedVideoDeviceId: string | null;
   setVideoDevice: (deviceId: string) => Promise<void>;
+  prewarmMic: () => Promise<void>;
 };
+
+// Apply codec preferences so the SDP offers Opus first (with DTX/FEC) for
+// audio and VP8 first for video — best cross-browser stability for a mesh.
+function preferCodecs(tx: RTCRtpTransceiver, kind: "audio" | "video") {
+  try {
+    type Caps = { codecs: { mimeType: string }[] } | null;
+    type GetCapabilities = (k: string) => Caps;
+    const getCaps = (RTCRtpSender as unknown as { getCapabilities?: GetCapabilities }).getCapabilities;
+    if (!getCaps) return;
+    const caps = getCaps(kind);
+    if (!caps?.codecs?.length) return;
+    const want = kind === "audio" ? "audio/opus" : "video/VP8";
+    const preferred = caps.codecs.filter((c) => c.mimeType.toLowerCase() === want.toLowerCase());
+    const others = caps.codecs.filter((c) => c.mimeType.toLowerCase() !== want.toLowerCase());
+    if (!preferred.length) return;
+    type Codec = { mimeType: string };
+    const setPrefs = (tx as unknown as { setCodecPreferences?: (cs: Codec[]) => void }).setCodecPreferences;
+    setPrefs?.([...preferred, ...others] as Codec[]);
+  } catch { /* noop */ }
+}
 
 export function useRtcMesh(myId: string | null, desiredPeers: string[]): RtcMeshState {
   const [micOn, setMicOn] = useState(false);
@@ -129,6 +150,16 @@ export function useRtcMesh(myId: string | null, desiredPeers: string[]): RtcMesh
     const videoTx = pc.addTransceiver("video", { direction: "sendrecv" });
     const screenTx = pc.addTransceiver("video", { direction: "sendrecv" });
 
+    // Prefer Opus / VP8 for cross-browser stability.
+    preferCodecs(audioTx, "audio");
+    preferCodecs(videoTx, "video");
+    preferCodecs(screenTx, "video");
+
+    // Reduce audio playout latency where supported (Chromium).
+    try {
+      (audioTx.receiver as unknown as { playoutDelayHint?: number }).playoutDelayHint = 0.05;
+    } catch { /* noop */ }
+
     // If we already have local tracks, attach now
     if (audioTrackRef.current) void audioTx.sender.replaceTrack(audioTrackRef.current);
     if (videoTrackRef.current) void videoTx.sender.replaceTrack(videoTrackRef.current);
@@ -170,6 +201,29 @@ export function useRtcMesh(myId: string | null, desiredPeers: string[]): RtcMesh
         };
       } else {
         setRemoteStreams((prev) => ({ ...prev, [peerId]: remoteStream }));
+      }
+    };
+
+    // ICE restart watchdog: keep media alive across transient network blips.
+    // We DO NOT destroy the PC — restartIce() renegotiates without touching the
+    // attached local tracks, so the user's camera/mic LED stays on.
+    let iceRestartTimer: number | null = null;
+    const scheduleIceRestart = (delay: number) => {
+      if (iceRestartTimer != null) return;
+      iceRestartTimer = window.setTimeout(() => {
+        iceRestartTimer = null;
+        if (pc.connectionState === "closed") return;
+        if (pc.iceConnectionState === "connected" || pc.iceConnectionState === "completed") return;
+        if (!entry.isOfferer) return; // the offerer drives the restart
+        try { pc.restartIce(); } catch { /* noop */ }
+      }, delay);
+    };
+    pc.oniceconnectionstatechange = () => {
+      const st = pc.iceConnectionState;
+      if (st === "failed") scheduleIceRestart(0);
+      else if (st === "disconnected") scheduleIceRestart(5000);
+      else if (st === "connected" || st === "completed") {
+        if (iceRestartTimer != null) { window.clearTimeout(iceRestartTimer); iceRestartTimer = null; }
       }
     };
 
@@ -438,6 +492,29 @@ export function useRtcMesh(myId: string | null, desiredPeers: string[]): RtcMesh
     };
   }, [remoteStreams]);
 
+  // Pre-acquire the mic with enabled=false so toggleMic is instant later and
+  // the audio sender on every peer already has a track attached. This kills
+  // the "I clicked unmute but nothing comes out" window.
+  const prewarmMic = useCallback(async () => {
+    if (audioTrackRef.current) return;
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+      });
+      const track = stream.getAudioTracks()[0];
+      if (!track) return;
+      track.enabled = false; // muted until user toggles
+      audioTrackRef.current = track;
+      if (!localStreamRef.current) localStreamRef.current = new MediaStream();
+      localStreamRef.current.addTrack(track);
+      for (const entry of peersRef.current.values()) {
+        if (entry.audioSender) await entry.audioSender.replaceTrack(track);
+      }
+    } catch (err) {
+      console.warn("mic prewarm failed (will retry on toggle)", err);
+    }
+  }, []);
+
   // Acquire local mic
   const enableMic = useCallback(async () => {
     if (audioTrackRef.current) {
@@ -614,5 +691,6 @@ export function useRtcMesh(myId: string | null, desiredPeers: string[]): RtcMesh
     videoDevices,
     selectedVideoDeviceId,
     setVideoDevice,
+    prewarmMic,
   };
 }

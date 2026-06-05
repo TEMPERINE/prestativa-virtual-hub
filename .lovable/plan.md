@@ -1,122 +1,53 @@
+Sim — as três melhorias são totalmente viáveis e necessárias para chegar perto da fluidez do Gather. O código atual já tem as fundações (broadcast de posições, grace period RTC, polling 1s), mas várias peças críticas ainda faltam ou estão sub-otimizadas. Plano abaixo trata cada eixo de ponta a ponta.
 
-# Perfil do avatar + Onboarding de convidados
+## 1. Mídia warm-start (reduzir delay do vídeo, garantir áudio)
 
-Vamos criar três peças conectadas: (1) um **menu de perfil** que abre ao clicar no seu avatar no header, (2) telas de **edição de personagem, nome, cor e frase**, e (3) um **fluxo guiado de onboarding** que aparece automaticamente para qualquer pessoa cuja conta ainda não tenha personagem escolhido.
+Hoje a câmera/mic só são adquiridos quando o usuário clica nos botões, **depois** o `replaceTrack` é feito em cada peer. Isso causa o delay percebido e janelas onde o áudio não sai.
 
----
+- **Pré-adquirir mic na entrada do `/office`** (depois do gesto inicial de "Entrar"), com `getUserMedia({ audio: true, video: false })` e manter o track `enabled=false` até o usuário ativar. Toggle vira instantâneo (só flip de `enabled`), sem renegociação SDP.
+- **Pré-aquecer a câmera opcionalmente** com resolução baixa (160x120) assim que o usuário concede permissão uma vez; `track.enabled=false` para não acender LED. Ao ligar, sobe para 320x240 via `applyConstraints` — sem novo `getUserMedia` e sem renegociar.
+- **Transceivers já criados com direção `sendrecv` desde o connect** (já existe) + `setCodecPreferences` priorizando **Opus DTX/FEC** para áudio e **VP8** para vídeo (melhor compatibilidade cross-browser do que VP9/AV1 default).
+- **Sinalização paralela ao `getUserMedia`**: hoje o `createPeer` espera o track. Vamos disparar offer assim que o transceiver existe, e fazer `replaceTrack(null→track)` quando a mídia ficar pronta — peer já está conectado, só o frame aparece.
+- **Audio unlock global**: na primeira interação do usuário (clique no botão "Entrar"), criar/retomar um `AudioContext` compartilhado e chamar `.play()` em um `<audio>` silencioso. Isso destrava autoplay para todos os `<audio>` remotos futuros (problema atual: áudio remoto às vezes fica "preso" até o usuário interagir de novo).
+- **Jitter buffer mínimo**: `RTCRtpReceiver.playoutDelayHint = 0.05` nos receivers de áudio quando suportado, reduzindo latência percebida.
 
-## 1. O que cada usuário vai poder personalizar
+## 2. Sincronização contínua de posições (heartbeat + reconciliação)
 
-| Campo | Onde fica | Observação |
-|---|---|---|
-| **Nome do avatar** (`display_name`) | Editar perfil | Aparece em cima do avatar (não usa mais o email) |
-| **Cor do nome** (`avatar_color`) | Editar perfil | Color picker livre — pinta a tag acima do avatar |
-| **Frase favorita** (`tagline`, novo) | Editar perfil | Aparece em balãozinho/hover, e abaixo do nome no menu |
-| **Status** (`status`, novo: `available` / `busy` / `away`) | Header do menu | Bolinha verde/laranja/cinza ao lado do nome |
-| **Sprite do personagem** (`sprite_id`, novo) | Editar personagem | Escolhe de um catálogo (loira, morena, padrão atual, etc.) |
+Hoje há broadcast a cada 120ms + polling DB a 1s + Postgres changes. Falta o "cinto e suspensório" que o Gather usa:
 
-> Inicialmente vou subir mais 2 sprites femininos (loira e morena de cabelo cacheado, dos exemplos enviados). O catálogo é facilmente extensível depois.
+- **Heartbeat de presença via canal `presence`** do Supabase Realtime: cada cliente faz `track({ user_id, x, y, zone, facing, ts })` a cada 1s. Eventos `sync/join/leave` reconciliam o `positions` state — funciona mesmo se Postgres CDC falhar e revela quem está online instantaneamente (atual `is_online` depende de `beforeunload`, que falha em mobile/crash).
+- **Last-write-wins por timestamp** em todas as 3 fontes (broadcast, presence, polling/CDC) para evitar "teletransporte" quando uma fonte chega atrasada.
+- **Interpolação de posição** no render do avatar remoto: ao receber nova posição, interpolar do ponto atual ao alvo nos próximos 120ms (mesma cadência do envio). Movimento fica fluido em vez de "saltar" a cada update.
+- **Detecção de stale**: se um peer não mandar heartbeat por 5s, marca como offline localmente (sem esperar polling DB).
+- **Throttle inteligente do persist**: só persistir no DB quando há movimento real OU a cada 5s (vs 1s hoje) — reduz carga com 15 usuários e libera o canal realtime para broadcast.
 
----
+## 3. Reconexão automática (sem derrubar mídia)
 
-## 2. Menu de perfil (popover do header)
+Hoje, se o WebSocket cair, os canais ficam "fantasmas". Plano:
 
-Ao clicar no próprio avatar/iniciais no canto do header, abre um popover idêntico à referência:
+- **Watchdog do Realtime** (`supabase.realtime.connection.socket`): observa `onclose`/`onerror`, e quando reconecta refaz `setAuth(token)` + re-`subscribe` em todos os canais (positions, broadcast, claims, notes, reactions, rtc-mesh) preservando handlers. Usa backoff exponencial 1s→2s→5s→10s (cap).
+- **Refresh proativo de JWT**: assinar `supabase.auth.onAuthStateChange` e em `TOKEN_REFRESHED` chamar `realtime.setAuth(newToken)` — evita o canal cair silenciosamente após 1h.
+- **WebRTC ICE restart**: em `pc.oniceconnectionstatechange === "failed"` ou `"disconnected" > 5s`, chamar `pc.restartIce()` e renegociar — **sem fechar o PC**, então mic/câmera continuam. Hoje o código destrói o peer após grace period, o que faz a mídia piscar.
+- **Buffer de sinalização persistente**: a fila `pendingSignalsRef` já existe; estender para sobreviver à reconexão do canal (não esvazia no `CLOSED`).
+- **Visibilidade**: ao voltar de `document.visibilitychange`, forçar um `syncPositions()` e um round de `hello` em todos os peers ativos.
+- **TURN server**: hoje só tem STUN. Para garantir conexão atrás de NAT simétrico (comum em redes corporativas brasileiras), adicionar TURN (Twilio/Metered free tier ou self-hosted coturn). Sem isso, ~10% dos usuários nunca conectam vídeo P2P. **Decisão necessária do usuário** — ver pergunta abaixo.
 
-```text
-┌────────────────────────────────┐
-│ [sprite] Márcio          ⋮  ›  │   ← nome do avatar + status
-│          ● Disponível          │
-├────────────────────────────────┤
-│ 😊 Energia lá em cima…    [x]  │   ← frase favorita editável inline
-├────────────────────────────────┤
-│ 👕 Editar personagem            │   → abre catálogo de sprites
-│ 👤 Editar perfil                │   → abre form (nome, cor, frase)
-│ 🪑 Ir até minha mesa   Ctrl+D   │   → teleporta para zona reivindicada
-│ ↻ Me leve ao saguão            │   → teleporta para SPAWN do lobby
-├────────────────────────────────┤
-│ marciotemperine@gmail.com  Sair │
-└────────────────────────────────┘
-```
+## 4. Detalhes técnicos (resumo)
 
-Comportamentos:
-- O nome em cima do avatar no mapa passa a ser `display_name` (já é, mas vou trocar **Márcio Temperine → Márcio** e cor → **roxo** no seed).
-- Clicar no status abre submenu com Disponível / Ocupado / Ausente.
-- "Ir até minha mesa" desabilitado (cinza) se o usuário não tem `workspace_claim`.
-- "Me leve ao saguão" desabilitado se já está no lobby.
+- `useRtcMesh.ts`: mover criação dos transceivers/PC para o mount (peers são criados antes da mídia); adicionar `restartIce()` watchdog; expor `prewarmAudio()`/`prewarmVideo()`; preferências de codec.
+- `OfficeScene.tsx`: trocar polling DB por presence channel + interpolação; adicionar `RealtimeReconnector` hook; chamar `prewarmAudio` após "Entrar"; audio-unlock no mesmo gesto.
+- `RemoteVideoTiles.tsx`: já está OK pós-últimas mudanças; manter.
+- Novo arquivo: `src/lib/rtc/useRealtimeWatchdog.ts` centralizando reconexão de canais.
+- Novo arquivo: `src/lib/rtc/audio-unlock.ts` para destravar autoplay global.
 
----
+## 5. Escala (15+ usuários)
 
-## 3. Telas de edição
+- Manter cap de 14 peers no mesh (já existe).
+- Quando lobby tiver >8 pessoas, **desligar vídeo automaticamente** para peers fora da zona ativa, mantendo só áudio (como Gather faz com "spatial audio"). Vídeo só liga em proximidade <0.15 ou mesma zona.
+- Áudio com volume proporcional à distância (já temos as posições; trivial de adicionar via `GainNode`).
 
-**Editar personagem** (modal full-screen leve):
-- Grid de cards com preview animado de cada sprite disponível.
-- Card selecionado fica destacado com a `avatar_color`.
-- Botão "Salvar" grava `profiles.sprite_id`.
+## Pergunta antes de implementar
 
-**Editar perfil** (modal):
-- Campo **Nome do avatar** (max 24 chars).
-- **Cor do nome** — color picker (input nativo + 8 swatches sugeridos).
-- **Frase favorita** (max 80 chars).
-- Preview ao vivo da tag flutuante no topo.
+**TURN server**: você quer que eu (a) provisione TURN gratuito via Metered.ca (precisa de uma chave gratuita — 50GB/mês), (b) deixe só STUN por enquanto e a gente adiciona depois se aparecer problema, ou (c) você já tem um TURN?
 
----
-
-## 4. Onboarding de convidados
-
-Quando alguém faz login pela primeira vez (`profiles.sprite_id IS NULL` OU `profiles.onboarded_at IS NULL`), o app intercepta antes de renderizar o escritório e mostra um wizard de boas-vindas em **4 passos**, em tela cheia, com a paleta do app:
-
-1. **Boas-vindas** — "Bem-vindo ao Prestativa Office 👋. Vamos montar seu avatar em 1 minuto." + ilustração.
-2. **Escolha seu personagem** — grid dos sprites disponíveis (mesma UI do "Editar personagem").
-3. **Seu nome e cor** — input do nome (pré-preenche com o prefixo do email, editável) + color picker para a cor da tag.
-4. **Sua vibe** — frase favorita (opcional, com sugestões clicáveis: "Bora codar!", "Café primeiro", "Foco total", etc.) + status inicial.
-
-Final → grava tudo + `onboarded_at = now()` e entra no escritório com um toast "Bem-vindo(a), {nome}! 🎉".
-
-Quem já está onboarded nunca mais vê o fluxo. Existe também um botão "Refazer onboarding" escondido em Editar perfil para testes.
-
----
-
-## 5. Catálogo de sprites
-
-Crio `src/lib/sprite-catalog.ts`:
-
-```ts
-export const SPRITES = [
-  { id: "marcio",      label: "Márcio (padrão)",  gender: "m", sheets: { down: ..., up: ..., left: ..., right: ... } },
-  { id: "blonde-bun",  label: "Loira",            gender: "f", sheets: { ... } },
-  { id: "curly-dark",  label: "Morena cacheada",  gender: "f", sheets: { ... } },
-];
-```
-
-Os sprites laterais novos seguem o mesmo layout 6 frames horizontais que o atual (com o frame 0 = idle, frame 3 substituído por idle — lógica já implementada no OfficeScene). Vou cortar cada linha do seu PNG enviado em 4 arquivos (down/up/left/right) usando o mesmo formato dos atuais e subir como assets.
-
-`AvatarSprite` em `OfficeScene` passa a aceitar `spriteId` e ler do catálogo em vez do import fixo.
-
----
-
-## 6. Mudanças técnicas (resumo)
-
-**Banco (migration):**
-- `ALTER TABLE profiles ADD COLUMN sprite_id text DEFAULT 'marcio'`
-- `ALTER TABLE profiles ADD COLUMN tagline text`
-- `ALTER TABLE profiles ADD COLUMN status text DEFAULT 'available' CHECK (status IN ('available','busy','away'))`
-- `ALTER TABLE profiles ADD COLUMN onboarded_at timestamptz`
-- Atualizar perfil do Márcio: `display_name='Márcio'`, `avatar_color='#9b5cf6'` (roxinho).
-
-**Frontend (novos arquivos):**
-- `src/components/profile/ProfileMenu.tsx` — popover do header
-- `src/components/profile/EditCharacterModal.tsx`
-- `src/components/profile/EditProfileModal.tsx`
-- `src/components/onboarding/OnboardingWizard.tsx` (com 4 steps internos)
-- `src/lib/sprite-catalog.ts`
-- Assets: `src/assets/sprites/blonde-bun-{down,up,left,right}.png` e `curly-dark-*.png` (recortados dos PNGs enviados)
-
-**Frontend (edições):**
-- `OfficeScene.tsx`: trocar header (botão de avatar abre ProfileMenu), `AvatarSprite` aceita `spriteId`, label do avatar usa `display_name`, hook que dispara onboarding se necessário.
-
-**Sem mudanças** em RLS (já cobre update do próprio profile), nem em realtime.
-
----
-
-Quer que eu siga assim? Se sim, no próximo passo eu já implemento a migration + menu de perfil + edição + onboarding, atualizo seu nome para "Márcio" em roxo, e adiciono os 2 sprites femininos ao catálogo. Depois disso você cria o segundo usuário pelo fluxo de convite e testamos voz/vídeo entre os dois.
+Posso seguir com tudo o resto independente da resposta — só essa decisão afeta a robustez em redes restritas.

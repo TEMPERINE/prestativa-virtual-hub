@@ -38,6 +38,7 @@ import { toast } from "sonner";
 import { LogOut, Mic, MicOff, Video, VideoOff, MonitorUp, Users, Pencil, User as UserIcon, Hand, MessageCircle, StickyNote, X as XIcon, Plus, Minus, Locate, ChevronLeft, ChevronRight } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import { useRtcMesh } from "@/lib/rtc/useRtcMesh";
+import { installAudioUnlockListeners, unlockAudioPlayback } from "@/lib/rtc/audio-unlock";
 import { RemoteVideoTiles } from "./RemoteVideoTiles";
 import { CamPreviewAndPicker } from "./CamPreviewAndPicker";
 import { ScreenShareViewer } from "./ScreenShareViewer";
@@ -289,6 +290,33 @@ export function OfficeScene() {
     connectedPeersRef.current = new Set(desiredPeers);
   }, [desiredPeers]);
 
+  // Warm-start mic the moment we know the user — getUserMedia runs once,
+  // the track stays disabled until the user clicks unmute. This removes the
+  // 1–3s permission/negotiation delay from the first unmute and ensures
+  // peers already have an audio sender attached when they connect.
+  // Also wires global audio unlock so remote <audio> tags can autoplay.
+  const prewarmMic = rtc.prewarmMic;
+  useEffect(() => {
+    if (!me?.id) return;
+    void prewarmMic();
+  }, [me?.id, prewarmMic]);
+  useEffect(() => {
+    const off = installAudioUnlockListeners();
+    return off;
+  }, []);
+
+  // Keep realtime authenticated forever: re-attach JWT on every token refresh,
+  // otherwise the websocket silently loses access to RLS-protected tables
+  // after ~1h and movement events stop arriving.
+  useEffect(() => {
+    const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
+      if ((event === "TOKEN_REFRESHED" || event === "SIGNED_IN") && session?.access_token) {
+        try { void supabase.realtime.setAuth(session.access_token); } catch { /* noop */ }
+      }
+    });
+    return () => { sub.subscription.unsubscribe(); };
+  }, []);
+
   const sendPos = useCallback((x: number, y: number, z: ZoneId, f: Facing, persistNow = false) => {
     const knownId = meIdRef.current;
     const write = (userId: string) => {
@@ -485,6 +513,46 @@ export function OfficeScene() {
       });
     positionBroadcastChannelRef.current = positionBroadcastCh;
 
+    // Presence channel — third source of truth for live positions. Each client
+    // tracks its own state every ~1s; presence sync/join/leave events tell us
+    // who is actually online right now (independent of DB CDC + broadcasts).
+    // Eventual consistency: we accept the freshest sample per user (LWW by ts).
+    type PresenceState = { user_id: string; x: number; y: number; zone: string; facing?: Facing; ts: number };
+    const presenceCh = supabase.channel(`positions-presence:${realtimeChannelSuffix}`, {
+      config: { presence: { key: meIdRef.current ?? `anon:${realtimeChannelSuffix}` } },
+    });
+    const presenceLastTs = new Map<string, number>();
+    const mergePresence = (raw: unknown) => {
+      const arr = raw as PresenceState[] | undefined;
+      if (!Array.isArray(arr)) return;
+      for (const s of arr) {
+        if (!s?.user_id || s.user_id === meIdRef.current) continue;
+        const prev = presenceLastTs.get(s.user_id) ?? 0;
+        if (s.ts <= prev) continue;
+        presenceLastTs.set(s.user_id, s.ts);
+        setPositions((p) => ({
+          ...p,
+          [s.user_id]: { user_id: s.user_id, x: s.x, y: s.y, zone: s.zone, facing: s.facing, is_online: true },
+        }));
+      }
+    };
+    presenceCh.on("presence", { event: "sync" }, () => {
+      const state = presenceCh.presenceState() as Record<string, PresenceState[]>;
+      for (const list of Object.values(state)) mergePresence(list);
+    });
+    presenceCh.on("presence", { event: "join" }, ({ newPresences }) => mergePresence(newPresences));
+    presenceCh.on("presence", { event: "leave" }, ({ leftPresences }) => {
+      const arr = leftPresences as unknown as PresenceState[];
+      for (const s of arr ?? []) {
+        if (!s?.user_id || s.user_id === meIdRef.current) continue;
+        setPositions((p) => {
+          const cur = p[s.user_id];
+          if (!cur) return p;
+          return { ...p, [s.user_id]: { ...cur, is_online: false } };
+        });
+      }
+    });
+
     const claimsCh = supabase
       .channel(`claims-room:${realtimeChannelSuffix}`)
       .on(
@@ -514,7 +582,34 @@ export function OfficeScene() {
         positionBroadcastReadyRef.current = status === "SUBSCRIBED";
       });
       claimsCh.subscribe();
+      presenceCh.subscribe(async (status) => {
+        if (status !== "SUBSCRIBED") return;
+        const uid = meIdRef.current;
+        if (!uid) return;
+        const cur = posRef.current;
+        try {
+          await presenceCh.track({
+            user_id: uid, x: cur.x, y: cur.y,
+            zone: zoneAt(cur).id, facing: facingRef.current, ts: Date.now(),
+          });
+        } catch { /* noop */ }
+      });
     })();
+
+    // Heartbeat presence every second so peers detect each other within 1s of
+    // joining and the "frozen avatar" symptom can't happen even if both
+    // postgres_changes and broadcasts get dropped on flaky networks.
+    const presenceHeartbeat = window.setInterval(() => {
+      const uid = meIdRef.current;
+      if (!uid) return;
+      const cur = posRef.current;
+      void presenceCh.track({
+        user_id: uid, x: cur.x, y: cur.y,
+        zone: zoneAt(cur).id, facing: facingRef.current, ts: Date.now(),
+      }).catch(() => { /* noop */ });
+    }, 1000);
+
+
 
     const offline = async () => {
       const { data: u } = await supabase.auth.getUser();
@@ -593,11 +688,13 @@ export function OfficeScene() {
       supabase.removeChannel(reactionCh);
       supabase.removeChannel(positionBroadcastCh);
       supabase.removeChannel(claimsCh);
+      supabase.removeChannel(presenceCh);
       supabase.removeChannel(notesCh);
       reactionChannelRef.current = null;
       positionBroadcastChannelRef.current = null;
       positionBroadcastReadyRef.current = false;
       window.clearInterval(positionsPoll);
+      window.clearInterval(presenceHeartbeat);
       window.removeEventListener("beforeunload", offline);
       offline();
     };
@@ -1474,6 +1571,7 @@ export function OfficeScene() {
             <IconButton
               active={rtc.micOn}
               onClick={() => {
+                void unlockAudioPlayback();
                 rtc.toggleMic().catch(() => toast.error("Não foi possível acessar o microfone"));
               }}
               title="Microfone"
@@ -1483,6 +1581,7 @@ export function OfficeScene() {
             <IconButton
               active={rtc.camOn}
               onClick={() => {
+                void unlockAudioPlayback();
                 rtc.toggleCam().catch(() => toast.error("Não foi possível acessar a câmera"));
               }}
               title="Câmera"
