@@ -274,6 +274,40 @@ export function MapEditor() {
     [paintCell, tool]
   );
 
+  const spawnPoints = overrides.spawnPoints ?? {};
+  const draggingPin = useRef<string | null>(null);
+  const propsList = overrides.props ?? [];
+  const [selectedPropId, setSelectedPropId] = useState<string | null>(null);
+  const draggingPropRef = useRef<{ id: string; mode: "move" | "resize"; startX: number; startY: number; startW: number } | null>(null);
+
+  const updateProp = useCallback((id: string, patch: Partial<PropInstance>) => {
+    setOverrides((prev) => ({
+      ...prev,
+      props: (prev.props ?? []).map((p) => (p.id === id ? { ...p, ...patch } : p)),
+    }));
+    setDirty(true);
+  }, []);
+
+  const removeProp = useCallback((id: string) => {
+    setOverrides((prev) => ({
+      ...prev,
+      props: (prev.props ?? []).filter((p) => p.id !== id),
+    }));
+    setSelectedPropId((cur) => (cur === id ? null : cur));
+    setDirty(true);
+  }, []);
+
+  const togglePropInteractive = useCallback((id: string) => {
+    setOverrides((prev) => ({
+      ...prev,
+      props: (prev.props ?? []).map((p) =>
+        p.id === id ? { ...p, interactive: !p.interactive } : p
+      ),
+    }));
+    setDirty(true);
+  }, []);
+
+
   const removeSpawn = useCallback((zoneId: string) => {
     setOverrides((prev) => {
       const cur = { ...(prev.spawnPoints ?? {}) };
