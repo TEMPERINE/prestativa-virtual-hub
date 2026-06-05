@@ -1597,7 +1597,7 @@ export function OfficeScene() {
                   : isMe
                   ? "none"
                   : "left 120ms linear, top 120ms linear",
-                zIndex: focusedZone ? (inFocus ? 60 : 20) : Math.round(renderPoint.y * 1000),
+                zIndex: (focusedZone ? (inFocus ? 60000 : 20000) : 0) + Math.round(renderPoint.y * 1000),
                 opacity: tpOpacity,
                 filter: tpData
                   ? `drop-shadow(0 0 18px var(--primary)) drop-shadow(0 0 36px var(--primary-glow)) brightness(${tpData.phase === "out" ? 1.8 : 1.4})`
