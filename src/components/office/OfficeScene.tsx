@@ -524,18 +524,16 @@ export function OfficeScene() {
               delete next[row.user_id];
               return next;
             }
-            // LWW: if a broadcast/presence sample within the last 5s already
-            // wrote a fresher position, ignore this DB row — it may be a
-            // stale heartbeat that would snap the avatar back to spawn.
             const dbTs = row.updated_at ? Date.parse(row.updated_at) : 0;
             const freshTs = positionFreshTs.current.get(row.user_id) ?? 0;
-            if (freshTs > dbTs && Date.now() - freshTs < 5000) {
+            if (dbTs && dbTs < freshTs) {
               const cur = prev[row.user_id];
               if (cur) {
                 next[row.user_id] = { ...cur, is_online: row.is_online };
                 return next;
               }
             }
+            if (dbTs) positionFreshTs.current.set(row.user_id, dbTs);
             next[row.user_id] = row;
             return next;
           });
@@ -567,8 +565,13 @@ export function OfficeScene() {
       .on("broadcast", { event: "position" }, (payload) => {
         const row = payload.payload as RemotePos;
         if (!row?.user_id) return;
-        positionFreshTs.current.set(row.user_id, Date.now());
-        setPositions((prev) => ({ ...prev, [row.user_id]: row }));
+        const incomingTs = timestampForPosition(row) || Date.now();
+        setPositions((prev) => {
+          const curTs = timestampForPosition(prev[row.user_id] ?? {}) || (positionFreshTs.current.get(row.user_id) ?? 0);
+          if (incomingTs < curTs) return prev;
+          positionFreshTs.current.set(row.user_id, incomingTs);
+          return { ...prev, [row.user_id]: { ...row, ts: incomingTs } };
+        });
       });
     positionBroadcastChannelRef.current = positionBroadcastCh;
 
