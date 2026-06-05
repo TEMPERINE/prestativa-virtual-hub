@@ -485,21 +485,23 @@ export function MapEditor() {
     canvas.height = rows;
     const ctx = canvas.getContext("2d")!;
     ctx.clearRect(0, 0, cols, rows);
+    const showZones = editorTab === "zones";
+    const showBlocked = editorTab === "map";
     for (let r = 0; r < rows; r++) {
       for (let c = 0; c < cols; c++) {
         const i = cellIndex(c, r, cols);
         const zid = overrides.zones[i];
-        if (zid) {
+        if (showZones && zid) {
           ctx.fillStyle = zoneColorOf(zid) + "66"; // ~40% alpha
           ctx.fillRect(c, r, 1, 1);
         }
-        if (overrides.blocked[i]) {
+        if (showBlocked && overrides.blocked[i]) {
           ctx.fillStyle = "rgba(239, 68, 68, 0.55)"; // red
           ctx.fillRect(c, r, 1, 1);
         }
       }
     }
-  }, [overrides, zoneColorOf]);
+  }, [overrides, zoneColorOf, editorTab]);
 
   // Effective-collision overlay: shows EXACTLY what the game blocks for
   // the avatar (FLOOR_POLY + painted blocked OR default COLLIDERS).
@@ -552,7 +554,7 @@ export function MapEditor() {
         }
       }
     }
-  }, [overrides, showEffective]);
+  }, [overrides, showEffective, editorTab]);
 
   return (
     <div className="h-screen w-screen flex flex-col bg-background text-foreground">
@@ -1072,11 +1074,13 @@ export function MapEditor() {
               style={{ imageRendering: "pixelated" }}
             />
             {/* Effective game-collision overlay (FLOOR_POLY + colliders/painted) */}
-            <canvas
-              ref={effectiveCanvasRef}
-              className="absolute inset-0 w-full h-full pointer-events-none"
-              style={{ imageRendering: "pixelated", mixBlendMode: "screen" }}
-            />
+            {editorTab === "map" && (
+              <canvas
+                ref={effectiveCanvasRef}
+                className="absolute inset-0 w-full h-full pointer-events-none"
+                style={{ imageRendering: "pixelated", mixBlendMode: "screen" }}
+              />
+            )}
             {/* Grid overlay */}
             {showGrid && (
               <div
@@ -1089,7 +1093,7 @@ export function MapEditor() {
               />
             )}
             {/* Spawn point pins */}
-            {Object.entries(spawnPoints).map(([zid, p]) => {
+            {editorTab === "zones" && Object.entries(spawnPoints).map(([zid, p]) => {
               const color = zoneColorOf(zid);
               const label = ZONES.find((z) => z.id === zid)?.label
                 ?? customZones.find((c) => c.id === zid)?.label
@@ -1145,7 +1149,7 @@ export function MapEditor() {
             )}
 
             {/* Props (elementos) — render + handles de edição */}
-            {propsList.map((pi) => {
+            {editorTab === "elements" && propsList.map((pi) => {
               const def = getPropDef(pi.defId);
               if (!def) return null;
               const sel = selectedPropId === pi.id;
