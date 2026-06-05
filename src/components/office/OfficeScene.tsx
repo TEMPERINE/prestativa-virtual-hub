@@ -142,6 +142,11 @@ export function OfficeScene() {
   const [facing, setFacing] = useState<Facing>("down");
   const facingRef = useRef<Facing>("down");
   const [reactions, setReactions] = useState<Record<string, { emoji: string; ts: number }>>({});
+  // Active remote-user teleport effects (so others see the sparkle/fade like a game).
+  const [remoteTeleports, setRemoteTeleports] = useState<
+    Record<string, { from: Point; to: Point; phase: "out" | "in"; id: number }>
+  >({});
+  const remoteTeleportTimers = useRef<Map<string, number[]>>(new Map());
   // Per-remote-user walking animation state. Advances frame while position is changing.
   const remoteAnimRef = useRef<Map<string, { frame: number; lastMove: number; lastX: number; lastY: number; lastTick: number }>>(new Map());
   const [remoteFrames, setRemoteFrames] = useState<Record<string, number>>({});
@@ -629,6 +634,39 @@ export function OfficeScene() {
           positionFreshTs.current.set(row.user_id, incomingTs);
           return { ...prev, [row.user_id]: { ...row, ts: incomingTs } };
         });
+      })
+      .on("broadcast", { event: "teleport" }, (payload) => {
+        const { user_id, from, to } = (payload.payload ?? {}) as {
+          user_id?: string;
+          from?: Point;
+          to?: Point;
+        };
+        if (!user_id || user_id === meIdRef.current || !from || !to) return;
+        const id = Date.now() + Math.random();
+        // Clear any previous timers for this user
+        const prevTimers = remoteTeleportTimers.current.get(user_id) ?? [];
+        prevTimers.forEach((t) => window.clearTimeout(t));
+        const timers: number[] = [];
+        setRemoteTeleports((p) => ({ ...p, [user_id]: { from, to, phase: "out", id } }));
+        timers.push(
+          window.setTimeout(() => {
+            setRemoteTeleports((p) =>
+              p[user_id]?.id === id ? { ...p, [user_id]: { ...p[user_id], phase: "in" } } : p
+            );
+          }, 450)
+        );
+        timers.push(
+          window.setTimeout(() => {
+            setRemoteTeleports((p) => {
+              if (p[user_id]?.id !== id) return p;
+              const next = { ...p };
+              delete next[user_id];
+              return next;
+            });
+            remoteTeleportTimers.current.delete(user_id);
+          }, 1100)
+        );
+        remoteTeleportTimers.current.set(user_id, timers);
       });
     positionBroadcastChannelRef.current = positionBroadcastCh;
 
@@ -979,6 +1017,19 @@ export function OfficeScene() {
 
     const id = Date.now();
     setTeleport({ from, to: target, phase: "out", id });
+
+    // Tell peers immediately so they see the sparkle/fade at the origin,
+    // BEFORE the position snaps. Without this, remote viewers only see the
+    // avatar slide between points.
+    const uid = meIdRef.current;
+    const ch = positionBroadcastChannelRef.current;
+    if (uid && ch && positionBroadcastReadyRef.current) {
+      void ch.send({
+        type: "broadcast",
+        event: "teleport",
+        payload: { user_id: uid, from, to: target },
+      });
+    }
 
     // Phase 1: fade out + sparkle at origin
     teleportTimers.current.push(
@@ -1431,24 +1482,33 @@ export function OfficeScene() {
               display.y >= focusedZone.rect.y1 &&
               display.y <= focusedZone.rect.y2);
           const myTeleporting = isMe && teleport;
-          const meOpacity = myTeleporting
-            ? teleport!.phase === "out" ? 0 : 1
-            : 1;
+          const remoteTp = !isMe ? remoteTeleports[profile.id] : null;
+          const teleporting = myTeleporting || remoteTp;
+          // While the "out" phase plays, render the avatar at the ORIGIN so the
+          // sparkle is anchored there; on "in", render at destination. This
+          // matches what the teleporter themself sees.
+          const tpData = myTeleporting ? teleport! : remoteTp;
+          const renderPoint = tpData
+            ? (tpData.phase === "out" ? tpData.from : tpData.to)
+            : display;
+          const tpOpacity = tpData ? (tpData.phase === "out" ? 0 : 1) : 1;
           return (
             <div
               key={profile.id}
               className="absolute pointer-events-none"
               style={{
-                left: `${display.x * 100}%`,
-                top: `${display.y * 100}%`,
+                left: `${renderPoint.x * 100}%`,
+                top: `${renderPoint.y * 100}%`,
                 transform: "translate(-50%, -90%)",
-                transition: isMe
-                  ? (myTeleporting ? "opacity 420ms ease-in-out, filter 420ms ease-in-out" : "none")
+                transition: teleporting
+                  ? "opacity 420ms ease-in-out, filter 420ms ease-in-out"
+                  : isMe
+                  ? "none"
                   : "left 120ms linear, top 120ms linear",
-                zIndex: focusedZone ? (inFocus ? 60 : 20) : Math.round(display.y * 1000),
-                opacity: isMe ? meOpacity : 1,
-                filter: myTeleporting
-                  ? `drop-shadow(0 0 18px var(--primary)) drop-shadow(0 0 36px var(--primary-glow)) brightness(${teleport!.phase === "out" ? 1.8 : 1.4})`
+                zIndex: focusedZone ? (inFocus ? 60 : 20) : Math.round(renderPoint.y * 1000),
+                opacity: tpOpacity,
+                filter: tpData
+                  ? `drop-shadow(0 0 18px var(--primary)) drop-shadow(0 0 36px var(--primary-glow)) brightness(${tpData.phase === "out" ? 1.8 : 1.4})`
                   : "none",
               }}
             >
@@ -1478,14 +1538,22 @@ export function OfficeScene() {
           );
         })}
 
-        {/* Magic teleport particles */}
+        {/* Magic teleport particles — local + every remote teleport in progress */}
         {teleport && (
           <TeleportFx
             point={teleport.phase === "out" ? teleport.from : teleport.to}
             phase={teleport.phase}
-            key={`${teleport.id}-${teleport.phase}`}
+            key={`me-${teleport.id}-${teleport.phase}`}
           />
         )}
+        {Object.entries(remoteTeleports).map(([uid, tp]) => (
+          <TeleportFx
+            key={`${uid}-${tp.id}-${tp.phase}`}
+            point={tp.phase === "out" ? tp.from : tp.to}
+            phase={tp.phase}
+          />
+        ))}
+
 
         {/* Desk notes (post-it gifts) sitting on workstations */}
         {notes.map((n) => {
