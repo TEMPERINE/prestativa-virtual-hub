@@ -122,7 +122,7 @@ export function PropsLayer({ selfX, selfY }: Props) {
       {rendered.map((p) => {
         const def = getPropDef(p.defId);
         if (!def) return null;
-        const frame = frames[p.id] ?? 0;
+        const frame = frames[p.id] ?? p.frame ?? 0;
         const src = def.frames[frame] ?? def.frames[0];
         const wPct = p.w * 100;
         const hPct = (p.w / def.aspectRatio) * 100;
