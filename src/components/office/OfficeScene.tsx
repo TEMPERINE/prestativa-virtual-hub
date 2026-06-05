@@ -1048,6 +1048,33 @@ export function OfficeScene() {
     };
   }, []);
 
+  // Atalho: pressionar X dentro de uma zona que tenha um recadinho para mim,
+  // abre o recadinho (mesmo comportamento da overlay flutuante).
+  const notesRef = useRef(notes);
+  notesRef.current = notes;
+  const zoneRef = useRef(zone);
+  zoneRef.current = zone;
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      if (e.key.toLowerCase() !== "x") return;
+      const target = e.target as HTMLElement | null;
+      const tag = target?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || target?.isContentEditable) return;
+      const uid = meIdRef.current;
+      if (!uid) return;
+      const curZone = zoneRef.current;
+      const candidate = notesRef.current.find(
+        (n) => n.recipient_id === uid && n.zone_id === curZone
+      );
+      if (!candidate) return;
+      e.preventDefault();
+      setOpeningNote(candidate);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
   const claimZone = useCallback(async (zoneId: string) => {
     const uid = meIdRef.current;
     if (!uid) return;
