@@ -114,6 +114,9 @@ export function OfficeScene() {
   const [me, setMe] = useState<Profile | null>(null);
   const [profiles, setProfiles] = useState<Record<string, Profile>>({});
   const [positions, setPositions] = useState<Record<string, RemotePos>>({});
+  // LWW tracker — wall-clock ts of the freshest known sample per user (broadcast/presence).
+  // Lets us discard stale DB poll rows that would otherwise snap remote avatars back.
+  const positionFreshTs = useRef<Map<string, number>>(new Map());
   const [pos, setPos] = useState<Point>(SPAWN);
   const [zone, setZone] = useState<ZoneId>("lobby");
   const [showTeam, setShowTeam] = useState(false);
@@ -511,6 +514,7 @@ export function OfficeScene() {
       .on("broadcast", { event: "position" }, (payload) => {
         const row = payload.payload as RemotePos;
         if (!row?.user_id) return;
+        positionFreshTs.current.set(row.user_id, Date.now());
         setPositions((prev) => ({ ...prev, [row.user_id]: row }));
       });
     positionBroadcastChannelRef.current = positionBroadcastCh;
@@ -532,6 +536,7 @@ export function OfficeScene() {
         const prev = presenceLastTs.get(s.user_id) ?? 0;
         if (s.ts <= prev) continue;
         presenceLastTs.set(s.user_id, s.ts);
+        positionFreshTs.current.set(s.user_id, s.ts);
         setPositions((p) => ({
           ...p,
           [s.user_id]: { user_id: s.user_id, x: s.x, y: s.y, zone: s.zone, facing: s.facing, is_online: true },
@@ -656,13 +661,25 @@ export function OfficeScene() {
 
 
     const syncPositions = async () => {
-      const { data } = await supabase.from("positions").select("user_id, x, y, zone, facing, is_online");
+      const { data } = await supabase.from("positions").select("user_id, x, y, zone, facing, is_online, updated_at");
       if (!data) return;
       const uid = meIdRef.current;
-      setPositions(() => {
-        const next: Record<string, RemotePos> = {};
-        (data as RemotePos[]).forEach((p) => {
-          next[p.user_id] = p;
+      setPositions((prev) => {
+        const next: Record<string, RemotePos> = { ...prev };
+        (data as Array<RemotePos & { updated_at?: string }>).forEach((p) => {
+          if (uid && p.user_id === uid) return; // handled below
+          const dbTs = p.updated_at ? Date.parse(p.updated_at) : 0;
+          const freshTs = positionFreshTs.current.get(p.user_id) ?? 0;
+          // Realtime broadcast/presence within the last 5s wins over DB poll.
+          // Prevents stale DB rows from snapping remote avatars back to a previous spot.
+          if (freshTs > dbTs && Date.now() - freshTs < 5000) {
+            // Keep is_online state in sync from DB while preserving live x/y.
+            const cur = prev[p.user_id];
+            if (cur) next[p.user_id] = { ...cur, is_online: p.is_online };
+            else next[p.user_id] = p;
+          } else {
+            next[p.user_id] = p;
+          }
         });
         if (uid) {
           const cur = posRef.current;
@@ -682,6 +699,23 @@ export function OfficeScene() {
     const positionsPoll = window.setInterval(() => {
       void syncPositions();
     }, 1000);
+
+    // Idle DB heartbeat — persist the local position every 2s even when
+    // standing still, so other clients' DB poll never reads a stale row and
+    // can't snap our avatar back to a previous spot.
+    const persistHeartbeat = window.setInterval(() => {
+      const uid = meIdRef.current;
+      if (!uid) return;
+      const cur = posRef.current;
+      void supabase.from("positions").upsert({
+        user_id: uid,
+        x: cur.x,
+        y: cur.y,
+        zone: zoneAt(cur).id,
+        facing: facingRef.current,
+        is_online: true,
+      });
+    }, 2000);
 
     // Load + subscribe to desk notes (post-it gifts left on workstations)
     void (async () => {
@@ -731,6 +765,7 @@ export function OfficeScene() {
       positionBroadcastReadyRef.current = false;
       window.clearInterval(positionsPoll);
       window.clearInterval(presenceHeartbeat);
+      window.clearInterval(persistHeartbeat);
       window.removeEventListener("beforeunload", offline);
       document.removeEventListener("visibilitychange", onVisible);
       window.removeEventListener("focus", onVisible);
