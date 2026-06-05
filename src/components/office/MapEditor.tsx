@@ -716,6 +716,79 @@ export function MapEditor() {
             </button>
           </div>
 
+          {/* ===== Galeria de elementos ===== */}
+          <div className="mt-4 pt-3 border-t border-border/60">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-xs font-semibold uppercase text-muted-foreground">Elementos</h3>
+              <button
+                onClick={() => setTool({ kind: "select" })}
+                title="Selecionar / mover elementos"
+                className={`p-1 rounded ${tool.kind === "select" ? "ring-2 ring-primary text-primary" : "text-muted-foreground hover:bg-muted"}`}
+              >
+                <Hand size={12} />
+              </button>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              {PROP_CATALOG.map((def) => {
+                const active = tool.kind === "place-prop" && tool.defId === def.id;
+                return (
+                  <button
+                    key={def.id}
+                    onClick={() => setTool({ kind: "place-prop", defId: def.id })}
+                    className={`flex flex-col items-center gap-1 p-2 rounded border ${active ? "border-primary bg-primary/10" : "border-border hover:bg-muted"}`}
+                    title={`Adicionar ${def.label}`}
+                  >
+                    <img src={def.frames[0]} alt="" className="h-12 object-contain" draggable={false} />
+                    <span className="text-[10px]">{def.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+            {tool.kind === "place-prop" && (
+              <p className="text-[10px] text-muted-foreground mt-2">
+                Clique no mapa para colocar. Esc para cancelar.
+              </p>
+            )}
+            {propsList.length > 0 && (
+              <div className="mt-3 flex flex-col gap-1">
+                <span className="text-[10px] uppercase text-muted-foreground">No mapa ({propsList.length})</span>
+                {propsList.map((pi) => {
+                  const def = getPropDef(pi.defId);
+                  if (!def) return null;
+                  const sel = selectedPropId === pi.id;
+                  return (
+                    <div
+                      key={pi.id}
+                      className={`group flex items-center gap-2 px-2 py-1 rounded text-xs ${sel ? "bg-muted ring-1 ring-primary" : "hover:bg-muted"}`}
+                    >
+                      <button
+                        onClick={() => { setTool({ kind: "select" }); setSelectedPropId(pi.id); }}
+                        className="flex-1 text-left truncate"
+                      >
+                        {def.label}
+                      </button>
+                      {def.interactive && (
+                        <button
+                          onClick={() => togglePropInteractive(pi.id)}
+                          title={pi.interactive ? "Interativo (clique para desativar)" : "Não interativo (clique para ativar)"}
+                          className={`p-0.5 ${pi.interactive ? "text-primary" : "text-muted-foreground"}`}
+                        >
+                          {pi.interactive ? <Zap size={12} /> : <ZapOff size={12} />}
+                        </button>
+                      )}
+                      <button
+                        onClick={() => removeProp(pi.id)}
+                        className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive"
+                        title="Remover"
+                      >
+                        <X size={12} />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
 
           <h3 className="text-xs font-semibold uppercase text-muted-foreground mt-4 mb-2">Legenda</h3>
           <div className="text-xs text-muted-foreground space-y-1">
@@ -724,7 +797,7 @@ export function MapEditor() {
               Bloqueado
             </div>
             <div>
-              <p className="mt-2">Clique e arraste para pintar. Use Apagar para limpar célula.</p>
+              <p className="mt-2">Clique e arraste para pintar. Use Apagar para limpar célula. Para mover elementos, ative a ferramenta de seleção.</p>
             </div>
           </div>
         </aside>
