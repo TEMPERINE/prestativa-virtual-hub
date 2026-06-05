@@ -40,7 +40,7 @@ const EMOJI_MAP: Record<string, string> = {
 };
 const REACTION_DURATION_MS = 3000;
 import { toast } from "sonner";
-import { LogOut, Mic, MicOff, Video, VideoOff, MonitorUp, Users, Pencil, User as UserIcon, Hand, MessageCircle, StickyNote, X as XIcon, Plus, Minus, Locate, ChevronLeft, ChevronRight } from "lucide-react";
+import { LogOut, Mic, MicOff, Video, VideoOff, MonitorUp, Users, Pencil, User as UserIcon, Hand, MessageCircle, StickyNote, X as XIcon, Plus, Minus, Locate, ChevronLeft, ChevronRight, Footprints, UserPlus } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import { useRtcMesh } from "@/lib/rtc/useRtcMesh";
 import { installAudioUnlockListeners, unlockAudioPlayback } from "@/lib/rtc/audio-unlock";
@@ -1216,6 +1216,128 @@ export function OfficeScene() {
     };
   }, []);
 
+  // ===== Follow / Lead (Seguir / Pedir para conduzir) =====
+  // followingUid: when set, my avatar auto-walks behind this user until I press
+  // a movement key (or the other side cancels).
+  const [followingUid, setFollowingUid] = useState<string | null>(null);
+  const followingUidRef = useRef<string | null>(null);
+  useEffect(() => { followingUidRef.current = followingUid; }, [followingUid]);
+  const profilesRef = useRef<Record<string, Profile>>({});
+  profilesRef.current = profiles;
+  const leadChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  const [hoveredAvatarUid, setHoveredAvatarUid] = useState<string | null>(null);
+  const [avatarMenuUid, setAvatarMenuUid] = useState<string | null>(null);
+
+  const broadcastFollowStop = useCallback((toUid: string) => {
+    const ch = leadChannelRef.current;
+    const from = meIdRef.current;
+    if (!ch || !from || !toUid) return;
+    void ch.send({ type: "broadcast", event: "follow-stop", payload: { from, to: toUid } });
+  }, []);
+
+  const stopFollowing = useCallback((notify = true) => {
+    const cur = followingUidRef.current;
+    if (!cur) return;
+    if (notify) broadcastFollowStop(cur);
+    followingUidRef.current = null;
+    setFollowingUid(null);
+    autoWalkRef.current = null;
+  }, [broadcastFollowStop]);
+
+  const startFollowing = useCallback((uid: string) => {
+    if (!uid || uid === meIdRef.current) return;
+    followingUidRef.current = uid;
+    setFollowingUid(uid);
+    const name = profilesRef.current[uid]?.display_name ?? "personagem";
+    toast.success(`Seguindo ${name}. Pressione qualquer direção para parar.`);
+  }, []);
+
+  const requestLead = useCallback((uid: string) => {
+    const ch = leadChannelRef.current;
+    const from = meIdRef.current;
+    if (!ch || !from) { toast.error("Conexão indisponível."); return; }
+    const fromName = profilesRef.current[from]?.display_name ?? "Alguém";
+    void ch.send({ type: "broadcast", event: "lead-request", payload: { from, to: uid, fromName } });
+    const target = profilesRef.current[uid]?.display_name ?? "personagem";
+    toast.info(`Pedido enviado a ${target}. Aguardando resposta...`);
+  }, []);
+
+  const acceptLead = useCallback((fromUid: string) => {
+    const ch = leadChannelRef.current;
+    const me = meIdRef.current;
+    if (!ch || !me) return;
+    void ch.send({ type: "broadcast", event: "lead-accept", payload: { from: me, to: fromUid } });
+    // Requester is the leader → I (receiver) will follow them
+    startFollowing(fromUid);
+  }, [startFollowing]);
+
+  const declineLead = useCallback((fromUid: string) => {
+    const ch = leadChannelRef.current;
+    const me = meIdRef.current;
+    if (!ch || !me) return;
+    void ch.send({ type: "broadcast", event: "lead-decline", payload: { from: me, to: fromUid } });
+  }, []);
+
+  // Lead channel — separate from positions so we can subscribe independently
+  // once we know our user id (the broadcast handlers need stable closures).
+  useEffect(() => {
+    const uid = me?.id;
+    if (!uid) return;
+    const ch = supabase
+      .channel(`lead-events-${uid}`, { config: { broadcast: { self: false } } })
+      .on("broadcast", { event: "lead-request" }, ({ payload }) => {
+        const p = payload as { from?: string; to?: string; fromName?: string };
+        if (!p?.from || p.to !== uid) return;
+        const from = p.from;
+        toast(`${p.fromName ?? "Alguém"} pediu para te conduzir`, {
+          description: "Aceite para seguir essa pessoa até onde ela for.",
+          duration: 20000,
+          action: { label: "Aceitar", onClick: () => acceptLead(from) },
+          cancel: { label: "Recusar", onClick: () => declineLead(from) },
+        });
+      })
+      .on("broadcast", { event: "lead-accept" }, ({ payload }) => {
+        const p = payload as { from?: string; to?: string };
+        if (!p?.from || p.to !== uid) return;
+        const name = profilesRef.current[p.from]?.display_name ?? "Alguém";
+        toast.success(`${name} aceitou! Pode começar a andar — ${name} vai te seguir.`);
+      })
+      .on("broadcast", { event: "lead-decline" }, ({ payload }) => {
+        const p = payload as { from?: string; to?: string };
+        if (!p?.from || p.to !== uid) return;
+        toast.info("Pedido recusado.");
+      })
+      .on("broadcast", { event: "follow-stop" }, ({ payload }) => {
+        const p = payload as { from?: string; to?: string };
+        if (!p?.from || p.to !== uid) return;
+        const name = profilesRef.current[p.from]?.display_name ?? "Alguém";
+        toast.info(`${name} parou de te seguir.`);
+      })
+      .subscribe();
+    leadChannelRef.current = ch;
+    return () => {
+      supabase.removeChannel(ch);
+      if (leadChannelRef.current === ch) leadChannelRef.current = null;
+    };
+  }, [me?.id, acceptLead, declineLead]);
+
+  // Close avatar menu on outside click / Esc
+  useEffect(() => {
+    if (!avatarMenuUid) return;
+    const onDoc = (e: MouseEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (!t || !t.closest("[data-avatar-menu]")) setAvatarMenuUid(null);
+    };
+    const onEsc = (e: KeyboardEvent) => { if (e.key === "Escape") setAvatarMenuUid(null); };
+    document.addEventListener("mousedown", onDoc);
+    window.addEventListener("keydown", onEsc);
+    return () => {
+      document.removeEventListener("mousedown", onDoc);
+      window.removeEventListener("keydown", onEsc);
+    };
+  }, [avatarMenuUid]);
+
+
 
 
 
@@ -1280,8 +1402,9 @@ export function OfficeScene() {
       if (!dir) return;
       e.preventDefault();
       if (e.repeat) return;
-      // Manual movement cancels auto-walk
+      // Manual movement cancels auto-walk and any active follow
       autoWalkRef.current = null;
+      if (followingUidRef.current) stopFollowing(true);
       keysDown.current.add(dir);
       lastDir.current = dir;
       setLocalFacing(dir);
@@ -1328,6 +1451,21 @@ export function OfficeScene() {
       const stepFactor = dtMs / 16.667;
 
       let dir = lastDir.current;
+
+      // Follow: keep autoWalk pointing at the leader as they move.
+      if (!dir && followingUidRef.current) {
+        const tgt = positionsRef.current[followingUidRef.current];
+        if (!tgt || !tgt.is_online) {
+          followingUidRef.current = null;
+          setFollowingUid(null);
+          autoWalkRef.current = null;
+        } else {
+          const cur = posRef.current;
+          const d = Math.hypot(tgt.x - cur.x, tgt.y - cur.y);
+          if (d > 0.06) autoWalkRef.current = { x: tgt.x, y: tgt.y };
+          else autoWalkRef.current = null;
+        }
+      }
 
       // Auto-walk: if no manual key, compute a direction toward the target.
       if (!dir && autoWalkRef.current) {
@@ -1685,6 +1823,22 @@ export function OfficeScene() {
                   {profile.display_name}
                 </div>
                 <div className="relative">
+                  {/* Selection ring on the floor (perspective ellipse) for remote avatars */}
+                  {!isMe && (hoveredAvatarUid === profile.id || avatarMenuUid === profile.id) && (
+                    <div
+                      className="absolute left-1/2 -translate-x-1/2 pointer-events-none"
+                      style={{ bottom: -6, width: 56, height: 16, zIndex: 1 }}
+                    >
+                      <div
+                        className="w-full h-full rounded-[50%] border-2"
+                        style={{
+                          borderColor: "var(--primary)",
+                          boxShadow: "0 0 14px var(--primary), inset 0 0 8px color-mix(in oklab, var(--primary) 40%, transparent)",
+                          animation: "pulse 1.4s ease-in-out infinite",
+                        }}
+                      />
+                    </div>
+                  )}
                   <div className="absolute left-1/2 -translate-x-1/4 -top-5 z-10 pointer-events-none">
                     <ReactionBubble emoji={reactions[profile.id]?.emoji ?? null} />
                   </div>
@@ -1694,6 +1848,30 @@ export function OfficeScene() {
                     glowColor={isMe ? profile.avatar_color : undefined}
                     spriteId={profile.sprite_id}
                   />
+                  {/* Hover/click hit-area for remote avatars (sits over the sprite) */}
+                  {!isMe && (
+                    <div
+                      data-avatar-menu
+                      className="absolute left-1/2 -translate-x-1/2 pointer-events-auto"
+                      style={{ bottom: 0, width: 56, height: 80, cursor: "pointer", zIndex: 5 }}
+                      onMouseEnter={() => setHoveredAvatarUid(profile.id)}
+                      onMouseLeave={() => setHoveredAvatarUid((c) => (c === profile.id ? null : c))}
+                      onMouseDown={(e) => e.stopPropagation()}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setAvatarMenuUid((cur) => (cur === profile.id ? null : profile.id));
+                      }}
+                      title={`Interagir com ${profile.display_name}`}
+                    />
+                  )}
+                  {!isMe && avatarMenuUid === profile.id && (
+                    <AvatarInteractionMenu
+                      profile={profile}
+                      onClose={() => setAvatarMenuUid(null)}
+                      onFollow={() => { startFollowing(profile.id); setAvatarMenuUid(null); }}
+                      onLead={() => { requestLead(profile.id); setAvatarMenuUid(null); }}
+                    />
+                  )}
                 </div>
               </div>
             </div>
@@ -2400,6 +2578,70 @@ function TeleportFx({ point, phase }: { point: Point; phase: "out" | "in" }) {
 
 
 /** Animated sprite avatar — delega 100% para AlignedSprite (regra única). */
+function AvatarInteractionMenu({
+  profile,
+  onClose,
+  onFollow,
+  onLead,
+}: {
+  profile: Profile;
+  onClose: () => void;
+  onFollow: () => void;
+  onLead: () => void;
+}) {
+  return (
+    <div
+      data-avatar-menu
+      className="absolute left-full ml-3 -top-6 w-56 rounded-xl bg-popover text-popover-foreground shadow-2xl border pointer-events-auto"
+      style={{ zIndex: 1_000_000 }}
+      onMouseDown={(e) => e.stopPropagation()}
+      onClick={(e) => e.stopPropagation()}
+    >
+      <div className="flex items-center gap-2 px-3 py-2 border-b">
+        <span className="w-2 h-2 rounded-full bg-green-500 shrink-0" />
+        <div className="text-sm font-semibold truncate" style={{ color: profile.avatar_color }}>
+          {profile.display_name}
+        </div>
+        <button
+          type="button"
+          onClick={onClose}
+          className="ml-auto p-1 rounded hover:bg-muted text-muted-foreground"
+          aria-label="Fechar"
+        >
+          <XIcon className="w-3.5 h-3.5" />
+        </button>
+      </div>
+      <div className="p-1">
+        <button
+          type="button"
+          onClick={() => {
+            const bits = [profile.tagline, profile.status].filter(Boolean).join(" • ");
+            toast(profile.display_name, { description: bits || "Perfil sem descrição." });
+            onClose();
+          }}
+          className="w-full flex items-center gap-2 px-2 py-2 text-sm rounded hover:bg-muted text-left"
+        >
+          <UserIcon className="w-4 h-4" /> Ver perfil
+        </button>
+        <button
+          type="button"
+          onClick={onFollow}
+          className="w-full flex items-center gap-2 px-2 py-2 text-sm rounded hover:bg-muted text-left"
+        >
+          <Footprints className="w-4 h-4" /> Seguir
+        </button>
+        <button
+          type="button"
+          onClick={onLead}
+          className="w-full flex items-center gap-2 px-2 py-2 text-sm rounded hover:bg-muted text-left"
+        >
+          <UserPlus className="w-4 h-4" /> Pedir para conduzir
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function SpriteAvatar({
   facing,
   frame,
