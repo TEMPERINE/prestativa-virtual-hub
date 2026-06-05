@@ -60,6 +60,8 @@ export function useRtcMesh(myId: string | null, desiredPeers: string[]): RtcMesh
 
   const peersRef = useRef<Map<string, PeerEntry>>(new Map());
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  const channelReadyRef = useRef(false);
+  const pendingSignalsRef = useRef<Omit<SignalMsg, "from">[]>([]);
   const localStreamRef = useRef<MediaStream | null>(null);
   const audioTrackRef = useRef<MediaStreamTrack | null>(null);
   const videoTrackRef = useRef<MediaStreamTrack | null>(null);
@@ -68,8 +70,24 @@ export function useRtcMesh(myId: string | null, desiredPeers: string[]): RtcMesh
 
   const sendSignal = useCallback((msg: Omit<SignalMsg, "from">) => {
     const ch = channelRef.current;
-    if (!ch || !myId) return;
+    if (!ch || !myId) {
+      pendingSignalsRef.current.push(msg);
+      return;
+    }
+    if (!channelReadyRef.current) {
+      pendingSignalsRef.current.push(msg);
+      return;
+    }
     void ch.send({ type: "broadcast", event: "rtc", payload: { ...msg, from: myId } });
+  }, [myId]);
+
+  const flushSignals = useCallback(() => {
+    const ch = channelRef.current;
+    if (!ch || !myId || !channelReadyRef.current) return;
+    const pending = pendingSignalsRef.current.splice(0);
+    for (const msg of pending) {
+      void ch.send({ type: "broadcast", event: "rtc", payload: { ...msg, from: myId } });
+    }
   }, [myId]);
 
   // Create a PC for a peer
@@ -256,10 +274,14 @@ export function useRtcMesh(myId: string | null, desiredPeers: string[]): RtcMesh
     });
     void ch.subscribe((status) => {
       if (status === "SUBSCRIBED") {
+        channelReadyRef.current = true;
+        flushSignals();
         // announce ourselves to currently desired peers
         for (const p of desiredRef.current) {
           sendSignal({ to: p, type: "hello" });
         }
+      } else if (status === "CLOSED" || status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+        channelReadyRef.current = false;
       }
     });
     return () => {
@@ -268,11 +290,13 @@ export function useRtcMesh(myId: string | null, desiredPeers: string[]): RtcMesh
         sendSignal({ to: peerId, type: "bye" });
         destroyPeer(peerId);
       }
+      channelReadyRef.current = false;
+      pendingSignalsRef.current = [];
       supabase.removeChannel(ch);
       channelRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [myId]);
+  }, [myId, flushSignals, sendSignal]);
 
   // Reconcile desired peers
   useEffect(() => {
@@ -296,6 +320,21 @@ export function useRtcMesh(myId: string | null, desiredPeers: string[]): RtcMesh
       }
     }
   }, [desiredPeers, myId, createPeer, destroyPeer, sendSignal]);
+
+  // Keep announcing presence while a nearby/in-room peer is desired. This
+  // recovers from missed first offers when either browser joins a few seconds late.
+  useEffect(() => {
+    if (!myId) return;
+    const timer = window.setInterval(() => {
+      for (const peerId of desiredRef.current) {
+        if (peerId === myId) continue;
+        sendSignal({ to: peerId, type: "hello" });
+        const entry = peersRef.current.get(peerId);
+        if (!entry && myId > peerId) createPeer(peerId, true);
+      }
+    }, 2500);
+    return () => window.clearInterval(timer);
+  }, [myId, createPeer, sendSignal]);
 
   // Speaking detection (simple: analyse remote audio levels)
   useEffect(() => {
