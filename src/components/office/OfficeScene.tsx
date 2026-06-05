@@ -689,6 +689,7 @@ export function OfficeScene() {
           from?: Point;
           to?: Point;
         };
+        if (!user_id || !from || !to) return;
         startRemoteTeleport(user_id, from, to);
       });
     positionBroadcastChannelRef.current = positionBroadcastCh;
