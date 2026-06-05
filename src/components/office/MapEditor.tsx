@@ -278,7 +278,24 @@ export function MapEditor() {
   const draggingPin = useRef<string | null>(null);
   const propsList = overrides.props ?? [];
   const [selectedPropId, setSelectedPropId] = useState<string | null>(null);
-  const draggingPropRef = useRef<{ id: string; mode: "move" | "resize"; startX: number; startY: number; startW: number } | null>(null);
+  const draggingPropRef = useRef<
+    | {
+        id: string;
+        mode: "move";
+        offX: number; // pi.x - mouseNx no início
+        offY: number;
+        aspect: number;
+      }
+    | {
+        id: string;
+        mode: "resize";
+        anchorLeft: number; // canto oposto (fixo durante o resize)
+        anchorTop: number;
+        aspect: number;
+      }
+    | null
+  >(null);
+  const [ghostPos, setGhostPos] = useState<{ x: number; y: number } | null>(null);
 
   const updateProp = useCallback((id: string, patch: Partial<PropInstance>) => {
     setOverrides((prev) => ({
