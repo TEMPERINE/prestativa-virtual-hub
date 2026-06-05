@@ -1198,14 +1198,16 @@ export function MapEditor() {
               </div>
             )}
 
-            {/* Props (elementos) — render + handles de edição */}
-            {editorTab === "elements" && propsList.map((pi) => {
+            {/* Props (elementos) — render + handles de edição.
+                Em outras abas, viram "fantasmas" pra manter referência sem poluir. */}
+            {propsList.map((pi) => {
               const def = getPropDef(pi.defId);
               if (!def) return null;
               const sel = selectedPropId === pi.id;
               const wPct = pi.w * 100;
               const hPct = (pi.w / def.aspectRatio) * 100;
               const curFrame = pi.frame ?? 0;
+              const isGhost = editorTab !== "elements";
               return (
                 <div
                   key={pi.id}
@@ -1217,8 +1219,11 @@ export function MapEditor() {
                     height: `${hPct}%`,
                     transform: "translate(-50%, -100%)",
                     zIndex: 30000 + Math.round(pi.y * 5000),
-                    cursor: tool.kind === "select" ? "move" : "default",
-                    pointerEvents: tool.kind === "select" ? "auto" : "none",
+                    cursor: !isGhost && tool.kind === "select" ? "move" : "default",
+                    pointerEvents: !isGhost && tool.kind === "select" ? "auto" : "none",
+                    opacity: isGhost ? 0.28 : 1,
+                    filter: isGhost ? "grayscale(0.6)" : undefined,
+                    transition: "opacity 120ms ease, filter 120ms ease",
                   }}
                   onPointerDown={(e) => {
                     if (tool.kind !== "select") return;
