@@ -90,14 +90,28 @@ def bbox(alpha: np.ndarray) -> tuple[int, int, int, int] | None:
     ys, xs = np.where(labels == main)
     y0, y1 = int(ys.min()), int(ys.max()) + 1
     x0, x1 = int(xs.min()), int(xs.max()) + 1
-    # Expand to include any blob whose own bbox is fully inside main's bbox.
+    # Expand to include any blob whose own bbox is fully inside main's bbox,
+    # OR a small satellite directly below the main blob (feet/shoes that the
+    # character art separates from the body via a contrasting color, e.g.
+    # high heels under white pants — they'd be dropped otherwise).
+    cell_h_local = mask.shape[0]
     for i in range(1, n + 1):
         if i == main:
             continue
         ys2, xs2 = np.where(labels == i)
         iy0, iy1 = int(ys2.min()), int(ys2.max()) + 1
         ix0, ix1 = int(xs2.min()), int(xs2.max()) + 1
-        if iy0 >= y0 - 2 and iy1 <= y1 + 2 and ix0 >= x0 - 4 and ix1 <= x1 + 4:
+        inside = (iy0 >= y0 - 2 and iy1 <= y1 + 2 and ix0 >= x0 - 4 and ix1 <= x1 + 4)
+        # Below-main: small blob hanging directly under the body, horizontally
+        # within (or only slightly outside) the main silhouette. Cap the gap and
+        # the size so we don't pull in the next row's character.
+        below_main = (
+            iy0 >= y1 - 2
+            and (iy0 - y1) <= max(8, int(0.06 * cell_h_local))
+            and ix0 >= x0 - 6 and ix1 <= x1 + 6
+            and (iy1 - iy0) <= int(0.20 * cell_h_local)
+        )
+        if inside or below_main:
             y0 = min(y0, iy0); y1 = max(y1, iy1)
             x0 = min(x0, ix0); x1 = max(x1, ix1)
     return x0, y0, x1, y1
