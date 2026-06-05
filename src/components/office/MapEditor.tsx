@@ -248,15 +248,31 @@ export function MapEditor() {
         setDirty(true);
         return;
       }
+      if (tool.kind === "place-prop") {
+        const def = getPropDef(tool.defId);
+        if (!def) return;
+        const id = `prop-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+        const inst: PropInstance = {
+          id,
+          defId: def.id,
+          x,
+          y,
+          w: def.defaultW,
+          interactive: def.interactive,
+        };
+        setOverrides((prev) => ({ ...prev, props: [...(prev.props ?? []), inst] }));
+        setSelectedPropId(id);
+        setTool({ kind: "select" });
+        setDirty(true);
+        return;
+      }
+      if (tool.kind === "select") return;
       const col = Math.max(0, Math.min(GRID_COLS - 1, Math.floor(x * GRID_COLS)));
       const row = Math.max(0, Math.min(GRID_ROWS - 1, Math.floor(y * GRID_ROWS)));
       paintCell(col, row);
     },
     [paintCell, tool]
   );
-
-  const spawnPoints = overrides.spawnPoints ?? {};
-  const draggingPin = useRef<string | null>(null);
 
   const removeSpawn = useCallback((zoneId: string) => {
     setOverrides((prev) => {
