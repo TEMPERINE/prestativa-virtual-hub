@@ -38,9 +38,10 @@ import latinaDown from "@/assets/sprites/latina-down.png";
 import latinaUp from "@/assets/sprites/latina-up.png";
 import latinaLeft from "@/assets/sprites/latina-left.png";
 
-import cruellaDown from "@/assets/sprites/cruella-down.png";
-import cruellaUp from "@/assets/sprites/cruella-up.png";
-import cruellaLeft from "@/assets/sprites/cruella-left.png";
+import indiDown from "@/assets/sprites/indi-down.png";
+import indiUp from "@/assets/sprites/indi-up.png";
+import indiLeft from "@/assets/sprites/indi-left.png";
+import indiRight from "@/assets/sprites/indi-right.png";
 
 export type Facing = "up" | "down" | "left" | "right";
 
