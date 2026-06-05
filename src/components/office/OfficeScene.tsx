@@ -475,6 +475,7 @@ export function OfficeScene() {
     const knownId = meIdRef.current;
     const write = (userId: string) => {
       const payload = { user_id: userId, x, y, zone: z, facing: f, is_online: true, ts: Date.now() };
+      writeLocalSavedPosition(userId, { x, y }, z, f);
       const ch = positionBroadcastChannelRef.current;
       if (ch && positionBroadcastReadyRef.current) {
         void ch.send({ type: "broadcast", event: "position", payload });
@@ -651,10 +652,17 @@ export function OfficeScene() {
       // Preserve the last known position on refresh — never snap an existing
       // user back to a spawn point. Only first-time entry uses spawn logic.
       const myClaimZone = Object.entries(cmap).find(([, uid]) => uid === userData.user!.id)?.[0];
+      const localSaved = readLocalSavedPosition(userData.user.id);
       let startPoint: Point;
       const existing = pmap[userData.user.id];
       const hasSavedPos = existing && typeof existing.x === "number" && typeof existing.y === "number";
-      if (hasSavedPos) {
+      const dbTs = timestampForPosition(existing ?? {});
+      const localWins = !!localSaved && (!hasSavedPos || localSaved.ts >= dbTs - 1500);
+      if (localWins) {
+        // The browser copy is written on every movement/unload before the DB
+        // roundtrip finishes, so on hard refresh it is the safest resume point.
+        startPoint = { x: localSaved.x, y: localSaved.y };
+      } else if (hasSavedPos) {
         // Current DB/presence position is authoritative for returning users.
         // Do not collision-correct it here: map overrides can still be loading,
         // and "fixing" it would clobber the live position with a spawn point.
@@ -675,10 +683,11 @@ export function OfficeScene() {
       setPos(safeStart);
       const startZone = zoneAt(safeStart).id;
       setZone(startZone);
-      const startFacing = (existing?.facing as Facing | undefined) ?? facingRef.current;
+      const startFacing = (localWins ? localSaved?.facing : undefined) ?? (existing?.facing as Facing | undefined) ?? facingRef.current;
       facingRef.current = startFacing;
       setFacing(startFacing);
       positionHydratedRef.current = true;
+      writeLocalSavedPosition(userData.user.id, safeStart, startZone, startFacing);
 
       pmap[userData.user.id] = {
         user_id: userData.user.id,
