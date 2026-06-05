@@ -8,10 +8,11 @@
 //   1. Load each sheet once into an offscreen canvas.
 //   2. For each frame cell, find the topmost opaque pixel row (top of head)
 //      and define a small "head band" below it (~22% of cell height).
-//   3. Within that band, compute the horizontal centroid (head X).
-//   4. Frame offsets are deviations from the MEAN head X / head-top Y
-//      across all frames — so the renderer can compensate to keep the head
-//      locked in place frame-to-frame.
+//   3. Within that band, compute a robust horizontal center for the head,
+//      trimming edge outliers so one stray pixel cannot move the frame.
+//   4. Frame X offsets target the CENTER OF THE CELL, which is also the
+//      renderer's shadow center. Frame Y offsets still use the average
+//      head-top Y to avoid vertical bobbing without detaching feet from shadow.
 
 const SPRITE_FRAMES = 6;
 const ALPHA_THRESHOLD = 32;
@@ -105,31 +106,29 @@ function computeOffsets(img: HTMLImageElement): FrameOffset[] {
     if (topY < 0) continue;
     headTopY[f] = topY;
 
-    // 2. Horizontal bounding box of the head band → midpoint is much more
-    //    stable across frames than a pixel-mass centroid (which shifts when
-    //    arms raise/lower or hair sways asymmetrically).
+    // 2. Robust horizontal center of the head band. We use percentiles instead
+    //    of raw min/max because exported sheets can contain isolated edge
+    //    pixels in a single frame (Japa had this), which would otherwise make
+    //    that frame jump sideways.
     const yEnd = Math.min(h, topY + HEAD_BAND);
-    let minX = cellW;
-    let maxX = -1;
+    const xs: number[] = [];
     for (let y = topY; y < yEnd; y++) {
       const rowOff = y * w * 4;
       for (let x = x0; x < x1; x++) {
         if (data[rowOff + x * 4 + 3] > ALPHA_THRESHOLD) {
-          const lx = x - x0;
-          if (lx < minX) minX = lx;
-          if (lx > maxX) maxX = lx;
+          xs.push(x - x0);
         }
       }
     }
-    if (maxX >= 0) headX[f] = (minX + maxX) / 2;
+    if (xs.length > 0) headX[f] = robustCenter(xs);
   }
 
-  // Reference = mean across valid frames. We anchor to the AVERAGE head
-  // position so the visible drift across the cycle cancels out.
+  // X reference is the cell center so every frame's head lands exactly on the
+  // renderer's shadow center. Y reference remains the mean top to avoid bobbing.
   const validX = headX.filter((v) => Number.isFinite(v));
   const validY = headTopY.filter((v) => Number.isFinite(v));
   if (validX.length === 0) return zero;
-  const refX = validX.reduce((a, b) => a + b, 0) / validX.length;
+  const refX = cellW / 2;
   const refY = validY.length ? validY.reduce((a, b) => a + b, 0) / validY.length : 0;
 
   const out: FrameOffset[] = [];
@@ -146,4 +145,17 @@ function computeOffsets(img: HTMLImageElement): FrameOffset[] {
     });
   }
   return out;
+}
+
+function robustCenter(values: number[]): number {
+  const sorted = values.slice().sort((a, b) => a - b);
+  const low = percentile(sorted, 0.15);
+  const high = percentile(sorted, 0.85);
+  return (low + high) / 2;
+}
+
+function percentile(sorted: number[], p: number): number {
+  if (sorted.length === 1) return sorted[0];
+  const idx = Math.min(sorted.length - 1, Math.max(0, Math.round((sorted.length - 1) * p)));
+  return sorted[idx];
 }
