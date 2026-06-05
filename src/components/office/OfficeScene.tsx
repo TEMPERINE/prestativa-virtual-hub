@@ -399,6 +399,59 @@ export function OfficeScene() {
     };
   }, []);
 
+  // Remote avatar walk-cycle animation. Detect (x,y) changes per user and
+  // step through frames 1..5 while moving; freeze on frame 0 when idle for
+  // more than ~220ms. Runs on a single timer so all remotes stay in sync.
+  useEffect(() => {
+    const MOVE_DECAY_MS = 220;
+    const TICK_MS = 110;
+    const id = window.setInterval(() => {
+      const now = performance.now();
+      const tracker = remoteAnimRef.current;
+      let changed = false;
+      const next: Record<string, number> = {};
+
+      // Sync tracker with current positions (add/update entries).
+      Object.values(positions).forEach((p) => {
+        if (p.user_id === meIdRef.current) return;
+        const t = tracker.get(p.user_id);
+        if (!t) {
+          tracker.set(p.user_id, { frame: 0, lastMove: 0, lastX: p.x, lastY: p.y, lastTick: now });
+          next[p.user_id] = 0;
+          return;
+        }
+        if (t.lastX !== p.x || t.lastY !== p.y) {
+          t.lastX = p.x;
+          t.lastY = p.y;
+          t.lastMove = now;
+        }
+        const moving = now - t.lastMove < MOVE_DECAY_MS;
+        const newFrame = moving
+          ? (t.frame >= 5 || t.frame < 1 ? 1 : t.frame + 1)
+          : 0;
+        if (newFrame !== t.frame) {
+          t.frame = newFrame;
+          changed = true;
+        }
+        t.lastTick = now;
+        next[p.user_id] = newFrame;
+      });
+
+      // Drop trackers for users no longer present.
+      for (const key of Array.from(tracker.keys())) {
+        if (!(key in next)) {
+          tracker.delete(key);
+          changed = true;
+        }
+      }
+
+      if (changed) setRemoteFrames(next);
+    }, TICK_MS);
+    return () => window.clearInterval(id);
+  }, [positions]);
+
+
+
 
   const tryMove = useCallback((dir: Facing) => {
     const cur = posRef.current;
