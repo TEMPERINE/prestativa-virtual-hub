@@ -661,7 +661,7 @@ export function MapEditor() {
                     } else if (t.id === "elements" && tool.kind !== "select" && tool.kind !== "place-prop") {
                       setTool({ kind: "select" });
                     } else if (t.id === "zones" && (tool.kind === "blocked" || tool.kind === "erase" || tool.kind === "place-prop" || tool.kind === "select")) {
-                      setTool({ kind: "erase-zone" });
+                      // mantém ferramenta atual; usuário escolhe uma zona ou borracha
                     }
                   }}
                   className={`flex-1 inline-flex items-center justify-center gap-1.5 text-xs px-2 py-2 border-b-2 transition-colors ${
