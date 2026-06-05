@@ -51,6 +51,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { ProfileMenu } from "@/components/profile/ProfileMenu";
+import { SavedNotesDialog } from "@/components/profile/SavedNotesDialog";
 import { EditCharacterModal } from "@/components/profile/EditCharacterModal";
 import { EditProfileModal } from "@/components/profile/EditProfileModal";
 import { OnboardingWizard } from "@/components/onboarding/OnboardingWizard";
