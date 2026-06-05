@@ -14,6 +14,36 @@ export type Database = {
   }
   public: {
     Tables: {
+      custom_props: {
+        Row: {
+          aspect_ratio: number
+          created_at: string
+          created_by: string | null
+          default_w: number
+          frames: Json
+          id: string
+          label: string
+        }
+        Insert: {
+          aspect_ratio?: number
+          created_at?: string
+          created_by?: string | null
+          default_w?: number
+          frames: Json
+          id: string
+          label: string
+        }
+        Update: {
+          aspect_ratio?: number
+          created_at?: string
+          created_by?: string | null
+          default_w?: number
+          frames?: Json
+          id?: string
+          label?: string
+        }
+        Relationships: []
+      }
       desk_notes: {
         Row: {
           body: string
