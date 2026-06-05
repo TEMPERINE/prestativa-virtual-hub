@@ -2178,9 +2178,11 @@ function SpriteAvatar({
         // vertical bob beyond the natural reference position).
         const offsets = getFrameOffsets(sprite.sheets[srcFacing]);
         const off = offsets ? offsets[displayFrame] ?? { dx: 0, dy: 0 } : { dx: 0, dy: 0 };
-        // When mirrored (left rendered from right sheet), X sign flips visually.
-        const signedDx = useMirror ? -off.dx : off.dx;
-        const bgPosX = ((displayFrame - signedDx) / (FRAMES - 1)) * 100;
+        // The offset is measured inside the source sheet cell. To keep the
+        // head centered over the shadow, move the crop window in the SAME
+        // direction as the detected drift. Mirroring happens after the crop,
+        // so the sign must not be inverted for left-facing mirrored sprites.
+        const bgPosX = ((displayFrame + off.dx) / (FRAMES - 1)) * 100;
         // For Y: background is `100% height` of the element so background-position-y
         // in % doesn't translate directly to pixels. Use a CSS calc that shifts
         // by a fraction of the element height instead, via translateY on the layer.
