@@ -841,13 +841,52 @@ export function OfficeScene() {
     document.addEventListener("visibilitychange", onVisible);
     window.addEventListener("focus", onVisible);
 
-    const offline = async () => {
-      const { data: u } = await supabase.auth.getUser();
-      if (u.user) {
-        await supabase.from("positions").update({ is_online: false }).eq("user_id", u.user.id);
-      }
+    // Persist the user's CURRENT position synchronously on unload/hide so a
+    // refresh, tab close or app switch never loses the last few movements
+    // (which would make the avatar appear to "respawn" at an old spot).
+    const persistFinalPosition = () => {
+      const uid = meIdRef.current;
+      if (!uid || !positionHydratedRef.current) return;
+      const cur = posRef.current;
+      const z = zoneAt(cur).id;
+      const body = JSON.stringify({
+        user_id: uid,
+        x: cur.x,
+        y: cur.y,
+        zone: z,
+        facing: facingRef.current,
+        is_online: false,
+      });
+      try {
+        const url = `${import.meta.env.VITE_SUPABASE_URL}/rest/v1/positions?on_conflict=user_id`;
+        const headers = {
+          "Content-Type": "application/json",
+          apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+          Authorization: `Bearer ${(supabase as unknown as { auth: { currentSession?: { access_token: string } } }).auth.currentSession?.access_token ?? import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          Prefer: "resolution=merge-duplicates",
+        };
+        // Prefer fetch keepalive (allows custom headers); fall back to sendBeacon
+        void fetch(url, { method: "POST", headers, body, keepalive: true }).catch(() => {
+          try { navigator.sendBeacon?.(url, new Blob([body], { type: "application/json" })); } catch { /* noop */ }
+        });
+      } catch { /* noop */ }
+      // Also fire a normal async upsert as a backup (works if the page isn't fully torn down yet)
+      void supabase.from("positions").upsert({
+        user_id: uid,
+        x: cur.x,
+        y: cur.y,
+        zone: z,
+        facing: facingRef.current,
+        is_online: false,
+      });
     };
-    window.addEventListener("beforeunload", offline);
+    const onPageHide = () => persistFinalPosition();
+    const onVisibilityHidden = () => {
+      if (document.visibilityState === "hidden") persistFinalPosition();
+    };
+    window.addEventListener("beforeunload", persistFinalPosition);
+    window.addEventListener("pagehide", onPageHide);
+    document.addEventListener("visibilitychange", onVisibilityHidden);
 
 
     const syncPositions = async () => {
