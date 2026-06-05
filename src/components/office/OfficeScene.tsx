@@ -634,6 +634,39 @@ export function OfficeScene() {
           positionFreshTs.current.set(row.user_id, incomingTs);
           return { ...prev, [row.user_id]: { ...row, ts: incomingTs } };
         });
+      })
+      .on("broadcast", { event: "teleport" }, (payload) => {
+        const { user_id, from, to } = (payload.payload ?? {}) as {
+          user_id?: string;
+          from?: Point;
+          to?: Point;
+        };
+        if (!user_id || user_id === meIdRef.current || !from || !to) return;
+        const id = Date.now() + Math.random();
+        // Clear any previous timers for this user
+        const prevTimers = remoteTeleportTimers.current.get(user_id) ?? [];
+        prevTimers.forEach((t) => window.clearTimeout(t));
+        const timers: number[] = [];
+        setRemoteTeleports((p) => ({ ...p, [user_id]: { from, to, phase: "out", id } }));
+        timers.push(
+          window.setTimeout(() => {
+            setRemoteTeleports((p) =>
+              p[user_id]?.id === id ? { ...p, [user_id]: { ...p[user_id], phase: "in" } } : p
+            );
+          }, 450)
+        );
+        timers.push(
+          window.setTimeout(() => {
+            setRemoteTeleports((p) => {
+              if (p[user_id]?.id !== id) return p;
+              const next = { ...p };
+              delete next[user_id];
+              return next;
+            });
+            remoteTeleportTimers.current.delete(user_id);
+          }, 1100)
+        );
+        remoteTeleportTimers.current.set(user_id, timers);
       });
     positionBroadcastChannelRef.current = positionBroadcastCh;
 
