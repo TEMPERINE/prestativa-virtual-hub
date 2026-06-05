@@ -128,6 +128,8 @@ export function OfficeScene() {
   const [cursor, setCursor] = useState<{ x: number; y: number } | null>(null);
   const [openingNote, setOpeningNote] = useState<DeskNote | null>(null);
   const reactionChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  const positionBroadcastChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  const positionBroadcastReadyRef = useRef(false);
   const meIdRef = useRef<string | null>(null);
   const [myEmail, setMyEmail] = useState<string>("");
   const [editCharOpen, setEditCharOpen] = useState(false);
@@ -236,6 +238,7 @@ export function OfficeScene() {
   const keysDown = useRef<Set<Facing>>(new Set());
   const lastDir = useRef<Facing | null>(null);
   const lastSent = useRef(0);
+  const lastPersisted = useRef(0);
   const posRef = useRef(pos);
   posRef.current = pos;
 
@@ -258,7 +261,7 @@ export function OfficeScene() {
     const meId = me?.id;
     if (!meId) return [] as string[];
     const myClaimZone = Object.entries(claims).find(([, uid]) => uid === meId)?.[0];
-    const result: string[] = [];
+    const candidates: { uid: string; score: number }[] = [];
     for (const [uid, p] of Object.entries(positions)) {
       if (uid === meId) continue;
       if (!p.is_online) continue;
@@ -272,10 +275,13 @@ export function OfficeScene() {
       const dist = Math.hypot(dx, dy);
       const already = connectedPeersRef.current.has(uid);
       const closeEnough = already ? dist <= PROXIMITY_DISCONNECT : dist <= PROXIMITY_CONNECT;
-      if (sameZone || sameActiveRoom || closeEnough) result.push(uid);
+      if (sameZone || sameActiveRoom || closeEnough) {
+        const score = (sameZone ? 0 : sameActiveRoom ? 1 : 2) + dist;
+        candidates.push({ uid, score });
+      }
     }
-    // cap to 6 peers
-    return result.slice(0, 6);
+    // A browser mesh is capped to keep the room stable with ~15 collaborators.
+    return candidates.sort((a, b) => a.score - b.score).slice(0, 14).map((c) => c.uid);
   }, [me?.id, positions, claims, pos.x, pos.y, zone]);
 
   const rtc = useRtcMesh(me?.id ?? null, desiredPeers);
@@ -283,13 +289,19 @@ export function OfficeScene() {
     connectedPeersRef.current = new Set(desiredPeers);
   }, [desiredPeers]);
 
-  const sendPos = useCallback((x: number, y: number, z: ZoneId, f: Facing) => {
+  const sendPos = useCallback((x: number, y: number, z: ZoneId, f: Facing, persistNow = false) => {
     const knownId = meIdRef.current;
     const write = (userId: string) => {
-      void supabase.from("positions").upsert({
-        user_id: userId,
-        x, y, zone: z, facing: f, is_online: true,
-      });
+      const payload = { user_id: userId, x, y, zone: z, facing: f, is_online: true };
+      const ch = positionBroadcastChannelRef.current;
+      if (ch && positionBroadcastReadyRef.current) {
+        void ch.send({ type: "broadcast", event: "position", payload });
+      }
+      const now = performance.now();
+      if (persistNow || now - lastPersisted.current > 1000) {
+        lastPersisted.current = now;
+        void supabase.from("positions").upsert(payload);
+      }
     };
     if (knownId) {
       write(knownId);
