@@ -554,7 +554,7 @@ export function MapEditor() {
         }
       }
     }
-  }, [overrides, showEffective]);
+  }, [overrides, showEffective, editorTab]);
 
   return (
     <div className="h-screen w-screen flex flex-col bg-background text-foreground">
