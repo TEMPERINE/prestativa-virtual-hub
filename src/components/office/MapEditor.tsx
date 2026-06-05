@@ -1093,7 +1093,7 @@ export function MapEditor() {
               />
             )}
             {/* Spawn point pins */}
-            {Object.entries(spawnPoints).map(([zid, p]) => {
+            {editorTab === "zones" && Object.entries(spawnPoints).map(([zid, p]) => {
               const color = zoneColorOf(zid);
               const label = ZONES.find((z) => z.id === zid)?.label
                 ?? customZones.find((c) => c.id === zid)?.label
