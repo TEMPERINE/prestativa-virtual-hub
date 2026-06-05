@@ -859,6 +859,7 @@ export function OfficeScene() {
           if (uid && p.user_id === uid) return; // handled below
           const dbTs = p.updated_at ? Date.parse(p.updated_at) : 0;
           const freshTs = positionFreshTs.current.get(p.user_id) ?? 0;
+          if (p.is_online) maybeStartRemoteTeleportFromCurrent(p.user_id, { x: p.x, y: p.y }, dbTs || Date.now());
           // Strict LWW: DB rows older than the freshest known live sample are
           // never allowed to move a stopped avatar back to a spawn/old spot.
           if (dbTs && dbTs < freshTs) {
