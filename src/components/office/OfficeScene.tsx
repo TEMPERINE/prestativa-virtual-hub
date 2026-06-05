@@ -427,8 +427,9 @@ export function OfficeScene() {
     // os eventos postgres_changes (UPDATE/INSERT/DELETE) são filtrados e os
     // outros usuários parecem "congelados", mesmo com as posições sendo
     // gravadas no banco corretamente.
+    const realtimeChannelSuffix = `${Date.now()}:${Math.random().toString(36).slice(2)}`;
     const ch = supabase
-      .channel("positions-room")
+      .channel(`positions-room:${realtimeChannelSuffix}`)
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "positions" },
@@ -464,7 +465,7 @@ export function OfficeScene() {
     reactionChannelRef.current = reactionCh;
 
     const claimsCh = supabase
-      .channel("claims-room")
+      .channel(`claims-room:${realtimeChannelSuffix}`)
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "workspace_claims" },
@@ -536,7 +537,7 @@ export function OfficeScene() {
       if (data) setNotes(data as DeskNote[]);
     })();
     const notesCh = supabase
-      .channel("desk-notes-room")
+      .channel(`desk-notes-room:${realtimeChannelSuffix}`)
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "desk_notes" },
