@@ -272,28 +272,32 @@ export function useRtcMesh(myId: string | null, desiredPeers: string[]): RtcMesh
 
     try {
       if (msg.type === "offer" && msg.sdp) {
-        // Polite peer: if we're making an offer and our id is lower, rollback
-        const polite = myId < peerId;
-        const offerCollision = entry.makingOffer || pc.signalingState !== "stable";
-        if (offerCollision && !polite) return;
-        if (offerCollision && polite) {
-          await Promise.all([
-            pc.setLocalDescription({ type: "rollback" }),
-            pc.setRemoteDescription(msg.sdp),
-          ]);
-        } else {
-          await pc.setRemoteDescription(msg.sdp);
+        if (entry.isOfferer || pc.signalingState !== "stable") {
+          destroyPeer(peerId);
+          const fresh = createPeer(peerId, false);
+          if (!fresh) return;
+          entry = fresh;
         }
-        const answer = await pc.createAnswer();
-        await pc.setLocalDescription(answer);
-        sendSignal({ to: peerId, type: "answer", sdp: pc.localDescription! });
+        await entry.pc.setRemoteDescription(msg.sdp);
+        for (const candidate of entry.pendingIce.splice(0)) {
+          try { await entry.pc.addIceCandidate(candidate); } catch { /* noop */ }
+        }
+        const answer = await entry.pc.createAnswer();
+        await entry.pc.setLocalDescription(answer);
+        sendSignal({ to: peerId, type: "answer", sdp: entry.pc.localDescription! });
       } else if (msg.type === "answer" && msg.sdp) {
-        if (pc.signalingState === "have-local-offer") {
+        if (entry.isOfferer && pc.signalingState === "have-local-offer") {
           await pc.setRemoteDescription(msg.sdp);
+          for (const candidate of entry.pendingIce.splice(0)) {
+            try { await pc.addIceCandidate(candidate); } catch { /* noop */ }
+          }
         }
       } else if (msg.type === "ice") {
         try {
-          if (msg.candidate) await pc.addIceCandidate(msg.candidate);
+          if (msg.candidate) {
+            if (pc.remoteDescription) await pc.addIceCandidate(msg.candidate);
+            else entry.pendingIce.push(msg.candidate);
+          }
         } catch (err) {
           console.warn("addIceCandidate failed", err);
         }
