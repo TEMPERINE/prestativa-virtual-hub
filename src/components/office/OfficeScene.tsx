@@ -1001,10 +1001,12 @@ export function OfficeScene() {
       window.clearInterval(positionsPoll);
       window.clearInterval(presenceHeartbeat);
       window.clearInterval(persistHeartbeat);
-      window.removeEventListener("beforeunload", offline);
+      window.removeEventListener("beforeunload", persistFinalPosition);
+      window.removeEventListener("pagehide", onPageHide);
+      document.removeEventListener("visibilitychange", onVisibilityHidden);
       document.removeEventListener("visibilitychange", onVisible);
       window.removeEventListener("focus", onVisible);
-      offline();
+      persistFinalPosition();
     };
   }, []);
 
