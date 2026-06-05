@@ -2824,17 +2824,21 @@ function OccupantCard({
   isMe,
   onLeaveNote,
   onLeaveDesk,
+  onFollow,
+  onLead,
 }: {
   profile: Profile | null;
   online: boolean;
   isMe?: boolean;
   onLeaveNote?: () => void;
   onLeaveDesk?: () => void;
+  onFollow?: () => void;
+  onLead?: () => void;
 }) {
   const initials = (profile?.display_name ?? "?").charAt(0).toUpperCase();
   return (
     <div
-      className="rounded-lg shadow-soft px-2.5 py-2 text-white flex flex-col items-center gap-1.5 min-w-[150px]"
+      className="rounded-lg shadow-soft px-2.5 py-2 text-white flex flex-col items-center gap-1.5 min-w-[170px]"
       style={{
         background: "rgba(20, 22, 38, 0.96)",
         border: "1px solid rgba(255,255,255,0.08)",
@@ -2860,16 +2864,23 @@ function OccupantCard({
           </div>
         </div>
       </div>
-      <div className="flex items-center gap-1">
+      <div className="flex items-center gap-1 flex-wrap justify-center">
         <CardIconBtn title="Perfil (em breve)" disabled>
           <UserIcon className="w-3 h-3" />
-        </CardIconBtn>
-        <CardIconBtn title="Cumprimentar (em breve)" disabled>
-          <Hand className="w-3 h-3" />
         </CardIconBtn>
         <CardIconBtn title="Chat (em breve)" disabled>
           <MessageCircle className="w-3 h-3" />
         </CardIconBtn>
+        {!isMe && onFollow && (
+          <CardIconBtn title="Seguir" onClick={onFollow} active>
+            <Footprints className="w-3 h-3" />
+          </CardIconBtn>
+        )}
+        {!isMe && onLead && (
+          <CardIconBtn title="Pedir para conduzir" onClick={onLead} active>
+            <UserPlus className="w-3 h-3" />
+          </CardIconBtn>
+        )}
         {!isMe && (
           <CardIconBtn
             title="Deixar recadinho"
