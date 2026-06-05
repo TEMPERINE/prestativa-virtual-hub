@@ -609,7 +609,40 @@ export function OfficeScene() {
       }).catch(() => { /* noop */ });
     }, 1000);
 
-
+    // Reconnection + resync watchdog: when the tab regains focus (or the
+    // browser wakes from sleep), force a position sync, re-track presence
+    // and re-broadcast our position. Supabase Realtime auto-reconnects the
+    // socket, but channels can miss events while the page was hidden — this
+    // closes the gap so the other avatars don't appear "frozen".
+    const onVisible = () => {
+      if (document.visibilityState !== "visible") return;
+      const uid = meIdRef.current;
+      if (!uid) return;
+      const cur = posRef.current;
+      const curZone = zoneAt(cur).id;
+      // 1) Re-attach the latest JWT to the realtime socket
+      void supabase.auth.getSession().then(({ data }) => {
+        const token = data.session?.access_token;
+        if (token) { try { void supabase.realtime.setAuth(token); } catch { /* noop */ } }
+      });
+      // 2) Force a full positions reload from DB
+      void syncPositions();
+      // 3) Refresh presence heartbeat immediately
+      void presenceCh.track({
+        user_id: uid, x: cur.x, y: cur.y, zone: curZone,
+        facing: facingRef.current, ts: Date.now(),
+      }).catch(() => { /* noop */ });
+      // 4) Re-broadcast our position so peers update without waiting 1s
+      const pbCh = positionBroadcastChannelRef.current;
+      if (pbCh && positionBroadcastReadyRef.current) {
+        void pbCh.send({
+          type: "broadcast", event: "position",
+          payload: { user_id: uid, x: cur.x, y: cur.y, zone: curZone, facing: facingRef.current, is_online: true },
+        });
+      }
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", onVisible);
 
     const offline = async () => {
       const { data: u } = await supabase.auth.getUser();
@@ -618,6 +651,7 @@ export function OfficeScene() {
       }
     };
     window.addEventListener("beforeunload", offline);
+
 
     const syncPositions = async () => {
       const { data } = await supabase.from("positions").select("user_id, x, y, zone, facing, is_online");
