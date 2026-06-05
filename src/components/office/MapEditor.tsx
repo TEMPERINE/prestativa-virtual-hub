@@ -569,49 +569,8 @@ export function MapEditor() {
           {GRID_COLS}×{GRID_ROWS} células
         </span>
 
-        <div className="ml-4 flex items-center gap-1">
-          <ToolBtn
-            active={tool.kind === "blocked"}
-            onClick={() => setTool({ kind: "blocked" })}
-            icon={<Square size={14} />}
-            label="Bloqueado"
-            color="#ef4444"
-          />
-          <ToolBtn
-            active={tool.kind === "erase"}
-            onClick={() => setTool({ kind: "erase" })}
-            icon={<Eraser size={14} />}
-            label="Apagar"
-          />
-          <button
-            onClick={undo}
-            disabled={!canUndo}
-            className={`inline-flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded ${
-              canUndo ? "bg-muted/60 hover:bg-muted" : "opacity-50 cursor-not-allowed"
-            }`}
-            title="Desfazer (Ctrl+Z)"
-          >
-            <Undo size={14} />
-            Desfazer
-          </button>
-        </div>
-
-        <div className="flex items-center gap-1 ml-2">
-          <span className="text-xs text-muted-foreground">Pincel</span>
-          {[1, 2, 3, 5].map((b) => (
-            <button
-              key={b}
-              onClick={() => setBrush(b)}
-              className={`text-xs px-2 py-1 rounded ${
-                brush === b ? "bg-primary text-primary-foreground" : "bg-muted"
-              }`}
-            >
-              {b}×{b}
-            </button>
-          ))}
-        </div>
-
         <div className="ml-auto flex items-center gap-2">
+
           <button
             onClick={() => setShowImage((v) => !v)}
             className="text-xs px-2 py-1 rounded bg-muted inline-flex items-center gap-1"
