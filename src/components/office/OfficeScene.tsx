@@ -1719,7 +1719,7 @@ export function OfficeScene() {
               left: `${cursor.x * 100}%`,
               top: `${cursor.y * 100}%`,
               transform: "translate(-50%, -85%)",
-              zIndex: 95,
+              zIndex: 200002,
               opacity: 0.95,
               filter: "drop-shadow(0 4px 10px rgba(0,0,0,0.35))",
             }}
