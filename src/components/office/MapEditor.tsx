@@ -1123,12 +1123,15 @@ export function MapEditor() {
                     width: `${wPct}%`,
                     height: `${hPct}%`,
                     transform: "translate(-50%, -100%)",
+                    objectFit: "contain",
+                    objectPosition: "bottom center",
                     opacity: 0.45,
                     imageRendering: "pixelated",
                     zIndex: 80000,
                     filter: "drop-shadow(0 0 4px rgba(0,0,0,0.5))",
                   }}
                 />
+
               );
             })()}
 
