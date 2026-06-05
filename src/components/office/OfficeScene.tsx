@@ -434,7 +434,7 @@ export function OfficeScene() {
         void ch.send({ type: "broadcast", event: "position", payload });
       }
       const now = performance.now();
-      if (persistNow || now - lastPersisted.current > 1000) {
+      if (persistNow || now - lastPersisted.current > 300) {
         lastPersisted.current = now;
         void supabase.from("positions").upsert({
           user_id: userId,
@@ -994,7 +994,7 @@ export function OfficeScene() {
         facing: facingRef.current,
         is_online: true,
       });
-    }, 2000);
+    }, 750);
 
 
     // Load + subscribe to desk notes (post-it gifts left on workstations)
@@ -1426,6 +1426,13 @@ export function OfficeScene() {
         lastDir.current = remaining[remaining.length - 1] ?? null;
         if (lastDir.current) setLocalFacing(lastDir.current);
       }
+      // Quando o usuário para de andar (nenhuma tecla pressionada), persiste
+      // a posição final IMEDIATAMENTE no banco. Isso garante que ao recarregar
+      // a página o personagem volte exatamente onde parou — sem cair no spawn.
+      if (keysDown.current.size === 0) {
+        const cur = posRef.current;
+        sendPos(cur.x, cur.y, zoneAt(cur).id, facingRef.current, true);
+      }
     };
     const blur = () => {
       keysDown.current.clear();
@@ -1439,7 +1446,7 @@ export function OfficeScene() {
       window.removeEventListener("keyup", up);
       window.removeEventListener("blur", blur);
     };
-  }, [setLocalFacing, sendReaction, teleportToMyClaim]);
+  }, [setLocalFacing, sendReaction, teleportToMyClaim, sendPos]);
 
   // movement + animation loop
   useEffect(() => {
