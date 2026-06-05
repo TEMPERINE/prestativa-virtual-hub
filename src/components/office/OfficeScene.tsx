@@ -434,7 +434,7 @@ export function OfficeScene() {
         void ch.send({ type: "broadcast", event: "position", payload });
       }
       const now = performance.now();
-      if (persistNow || now - lastPersisted.current > 1000) {
+      if (persistNow || now - lastPersisted.current > 300) {
         lastPersisted.current = now;
         void supabase.from("positions").upsert({
           user_id: userId,
