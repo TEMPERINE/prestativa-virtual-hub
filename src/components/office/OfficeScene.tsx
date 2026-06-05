@@ -61,7 +61,16 @@ type Profile = {
   status?: "available" | "busy" | "away" | null;
   onboarded_at?: string | null;
 };
-type RemotePos = { user_id: string; x: number; y: number; zone: string; is_online: boolean; facing?: Facing };
+type RemotePos = {
+  user_id: string;
+  x: number;
+  y: number;
+  zone: string;
+  is_online: boolean;
+  facing?: Facing;
+  updated_at?: string;
+  ts?: number;
+};
 type DeskNote = {
   id: string;
   zone_id: string;
@@ -78,6 +87,9 @@ const SPEED = 0.0042;
 const SEND_INTERVAL_MS = 120;
 const POSITION_BROADCAST_CHANNEL = "positions-broadcast-v1";
 const POSITION_PRESENCE_CHANNEL = "positions-presence-v1";
+
+const timestampForPosition = (p: Pick<RemotePos, "updated_at" | "ts">) =>
+  p.ts ?? (p.updated_at ? Date.parse(p.updated_at) : 0);
 
 // "Seat" point of a zone rect — bottom-center, in front of the desk.
 // If that point collides with furniture, walk it upward until it's walkable.
