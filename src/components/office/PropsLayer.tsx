@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { loadOverrides, subscribeOverridesFromCloud, zoneFromOverrides, type PropInstance } from "@/lib/map-overrides";
-import { getPropDef } from "@/lib/prop-catalog";
+import { getPropDef, subscribePropCatalog } from "@/lib/prop-catalog";
+import { loadCustomPropsFromCloud } from "@/lib/custom-props";
 import { publishProps, publishFrames } from "@/lib/prop-gates";
 
 const INTERACT_RADIUS = 0.1; // distância (em fração do mapa) para o avatar poder interagir
