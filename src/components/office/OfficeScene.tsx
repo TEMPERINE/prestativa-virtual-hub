@@ -596,11 +596,22 @@ export function OfficeScene() {
         presenceLastTs.set(s.user_id, s.ts);
         setPositions((p) => {
           const cur = p[s.user_id];
-          if (cur) return { ...p, [s.user_id]: { ...cur, is_online: true } };
+          // Presence heartbeat is hydration-guarded (never advertises SPAWN),
+          // so its x/y always reflects the peer's real current position.
+          // Accept it so an F5'd tab learns "where they are right now" within
+          // 1s (the heartbeat cadence) instead of waiting for a DB write.
           positionFreshTs.current.set(s.user_id, s.ts);
           return {
             ...p,
-            [s.user_id]: { user_id: s.user_id, x: s.x, y: s.y, zone: s.zone, facing: s.facing, is_online: true, ts: s.ts },
+            [s.user_id]: {
+              user_id: s.user_id,
+              x: s.x,
+              y: s.y,
+              zone: s.zone,
+              facing: s.facing ?? cur?.facing ?? "down",
+              is_online: true,
+              ts: s.ts,
+            },
           };
         });
       }
