@@ -18,6 +18,7 @@ import { SPRITES, getSprite, SPRITE_FRAMES as FRAMES, type Facing } from "@/lib/
 import { ensureFrameOffsets, getFrameOffsets, subscribeFrameOffsets } from "@/lib/sprite-alignment";
 import { AlignedSprite } from "@/components/sprites/AlignedSprite";
 import { PropsLayer } from "./PropsLayer";
+import { isMoveGated } from "@/lib/prop-gates";
 
 const WALK_FRAME_MS = 110;
 
@@ -525,6 +526,7 @@ export function OfficeScene() {
 
 
 
+  const lastGatedToastRef = useRef(0);
   const tryMove = useCallback((dir: Facing) => {
     const cur = posRef.current;
     const dx = dir === "left" ? -SPEED : dir === "right" ? SPEED : 0;
@@ -535,9 +537,21 @@ export function OfficeScene() {
     if (collides({ x: nx, y: ny })) ny = cur.y;
     if (nx === cur.x && ny === cur.y) return false;
     const np = { x: nx, y: ny };
+    // Bloqueio por porta/elemento: se o passo cruza a fronteira de uma zona
+    // trancada (por ex. porta fechada), reverte o movimento.
+    const fromZoneId = zoneAt(cur).id;
+    const toZoneId = zoneAt(np).id;
+    if (isMoveGated(fromZoneId, toZoneId)) {
+      const now = performance.now();
+      if (now - lastGatedToastRef.current > 1500) {
+        lastGatedToastRef.current = now;
+        toast("Porta fechada", { description: "Aperte X para abrir." });
+      }
+      return false;
+    }
     posRef.current = np;
     setPos(np);
-    const z = zoneAt(np);
+    const z = { id: toZoneId };
     setZone((prev) => (prev !== z.id ? z.id : prev));
     const now = performance.now();
     if (now - lastSent.current > SEND_INTERVAL_MS) {
