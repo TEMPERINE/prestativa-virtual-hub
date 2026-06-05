@@ -328,6 +328,7 @@ export function OfficeScene() {
   }, []);
 
   const sendPos = useCallback((x: number, y: number, z: ZoneId, f: Facing, persistNow = false) => {
+    if (!positionHydratedRef.current) return;
     const knownId = meIdRef.current;
     const write = (userId: string) => {
       const payload = { user_id: userId, x, y, zone: z, facing: f, is_online: true };
@@ -621,7 +622,7 @@ export function OfficeScene() {
       presenceCh.subscribe(async (status) => {
         if (status !== "SUBSCRIBED") return;
         const uid = meIdRef.current;
-        if (!uid) return;
+        if (!uid || !positionHydratedRef.current) return;
         const cur = posRef.current;
         try {
           await presenceCh.track({
@@ -637,7 +638,7 @@ export function OfficeScene() {
     // postgres_changes and broadcasts get dropped on flaky networks.
     const presenceHeartbeat = window.setInterval(() => {
       const uid = meIdRef.current;
-      if (!uid) return;
+      if (!uid || !positionHydratedRef.current) return;
       const cur = posRef.current;
       void presenceCh.track({
         user_id: uid, x: cur.x, y: cur.y,
@@ -653,7 +654,7 @@ export function OfficeScene() {
     const onVisible = () => {
       if (document.visibilityState !== "visible") return;
       const uid = meIdRef.current;
-      if (!uid) return;
+      if (!uid || !positionHydratedRef.current) return;
       const cur = posRef.current;
       const curZone = zoneAt(cur).id;
       // 1) Re-attach the latest JWT to the realtime socket
@@ -734,7 +735,7 @@ export function OfficeScene() {
     // can't snap our avatar back to a previous spot.
     const persistHeartbeat = window.setInterval(() => {
       const uid = meIdRef.current;
-      if (!uid) return;
+      if (!uid || !positionHydratedRef.current) return;
       const cur = posRef.current;
       // Don't persist while we're still on the default SPAWN sentinel —
       // the init effect hasn't hydrated the saved position yet, and writing
