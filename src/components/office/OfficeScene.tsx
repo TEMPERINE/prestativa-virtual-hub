@@ -88,7 +88,7 @@ const SEND_INTERVAL_MS = 120;
 const POSITION_BROADCAST_CHANNEL = "positions-broadcast-v1";
 const POSITION_PRESENCE_CHANNEL = "positions-presence-v1";
 
-const timestampForPosition = (p: Pick<RemotePos, "updated_at" | "ts">) =>
+const timestampForPosition = (p: Partial<Pick<RemotePos, "updated_at" | "ts">>) =>
   p.ts ?? (p.updated_at ? Date.parse(p.updated_at) : 0);
 
 // "Seat" point of a zone rect — bottom-center, in front of the desk.
