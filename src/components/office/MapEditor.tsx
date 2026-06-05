@@ -1021,7 +1021,7 @@ export function MapEditor() {
                 return;
               }
               (e.target as Element).setPointerCapture?.(e.pointerId);
-              if (tool.kind === "blocked" || tool.kind === "erase" || tool.kind === "zone") {
+              if (tool.kind === "blocked" || tool.kind === "erase" || tool.kind === "erase-zone" || tool.kind === "zone") {
                 painting.current = true;
                 pushHistory({
                   ...overrides,
