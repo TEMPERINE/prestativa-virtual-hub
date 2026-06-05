@@ -153,7 +153,7 @@ def robust_center_x(mask: np.ndarray) -> float:
     return float(np.average(np.arange(len(cc)), weights=cc))
 
 
-def process(src_path: str, skin_id: str, rows: int, cols: int, out_dir: str, out_cols: int):
+def process(src_path: str, skin_id: str, rows: int, cols: int, out_dir: str, out_cols: int, include_right: bool = False):
     img = Image.open(src_path).convert("RGBA")
     arr = np.array(img)
     arr = remove_white_bg(arr)
