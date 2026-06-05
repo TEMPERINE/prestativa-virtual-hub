@@ -18,10 +18,11 @@ import {
   type PropAction,
 } from "@/lib/map-overrides";
 import { ZONES, COLLIDERS, FLOOR_POLY, type ZoneId } from "@/lib/office-map";
-import { PROP_CATALOG, getPropDef } from "@/lib/prop-catalog";
+import { PROP_CATALOG, getPropDef, subscribePropCatalog } from "@/lib/prop-catalog";
+import { loadCustomPropsFromCloud, deleteCustomProp, uploadCustomProp } from "@/lib/custom-props";
 import officeMap from "@/assets/office-map.webp";
 import { toast } from "sonner";
-import { ArrowLeft, Eraser, Square, Download, Trash2, Eye, EyeOff, Undo, Plus, X, Briefcase, Users, MapPin, Hand, Zap, ZapOff, Lock, Map as MapIcon, Boxes, LayoutGrid } from "lucide-react";
+import { ArrowLeft, Eraser, Square, Download, Trash2, Eye, EyeOff, Undo, Plus, X, Briefcase, Users, MapPin, Hand, Zap, ZapOff, Lock, Map as MapIcon, Boxes, LayoutGrid, Upload, Loader2 } from "lucide-react";
 
 type Tool =
   | { kind: "blocked" }
