@@ -2032,6 +2032,7 @@ export function OfficeScene() {
                 onRestartOnboarding={() => setForceOnboarding(true)}
                 onSignOut={signOut}
                 onStatusChanged={refreshMe}
+                onOpenSavedNotes={() => setSavedNotesOpen(true)}
               />
             )}
           </div>
