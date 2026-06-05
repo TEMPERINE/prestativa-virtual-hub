@@ -1505,7 +1505,7 @@ export function OfficeScene() {
         />
 
         {/* Elementos sobrepostos (mobília, portas etc.) */}
-        <PropsLayer selfX={pos.x} selfY={pos.y} />
+        <PropsLayer selfX={pos.x} selfY={pos.y} focusedRect={focusedZone?.rect ?? null} />
 
 
 
