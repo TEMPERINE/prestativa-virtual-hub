@@ -2105,11 +2105,10 @@ function TeleportFx({ point, phase }: { point: Point; phase: "out" | "in" }) {
 
 
 
-/** Animated sprite avatar — 6-frame horizontal sheet per direction. */
+/** Animated sprite avatar — delega 100% para AlignedSprite (regra única). */
 function SpriteAvatar({
   facing,
   frame,
-  glowColor,
   spriteId,
 }: {
   facing: Facing;
@@ -2117,99 +2116,13 @@ function SpriteAvatar({
   glowColor?: string;
   spriteId?: string | null;
 }) {
-  const sprite = getSprite(spriteId);
-  // Reference dims = max H across sheets, max W across sheets.
-  // Container size is fixed regardless of facing → no "samba" vertical.
-  const facings: Facing[] = ["down", "up", "left", "right"];
-  const refH = Math.max(...facings.map((f) => sprite.dims[f].h));
-  const refW = Math.max(...facings.map((f) => sprite.dims[f].w));
-  // Para laterais, substitui o frame 3 pelo idle (frame 0) — quebra a sensação de deslizar.
-  const displayFrame = (facing === "left" || facing === "right") && frame === 3 ? 0 : frame;
-
-  // Per-frame horizontal alignment — re-center each frame on the cell so
-  // the character doesn't "samba" sideways between frames of the walk cycle.
-  const [, bumpAlignment] = useState(0);
-  useEffect(() => {
-    facings.forEach((f) => {
-      const useMirror = f === "left" && sprite.mirrorLeftFromRight;
-      const srcFacing: Facing = useMirror ? "right" : f;
-      void ensureFrameOffsets(sprite.sheets[srcFacing]);
-    });
-    const off = subscribeFrameOffsets(() => bumpAlignment((v) => v + 1));
-    return off;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sprite.id]);
-
   return (
-    <div
-      style={{
-        position: "relative",
-        height: "min(9vh, 94px)",
-        aspectRatio: `${refW} / ${refH}`,
-      }}
-    >
-      {/* Contact shadow — anchors the character to the floor */}
-      <div
-        aria-hidden
-        style={{
-          position: "absolute",
-          left: "50%",
-          bottom: "-2%",
-          width: "62%",
-          height: "10%",
-          transform: "translateX(-50%)",
-          background:
-            "radial-gradient(ellipse at center, rgba(0,0,0,0.45) 0%, rgba(0,0,0,0.28) 45%, rgba(0,0,0,0) 72%)",
-          filter: "blur(1.5px)",
-          pointerEvents: "none",
-          zIndex: 0,
-        }}
-      />
-      {facings.map((f) => {
-        // For mirrored-left sprites, render right sheet flipped when facing left.
-        const useMirror = f === "left" && sprite.mirrorLeftFromRight;
-        const srcFacing: Facing = useMirror ? "right" : f;
-        const h = sprite.dims[srcFacing].h;
-        const w = sprite.dims[srcFacing].w;
-        const active = f === facing;
-        const heightPct = (h / refH) * 100;
-        // Per-frame head offset (in cell-w / cell-h units). Compensate so
-        // the head stays locked frame-to-frame (no horizontal samba, no
-        // vertical bob beyond the natural reference position).
-        const offsets = getFrameOffsets(sprite.sheets[srcFacing]);
-        const off = offsets ? offsets[displayFrame] ?? { dx: 0, dy: 0 } : { dx: 0, dy: 0 };
-        // The offset is measured inside the source sheet cell. To keep the
-        // head centered over the shadow, move the crop window in the SAME
-        // direction as the detected drift. Mirroring happens after the crop,
-        // so the sign must not be inverted for left-facing mirrored sprites.
-        const bgPosX = ((displayFrame + off.dx) / (FRAMES - 1)) * 100;
-        // For Y: background is `100% height` of the element so background-position-y
-        // in % doesn't translate directly to pixels. Use a CSS calc that shifts
-        // by a fraction of the element height instead, via translateY on the layer.
-        const dyPct = -off.dy * 100; // negative dy.y compensates downward drift
-        return (
-          <div
-            key={f}
-            style={{
-              position: "absolute",
-              left: "50%",
-              bottom: 0,
-              transform: `translate(-50%, ${dyPct}%) ${useMirror ? "scaleX(-1)" : ""}`,
-              height: `${heightPct}%`,
-              width: `${(w / refW) * 100}%`,
-              backgroundImage: `url(${sprite.sheets[srcFacing]})`,
-              backgroundRepeat: "no-repeat",
-              backgroundSize: `${FRAMES * 100}% 100%`,
-              backgroundPosition: `${bgPosX}% 100%`,
-              imageRendering: "auto",
-              visibility: active ? "visible" : "hidden",
-              filter: "drop-shadow(0 2px 1px rgba(0,0,0,0.25))",
-              zIndex: 1,
-            }}
-          />
-        );
-      })}
-    </div>
+    <AlignedSprite
+      spriteId={spriteId}
+      facing={facing}
+      frame={frame}
+      mode="scene"
+    />
   );
 }
 
