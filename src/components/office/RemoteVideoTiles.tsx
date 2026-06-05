@@ -55,7 +55,7 @@ function VideoEl({ stream }: { stream: MediaStream }) {
 
 function HiddenAudioPlayers({ streams }: { streams: Record<string, MediaStream> }) {
   return (
-    <div className="hidden">
+    <div className="absolute -left-[9999px] top-0 w-px h-px overflow-hidden" aria-hidden>
       {Object.entries(streams).map(([peerId, stream]) => (
         <AudioEl key={peerId} stream={stream} />
       ))}
@@ -66,7 +66,9 @@ function HiddenAudioPlayers({ streams }: { streams: Record<string, MediaStream> 
 function AudioEl({ stream }: { stream: MediaStream }) {
   const ref = useRef<HTMLAudioElement | null>(null);
   useEffect(() => {
-    if (ref.current && ref.current.srcObject !== stream) ref.current.srcObject = stream;
+    if (!ref.current) return;
+    if (ref.current.srcObject !== stream) ref.current.srcObject = stream;
+    void ref.current.play().catch(() => {});
   }, [stream]);
   return <audio ref={ref} autoPlay playsInline />;
 }
