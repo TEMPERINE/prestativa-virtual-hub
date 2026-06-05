@@ -506,10 +506,7 @@ export function MapEditor() {
   // Keyboard shortcuts
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.ctrlKey && (e.key === "z" || e.key === "Z")) {
-        e.preventDefault();
-        undo();
-      } else if (e.key === "Escape") {
+      if (e.key === "Escape") {
         if (tool.kind === "place-prop" || tool.kind === "spawn") {
           setTool({ kind: "blocked" });
         }
@@ -524,6 +521,10 @@ export function MapEditor() {
       if (e.altKey) setAltDown(true);
     };
     const onKeyUp = (e: KeyboardEvent) => {
+      if (e.ctrlKey && (e.key === "z" || e.key === "Z")) {
+        e.preventDefault();
+        undo();
+      }
       if (!e.altKey) setAltDown(false);
     };
     const onBlur = () => setAltDown(false);
