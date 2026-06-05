@@ -691,5 +691,6 @@ export function useRtcMesh(myId: string | null, desiredPeers: string[]): RtcMesh
     videoDevices,
     selectedVideoDeviceId,
     setVideoDevice,
+    prewarmMic,
   };
 }
