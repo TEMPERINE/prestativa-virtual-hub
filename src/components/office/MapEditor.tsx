@@ -19,7 +19,7 @@ import {
 } from "@/lib/map-overrides";
 import { ZONES, COLLIDERS, FLOOR_POLY, type ZoneId } from "@/lib/office-map";
 import { PROP_CATALOG, getPropDef } from "@/lib/prop-catalog";
-import officeMap from "@/assets/office-map.jpg";
+import officeMap from "@/assets/office-map.webp";
 import { toast } from "sonner";
 import { ArrowLeft, Eraser, Square, Download, Trash2, Eye, EyeOff, Undo, Plus, X, Briefcase, Users, MapPin, Hand, Zap, ZapOff, Lock, Map as MapIcon, Boxes, LayoutGrid } from "lucide-react";
 
