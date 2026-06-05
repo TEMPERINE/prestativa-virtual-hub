@@ -476,6 +476,15 @@ export function OfficeScene() {
       });
     reactionChannelRef.current = reactionCh;
 
+    const positionBroadcastCh = supabase
+      .channel(`positions-broadcast:${realtimeChannelSuffix}`, { config: { broadcast: { self: false } } })
+      .on("broadcast", { event: "position" }, (payload) => {
+        const row = payload.payload as RemotePos;
+        if (!row?.user_id) return;
+        setPositions((prev) => ({ ...prev, [row.user_id]: row }));
+      });
+    positionBroadcastChannelRef.current = positionBroadcastCh;
+
     const claimsCh = supabase
       .channel(`claims-room:${realtimeChannelSuffix}`)
       .on(
@@ -501,6 +510,9 @@ export function OfficeScene() {
       }
       ch.subscribe();
       reactionCh.subscribe();
+      positionBroadcastCh.subscribe((status) => {
+        positionBroadcastReadyRef.current = status === "SUBSCRIBED";
+      });
       claimsCh.subscribe();
     })();
 
@@ -579,9 +591,12 @@ export function OfficeScene() {
     return () => {
       supabase.removeChannel(ch);
       supabase.removeChannel(reactionCh);
+      supabase.removeChannel(positionBroadcastCh);
       supabase.removeChannel(claimsCh);
       supabase.removeChannel(notesCh);
       reactionChannelRef.current = null;
+      positionBroadcastChannelRef.current = null;
+      positionBroadcastReadyRef.current = false;
       window.clearInterval(positionsPoll);
       window.removeEventListener("beforeunload", offline);
       offline();
