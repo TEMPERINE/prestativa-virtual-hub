@@ -2602,7 +2602,7 @@ function AvatarHitArea({
   onToggle: () => void;
   menu: React.ReactNode;
 }) {
-  const anchorRef = useRef<HTMLDivElement | null>(null);
+  const anchorRef = useRef<HTMLButtonElement | null>(null);
   const [pos, setPos] = useState<{ left: number; top: number } | null>(null);
 
   useEffect(() => {
@@ -2650,18 +2650,34 @@ function AvatarHitArea({
 
   return (
     <>
-      <div
+      <button
+        type="button"
         ref={anchorRef}
         data-avatar-menu
         className="absolute left-1/2 -translate-x-1/2 pointer-events-auto"
-        style={{ bottom: 0, width: 80, height: 130, cursor: "pointer", zIndex: 2_000_000_000 }}
+        style={{
+          bottom: 0,
+          width: 80,
+          height: 130,
+          cursor: "pointer",
+          zIndex: 2_000_000_000,
+          background: "transparent",
+          border: 0,
+          padding: 0,
+        }}
         onMouseEnter={onHoverIn}
         onMouseLeave={onHoverOut}
-        onMouseDown={(e) => e.stopPropagation()}
+        onPointerDown={(e) => {
+          e.stopPropagation();
+        }}
+        onMouseDown={(e) => {
+          e.stopPropagation();
+        }}
         onClick={(e) => {
           e.stopPropagation();
           onToggle();
         }}
+        aria-label={`Interagir com ${displayName}`}
         title={`Interagir com ${displayName}`}
       />
       {isOpen && pos && typeof document !== "undefined" &&
