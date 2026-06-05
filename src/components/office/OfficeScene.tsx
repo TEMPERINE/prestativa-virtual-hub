@@ -343,7 +343,7 @@ export function OfficeScene() {
     if (!positionHydratedRef.current) return;
     const knownId = meIdRef.current;
     const write = (userId: string) => {
-      const payload = { user_id: userId, x, y, zone: z, facing: f, is_online: true };
+      const payload = { user_id: userId, x, y, zone: z, facing: f, is_online: true, ts: Date.now() };
       const ch = positionBroadcastChannelRef.current;
       if (ch && positionBroadcastReadyRef.current) {
         void ch.send({ type: "broadcast", event: "position", payload });
@@ -351,7 +351,14 @@ export function OfficeScene() {
       const now = performance.now();
       if (persistNow || now - lastPersisted.current > 1000) {
         lastPersisted.current = now;
-        void supabase.from("positions").upsert(payload);
+        void supabase.from("positions").upsert({
+          user_id: userId,
+          x,
+          y,
+          zone: z,
+          facing: f,
+          is_online: true,
+        });
       }
     };
     if (knownId) {
