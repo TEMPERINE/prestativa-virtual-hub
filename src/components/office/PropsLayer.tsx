@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { loadOverrides, subscribeOverridesFromCloud, type PropInstance } from "@/lib/map-overrides";
 import { getPropDef } from "@/lib/prop-catalog";
