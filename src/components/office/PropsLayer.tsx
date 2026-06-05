@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { loadOverrides, subscribeOverridesFromCloud, type PropInstance } from "@/lib/map-overrides";
+import { loadOverrides, subscribeOverridesFromCloud, zoneFromOverrides, type PropInstance } from "@/lib/map-overrides";
 import { getPropDef } from "@/lib/prop-catalog";
 import { publishProps, publishFrames } from "@/lib/prop-gates";
 
@@ -141,6 +141,33 @@ export function PropsLayer({ selfX, selfY, focusedRect = null }: Props) {
       if (!best) return;
       e.preventDefault();
       triggerInteract(best.prop);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [triggerInteract]);
+
+  // Atalho global: Ctrl+X alterna qualquer prop com ação `gate-zone` cuja
+  // zona alvo seja a zona onde o avatar está atualmente. Permite "trancar
+  // a sala" de dentro sem precisar estar perto da porta.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey)) return;
+      if (e.key.toLowerCase() !== "x") return;
+      const target = e.target as HTMLElement | null;
+      const tag = target?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || target?.isContentEditable) return;
+      const me = selfRef.current;
+      const currentZone = zoneFromOverrides({ x: me.x, y: me.y });
+      if (!currentZone) return;
+      const candidates = propsRef.current.filter((p) => {
+        if (!p.interactive || !p.actions) return false;
+        const def = getPropDef(p.defId);
+        if (!def?.interactive) return false;
+        return p.actions.some((a) => a.type === "gate-zone" && a.zoneId === currentZone);
+      });
+      if (candidates.length === 0) return;
+      e.preventDefault();
+      for (const p of candidates) triggerInteract(p);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
