@@ -15,6 +15,8 @@ import officeMap from "@/assets/office-map.jpg";
 import parkLeft from "@/assets/scene-park-left.jpg";
 import roadRight from "@/assets/scene-road-right.jpg";
 import { SPRITES, getSprite, SPRITE_FRAMES as FRAMES, type Facing } from "@/lib/sprite-catalog";
+import { ensureFrameOffsets, getFrameOffsets, subscribeFrameOffsets } from "@/lib/sprite-alignment";
+
 const WALK_FRAME_MS = 110;
 
 function dirFromKey(k: string): Facing | null {
@@ -2015,6 +2017,21 @@ function SpriteAvatar({
   const refW = Math.max(...facings.map((f) => sprite.dims[f].w));
   // Para laterais, substitui o frame 3 pelo idle (frame 0) — quebra a sensação de deslizar.
   const displayFrame = (facing === "left" || facing === "right") && frame === 3 ? 0 : frame;
+
+  // Per-frame horizontal alignment — re-center each frame on the cell so
+  // the character doesn't "samba" sideways between frames of the walk cycle.
+  const [, bumpAlignment] = useState(0);
+  useEffect(() => {
+    facings.forEach((f) => {
+      const useMirror = f === "left" && sprite.mirrorLeftFromRight;
+      const srcFacing: Facing = useMirror ? "right" : f;
+      void ensureFrameOffsets(sprite.sheets[srcFacing]);
+    });
+    const off = subscribeFrameOffsets(() => bumpAlignment((v) => v + 1));
+    return off;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sprite.id]);
+
   return (
     <div
       style={{
@@ -2048,7 +2065,14 @@ function SpriteAvatar({
         const w = sprite.dims[srcFacing].w;
         const active = f === facing;
         const heightPct = (h / refH) * 100;
-        const widthPct = (w / refH) * (refH / refW) * 100; // = (w/refW)*100, kept symmetric
+        // Per-frame X offset (in cell-width units, sign: + = drawn right of center).
+        // We subtract it from the background-position to pull the frame back to center.
+        const offsets = getFrameOffsets(sprite.sheets[srcFacing]);
+        const dxNorm = offsets ? offsets[displayFrame] ?? 0 : 0;
+        // Background-position-x % = (i/(N-1))*100 - dxNorm/(N-1)*100
+        // When mirrored (left from right sheet), the sign of dx flips visually.
+        const signedDx = useMirror ? -dxNorm : dxNorm;
+        const bgPosX = ((displayFrame - signedDx) / (FRAMES - 1)) * 100;
         return (
           <div
             key={f}
@@ -2062,7 +2086,7 @@ function SpriteAvatar({
               backgroundImage: `url(${sprite.sheets[srcFacing]})`,
               backgroundRepeat: "no-repeat",
               backgroundSize: `${FRAMES * 100}% 100%`,
-              backgroundPosition: `${(displayFrame / (FRAMES - 1)) * 100}% 100%`,
+              backgroundPosition: `${bgPosX}% 100%`,
               imageRendering: "auto",
               visibility: active ? "visible" : "hidden",
               filter: "drop-shadow(0 2px 1px rgba(0,0,0,0.25))",
@@ -2074,6 +2098,7 @@ function SpriteAvatar({
     </div>
   );
 }
+
 
 /** Speech-bubble reaction shown above an avatar. */
 function ReactionBubble({ emoji }: { emoji: string | null }) {
