@@ -1452,6 +1452,21 @@ export function OfficeScene() {
 
       let dir = lastDir.current;
 
+      // Follow: keep autoWalk pointing at the leader as they move.
+      if (!dir && followingUidRef.current) {
+        const tgt = positionsRef.current[followingUidRef.current];
+        if (!tgt || !tgt.is_online) {
+          followingUidRef.current = null;
+          setFollowingUid(null);
+          autoWalkRef.current = null;
+        } else {
+          const cur = posRef.current;
+          const d = Math.hypot(tgt.x - cur.x, tgt.y - cur.y);
+          if (d > 0.06) autoWalkRef.current = { x: tgt.x, y: tgt.y };
+          else autoWalkRef.current = null;
+        }
+      }
+
       // Auto-walk: if no manual key, compute a direction toward the target.
       if (!dir && autoWalkRef.current) {
         const cur = posRef.current;
