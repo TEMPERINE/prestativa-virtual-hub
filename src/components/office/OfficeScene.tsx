@@ -19,7 +19,6 @@ import { ensureFrameOffsets, getFrameOffsets, subscribeFrameOffsets } from "@/li
 import { AlignedSprite } from "@/components/sprites/AlignedSprite";
 import { PropsLayer } from "./PropsLayer";
 import { isMoveGated } from "@/lib/prop-gates";
-import { toast } from "sonner";
 
 const WALK_FRAME_MS = 110;
 
