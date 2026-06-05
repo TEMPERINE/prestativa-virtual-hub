@@ -148,7 +148,12 @@ export function AlignedSprite({
   //   no mesmo tamanho no grid de seleção. Sem isso, sprites com cell maior
   //   (ex: Latina, cabelo enorme) acabam visualmente desproporcionais.
   const refH = Math.max(...facings.map((f) => sprite.dims[f].h));
-  const refW = Math.max(...facings.map((f) => sprite.dims[f].w));
+  // Lateral breathing room: bbox crops fit the silhouette tightly, so when
+  // the wrapper aspect ratio equals the tightest dim.w the side facings can
+  // visibly clip (curly hair, swinging arms). Inflate refW so every facing
+  // gets ~12% horizontal slack inside the wrapper.
+  const SCENE_LATERAL_PAD = 1.18;
+  const refW = Math.max(...facings.map((f) => sprite.dims[f].w)) * SCENE_LATERAL_PAD;
   // Referência global: a maior altura de cell entre todas as skins do catálogo.
   // Mantida com folga (300) para que mesmo a maior skin caiba com margem.
   const PREVIEW_REF_H = 300;

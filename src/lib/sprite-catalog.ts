@@ -152,8 +152,8 @@ export const SPRITES: SpriteDef[] = [
     gender: "f",
     sheets: { up: latinaUp, down: latinaDown, left: latinaLeft, right: latinaLeft },
     dims: {
-      down: { w: 176, h: 242 },
-      up: { w: 172, h: 242 },
+      down: { w: 178, h: 242 },
+      up: { w: 176, h: 242 },
       left: { w: 170, h: 246 },
       right: { w: 170, h: 246 },
     },
