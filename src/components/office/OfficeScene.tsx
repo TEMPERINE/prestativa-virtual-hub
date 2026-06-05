@@ -277,6 +277,7 @@ export function OfficeScene() {
   const positionBroadcastChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const positionBroadcastReadyRef = useRef(false);
   const meIdRef = useRef<string | null>(null);
+  const accessTokenRef = useRef<string | null>(null);
   const [myEmail, setMyEmail] = useState<string>("");
   const [editCharOpen, setEditCharOpen] = useState(false);
   const [editProfOpen, setEditProfOpen] = useState(false);
@@ -457,7 +458,11 @@ export function OfficeScene() {
   // otherwise the websocket silently loses access to RLS-protected tables
   // after ~1h and movement events stop arriving.
   useEffect(() => {
+    void supabase.auth.getSession().then(({ data }) => {
+      accessTokenRef.current = data.session?.access_token ?? null;
+    });
     const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
+      accessTokenRef.current = session?.access_token ?? null;
       if ((event === "TOKEN_REFRESHED" || event === "SIGNED_IN") && session?.access_token) {
         try { void supabase.realtime.setAuth(session.access_token); } catch { /* noop */ }
       }
