@@ -130,10 +130,19 @@ export function PropsLayer({ selfX, selfY, focusedRect = null }: Props) {
         const wPct = p.w * 100;
         const hPct = (p.w / def.aspectRatio) * 100;
         // Mesma escala dos avatares (Math.round(y * 1000)) para que props e
-        // personagens se ordenem corretamente por perspectiva: quem está mais
-        // embaixo na tela aparece na frente. Acima do cenário (z >= 1) e
-        // ainda abaixo do overlay de foco (20000+).
-        const zIndex = Math.max(1, Math.round(p.y * 1000));
+        // personagens se ordenem corretamente por perspectiva. Quando uma
+        // zona está focada, props DENTRO dela recebem o mesmo +60000 dos
+        // avatares em foco; props FORA, +20000 (como avatares fora de foco)
+        // — assim a regra "mais abaixo na tela = na frente" se mantém entre
+        // props e avatares dentro/fora da sala focada.
+        const inFocus =
+          !!focusedRect &&
+          p.x >= focusedRect.x1 &&
+          p.x <= focusedRect.x2 &&
+          p.y >= focusedRect.y1 &&
+          p.y <= focusedRect.y2;
+        const focusOffset = focusedRect ? (inFocus ? 60000 : 20000) : 0;
+        const zIndex = focusOffset + Math.max(1, Math.round(p.y * 1000));
         return (
           <img
             key={p.id}
