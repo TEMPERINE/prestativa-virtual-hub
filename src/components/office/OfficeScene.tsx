@@ -87,7 +87,10 @@ type DeskNote = {
   read_at: string | null;
 };
 
-const SPEED = 0.0042;
+const SPEED = 0.0042;            // tamanho do passo na cadência alvo de 60 fps
+const SPEED_PER_SEC = SPEED * 60; // velocidade real (frações de mapa por segundo)
+const MIN_STEP_FACTOR = 0.5;     // não deixa o passo ficar minúsculo em FPS alto
+const MAX_STEP_FACTOR = 3;       // evita pulos enormes quando a aba volta do background
 const SEND_INTERVAL_MS = 120;
 const POSITION_BROADCAST_CHANNEL = "positions-broadcast-v1";
 const POSITION_PRESENCE_CHANNEL = "positions-presence-v1";
