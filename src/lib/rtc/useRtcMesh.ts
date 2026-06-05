@@ -5,6 +5,8 @@ type SignalType = "offer" | "answer" | "ice" | "bye" | "hello";
 type SignalMsg = {
   from: string;
   to: string;
+  sessionId?: string;
+  targetSessionId?: string;
   type: SignalType;
   sdp?: RTCSessionDescriptionInit;
   candidate?: RTCIceCandidateInit | null;
@@ -17,6 +19,8 @@ type PeerEntry = {
   screenTransceiver: RTCRtpTransceiver | null;
   screenSender: RTCRtpSender | null;
   makingOffer: boolean;
+  isOfferer: boolean;
+  pendingIce: RTCIceCandidateInit[];
   remoteStream: MediaStream;
   remoteScreenStream: MediaStream;
 };
@@ -61,7 +65,9 @@ export function useRtcMesh(myId: string | null, desiredPeers: string[]): RtcMesh
   const peersRef = useRef<Map<string, PeerEntry>>(new Map());
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const channelReadyRef = useRef(false);
-  const pendingSignalsRef = useRef<Omit<SignalMsg, "from">[]>([]);
+  const pendingSignalsRef = useRef<Omit<SignalMsg, "from" | "sessionId" | "targetSessionId">[]>([]);
+  const localSessionIdRef = useRef(`${Date.now()}:${Math.random().toString(36).slice(2)}`);
+  const remoteSessionsRef = useRef<Map<string, string>>(new Map());
   const localStreamRef = useRef<MediaStream | null>(null);
   const audioTrackRef = useRef<MediaStreamTrack | null>(null);
   const videoTrackRef = useRef<MediaStreamTrack | null>(null);
