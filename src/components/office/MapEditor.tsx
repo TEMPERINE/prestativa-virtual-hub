@@ -1105,6 +1105,33 @@ export function MapEditor() {
               );
             })}
 
+            {/* Preview esmaecida do prop colado ao cursor */}
+            {tool.kind === "place-prop" && ghostPos && (() => {
+              const def = getPropDef(tool.defId);
+              if (!def) return null;
+              const wPct = def.defaultW * 100;
+              const hPct = (def.defaultW / def.aspectRatio) * 100;
+              return (
+                <img
+                  src={def.frames[0]}
+                  alt=""
+                  draggable={false}
+                  className="absolute pointer-events-none select-none"
+                  style={{
+                    left: `${ghostPos.x * 100}%`,
+                    top: `${ghostPos.y * 100}%`,
+                    width: `${wPct}%`,
+                    height: `${hPct}%`,
+                    transform: "translate(-50%, -100%)",
+                    opacity: 0.45,
+                    imageRendering: "pixelated",
+                    zIndex: 80000,
+                    filter: "drop-shadow(0 0 4px rgba(0,0,0,0.5))",
+                  }}
+                />
+              );
+            })()}
+
             {tool.kind === "place-prop" && (
               <div className="absolute top-2 left-1/2 -translate-x-1/2 pointer-events-none bg-primary text-primary-foreground text-xs px-3 py-1 rounded-full shadow-soft">
                 Clique no mapa para colocar · Esc para cancelar
