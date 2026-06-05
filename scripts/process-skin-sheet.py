@@ -31,37 +31,57 @@ EDGE_ERODE_PASSES = 2 # how many 1-px halo rings to erode around the silhouette
 
 
 def remove_white_bg(arr: np.ndarray) -> np.ndarray:
-    """Remove near-white background AND erode the white halo around the figure.
+    """Remove the white SHEET background only — never punch holes in the art.
+
+    Strategy: flood from the image borders through near-white pixels. Only
+    pixels reachable from outside the silhouette get cleared. White areas
+    INSIDE the character (e.g. Cruella's white hair streaks, white shirts,
+    eye highlights) are isolated by the surrounding darker outline and stay
+    fully opaque.
 
     Passes:
-      1. Solid near-white -> fully transparent.
-      2. Semi-transparent whitish pixels -> alpha killed (anti-aliased halo).
-      3. Edge erosion: opaque whitish pixels that touch a transparent pixel get
-         killed. Repeated EDGE_ERODE_PASSES times to remove the 1-2px white
-         fringe left over from generative AI sheets.
+      1. Flood fill near-white from image borders -> fully transparent.
+      2. Edge erosion: opaque whitish pixels that touch an already-cleared
+         (background) pixel get killed. Repeats EDGE_ERODE_PASSES times to
+         remove the 1-2px anti-aliased fringe. Erosion is restricted to
+         pixels adjacent to true background, so interior whites are safe.
     """
     rgb = arr[..., :3].astype(np.int16)
     a = arr[..., 3].astype(np.int16) if arr.shape[2] == 4 else np.full(arr.shape[:2], 255, np.int16)
 
+    # Background candidate: near-white pixels. Then keep only those connected
+    # to the image border via 8-connectivity flood fill.
     near_white = (rgb[..., 0] >= WHITE_T) & (rgb[..., 1] >= WHITE_T) & (rgb[..., 2] >= WHITE_T)
-    a = np.where(near_white, 0, a)
+    labels, n = ndimage.label(near_white, structure=np.ones((3, 3), dtype=bool))
+    if n > 0:
+        border_labels = set()
+        for side in (labels[0, :], labels[-1, :], labels[:, 0], labels[:, -1]):
+            border_labels.update(int(v) for v in np.unique(side) if v != 0)
+        if border_labels:
+            border_mask = np.isin(labels, list(border_labels))
+            background = border_mask
+        else:
+            background = np.zeros_like(near_white)
+    else:
+        background = np.zeros_like(near_white)
 
-    whitish_soft = (rgb.min(axis=-1) >= 205)
-    a = np.where((a < HALO_ALPHA_T) & whitish_soft, 0, a)
+    a = np.where(background, 0, a)
 
-    # Edge erosion: peel off whitish pixels right at the silhouette boundary.
+    # Edge erosion restricted to the silhouette boundary against true
+    # background (not against interior cavities, which don't exist here).
     whitish_edge = rgb.min(axis=-1) >= 210
+    cleared = background.copy()
     for _ in range(EDGE_ERODE_PASSES):
         opaque = a > 0
-        transparent = ~opaque
-        neighbor_transparent = (
-            np.pad(transparent[:-1, :], ((1, 0), (0, 0))) |
-            np.pad(transparent[1:, :],  ((0, 1), (0, 0))) |
-            np.pad(transparent[:, :-1], ((0, 0), (1, 0))) |
-            np.pad(transparent[:, 1:],  ((0, 0), (0, 1)))
+        neighbor_cleared = (
+            np.pad(cleared[:-1, :], ((1, 0), (0, 0))) |
+            np.pad(cleared[1:, :],  ((0, 1), (0, 0))) |
+            np.pad(cleared[:, :-1], ((0, 0), (1, 0))) |
+            np.pad(cleared[:, 1:],  ((0, 0), (0, 1)))
         )
-        edge_halo = opaque & neighbor_transparent & whitish_edge
+        edge_halo = opaque & neighbor_cleared & whitish_edge
         a = np.where(edge_halo, 0, a)
+        cleared = cleared | edge_halo
 
     out = np.dstack([arr[..., :3], a.astype(np.uint8)])
     return out
