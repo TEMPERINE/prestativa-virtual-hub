@@ -30,6 +30,14 @@ import japaDown from "@/assets/sprites/japa-down.png";
 import japaUp from "@/assets/sprites/japa-up.png";
 import japaLeft from "@/assets/sprites/japa-left.png";
 
+import morenaDown from "@/assets/sprites/morena-down.png";
+import morenaUp from "@/assets/sprites/morena-up.png";
+import morenaLeft from "@/assets/sprites/morena-left.png";
+
+import latinaDown from "@/assets/sprites/latina-down.png";
+import latinaUp from "@/assets/sprites/latina-up.png";
+import latinaLeft from "@/assets/sprites/latina-left.png";
+
 export type Facing = "up" | "down" | "left" | "right";
 
 export type SpriteSheets = Record<Facing, string>;
@@ -122,6 +130,32 @@ export const SPRITES: SpriteDef[] = [
       up: { w: 126, h: 250 },
       left: { w: 126, h: 236 },
       right: { w: 126, h: 236 },
+    },
+    mirrorRightFromLeft: true,
+  },
+  {
+    id: "morena",
+    label: "Morena Iluminada",
+    gender: "f",
+    sheets: { up: morenaUp, down: morenaDown, left: morenaLeft, right: morenaLeft },
+    dims: {
+      down: { w: 154, h: 254 },
+      up: { w: 142, h: 252 },
+      left: { w: 138, h: 236 },
+      right: { w: 138, h: 236 },
+    },
+    mirrorRightFromLeft: true,
+  },
+  {
+    id: "latina",
+    label: "Latina",
+    gender: "f",
+    sheets: { up: latinaUp, down: latinaDown, left: latinaLeft, right: latinaLeft },
+    dims: {
+      down: { w: 200, h: 242 },
+      up: { w: 174, h: 214 },
+      left: { w: 146, h: 210 },
+      right: { w: 146, h: 210 },
     },
     mirrorRightFromLeft: true,
   },
