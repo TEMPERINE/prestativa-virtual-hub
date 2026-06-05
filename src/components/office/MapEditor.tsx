@@ -997,6 +997,7 @@ export function MapEditor() {
               const sel = selectedPropId === pi.id;
               const wPct = pi.w * 100;
               const hPct = (pi.w / def.aspectRatio) * 100;
+              const curFrame = pi.frame ?? 0;
               return (
                 <div
                   key={pi.id}
@@ -1013,20 +1014,34 @@ export function MapEditor() {
                   }}
                   onPointerDown={(e) => {
                     if (tool.kind !== "select") return;
+                    if (e.button !== 0) return; // só botão esquerdo arrasta
                     e.stopPropagation();
                     setSelectedPropId(pi.id);
+                    if (!stageRef.current) return;
+                    const rect = stageRef.current.getBoundingClientRect();
+                    const nx = (e.clientX - rect.left) / rect.width;
+                    const ny = (e.clientY - rect.top) / rect.height;
                     draggingPropRef.current = {
                       id: pi.id,
                       mode: "move",
-                      startX: pi.x,
-                      startY: pi.y,
-                      startW: pi.w,
+                      offX: pi.x - nx, // preserva o ponto exato onde o usuário clicou
+                      offY: pi.y - ny,
+                      aspect: def.aspectRatio,
                     };
                     (stageRef.current as Element | null)?.setPointerCapture?.(e.pointerId);
                   }}
+                  onContextMenu={(e) => {
+                    if (tool.kind !== "select") return;
+                    if (def.frames.length <= 1) return;
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setSelectedPropId(pi.id);
+                    const next = (curFrame + 1) % def.frames.length;
+                    updateProp(pi.id, { frame: next });
+                  }}
                 >
                   <img
-                    src={def.frames[0]}
+                    src={def.frames[curFrame] ?? def.frames[0]}
                     alt=""
                     className="w-full h-full object-contain pointer-events-none select-none"
                     draggable={false}
@@ -1035,28 +1050,38 @@ export function MapEditor() {
                   {sel && tool.kind === "select" && (
                     <>
                       <div className="absolute inset-0 ring-2 ring-primary rounded pointer-events-none" />
-                      {/* Resize handle (canto inferior direito) */}
+                      {/* Resize handle (canto inferior direito) — âncora = canto superior esquerdo */}
                       <div
                         className="absolute -right-1 -bottom-1 w-3 h-3 bg-primary border border-card rounded-sm cursor-nwse-resize"
                         onPointerDown={(e) => {
                           e.stopPropagation();
                           if (!stageRef.current) return;
-                          const rect = stageRef.current.getBoundingClientRect();
+                          const hNorm = pi.w / def.aspectRatio;
                           draggingPropRef.current = {
                             id: pi.id,
                             mode: "resize",
-                            startX: (e.clientX - rect.left) / rect.width,
-                            startY: (e.clientY - rect.top) / rect.height,
-                            startW: pi.w,
+                            anchorLeft: pi.x - pi.w / 2,
+                            anchorTop: pi.y - hNorm,
+                            aspect: def.aspectRatio,
                           };
                           (stageRef.current as Element | null)?.setPointerCapture?.(e.pointerId);
                         }}
                       />
                       {/* Toolbar flutuante */}
                       <div
-                        className="absolute left-1/2 -translate-x-1/2 -top-7 flex items-center gap-1 bg-card border border-border rounded px-1 py-0.5 shadow-soft text-xs"
+                        className="absolute left-1/2 -translate-x-1/2 -top-7 flex items-center gap-1 bg-card border border-border rounded px-1 py-0.5 shadow-soft text-xs whitespace-nowrap"
                         onPointerDown={(e) => e.stopPropagation()}
+                        onContextMenu={(e) => e.stopPropagation()}
                       >
+                        {def.frames.length > 1 && (
+                          <button
+                            onClick={() => updateProp(pi.id, { frame: (curFrame + 1) % def.frames.length })}
+                            title="Alternar frame padrão (ou clique direito)"
+                            className="p-1 rounded text-muted-foreground hover:bg-muted"
+                          >
+                            <span className="text-[10px] font-mono px-0.5">{curFrame + 1}/{def.frames.length}</span>
+                          </button>
+                        )}
                         {def.interactive && (
                           <button
                             onClick={() => togglePropInteractive(pi.id)}
