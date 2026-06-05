@@ -23,10 +23,17 @@ export function PropsLayer({ selfX, selfY, focusedRect = null }: Props) {
     () => loadOverrides()?.props ?? []
   );
   const [frames, setFrames] = useState<Record<string, number>>({});
+  const [, setCatalogVersion] = useState(0);
   const selfRef = useRef({ x: selfX, y: selfY });
   selfRef.current = { x: selfX, y: selfY };
   const propsRef = useRef(propsList);
   propsRef.current = propsList;
+
+  // Carrega elementos personalizados e re-renderiza quando o catálogo muda
+  useEffect(() => {
+    void loadCustomPropsFromCloud();
+    return subscribePropCatalog(() => setCatalogVersion((v) => v + 1));
+  }, []);
 
   // Recarrega lista quando os overrides do mapa mudam
   useEffect(() => {
