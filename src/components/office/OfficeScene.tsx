@@ -2580,7 +2580,111 @@ function TeleportFx({ point, phase }: { point: Point; phase: "out" | "in" }) {
 
 
 
-/** Animated sprite avatar — delega 100% para AlignedSprite (regra única). */
+/**
+ * Hit-area + portal anchor para o sprite remoto. O menu é renderizado via
+ * portal no body, posicionado dinamicamente sobre o sprite (clamp na viewport)
+ * pra nunca ficar fora da tela e estar sempre acima do card da mesa.
+ */
+function AvatarHitArea({
+  profileId,
+  displayName,
+  isOpen,
+  onHoverIn,
+  onHoverOut,
+  onToggle,
+  menu,
+}: {
+  profileId: string;
+  displayName: string;
+  isOpen: boolean;
+  onHoverIn: () => void;
+  onHoverOut: () => void;
+  onToggle: () => void;
+  menu: React.ReactNode;
+}) {
+  const anchorRef = useRef<HTMLDivElement | null>(null);
+  const [pos, setPos] = useState<{ left: number; top: number } | null>(null);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    let raf = 0;
+    const tick = () => {
+      const el = anchorRef.current;
+      if (el) {
+        const r = el.getBoundingClientRect();
+        const menuW = 240;
+        const menuH = 180;
+        const margin = 8;
+        // âncora: direita do sprite, alinhado pelo topo
+        let left = r.right + 12;
+        let top = r.top - 8;
+        if (left + menuW > window.innerWidth - margin) {
+          // não cabe à direita → tenta à esquerda
+          left = r.left - menuW - 12;
+        }
+        if (left < margin) left = margin;
+        if (top + menuH > window.innerHeight - margin) {
+          top = window.innerHeight - menuH - margin;
+        }
+        if (top < margin) top = margin;
+        setPos({ left, top });
+      }
+      raf = window.requestAnimationFrame(tick);
+    };
+    tick();
+    return () => window.cancelAnimationFrame(raf);
+  }, [isOpen]);
+
+  // Fecha ao clicar fora
+  useEffect(() => {
+    if (!isOpen) return;
+    const onDown = (e: MouseEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (!t) return;
+      if (t.closest("[data-avatar-menu]")) return;
+      onToggle();
+    };
+    window.addEventListener("mousedown", onDown);
+    return () => window.removeEventListener("mousedown", onDown);
+  }, [isOpen, onToggle]);
+
+  return (
+    <>
+      <div
+        ref={anchorRef}
+        data-avatar-menu
+        className="absolute left-1/2 -translate-x-1/2 pointer-events-auto"
+        style={{ bottom: 0, width: 80, height: 130, cursor: "pointer", zIndex: 2_000_000_000 }}
+        onMouseEnter={onHoverIn}
+        onMouseLeave={onHoverOut}
+        onMouseDown={(e) => e.stopPropagation()}
+        onClick={(e) => {
+          e.stopPropagation();
+          onToggle();
+        }}
+        title={`Interagir com ${displayName}`}
+      />
+      {isOpen && pos && typeof document !== "undefined" &&
+        createPortal(
+          <div
+            data-avatar-menu
+            style={{
+              position: "fixed",
+              left: pos.left,
+              top: pos.top,
+              zIndex: 2147483647,
+              pointerEvents: "auto",
+            }}
+          >
+            {menu}
+          </div>,
+          document.body,
+        )}
+    </>
+  );
+}
+
+/** Menu derivado do personagem (portalado pelo AvatarHitArea). */
 function AvatarInteractionMenu({
   profile,
   onClose,
@@ -2595,8 +2699,7 @@ function AvatarInteractionMenu({
   return (
     <div
       data-avatar-menu
-      className="absolute left-full ml-3 -top-6 w-56 rounded-xl bg-popover text-popover-foreground shadow-2xl border pointer-events-auto"
-      style={{ zIndex: 1_000_000 }}
+      className="w-60 rounded-xl bg-popover text-popover-foreground shadow-2xl border"
       onMouseDown={(e) => e.stopPropagation()}
       onClick={(e) => e.stopPropagation()}
     >
