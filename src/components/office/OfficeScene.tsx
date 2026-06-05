@@ -1823,6 +1823,22 @@ export function OfficeScene() {
                   {profile.display_name}
                 </div>
                 <div className="relative">
+                  {/* Selection ring on the floor (perspective ellipse) for remote avatars */}
+                  {!isMe && (hoveredAvatarUid === profile.id || avatarMenuUid === profile.id) && (
+                    <div
+                      className="absolute left-1/2 -translate-x-1/2 pointer-events-none"
+                      style={{ bottom: -6, width: 56, height: 16, zIndex: 1 }}
+                    >
+                      <div
+                        className="w-full h-full rounded-[50%] border-2"
+                        style={{
+                          borderColor: "var(--primary)",
+                          boxShadow: "0 0 14px var(--primary), inset 0 0 8px color-mix(in oklab, var(--primary) 40%, transparent)",
+                          animation: "pulse 1.4s ease-in-out infinite",
+                        }}
+                      />
+                    </div>
+                  )}
                   <div className="absolute left-1/2 -translate-x-1/4 -top-5 z-10 pointer-events-none">
                     <ReactionBubble emoji={reactions[profile.id]?.emoji ?? null} />
                   </div>
@@ -1832,6 +1848,30 @@ export function OfficeScene() {
                     glowColor={isMe ? profile.avatar_color : undefined}
                     spriteId={profile.sprite_id}
                   />
+                  {/* Hover/click hit-area for remote avatars (sits over the sprite) */}
+                  {!isMe && (
+                    <div
+                      data-avatar-menu
+                      className="absolute left-1/2 -translate-x-1/2 pointer-events-auto"
+                      style={{ bottom: 0, width: 56, height: 80, cursor: "pointer", zIndex: 5 }}
+                      onMouseEnter={() => setHoveredAvatarUid(profile.id)}
+                      onMouseLeave={() => setHoveredAvatarUid((c) => (c === profile.id ? null : c))}
+                      onMouseDown={(e) => e.stopPropagation()}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setAvatarMenuUid((cur) => (cur === profile.id ? null : profile.id));
+                      }}
+                      title={`Interagir com ${profile.display_name}`}
+                    />
+                  )}
+                  {!isMe && avatarMenuUid === profile.id && (
+                    <AvatarInteractionMenu
+                      profile={profile}
+                      onClose={() => setAvatarMenuUid(null)}
+                      onFollow={() => { startFollowing(profile.id); setAvatarMenuUid(null); }}
+                      onLead={() => { requestLead(profile.id); setAvatarMenuUid(null); }}
+                    />
+                  )}
                 </div>
               </div>
             </div>
