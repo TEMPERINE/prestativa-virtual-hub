@@ -188,18 +188,20 @@ export function PropsLayer({ selfX, selfY, focusedRect = null }: Props) {
               e.stopPropagation();
               triggerInteract(nearestInteractive);
             }}
-            className="absolute -translate-x-1/2 -translate-y-full flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-background/90 border border-border shadow-md text-xs font-medium text-foreground hover:bg-accent hover:text-accent-foreground transition-colors backdrop-blur-sm"
+            className="absolute -translate-x-1/2 -translate-y-full flex items-center gap-1 text-[11px] text-white/90 tracking-wide drop-shadow-[0_1px_2px_rgba(0,0,0,0.7)] hover:text-white transition-colors"
             style={{
               left: `${nearestInteractive.x * 100}%`,
               top: `${topPct}%`,
               zIndex: 1_000_000,
+              fontFamily: 'ui-sans-serif, system-ui, -apple-system, sans-serif',
             }}
             aria-label={`Interagir com ${def.label}`}
           >
-            <kbd className="inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1 rounded bg-primary text-primary-foreground font-mono text-[10px]">
+            <span className="font-medium opacity-80">Aperte</span>
+            <kbd className="font-bold text-white/100">
               {keyLabel}
             </kbd>
-            <span>Interagir</span>
+            <span className="font-medium opacity-80">para interagir</span>
           </button>
         );
       })()}
