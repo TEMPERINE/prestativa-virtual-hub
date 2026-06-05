@@ -1094,7 +1094,7 @@ export function OfficeScene() {
     const rect = zoneRectFromOverrides(zoneId) ?? z.rect;
     // Collect peers already in this zone so we don't land on top of them.
     const occupied: Point[] = Object.entries(positionsRef.current)
-      .filter(([uid, p]) => uid !== meIdRef.current && p && p.zone_id === zoneId)
+      .filter(([uid, p]) => uid !== meIdRef.current && p && p.zone === zoneId)
       .map(([, p]) => ({ x: p.x, y: p.y }));
     // Always pick a random walkable point inside the zone (no fixed spawn/seat)
     // so multiple people teleporting to the same room don't stack.
