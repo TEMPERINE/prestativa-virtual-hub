@@ -117,10 +117,12 @@ function readLocalSavedPosition(userId: string): LocalSavedPosition | null {
     const raw = window.localStorage.getItem(`${LAST_POSITION_KEY_PREFIX}${userId}`);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as Partial<LocalSavedPosition>;
-    if (!Number.isFinite(parsed.x) || !Number.isFinite(parsed.y)) return null;
+    const x = parsed.x;
+    const y = parsed.y;
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
     return {
-      x: parsed.x,
-      y: parsed.y,
+      x: x as number,
+      y: y as number,
       zone: typeof parsed.zone === "string" ? parsed.zone : undefined,
       facing: parsed.facing,
       ts: Number.isFinite(parsed.ts) ? parsed.ts! : 0,
