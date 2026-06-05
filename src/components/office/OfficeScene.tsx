@@ -1434,6 +1434,7 @@ export function OfficeScene() {
           setFollowMe(false);
         }}
         onPointerDown={(e) => {
+          if (placing) return;
           if (e.button !== 0) return;
           // Don't start a drag on interactive children (buttons, etc.)
           const tgt = e.target as HTMLElement;
@@ -1464,6 +1465,10 @@ export function OfficeScene() {
           try { (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId); } catch {}
         }}
         onClickCapture={(e) => {
+          if (placing) {
+            wasDragRef.current = false;
+            return;
+          }
           if (wasDragRef.current) {
             e.stopPropagation();
             e.preventDefault();
@@ -2662,7 +2667,7 @@ function PlacementLayer({
       <button
         type="button"
         onClick={onCancel}
-        className="absolute left-1/2 -translate-x-1/2 bottom-6 z-[120] flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold bg-white text-foreground shadow-soft hover:bg-white/90"
+        className="absolute left-1/2 -translate-x-1/2 bottom-6 z-[200003] flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold bg-white text-foreground shadow-soft hover:bg-white/90"
       >
         <XIcon className="w-4 h-4" /> Cancelar (Esc)
       </button>
