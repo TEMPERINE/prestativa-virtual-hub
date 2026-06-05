@@ -75,6 +75,13 @@ type RemotePos = {
   updated_at?: string;
   ts?: number;
 };
+type LocalSavedPosition = {
+  x: number;
+  y: number;
+  zone?: string;
+  facing?: Facing;
+  ts: number;
+};
 type DeskNote = {
   id: string;
   zone_id: string;
@@ -102,6 +109,40 @@ const timestampForPosition = (p: Partial<Pick<RemotePos, "updated_at" | "ts">>) 
 const distanceBetween = (a: Point, b: Point) => Math.hypot(a.x - b.x, a.y - b.y);
 const validPoint = (p: Point | undefined): p is Point =>
   !!p && Number.isFinite(p.x) && Number.isFinite(p.y);
+const LAST_POSITION_KEY_PREFIX = "office:last-position:v1:";
+
+function readLocalSavedPosition(userId: string): LocalSavedPosition | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(`${LAST_POSITION_KEY_PREFIX}${userId}`);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<LocalSavedPosition>;
+    const x = parsed.x;
+    const y = parsed.y;
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
+    return {
+      x: x as number,
+      y: y as number,
+      zone: typeof parsed.zone === "string" ? parsed.zone : undefined,
+      facing: parsed.facing,
+      ts: Number.isFinite(parsed.ts) ? parsed.ts! : 0,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function writeLocalSavedPosition(userId: string, point: Point, zone: string, facing: Facing) {
+  if (typeof window === "undefined" || !validPoint(point)) return;
+  try {
+    window.localStorage.setItem(
+      `${LAST_POSITION_KEY_PREFIX}${userId}`,
+      JSON.stringify({ x: point.x, y: point.y, zone, facing, ts: Date.now() } satisfies LocalSavedPosition),
+    );
+  } catch {
+    // localStorage can be unavailable in private modes; DB persistence remains the source of truth.
+  }
+}
 
 // "Seat" point of a zone rect — bottom-center, in front of the desk.
 // If that point collides with furniture, walk it upward until it's walkable.
@@ -236,6 +277,7 @@ export function OfficeScene() {
   const positionBroadcastChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const positionBroadcastReadyRef = useRef(false);
   const meIdRef = useRef<string | null>(null);
+  const accessTokenRef = useRef<string | null>(null);
   const [myEmail, setMyEmail] = useState<string>("");
   const [editCharOpen, setEditCharOpen] = useState(false);
   const [editProfOpen, setEditProfOpen] = useState(false);
@@ -416,7 +458,11 @@ export function OfficeScene() {
   // otherwise the websocket silently loses access to RLS-protected tables
   // after ~1h and movement events stop arriving.
   useEffect(() => {
+    void supabase.auth.getSession().then(({ data }) => {
+      accessTokenRef.current = data.session?.access_token ?? null;
+    });
     const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
+      accessTokenRef.current = session?.access_token ?? null;
       if ((event === "TOKEN_REFRESHED" || event === "SIGNED_IN") && session?.access_token) {
         try { void supabase.realtime.setAuth(session.access_token); } catch { /* noop */ }
       }
@@ -429,6 +475,7 @@ export function OfficeScene() {
     const knownId = meIdRef.current;
     const write = (userId: string) => {
       const payload = { user_id: userId, x, y, zone: z, facing: f, is_online: true, ts: Date.now() };
+      writeLocalSavedPosition(userId, { x, y }, z, f);
       const ch = positionBroadcastChannelRef.current;
       if (ch && positionBroadcastReadyRef.current) {
         void ch.send({ type: "broadcast", event: "position", payload });
@@ -562,6 +609,8 @@ export function OfficeScene() {
     posRef.current = np;
     setPos(np);
     const z = { id: toZoneId };
+    const uid = meIdRef.current;
+    if (uid) writeLocalSavedPosition(uid, np, z.id, dir);
     setZone((prev) => (prev !== z.id ? z.id : prev));
     const now = performance.now();
     if (now - lastSent.current > SEND_INTERVAL_MS) {
@@ -605,10 +654,19 @@ export function OfficeScene() {
       // Preserve the last known position on refresh — never snap an existing
       // user back to a spawn point. Only first-time entry uses spawn logic.
       const myClaimZone = Object.entries(cmap).find(([, uid]) => uid === userData.user!.id)?.[0];
+      const localSaved = readLocalSavedPosition(userData.user.id);
       let startPoint: Point;
       const existing = pmap[userData.user.id];
       const hasSavedPos = existing && typeof existing.x === "number" && typeof existing.y === "number";
-      if (hasSavedPos) {
+      const dbTs = timestampForPosition(existing ?? {});
+      const dbLooksLikeSpawn = hasSavedPos && existing.x === SPAWN.x && existing.y === SPAWN.y;
+      const localLooksLikeSpawn = !!localSaved && localSaved.x === SPAWN.x && localSaved.y === SPAWN.y;
+      const localWins = !!localSaved && (!hasSavedPos || localSaved.ts >= dbTs - 1500 || (dbLooksLikeSpawn && !localLooksLikeSpawn));
+      if (localWins) {
+        // The browser copy is written on every movement/unload before the DB
+        // roundtrip finishes, so on hard refresh it is the safest resume point.
+        startPoint = { x: localSaved.x, y: localSaved.y };
+      } else if (hasSavedPos) {
         // Current DB/presence position is authoritative for returning users.
         // Do not collision-correct it here: map overrides can still be loading,
         // and "fixing" it would clobber the live position with a spawn point.
@@ -629,10 +687,11 @@ export function OfficeScene() {
       setPos(safeStart);
       const startZone = zoneAt(safeStart).id;
       setZone(startZone);
-      const startFacing = (existing?.facing as Facing | undefined) ?? facingRef.current;
+      const startFacing = (localWins ? localSaved?.facing : undefined) ?? (existing?.facing as Facing | undefined) ?? facingRef.current;
       facingRef.current = startFacing;
       setFacing(startFacing);
       positionHydratedRef.current = true;
+      writeLocalSavedPosition(userData.user.id, safeStart, startZone, startFacing);
 
       pmap[userData.user.id] = {
         user_id: userData.user.id,
@@ -894,6 +953,7 @@ export function OfficeScene() {
       if (!uid || !positionHydratedRef.current) return;
       const cur = posRef.current;
       const z = zoneAt(cur).id;
+      writeLocalSavedPosition(uid, cur, z, facingRef.current);
       const body = JSON.stringify({
         user_id: uid,
         x: cur.x,
@@ -904,10 +964,11 @@ export function OfficeScene() {
       });
       try {
         const url = `${import.meta.env.VITE_SUPABASE_URL}/rest/v1/positions?on_conflict=user_id`;
+        const token = accessTokenRef.current;
         const headers = {
           "Content-Type": "application/json",
           apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-          Authorization: `Bearer ${(supabase as unknown as { auth: { currentSession?: { access_token: string } } }).auth.currentSession?.access_token ?? import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          Authorization: `Bearer ${token ?? import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
           Prefer: "resolution=merge-duplicates",
         };
         // Prefer fetch keepalive (allows custom headers); fall back to sendBeacon
@@ -986,6 +1047,7 @@ export function OfficeScene() {
       // the init effect hasn't hydrated the saved position yet, and writing
       // SPAWN here would clobber the real DB row and snap us back for peers.
       if (cur.x === SPAWN.x && cur.y === SPAWN.y) return;
+      writeLocalSavedPosition(uid, cur, zoneAt(cur).id, facingRef.current);
       void supabase.from("positions").upsert({
         user_id: uid,
         x: cur.x,
