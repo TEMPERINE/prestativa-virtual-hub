@@ -47,7 +47,27 @@ export type RtcMeshState = {
   videoDevices: MediaDeviceInfo[];
   selectedVideoDeviceId: string | null;
   setVideoDevice: (deviceId: string) => Promise<void>;
+  prewarmMic: () => Promise<void>;
 };
+
+// Apply codec preferences so the SDP offers Opus first (with DTX/FEC) for
+// audio and VP8 first for video — best cross-browser stability for a mesh.
+function preferCodecs(tx: RTCRtpTransceiver, kind: "audio" | "video") {
+  try {
+    type GetCapabilities = (k: string) => RTCRtpCapabilities | null;
+    const getCaps = (RTCRtpSender as unknown as { getCapabilities?: GetCapabilities }).getCapabilities;
+    if (!getCaps) return;
+    const caps = getCaps(kind);
+    if (!caps?.codecs?.length) return;
+    const want = kind === "audio" ? "audio/opus" : "video/VP8";
+    const preferred = caps.codecs.filter((c) => c.mimeType.toLowerCase() === want.toLowerCase());
+    const others = caps.codecs.filter((c) => c.mimeType.toLowerCase() !== want.toLowerCase());
+    if (!preferred.length) return;
+    type SetPrefs = (codecs: RTCRtpCodecCapability[]) => void;
+    const setPrefs = (tx as unknown as { setCodecPreferences?: SetPrefs }).setCodecPreferences;
+    setPrefs?.([...preferred, ...others]);
+  } catch { /* noop */ }
+}
 
 export function useRtcMesh(myId: string | null, desiredPeers: string[]): RtcMeshState {
   const [micOn, setMicOn] = useState(false);
