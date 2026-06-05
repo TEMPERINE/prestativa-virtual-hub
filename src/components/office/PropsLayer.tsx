@@ -129,18 +129,17 @@ export function PropsLayer({ selfX, selfY, focusedRect = null }: Props) {
         const src = def.frames[frame] ?? def.frames[0];
         const wPct = p.w * 100;
         const hPct = (p.w / def.aspectRatio) * 100;
-        // Regras de profundidade:
-        // - Sem sala focada: ordena por Y como os avatares (mais abaixo = na frente).
-        // - Com sala focada: props marcados como `foregroundWhenFocused` (ex.: porta)
-        //   sobem para a frente de todos os avatares, simulando que a porta cobre
-        //   quem está dentro da sala. Demais props seguem a regra padrão.
-        let zIndex: number;
-        if (focusedRect && def.foregroundWhenFocused) {
-          // bem acima do boost de avatar em foco (60000 + y*1000 < 200000)
-          zIndex = 200000 + Math.max(1, Math.round(p.y * 1000));
-        } else {
-          zIndex = Math.max(1, Math.round(p.y * 1000));
-        }
+        // Ponto de comparação de profundidade: por padrão é a base do
+        // bounding box (p.y); em assets com muito alfa transparente abaixo
+        // usamos o meio do conteúdo visível (depthRefY). É esse ponto que
+        // dita quando o avatar passa "na frente" da porta.
+        const hNorm = p.w / def.aspectRatio;
+        const refY = p.y - hNorm * (1 - (def.depthRefY ?? 1));
+        // Quando há uma sala focada, props "de sala" (porta) entram no
+        // mesmo plano dos avatares em foco (que recebem +60000), pra que
+        // a ordenação por Y intercale corretamente porta vs personagem.
+        const focusOffset = focusedRect && def.foregroundWhenFocused ? 60000 : 0;
+        const zIndex = focusOffset + Math.max(1, Math.round(refY * 1000));
         return (
           <img
             key={p.id}

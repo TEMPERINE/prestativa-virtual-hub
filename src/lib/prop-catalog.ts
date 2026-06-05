@@ -13,8 +13,13 @@ export type PropDef = {
   aspectRatio: number;     // largura / altura para preservar proporção
   interactive: boolean;    // suporta tecla de interação
   interactKey?: string;    // tecla minúscula, ex. "x"
-  depthAnchorY?: number;    // 0 = topo visual, 1 = base visual; usado no z-index
-  foregroundWhenFocused?: boolean; // aparece na frente quando pertence à sala focada
+  /** Y (fração do bounding box, 0=topo, 1=base) usado como ponto de
+   *  comparação de profundidade. Padrão = 1 (base). Em assets com muito
+   *  alfa transparente abaixo, usar o meio do conteúdo visível dá o
+   *  resultado correto — o avatar passa "na frente" até esse ponto. */
+  depthRefY?: number;
+  /** Aparece na frente dos avatares quando há uma sala focada. */
+  foregroundWhenFocused?: boolean;
 };
 
 export const PROP_CATALOG: PropDef[] = [
@@ -23,10 +28,11 @@ export const PROP_CATALOG: PropDef[] = [
     label: "Porta",
     frames: [doorClosed.url, doorOpen.url],
     defaultW: 0.08,
-    aspectRatio: 245 / 230, // aproximado das artes enviadas
+    aspectRatio: 233 / 293, // medido a partir do PNG real
     interactive: true,
     interactKey: "x",
-    depthAnchorY: 0.12,
+    // meio do conteúdo visível: o alfa do PNG vai de y=56 a y=284 em 293px
+    depthRefY: 0.58,
     foregroundWhenFocused: true,
   },
 ];
