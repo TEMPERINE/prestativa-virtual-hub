@@ -88,9 +88,14 @@ const SPEED = 0.0042;
 const SEND_INTERVAL_MS = 120;
 const POSITION_BROADCAST_CHANNEL = "positions-broadcast-v1";
 const POSITION_PRESENCE_CHANNEL = "positions-presence-v1";
+const REMOTE_TELEPORT_MIN_DISTANCE = 0.075;
 
 const timestampForPosition = (p: Partial<Pick<RemotePos, "updated_at" | "ts">>) =>
   p.ts ?? (p.updated_at ? Date.parse(p.updated_at) : 0);
+
+const distanceBetween = (a: Point, b: Point) => Math.hypot(a.x - b.x, a.y - b.y);
+const validPoint = (p: Point | undefined): p is Point =>
+  !!p && Number.isFinite(p.x) && Number.isFinite(p.y);
 
 // "Seat" point of a zone rect — bottom-center, in front of the desk.
 // If that point collides with furniture, walk it upward until it's walkable.
