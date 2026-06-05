@@ -359,8 +359,11 @@ export function OfficeScene() {
   }, []);
 
   // ---- WebRTC mesh: voice/video by proximity or same claimed zone ----
-  const PROXIMITY_CONNECT = 0.08;
-  const PROXIMITY_DISCONNECT = 0.12;
+  // Raio de "conversa de corredor": só conecta quando os personagens estão
+  // bem próximos (cerca da distância de um sprite) e desconecta rapidamente
+  // assim que a bolha de papo é rompida.
+  const PROXIMITY_CONNECT = 0.05;
+  const PROXIMITY_DISCONNECT = 0.06;
   const connectedPeersRef = useRef<Set<string>>(new Set());
   const desiredPeers = useMemo(() => {
     const meId = me?.id;
