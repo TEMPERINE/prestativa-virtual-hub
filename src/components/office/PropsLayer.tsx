@@ -4,7 +4,7 @@ import { loadOverrides, subscribeOverridesFromCloud, type PropInstance } from "@
 import { getPropDef } from "@/lib/prop-catalog";
 import { publishProps, publishFrames } from "@/lib/prop-gates";
 
-const INTERACT_RADIUS = 0.06; // distância (em fração do mapa) para o avatar poder interagir
+const INTERACT_RADIUS = 0.1; // distância (em fração do mapa) para o avatar poder interagir
 
 type Props = {
   /** posição normalizada (0..1) do avatar local; usada para gating de tecla */
