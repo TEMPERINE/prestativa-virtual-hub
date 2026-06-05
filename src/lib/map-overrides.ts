@@ -12,6 +12,9 @@ export type CustomZone = { id: string; label: string; color: string; kind?: Zone
 
 export type SpawnPoint = { x: number; y: number };
 
+export type PropAction =
+  | { type: "gate-zone"; zoneId: string; blockedFrame: number };
+
 export type PropInstance = {
   id: string;            // uuid local
   defId: string;         // ref ao PROP_CATALOG
@@ -20,6 +23,7 @@ export type PropInstance = {
   w: number;             // largura normalizada (altura derivada do aspectRatio)
   interactive: boolean;  // toggle pelo editor
   frame?: number;        // frame inicial padrão (se não houver prop_state remoto)
+  actions?: PropAction[]; // efeitos do prop sobre o mundo (ex.: trancar sala)
 };
 
 export type MapOverrides = {
