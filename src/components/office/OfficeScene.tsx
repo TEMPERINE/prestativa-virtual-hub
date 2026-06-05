@@ -686,7 +686,7 @@ export function OfficeScene() {
         setPos(target);
         const z2 = zoneAt(target);
         setZone(z2.id);
-        sendPos(target.x, target.y, z2.id, facingRef.current);
+        sendPos(target.x, target.y, z2.id, facingRef.current, true);
         setTeleport({ from, to: target, phase: "in", id });
       }, 450)
     );
@@ -834,7 +834,7 @@ export function OfficeScene() {
           // Arrived
           autoWalkRef.current = null;
           const z = zoneAt(cur);
-          sendPos(cur.x, cur.y, z.id, facingRef.current);
+          sendPos(cur.x, cur.y, z.id, facingRef.current, true);
         } else {
           // Prefer the larger axis; if blocked, fall back to the other.
           const primary: Facing = adx >= ady
@@ -879,7 +879,7 @@ export function OfficeScene() {
         setFrame(0);
         const cur = posRef.current;
         const z = zoneAt(cur);
-        sendPos(cur.x, cur.y, z.id, facingRef.current);
+        sendPos(cur.x, cur.y, z.id, facingRef.current, true);
       }
       raf = requestAnimationFrame(tick);
     };
