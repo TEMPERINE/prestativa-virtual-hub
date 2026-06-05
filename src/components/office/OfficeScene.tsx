@@ -609,6 +609,8 @@ export function OfficeScene() {
     posRef.current = np;
     setPos(np);
     const z = { id: toZoneId };
+    const uid = meIdRef.current;
+    if (uid) writeLocalSavedPosition(uid, np, z.id, dir);
     setZone((prev) => (prev !== z.id ? z.id : prev));
     const now = performance.now();
     if (now - lastSent.current > SEND_INTERVAL_MS) {
@@ -959,10 +961,11 @@ export function OfficeScene() {
       });
       try {
         const url = `${import.meta.env.VITE_SUPABASE_URL}/rest/v1/positions?on_conflict=user_id`;
+        const token = accessTokenRef.current;
         const headers = {
           "Content-Type": "application/json",
           apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-          Authorization: `Bearer ${(supabase as unknown as { auth: { currentSession?: { access_token: string } } }).auth.currentSession?.access_token ?? import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          Authorization: `Bearer ${token ?? import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
           Prefer: "resolution=merge-duplicates",
         };
         // Prefer fetch keepalive (allows custom headers); fall back to sendBeacon
@@ -1041,6 +1044,7 @@ export function OfficeScene() {
       // the init effect hasn't hydrated the saved position yet, and writing
       // SPAWN here would clobber the real DB row and snap us back for peers.
       if (cur.x === SPAWN.x && cur.y === SPAWN.y) return;
+      writeLocalSavedPosition(uid, cur, zoneAt(cur).id, facingRef.current);
       void supabase.from("positions").upsert({
         user_id: uid,
         x: cur.x,
