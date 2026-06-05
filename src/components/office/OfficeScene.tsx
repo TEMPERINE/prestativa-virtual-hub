@@ -765,6 +765,7 @@ export function OfficeScene() {
       positionBroadcastReadyRef.current = false;
       window.clearInterval(positionsPoll);
       window.clearInterval(presenceHeartbeat);
+      window.clearInterval(persistHeartbeat);
       window.removeEventListener("beforeunload", offline);
       document.removeEventListener("visibilitychange", onVisible);
       window.removeEventListener("focus", onVisible);
