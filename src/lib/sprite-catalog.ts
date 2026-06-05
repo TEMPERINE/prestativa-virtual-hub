@@ -165,17 +165,16 @@ export const SPRITES: SpriteDef[] = [
     mirrorRightFromLeft: true,
   },
   {
-    id: "cruella",
-    label: "Cruella",
+    id: "indi",
+    label: "Indi",
     gender: "f",
-    sheets: { up: cruellaUp, down: cruellaDown, left: cruellaLeft, right: cruellaLeft },
+    sheets: { up: indiUp, down: indiDown, left: indiLeft, right: indiRight },
     dims: {
-      down: { w: 180, h: 256 },
-      up: { w: 168, h: 252 },
-      left: { w: 164, h: 252 },
-      right: { w: 164, h: 252 },
+      down: { w: 108, h: 232 },
+      up: { w: 106, h: 232 },
+      left: { w: 154, h: 232 },
+      right: { w: 162, h: 232 },
     },
-    mirrorRightFromLeft: true,
   },
 ];
 
