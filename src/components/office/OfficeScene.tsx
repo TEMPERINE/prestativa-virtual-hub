@@ -1065,10 +1065,9 @@ export function OfficeScene() {
             >
               <div className="flex flex-col items-center">
                 <div
-                  className={`px-2 py-0.5 rounded-full text-[10px] font-medium whitespace-nowrap mb-0.5 ${
-                    isMe ? "bg-primary text-primary-foreground" : "bg-card/95 text-foreground"
-                  } shadow-soft backdrop-blur-sm`}
+                  className="px-2 py-0.5 rounded-full text-[10px] font-medium whitespace-nowrap mb-0.5 shadow-soft backdrop-blur-sm text-white"
                   style={{
+                    background: profile.avatar_color,
                     border: isMe ? "none" : `1.5px solid ${profile.avatar_color}`,
                   }}
                 >
