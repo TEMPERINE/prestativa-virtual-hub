@@ -422,25 +422,25 @@ export function OfficeScene() {
       });
       setClaims(cmap);
 
-      // If I have a claim, always spawn at that workstation's "seat" point
-      // (bottom-center of the zone — in front of the desk).
+      // Preserve the last known position on refresh — never snap an existing
+      // user back to a spawn point. Only first-time entry uses spawn logic.
       const myClaimZone = Object.entries(cmap).find(([, uid]) => uid === userData.user!.id)?.[0];
       let startPoint: Point;
-      if (myClaimZone) {
+      const existing = pmap[userData.user.id];
+      const hasSavedPos = existing && typeof existing.x === "number" && typeof existing.y === "number";
+      if (hasSavedPos) {
+        const savedStart = { x: existing.x, y: existing.y };
+        startPoint = collides(savedStart) ? randomCorridorPoint() : savedStart;
+      } else if (myClaimZone) {
+        // First entry with a claim → spawn at the workstation seat.
         const z = findZoneById(myClaimZone);
         const sp = spawnPointForZone(myClaimZone);
         const rect = zoneRectFromOverrides(myClaimZone as ZoneId) ?? z?.rect ?? null;
         startPoint = sp ?? (rect ? seatPointForRect(rect) : SPAWN);
       } else {
-        const existing = pmap[userData.user.id];
-        if (existing && typeof existing.x === "number" && typeof existing.y === "number") {
-          const savedStart = { x: existing.x, y: existing.y };
-          startPoint = collides(savedStart) ? randomCorridorPoint() : savedStart;
-        } else {
-          // First time in: drop somewhere random in the corridors so people
-          // don't all pile on top of each other at the default spawn.
-          startPoint = randomCorridorPoint();
-        }
+        // First time in: drop somewhere random in the corridors so people
+        // don't all pile on top of each other at the default spawn.
+        startPoint = randomCorridorPoint();
       }
       const safeStart = collides(startPoint) ? SPAWN : startPoint;
       setPos(safeStart);
