@@ -141,6 +141,9 @@ export function OfficeScene() {
   const [facing, setFacing] = useState<Facing>("down");
   const facingRef = useRef<Facing>("down");
   const [reactions, setReactions] = useState<Record<string, { emoji: string; ts: number }>>({});
+  // Per-remote-user walking animation state. Advances frame while position is changing.
+  const remoteAnimRef = useRef<Map<string, { frame: number; lastMove: number; lastX: number; lastY: number; lastTick: number }>>(new Map());
+  const [remoteFrames, setRemoteFrames] = useState<Record<string, number>>({});
   // zone_id -> user_id (claims)
   const [claims, setClaims] = useState<Record<string, string>>({});
   const [hoveredZone, setHoveredZone] = useState<string | null>(null);
