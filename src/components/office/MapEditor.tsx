@@ -26,6 +26,7 @@ import { ArrowLeft, Eraser, Square, Download, Trash2, Eye, EyeOff, Undo, Plus, X
 type Tool =
   | { kind: "blocked" }
   | { kind: "erase" }
+  | { kind: "erase-zone" }
   | { kind: "zone"; zone: ZoneId }
   | { kind: "spawn"; zone: string }
   | { kind: "place-prop"; defId: string }
@@ -96,6 +97,7 @@ export function MapEditor() {
   const [showEffective, setShowEffective] = useState(true);
   const [dirty, setDirty] = useState(!loadOverrides());
   const painting = useRef(false);
+  const [altDown, setAltDown] = useState(false);
   const historyRef = useRef<MapOverrides[]>([]);
   const [canUndo, setCanUndo] = useState(false);
 
@@ -203,6 +205,14 @@ export function MapEditor() {
     []
   );
 
+  // Effective tool: ALT held swaps paint tools to their eraser counterpart.
+  const effectiveTool: Tool = useMemo(() => {
+    if (!altDown) return tool;
+    if (tool.kind === "blocked") return { kind: "erase" };
+    if (tool.kind === "zone") return { kind: "erase-zone" };
+    return tool;
+  }, [tool, altDown]);
+
   const paintCell = useCallback(
     (col: number, row: number) => {
       setOverrides((prev) => {
@@ -218,13 +228,15 @@ export function MapEditor() {
             const c = col + dc;
             if (r < 0 || r >= next.rows || c < 0 || c >= next.cols) continue;
             const idx = cellIndex(c, r, next.cols);
-            if (tool.kind === "blocked") {
+            if (effectiveTool.kind === "blocked") {
               next.blocked[idx] = 1;
-            } else if (tool.kind === "erase") {
+            } else if (effectiveTool.kind === "erase") {
               next.blocked[idx] = 0;
               next.zones[idx] = null;
-            } else if (tool.kind === "zone") {
-              next.zones[idx] = tool.zone;
+            } else if (effectiveTool.kind === "erase-zone") {
+              next.zones[idx] = null;
+            } else if (effectiveTool.kind === "zone") {
+              next.zones[idx] = effectiveTool.zone;
             }
           }
         }
@@ -232,7 +244,7 @@ export function MapEditor() {
       });
       setDirty(true);
     },
-    [brush, tool]
+    [brush, effectiveTool]
   );
 
   const handlePointer = useCallback(
@@ -467,9 +479,20 @@ export function MapEditor() {
         e.preventDefault();
         removeProp(selectedPropId);
       }
+      if (e.altKey) setAltDown(true);
     };
+    const onKeyUp = (e: KeyboardEvent) => {
+      if (!e.altKey) setAltDown(false);
+    };
+    const onBlur = () => setAltDown(false);
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    window.addEventListener("keyup", onKeyUp);
+    window.addEventListener("blur", onBlur);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("keyup", onKeyUp);
+      window.removeEventListener("blur", onBlur);
+    };
   }, [undo, tool, selectedPropId, removeProp]);
 
   // Pre-render tiles as plain divs would be huge (2560+). Use a canvas overlay.
@@ -638,7 +661,7 @@ export function MapEditor() {
                     } else if (t.id === "elements" && tool.kind !== "select" && tool.kind !== "place-prop") {
                       setTool({ kind: "select" });
                     } else if (t.id === "zones" && (tool.kind === "blocked" || tool.kind === "erase" || tool.kind === "place-prop" || tool.kind === "select")) {
-                      // mantém ferramenta atual ou nada
+                      // mantém ferramenta atual; usuário escolhe uma zona ou borracha
                     }
                   }}
                   className={`flex-1 inline-flex items-center justify-center gap-1.5 text-xs px-2 py-2 border-b-2 transition-colors ${
@@ -668,7 +691,7 @@ export function MapEditor() {
                     color="#ef4444"
                   />
                   <ToolBtn
-                    active={tool.kind === "erase"}
+                    active={tool.kind === "erase" || (altDown && tool.kind === "blocked")}
                     onClick={() => setTool({ kind: "erase" })}
                     icon={<Eraser size={14} />}
                     label="Retirar bloqueio"
@@ -707,7 +730,7 @@ export function MapEditor() {
                     <span className="w-3 h-3 rounded" style={{ background: "rgba(239,68,68,0.55)" }} />
                     Tile bloqueado (avatar não passa)
                   </div>
-                  <p className="text-[11px] mt-1">Clique e arraste para pintar/apagar.</p>
+                  <p className="text-[11px] mt-1">Clique e arraste para pintar/apagar. Segure <kbd className="px-1 rounded bg-muted text-foreground">Alt</kbd> para usar a borracha rapidamente.</p>
                 </div>
               </div>
             )}
@@ -822,8 +845,35 @@ export function MapEditor() {
                     <Plus size={12} /> Adicionar zona
                   </button>
                 </div>
+
+                <div className="mt-4 pt-3 border-t border-border/60 flex flex-col gap-2">
+                  <ToolBtn
+                    active={tool.kind === "erase-zone" || (altDown && tool.kind === "zone")}
+                    onClick={() => setTool({ kind: "erase-zone" })}
+                    icon={<Eraser size={14} />}
+                    label="Apagar área"
+                  />
+                  <div>
+                    <span className="text-[10px] uppercase text-muted-foreground">Tamanho do pincel</span>
+                    <div className="flex items-center gap-1 mt-1">
+                      {[1, 2, 3, 5].map((b) => (
+                        <button
+                          key={b}
+                          onClick={() => setBrush(b)}
+                          className={`text-xs px-2 py-1 rounded flex-1 ${
+                            brush === b ? "bg-primary text-primary-foreground" : "bg-muted"
+                          }`}
+                        >
+                          {b}×{b}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
                 <p className="mt-3 text-[11px] text-muted-foreground">
                   Clique no nome pra pintar a área. <MapPin size={10} className="inline" /> define onde o avatar aparece ao teleportar. <Briefcase size={10} className="inline" /> / <Users size={10} className="inline" /> alterna entre área privada e comum.
+                  <br />Segure <kbd className="px-1 rounded bg-muted text-foreground">Alt</kbd> para usar a borracha sem trocar de ferramenta.
                 </p>
               </div>
             )}
@@ -1009,7 +1059,7 @@ export function MapEditor() {
                 return;
               }
               (e.target as Element).setPointerCapture?.(e.pointerId);
-              if (tool.kind === "blocked" || tool.kind === "erase" || tool.kind === "zone") {
+              if (tool.kind === "blocked" || tool.kind === "erase" || tool.kind === "erase-zone" || tool.kind === "zone") {
                 painting.current = true;
                 pushHistory({
                   ...overrides,
