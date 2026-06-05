@@ -516,8 +516,16 @@ export function OfficeScene() {
             return [...without, row];
           });
         }
-      )
-      .subscribe();
+      );
+    // assina depois que o JWT estiver hidratado no socket de realtime
+    void (async () => {
+      const { data: sess } = await supabase.auth.getSession();
+      const token = sess.session?.access_token;
+      if (token) {
+        try { await supabase.realtime.setAuth(token); } catch { /* noop */ }
+      }
+      notesCh.subscribe();
+    })();
 
     return () => {
       supabase.removeChannel(ch);
