@@ -43,6 +43,8 @@ export type SpriteDef = {
   dims: SpriteDims;
   /** Quando true, a folha "left" é renderizada espelhando a "right" (mais consistente). */
   mirrorLeftFromRight?: boolean;
+  /** Quando true, a folha "right" é renderizada espelhando a "left" (padrão para skins novas). */
+  mirrorRightFromLeft?: boolean;
 };
 
 export const SPRITES: SpriteDef[] = [
@@ -121,7 +123,7 @@ export const SPRITES: SpriteDef[] = [
       left: { w: 126, h: 236 },
       right: { w: 126, h: 236 },
     },
-    mirrorLeftFromRight: true,
+    mirrorRightFromLeft: true,
   },
 ];
 
