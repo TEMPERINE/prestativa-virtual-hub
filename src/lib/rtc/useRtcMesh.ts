@@ -183,9 +183,11 @@ export function useRtcMesh(myId: string | null, desiredPeers: string[]): RtcMesh
     };
 
     pc.onnegotiationneeded = async () => {
+      if (!entry.isOfferer || pc.signalingState !== "stable") return;
       try {
         entry.makingOffer = true;
         const offer = await pc.createOffer();
+        if (pc.signalingState !== "stable") return;
         await pc.setLocalDescription(offer);
         sendSignal({ to: peerId, type: "offer", sdp: pc.localDescription! });
       } catch (err) {
@@ -214,6 +216,7 @@ export function useRtcMesh(myId: string | null, desiredPeers: string[]): RtcMesh
     if (!entry) return;
     try { entry.pc.close(); } catch { /* noop */ }
     peersRef.current.delete(peerId);
+    remoteSessionsRef.current.delete(peerId);
     setRemoteStreams((prev) => {
       const next = { ...prev };
       delete next[peerId];
@@ -235,7 +238,12 @@ export function useRtcMesh(myId: string | null, desiredPeers: string[]): RtcMesh
   // Handle incoming signaling
   const handleSignal = useCallback(async (msg: SignalMsg) => {
     if (!myId || msg.to !== myId || msg.from === myId) return;
+    if (msg.targetSessionId && msg.targetSessionId !== localSessionIdRef.current) return;
     const peerId = msg.from;
+    const knownSessionId = remoteSessionsRef.current.get(peerId);
+    const sessionChanged = !!msg.sessionId && !!knownSessionId && msg.sessionId !== knownSessionId;
+    if (sessionChanged) destroyPeer(peerId);
+    if (msg.sessionId) remoteSessionsRef.current.set(peerId, msg.sessionId);
 
     if (msg.type === "bye") {
       destroyPeer(peerId);
