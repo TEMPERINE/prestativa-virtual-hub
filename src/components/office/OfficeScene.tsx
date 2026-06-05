@@ -450,7 +450,7 @@ export function OfficeScene() {
         // don't all pile on top of each other at the default spawn.
         startPoint = randomCorridorPoint();
       }
-      const safeStart = startPoint;
+      const safeStart = hasSavedPos ? startPoint : (collides(startPoint) ? SPAWN : startPoint);
       posRef.current = safeStart;
       setPos(safeStart);
       const startZone = zoneAt(safeStart).id;
