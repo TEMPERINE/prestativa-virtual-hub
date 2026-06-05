@@ -74,6 +74,24 @@ const SHADOW_STYLES: Record<Mode, CSSProperties> = {
   },
 };
 
+function shouldMirrorFacing(
+  facing: Facing,
+  mirrorLeftFromRight?: boolean,
+  mirrorRightFromLeft?: boolean,
+) {
+  return (facing === "left" && mirrorLeftFromRight) || (facing === "right" && mirrorRightFromLeft);
+}
+
+function getSourceFacing(
+  facing: Facing,
+  mirrorLeftFromRight?: boolean,
+  mirrorRightFromLeft?: boolean,
+): Facing {
+  if (facing === "left" && mirrorLeftFromRight) return "right";
+  if (facing === "right" && mirrorRightFromLeft) return "left";
+  return facing;
+}
+
 export function AlignedSprite({
   spriteId,
   facing,
