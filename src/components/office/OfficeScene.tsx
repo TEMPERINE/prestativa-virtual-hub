@@ -2494,8 +2494,9 @@ function WorkspaceZoneHover({
             style={{
               position: "fixed",
               left: pos.left,
-              top: pos.top,
-              transform: "translate(-50%, -50%)",
+              // Flutua acima do retângulo da mesa pra não cobrir o sprite do personagem
+              top: pos.top - 90,
+              transform: "translate(-50%, -100%)",
               zIndex: 2147483647,
               pointerEvents: "auto",
             }}
