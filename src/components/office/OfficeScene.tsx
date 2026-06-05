@@ -723,6 +723,10 @@ export function OfficeScene() {
       const uid = meIdRef.current;
       if (!uid) return;
       const cur = posRef.current;
+      // Don't persist while we're still on the default SPAWN sentinel —
+      // the init effect hasn't hydrated the saved position yet, and writing
+      // SPAWN here would clobber the real DB row and snap us back for peers.
+      if (cur.x === SPAWN.x && cur.y === SPAWN.y) return;
       void supabase.from("positions").upsert({
         user_id: uid,
         x: cur.x,
@@ -732,6 +736,7 @@ export function OfficeScene() {
         is_online: true,
       });
     }, 2000);
+
 
     // Load + subscribe to desk notes (post-it gifts left on workstations)
     void (async () => {
