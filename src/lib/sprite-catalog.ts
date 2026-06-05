@@ -38,6 +38,10 @@ import latinaDown from "@/assets/sprites/latina-down.png";
 import latinaUp from "@/assets/sprites/latina-up.png";
 import latinaLeft from "@/assets/sprites/latina-left.png";
 
+import cruellaDown from "@/assets/sprites/cruella-down.png";
+import cruellaUp from "@/assets/sprites/cruella-up.png";
+import cruellaLeft from "@/assets/sprites/cruella-left.png";
+
 export type Facing = "up" | "down" | "left" | "right";
 
 export type SpriteSheets = Record<Facing, string>;
@@ -156,6 +160,19 @@ export const SPRITES: SpriteDef[] = [
       up: { w: 176, h: 242 },
       left: { w: 170, h: 246 },
       right: { w: 170, h: 246 },
+    },
+    mirrorRightFromLeft: true,
+  },
+  {
+    id: "cruella",
+    label: "Cruella",
+    gender: "f",
+    sheets: { up: cruellaUp, down: cruellaDown, left: cruellaLeft, right: cruellaLeft },
+    dims: {
+      down: { w: 180, h: 256 },
+      up: { w: 168, h: 252 },
+      left: { w: 164, h: 252 },
+      right: { w: 164, h: 252 },
     },
     mirrorRightFromLeft: true,
   },
