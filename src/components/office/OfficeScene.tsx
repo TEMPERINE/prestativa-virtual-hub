@@ -2005,7 +2005,7 @@ export function OfficeScene() {
             <Link
               to="/office/editor"
               title="Editor de mapa"
-              className="inline-flex items-center justify-center w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 text-white"
+              className="inline-flex items-center justify-center w-9 h-9 rounded-full bg-foreground text-background shadow-lg hover:bg-foreground/85 transition"
             >
               <Pencil className="w-4 h-4" />
             </Link>
