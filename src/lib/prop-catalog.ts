@@ -13,6 +13,8 @@ export type PropDef = {
   aspectRatio: number;     // largura / altura para preservar proporção
   interactive: boolean;    // suporta tecla de interação
   interactKey?: string;    // tecla minúscula, ex. "x"
+  depthAnchorY?: number;    // 0 = topo visual, 1 = base visual; usado no z-index
+  foregroundWhenFocused?: boolean; // aparece na frente quando pertence à sala focada
 };
 
 export const PROP_CATALOG: PropDef[] = [
@@ -24,6 +26,8 @@ export const PROP_CATALOG: PropDef[] = [
     aspectRatio: 245 / 230, // aproximado das artes enviadas
     interactive: true,
     interactKey: "x",
+    depthAnchorY: 0.12,
+    foregroundWhenFocused: true,
   },
 ];
 
