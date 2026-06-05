@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { loadOverrides, subscribeOverridesFromCloud, zoneFromOverrides, type PropInstance } from "@/lib/map-overrides";
-import { getPropDef } from "@/lib/prop-catalog";
+import { getPropDef, subscribePropCatalog } from "@/lib/prop-catalog";
+import { loadCustomPropsFromCloud } from "@/lib/custom-props";
 import { publishProps, publishFrames } from "@/lib/prop-gates";
 
 const INTERACT_RADIUS = 0.1; // distância (em fração do mapa) para o avatar poder interagir
@@ -22,10 +23,17 @@ export function PropsLayer({ selfX, selfY, focusedRect = null }: Props) {
     () => loadOverrides()?.props ?? []
   );
   const [frames, setFrames] = useState<Record<string, number>>({});
+  const [, setCatalogVersion] = useState(0);
   const selfRef = useRef({ x: selfX, y: selfY });
   selfRef.current = { x: selfX, y: selfY };
   const propsRef = useRef(propsList);
   propsRef.current = propsList;
+
+  // Carrega elementos personalizados e re-renderiza quando o catálogo muda
+  useEffect(() => {
+    void loadCustomPropsFromCloud();
+    return subscribePropCatalog(() => setCatalogVersion((v) => v + 1));
+  }, []);
 
   // Recarrega lista quando os overrides do mapa mudam
   useEffect(() => {

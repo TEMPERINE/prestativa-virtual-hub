@@ -18,10 +18,11 @@ import {
   type PropAction,
 } from "@/lib/map-overrides";
 import { ZONES, COLLIDERS, FLOOR_POLY, type ZoneId } from "@/lib/office-map";
-import { PROP_CATALOG, getPropDef } from "@/lib/prop-catalog";
+import { PROP_CATALOG, getPropDef, subscribePropCatalog } from "@/lib/prop-catalog";
+import { loadCustomPropsFromCloud, deleteCustomProp, uploadCustomProp } from "@/lib/custom-props";
 import officeMap from "@/assets/office-map.webp";
 import { toast } from "sonner";
-import { ArrowLeft, Eraser, Square, Download, Trash2, Eye, EyeOff, Undo, Plus, X, Briefcase, Users, MapPin, Hand, Zap, ZapOff, Lock, Map as MapIcon, Boxes, LayoutGrid } from "lucide-react";
+import { ArrowLeft, Eraser, Square, Download, Trash2, Eye, EyeOff, Undo, Plus, X, Briefcase, Users, MapPin, Hand, Zap, ZapOff, Lock, Map as MapIcon, Boxes, LayoutGrid, Upload, Loader2 } from "lucide-react";
 
 type Tool =
   | { kind: "blocked" }
@@ -100,6 +101,47 @@ export function MapEditor() {
   const [altDown, setAltDown] = useState(false);
   const historyRef = useRef<MapOverrides[]>([]);
   const [canUndo, setCanUndo] = useState(false);
+  // bump para re-renderizar quando o catálogo de props muda (uploads, deletes).
+  const [, setCatalogVersion] = useState(0);
+  const [uploading, setUploading] = useState(false);
+
+  // Carrega elementos personalizados da nuvem e re-renderiza quando mudam.
+  useEffect(() => {
+    void loadCustomPropsFromCloud();
+    return subscribePropCatalog(() => setCatalogVersion((v) => v + 1));
+  }, []);
+
+  const onUploadAsset = useCallback(async (file: File) => {
+    const label = window.prompt("Nome do elemento:", file.name.replace(/\.[^.]+$/, ""));
+    if (!label) return;
+    const framesStr = window.prompt(
+      "Quantos frames horizontais a imagem contém?\n(1 = imagem única; 2+ = sprite sheet dividido horizontalmente)",
+      "1"
+    );
+    if (!framesStr) return;
+    const frameCount = Math.max(1, Math.floor(Number(framesStr)) || 1);
+    setUploading(true);
+    try {
+      await uploadCustomProp({ label, file, frameCount });
+      toast.success(`"${label}" adicionado à galeria.`);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      toast.error(`Falha no upload: ${msg}`);
+    } finally {
+      setUploading(false);
+    }
+  }, []);
+
+  const onDeleteCustomProp = useCallback(async (id: string, label: string) => {
+    if (!confirm(`Remover "${label}" da galeria? Isso não apaga instâncias já colocadas no mapa.`)) return;
+    try {
+      await deleteCustomProp(id);
+      toast.success("Elemento removido da galeria.");
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      toast.error(`Falha ao remover: ${msg}`);
+    }
+  }, []);
 
   // Mouse-wheel zoom (anchored to cursor) for precise painting.
   useEffect(() => {
@@ -891,25 +933,55 @@ export function MapEditor() {
                     <Hand size={12} />
                   </button>
                 </div>
+                <label className={`mb-2 flex items-center justify-center gap-2 px-2 py-2 rounded border border-dashed text-[11px] cursor-pointer ${uploading ? "opacity-50 pointer-events-none" : "border-primary/40 text-primary hover:bg-primary/5"}`}>
+                  {uploading ? <Loader2 size={12} className="animate-spin" /> : <Upload size={12} />}
+                  {uploading ? "Enviando..." : "Enviar imagem ou sprite"}
+                  <input
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp,image/gif"
+                    className="hidden"
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      e.currentTarget.value = "";
+                      if (f) void onUploadAsset(f);
+                    }}
+                  />
+                </label>
                 <div className="grid grid-cols-2 gap-2">
                   {PROP_CATALOG.map((def) => {
                     const active = tool.kind === "place-prop" && tool.defId === def.id;
                     return (
-                      <button
-                        key={def.id}
-                        onClick={() => setTool({ kind: "place-prop", defId: def.id })}
-                        className={`flex flex-col items-center gap-1 p-2 rounded border ${active ? "border-primary bg-primary/10" : "border-border hover:bg-muted"}`}
-                        title={`Adicionar ${def.label}`}
-                      >
-                        <img src={def.frames[0]} alt="" className="h-12 object-contain" draggable={false} />
-                        <span className="text-[10px]">{def.label}</span>
-                      </button>
+                      <div key={def.id} className="relative group">
+                        <button
+                          onClick={() => setTool({ kind: "place-prop", defId: def.id })}
+                          className={`w-full flex flex-col items-center gap-1 p-2 rounded border ${active ? "border-primary bg-primary/10" : "border-border hover:bg-muted"}`}
+                          title={`Adicionar ${def.label}${def.frames.length > 1 ? ` (${def.frames.length} frames)` : ""}`}
+                        >
+                          <img src={def.frames[0]} alt="" className="h-12 object-contain" draggable={false} />
+                          <span className="text-[10px] truncate max-w-full">{def.label}</span>
+                          {def.frames.length > 1 && (
+                            <span className="absolute top-1 left-1 text-[9px] bg-primary/80 text-primary-foreground px-1 rounded">
+                              {def.frames.length}f
+                            </span>
+                          )}
+                        </button>
+                        {def.custom && (
+                          <button
+                            onClick={(e) => { e.stopPropagation(); void onDeleteCustomProp(def.id, def.label); }}
+                            className="absolute top-1 right-1 p-0.5 rounded bg-background/80 opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive"
+                            title="Remover da galeria"
+                          >
+                            <X size={10} />
+                          </button>
+                        )}
+                      </div>
                     );
                   })}
                 </div>
                 {tool.kind === "place-prop" && (
                   <p className="text-[10px] text-muted-foreground mt-2">Clique no mapa para colocar. Esc para cancelar.</p>
                 )}
+
 
                 {propsList.length > 0 && (
                   <div className="mt-3 flex flex-col gap-1">
