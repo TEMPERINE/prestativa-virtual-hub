@@ -592,11 +592,15 @@ export function OfficeScene() {
         const prev = presenceLastTs.get(s.user_id) ?? 0;
         if (s.ts <= prev) continue;
         presenceLastTs.set(s.user_id, s.ts);
-        setPositions((p) => ({
-          ...p,
-          [s.user_id]: { user_id: s.user_id, x: s.x, y: s.y, zone: s.zone, facing: s.facing, is_online: true, ts: s.ts },
-        }));
-        positionFreshTs.current.set(s.user_id, s.ts);
+        setPositions((p) => {
+          const curTs = timestampForPosition(p[s.user_id] ?? {}) || (positionFreshTs.current.get(s.user_id) ?? 0);
+          if (s.ts < curTs) return p;
+          positionFreshTs.current.set(s.user_id, s.ts);
+          return {
+            ...p,
+            [s.user_id]: { user_id: s.user_id, x: s.x, y: s.y, zone: s.zone, facing: s.facing, is_online: true, ts: s.ts },
+          };
+        });
       }
     };
     presenceCh.on("presence", { event: "sync" }, () => {
