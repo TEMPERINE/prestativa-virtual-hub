@@ -292,9 +292,11 @@ def main():
     ap.add_argument("--out-cols", type=int, default=6,
                     help="Number of frames per output sheet; pads with idle frame.")
     ap.add_argument("--out", default="src/assets/sprites")
+    ap.add_argument("--include-right", action="store_true",
+                    help="Also process the 4th row as 'right' (skip default mirror).")
     args = ap.parse_args()
     print(f"Processing {args.source} -> skin '{args.skin_id}'")
-    process(args.source, args.skin_id, args.rows, args.cols, args.out, args.out_cols)
+    process(args.source, args.skin_id, args.rows, args.cols, args.out, args.out_cols, args.include_right)
 
 
 
