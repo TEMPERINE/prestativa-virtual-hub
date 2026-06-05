@@ -1248,6 +1248,24 @@ export function OfficeScene() {
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
       const key = e.key.toLowerCase();
+      // Ctrl/Cmd + D — teleport to claimed workspace
+      if (key === "d" && (e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey) {
+        e.preventDefault();
+        teleportToMyClaim();
+        return;
+      }
+      // Ctrl + R — teleport to meeting room
+      if (key === "r" && (e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey) {
+        e.preventDefault();
+        teleportToZone("reuniao", "Sala de Reunião");
+        return;
+      }
+      // Ctrl + F — teleport to feedback room
+      if (key === "f" && (e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey) {
+        e.preventDefault();
+        teleportToZone("feedback", "Sala de Feedback");
+        return;
+      }
       const emoji = EMOJI_MAP[key];
       if (emoji && !e.repeat && !e.metaKey && !e.ctrlKey && !e.altKey) {
         const target = e.target as HTMLElement | null;
@@ -1272,26 +1290,7 @@ export function OfficeScene() {
     };
 
     const up = (e: KeyboardEvent) => {
-      const key = e.key.toLowerCase();
-      // Ctrl/Cmd shortcuts fire on keyup so holding the combo does not spam commands
-      if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey) {
-        if (key === "d") {
-          e.preventDefault();
-          teleportToMyClaim();
-          return;
-        }
-        if (key === "r") {
-          e.preventDefault();
-          teleportToZone("reuniao", "Sala de Reunião");
-          return;
-        }
-        if (key === "f") {
-          e.preventDefault();
-          teleportToZone("feedback", "Sala de Feedback");
-          return;
-        }
-      }
-      const dir = dirFromKey(key);
+      const dir = dirFromKey(e.key.toLowerCase());
       if (!dir) return;
       e.preventDefault();
       keysDown.current.delete(dir);

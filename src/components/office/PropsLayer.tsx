@@ -157,7 +157,6 @@ export function PropsLayer({ selfX, selfY, focusedRect = null }: Props) {
   // Atalho global: Ctrl+X alterna qualquer prop com ação `gate-zone` cuja
   // zona alvo seja a zona onde o avatar está atualmente. Permite "trancar
   // a sala" de dentro sem precisar estar perto da porta.
-  // Dispara no keyup para evitar spam ao segurar o atalho.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (!(e.ctrlKey || e.metaKey)) return;
@@ -178,8 +177,8 @@ export function PropsLayer({ selfX, selfY, focusedRect = null }: Props) {
       e.preventDefault();
       for (const p of candidates) triggerInteract(p);
     };
-    window.addEventListener("keyup", onKey);
-    return () => window.removeEventListener("keyup", onKey);
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
   }, [triggerInteract]);
 
   const rendered = useMemo(() => propsList, [propsList]);
