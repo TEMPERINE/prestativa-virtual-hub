@@ -1853,8 +1853,12 @@ export function OfficeScene() {
                     <div
                       data-avatar-menu
                       className="absolute left-1/2 -translate-x-1/2 pointer-events-auto"
-                      style={{ bottom: 0, width: 56, height: 80, cursor: "pointer", zIndex: 5 }}
-                      onMouseEnter={() => setHoveredAvatarUid(profile.id)}
+                      style={{ bottom: 0, width: 72, height: 110, cursor: "pointer", zIndex: 9999 }}
+                      onMouseEnter={() => {
+                        setHoveredAvatarUid(profile.id);
+                        // Sprite tem prioridade sobre o hover da mesa
+                        setHoveredZone(null);
+                      }}
                       onMouseLeave={() => setHoveredAvatarUid((c) => (c === profile.id ? null : c))}
                       onMouseDown={(e) => e.stopPropagation()}
                       onClick={(e) => {
