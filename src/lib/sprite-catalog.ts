@@ -26,6 +26,11 @@ import afroUp from "@/assets/sprites/afro-up.png";
 import afroLeft from "@/assets/sprites/afro-left.png";
 import afroRight from "@/assets/sprites/afro-right.png";
 
+import japaDown from "@/assets/sprites/japa-down.png";
+import japaUp from "@/assets/sprites/japa-up.png";
+import japaLeft from "@/assets/sprites/japa-left.png";
+import japaRight from "@/assets/sprites/japa-right.png";
+
 export type Facing = "up" | "down" | "left" | "right";
 
 export type SpriteSheets = Record<Facing, string>;
