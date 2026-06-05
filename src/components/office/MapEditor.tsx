@@ -1149,7 +1149,7 @@ export function MapEditor() {
             )}
 
             {/* Props (elementos) — render + handles de edição */}
-            {propsList.map((pi) => {
+            {editorTab === "elements" && propsList.map((pi) => {
               const def = getPropDef(pi.defId);
               if (!def) return null;
               const sel = selectedPropId === pi.id;
