@@ -659,7 +659,9 @@ export function OfficeScene() {
       const existing = pmap[userData.user.id];
       const hasSavedPos = existing && typeof existing.x === "number" && typeof existing.y === "number";
       const dbTs = timestampForPosition(existing ?? {});
-      const localWins = !!localSaved && (!hasSavedPos || localSaved.ts >= dbTs - 1500);
+      const dbLooksLikeSpawn = hasSavedPos && existing.x === SPAWN.x && existing.y === SPAWN.y;
+      const localLooksLikeSpawn = !!localSaved && localSaved.x === SPAWN.x && localSaved.y === SPAWN.y;
+      const localWins = !!localSaved && (!hasSavedPos || localSaved.ts >= dbTs - 1500 || (dbLooksLikeSpawn && !localLooksLikeSpawn));
       if (localWins) {
         // The browser copy is written on every movement/unload before the DB
         // roundtrip finishes, so on hard refresh it is the safest resume point.
@@ -951,6 +953,7 @@ export function OfficeScene() {
       if (!uid || !positionHydratedRef.current) return;
       const cur = posRef.current;
       const z = zoneAt(cur).id;
+      writeLocalSavedPosition(uid, cur, z, facingRef.current);
       const body = JSON.stringify({
         user_id: uid,
         x: cur.x,
