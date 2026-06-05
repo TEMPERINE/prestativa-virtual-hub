@@ -152,6 +152,33 @@ export function OfficeScene() {
     Record<string, { from: Point; to: Point; phase: "out" | "in"; id: number }>
   >({});
   const remoteTeleportTimers = useRef<Map<string, number[]>>(new Map());
+  const startRemoteTeleport = useCallback((userId: string, from: Point, to: Point) => {
+    if (!userId || userId === meIdRef.current || !validPoint(from) || !validPoint(to)) return;
+    const id = Date.now() + Math.random();
+    const prevTimers = remoteTeleportTimers.current.get(userId) ?? [];
+    prevTimers.forEach((t) => window.clearTimeout(t));
+    const timers: number[] = [];
+    setRemoteTeleports((p) => ({ ...p, [userId]: { from, to, phase: "out", id } }));
+    timers.push(
+      window.setTimeout(() => {
+        setRemoteTeleports((p) =>
+          p[userId]?.id === id ? { ...p, [userId]: { ...p[userId], phase: "in" } } : p
+        );
+      }, 450)
+    );
+    timers.push(
+      window.setTimeout(() => {
+        setRemoteTeleports((p) => {
+          if (p[userId]?.id !== id) return p;
+          const next = { ...p };
+          delete next[userId];
+          return next;
+        });
+        remoteTeleportTimers.current.delete(userId);
+      }, 1100)
+    );
+    remoteTeleportTimers.current.set(userId, timers);
+  }, []);
   // Per-remote-user walking animation state. Advances frame while position is changing.
   const remoteAnimRef = useRef<Map<string, { frame: number; lastMove: number; lastX: number; lastY: number; lastTick: number }>>(new Map());
   const [remoteFrames, setRemoteFrames] = useState<Record<string, number>>({});
