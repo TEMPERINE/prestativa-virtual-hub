@@ -1571,6 +1571,7 @@ export function OfficeScene() {
             <IconButton
               active={rtc.micOn}
               onClick={() => {
+                void unlockAudioPlayback();
                 rtc.toggleMic().catch(() => toast.error("Não foi possível acessar o microfone"));
               }}
               title="Microfone"
@@ -1580,6 +1581,7 @@ export function OfficeScene() {
             <IconButton
               active={rtc.camOn}
               onClick={() => {
+                void unlockAudioPlayback();
                 rtc.toggleCam().catch(() => toast.error("Não foi possível acessar a câmera"));
               }}
               title="Câmera"
