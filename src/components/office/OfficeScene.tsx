@@ -1772,7 +1772,44 @@ export function OfficeScene() {
 
         })}
 
+        {/* Bolhas de "conversa de corredor" — raio de alcance de voz/vídeo
+            ao redor de cada personagem que NÃO está numa sala reivindicada.
+            Mostra visualmente onde o microfone/câmera se conectam quando
+            dois colegas se aproximam no corredor. */}
+        {onlineList.map(({ pos: p, profile }) => {
+          const isMe = me?.id === profile.id;
+          const display = isMe ? pos : { x: p.x, y: p.y };
+          const inClaim = Object.values(claims).includes(profile.id);
+          const inRoom = (isMe ? zone : p.zone) !== "lobby";
+          if (inClaim || inRoom) return null;
+          // Diâmetro = 2 * raio de desconexão, em unidades de % do mapa.
+          const diameter = PROXIMITY_DISCONNECT * 2 * 100;
+          return (
+            <div
+              key={`chat-radius-${profile.id}`}
+              className="absolute pointer-events-none"
+              style={{
+                left: `${display.x * 100}%`,
+                top: `${display.y * 100}%`,
+                width: `${diameter}%`,
+                // Perspectiva isométrica → elipse achatada (~45% da largura).
+                height: `${diameter * 0.45}%`,
+                transform: "translate(-50%, -50%)",
+                borderRadius: "50%",
+                background:
+                  "radial-gradient(ellipse at center, rgba(255,255,255,0.28) 0%, rgba(255,255,255,0.12) 55%, rgba(255,255,255,0) 100%)",
+                border: "1px solid rgba(255,255,255,0.35)",
+                boxShadow: "inset 0 0 24px rgba(255,255,255,0.15)",
+                zIndex: Math.round(display.y * 1000) - 1,
+                transition: isMe ? "none" : "left 120ms linear, top 120ms linear",
+              }}
+            />
+          );
+        })}
+
         {/* Avatars */}
+
+
 
         {onlineList.map(({ pos: p, profile }) => {
           const isMe = me?.id === profile.id;
