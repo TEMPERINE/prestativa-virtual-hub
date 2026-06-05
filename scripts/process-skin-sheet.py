@@ -21,11 +21,13 @@ from __future__ import annotations
 import sys, os, argparse
 from PIL import Image
 import numpy as np
+from scipy import ndimage
 
 FACINGS = ["down", "up", "left", "right"]
 ALPHA_T = 24          # treat as transparent below this
 WHITE_T = 238         # near-white threshold for halo cleanup
 HALO_ALPHA_T = 200    # only clean halo where alpha is already partial
+
 
 
 def remove_white_bg(arr: np.ndarray) -> np.ndarray:
@@ -44,36 +46,40 @@ def remove_white_bg(arr: np.ndarray) -> np.ndarray:
 
 
 def bbox(alpha: np.ndarray) -> tuple[int, int, int, int] | None:
-    """Bbox of the TOPMOST connected character blob in the cell.
+    """Bbox of the LARGEST connected blob in the cell.
 
-    The source grid often has the next row's head/shadow bleeding into the
-    bottom of the current cell. We walk down from the first opaque row until
-    we hit a vertical gap of empty rows — everything below the gap belongs
-    to the next character and is ignored.
+    Source grids often have neighboring characters bleeding into the cell
+    (top from row above, bottom from row below, sides from adjacent columns).
+    We pick the biggest connected component to isolate the main character
+    and ignore stray bleed regardless of where it comes from.
     """
     mask = alpha > ALPHA_T
     if not mask.any():
         return None
-    row_has = mask.any(axis=1)
-    ys_all = np.where(row_has)[0]
-    y_top = int(ys_all[0])
-    GAP = 6  # consecutive empty rows that mark the end of THIS character
-    y_bot = y_top
-    empty = 0
-    for y in range(y_top, mask.shape[0]):
-        if row_has[y]:
-            y_bot = y
-            empty = 0
-        else:
-            empty += 1
-            if empty >= GAP:
-                break
-    # Restrict horizontal bbox to this vertical slice.
-    slice_mask = mask[y_top:y_bot + 1]
-    xs = np.where(slice_mask.any(axis=0))[0]
-    if xs.size == 0:
+    # 8-connectivity so anti-aliased thin strands don't fragment the blob.
+    labels, n = ndimage.label(mask, structure=np.ones((3, 3), dtype=bool))
+    if n == 0:
         return None
-    return int(xs[0]), y_top, int(xs[-1]) + 1, y_bot + 1
+    sizes = ndimage.sum(mask, labels, index=np.arange(1, n + 1))
+    main = int(np.argmax(sizes)) + 1
+    # Merge small satellite blobs that are vertically inside the main bbox
+    # (hair tips, earrings) but drop bleed from other characters.
+    ys, xs = np.where(labels == main)
+    y0, y1 = int(ys.min()), int(ys.max()) + 1
+    x0, x1 = int(xs.min()), int(xs.max()) + 1
+    # Expand to include any blob whose own bbox is fully inside main's bbox.
+    for i in range(1, n + 1):
+        if i == main:
+            continue
+        ys2, xs2 = np.where(labels == i)
+        iy0, iy1 = int(ys2.min()), int(ys2.max()) + 1
+        ix0, ix1 = int(xs2.min()), int(xs2.max()) + 1
+        if iy0 >= y0 - 2 and iy1 <= y1 + 2 and ix0 >= x0 - 4 and ix1 <= x1 + 4:
+            y0 = min(y0, iy0); y1 = max(y1, iy1)
+            x0 = min(x0, ix0); x1 = max(x1, ix1)
+    return x0, y0, x1, y1
+
+
 
 
 def robust_center_x(mask: np.ndarray) -> float:
@@ -90,7 +96,7 @@ def robust_center_x(mask: np.ndarray) -> float:
     return float(np.average(np.arange(len(cc)), weights=cc))
 
 
-def process(src_path: str, skin_id: str, rows: int, cols: int, out_dir: str):
+def process(src_path: str, skin_id: str, rows: int, cols: int, out_dir: str, out_cols: int):
     img = Image.open(src_path).convert("RGBA")
     arr = np.array(img)
     arr = remove_white_bg(arr)
@@ -112,66 +118,63 @@ def process(src_path: str, skin_id: str, rows: int, cols: int, out_dir: str):
         max_w_left = 0
         max_w_right = 0
         max_above_foot = 0
-        max_below_foot = 0
 
         for c in range(cols):
             cell = arr[r*cell_h:(r+1)*cell_h, c*cell_w:(c+1)*cell_w].copy()
             bb = bbox(cell[..., 3])
             if bb is None:
-                # blank cell -> skip but reserve slot
                 frames.append(None)
                 continue
             x0, y0, x1, y1 = bb
             crop = cell[y0:y1, x0:x1]
             mask = crop[..., 3] > ALPHA_T
             cx = robust_center_x(mask)
-            foot_y = crop.shape[0]  # feet = bottom of crop (we cropped tight)
+            foot_y = crop.shape[0]
             frames.append((crop, cx, foot_y))
             max_w_left  = max(max_w_left,  int(np.ceil(cx)))
             max_w_right = max(max_w_right, int(np.ceil(crop.shape[1] - cx)))
-            max_above_foot = max(max_above_foot, foot_y)  # = crop height
-            max_below_foot = max(max_below_foot, 0)
+            max_above_foot = max(max_above_foot, foot_y)
 
-        # Add small padding to avoid touching cell edges.
+        # Pad output to out_cols by repeating the idle frame (frame 0).
+        first_real = next((f for f in frames if f is not None), None)
+        while len(frames) < out_cols:
+            frames.append(first_real)
+        frames = frames[:out_cols]
+
         pad_x = 6
         pad_top = 6
         pad_bottom = 6
         out_cw = max_w_left + max_w_right + pad_x * 2
         out_ch = max_above_foot + pad_top + pad_bottom
-        # Snap to even number for crisp scaling.
         if out_cw % 2: out_cw += 1
         if out_ch % 2: out_ch += 1
 
-        sheet = np.zeros((out_ch, out_cw * cols, 4), dtype=np.uint8)
+        sheet = np.zeros((out_ch, out_cw * out_cols, 4), dtype=np.uint8)
 
         for c, fr in enumerate(frames):
             if fr is None:
                 continue
             crop, cx, foot_y = fr
             ch, cw = crop.shape[:2]
-            # Horizontal: align robust center to the cell center.
             cell_cx = out_cw // 2
             dst_x = c * out_cw + cell_cx - int(round(cx))
-            # Vertical: align feet to the same baseline (out_ch - pad_bottom).
             baseline = out_ch - pad_bottom
             dst_y = baseline - foot_y
-            # Clip if needed
             sx0 = max(0, -dst_x); sy0 = max(0, -dst_y)
             dx0 = max(0, dst_x);  dy0 = max(0, dst_y)
-            paste_w = min(cw - sx0, out_cw * cols - dx0)
+            paste_w = min(cw - sx0, out_cw * out_cols - dx0)
             paste_h = min(ch - sy0, out_ch - dy0)
             if paste_w <= 0 or paste_h <= 0:
                 continue
             region = sheet[dy0:dy0+paste_h, dx0:dx0+paste_w]
             src = crop[sy0:sy0+paste_h, sx0:sx0+paste_w]
-            # alpha compose (src over empty -> just copy where src alpha > 0)
             a = src[..., 3:4] / 255.0
             region[:] = (src * a + region * (1 - a)).astype(np.uint8)
             region[..., 3] = np.maximum(region[..., 3], src[..., 3])
 
         out_path = os.path.join(out_dir, f"{skin_id}-{facing}.png")
         Image.fromarray(sheet, "RGBA").save(out_path, optimize=True)
-        print(f"  {facing:5s} -> {out_path}  cell={out_cw}x{out_ch}  sheet={out_cw*cols}x{out_ch}")
+        print(f"  {facing:5s} -> {out_path}  cell={out_cw}x{out_ch}  sheet={out_cw*out_cols}x{out_ch}")
 
 
 def main():
@@ -180,10 +183,14 @@ def main():
     ap.add_argument("skin_id")
     ap.add_argument("--rows", type=int, default=4)
     ap.add_argument("--cols", type=int, default=6)
+    ap.add_argument("--out-cols", type=int, default=6,
+                    help="Number of frames per output sheet; pads with idle frame.")
     ap.add_argument("--out", default="src/assets/sprites")
     args = ap.parse_args()
     print(f"Processing {args.source} -> skin '{args.skin_id}'")
-    process(args.source, args.skin_id, args.rows, args.cols, args.out)
+    process(args.source, args.skin_id, args.rows, args.cols, args.out, args.out_cols)
+
+
 
 
 if __name__ == "__main__":
