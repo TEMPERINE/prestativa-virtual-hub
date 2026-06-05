@@ -21,11 +21,13 @@ from __future__ import annotations
 import sys, os, argparse
 from PIL import Image
 import numpy as np
+from scipy import ndimage
 
 FACINGS = ["down", "up", "left", "right"]
 ALPHA_T = 24          # treat as transparent below this
 WHITE_T = 238         # near-white threshold for halo cleanup
 HALO_ALPHA_T = 200    # only clean halo where alpha is already partial
+
 
 
 def remove_white_bg(arr: np.ndarray) -> np.ndarray:
@@ -44,36 +46,40 @@ def remove_white_bg(arr: np.ndarray) -> np.ndarray:
 
 
 def bbox(alpha: np.ndarray) -> tuple[int, int, int, int] | None:
-    """Bbox of the TOPMOST connected character blob in the cell.
+    """Bbox of the LARGEST connected blob in the cell.
 
-    The source grid often has the next row's head/shadow bleeding into the
-    bottom of the current cell. We walk down from the first opaque row until
-    we hit a vertical gap of empty rows — everything below the gap belongs
-    to the next character and is ignored.
+    Source grids often have neighboring characters bleeding into the cell
+    (top from row above, bottom from row below, sides from adjacent columns).
+    We pick the biggest connected component to isolate the main character
+    and ignore stray bleed regardless of where it comes from.
     """
     mask = alpha > ALPHA_T
     if not mask.any():
         return None
-    row_has = mask.any(axis=1)
-    ys_all = np.where(row_has)[0]
-    y_top = int(ys_all[0])
-    GAP = 6  # consecutive empty rows that mark the end of THIS character
-    y_bot = y_top
-    empty = 0
-    for y in range(y_top, mask.shape[0]):
-        if row_has[y]:
-            y_bot = y
-            empty = 0
-        else:
-            empty += 1
-            if empty >= GAP:
-                break
-    # Restrict horizontal bbox to this vertical slice.
-    slice_mask = mask[y_top:y_bot + 1]
-    xs = np.where(slice_mask.any(axis=0))[0]
-    if xs.size == 0:
+    # 8-connectivity so anti-aliased thin strands don't fragment the blob.
+    labels, n = ndimage.label(mask, structure=np.ones((3, 3), dtype=bool))
+    if n == 0:
         return None
-    return int(xs[0]), y_top, int(xs[-1]) + 1, y_bot + 1
+    sizes = ndimage.sum(mask, labels, index=np.arange(1, n + 1))
+    main = int(np.argmax(sizes)) + 1
+    # Merge small satellite blobs that are vertically inside the main bbox
+    # (hair tips, earrings) but drop bleed from other characters.
+    ys, xs = np.where(labels == main)
+    y0, y1 = int(ys.min()), int(ys.max()) + 1
+    x0, x1 = int(xs.min()), int(xs.max()) + 1
+    # Expand to include any blob whose own bbox is fully inside main's bbox.
+    for i in range(1, n + 1):
+        if i == main:
+            continue
+        ys2, xs2 = np.where(labels == i)
+        iy0, iy1 = int(ys2.min()), int(ys2.max()) + 1
+        ix0, ix1 = int(xs2.min()), int(xs2.max()) + 1
+        if iy0 >= y0 - 2 and iy1 <= y1 + 2 and ix0 >= x0 - 4 and ix1 <= x1 + 4:
+            y0 = min(y0, iy0); y1 = max(y1, iy1)
+            x0 = min(x0, ix0); x1 = max(x1, ix1)
+    return x0, y0, x1, y1
+
+
 
 
 def robust_center_x(mask: np.ndarray) -> float:
