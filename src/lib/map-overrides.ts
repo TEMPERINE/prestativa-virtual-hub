@@ -19,6 +19,7 @@ export type PropInstance = {
   y: number;
   w: number;             // largura normalizada (altura derivada do aspectRatio)
   interactive: boolean;  // toggle pelo editor
+  frame?: number;        // frame inicial padrão (se não houver prop_state remoto)
 };
 
 export type MapOverrides = {

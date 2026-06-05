@@ -278,7 +278,24 @@ export function MapEditor() {
   const draggingPin = useRef<string | null>(null);
   const propsList = overrides.props ?? [];
   const [selectedPropId, setSelectedPropId] = useState<string | null>(null);
-  const draggingPropRef = useRef<{ id: string; mode: "move" | "resize"; startX: number; startY: number; startW: number } | null>(null);
+  const draggingPropRef = useRef<
+    | {
+        id: string;
+        mode: "move";
+        offX: number; // pi.x - mouseNx no início
+        offY: number;
+        aspect: number;
+      }
+    | {
+        id: string;
+        mode: "resize";
+        anchorLeft: number; // canto oposto (fixo durante o resize)
+        anchorTop: number;
+        aspect: number;
+      }
+    | null
+  >(null);
+  const [ghostPos, setGhostPos] = useState<{ x: number; y: number } | null>(null);
 
   const updateProp = useCallback((id: string, patch: Partial<PropInstance>) => {
     setOverrides((prev) => ({
@@ -851,25 +868,38 @@ export function MapEditor() {
                 moveSpawnToPointer(e, draggingPin.current);
                 return;
               }
-              if (draggingPropRef.current && stageRef.current) {
-                const rect = stageRef.current.getBoundingClientRect();
-                const nx = (e.clientX - rect.left) / rect.width;
-                const ny = (e.clientY - rect.top) / rect.height;
+              if (!stageRef.current) return;
+              const rect = stageRef.current.getBoundingClientRect();
+              const nx = (e.clientX - rect.left) / rect.width;
+              const ny = (e.clientY - rect.top) / rect.height;
+              if (tool.kind === "place-prop") {
+                setGhostPos({ x: nx, y: ny });
+              }
+              if (draggingPropRef.current) {
                 const drag = draggingPropRef.current;
                 if (drag.mode === "move") {
                   updateProp(drag.id, {
-                    x: Math.max(0, Math.min(1, nx)),
-                    y: Math.max(0, Math.min(1, ny)),
+                    x: Math.max(0, Math.min(1, nx + drag.offX)),
+                    y: Math.max(0, Math.min(1, ny + drag.offY)),
                   });
                 } else {
-                  const dx = nx - drag.startX;
-                  const nextW = Math.max(0.01, Math.min(0.6, drag.startW + dx * 2));
-                  updateProp(drag.id, { w: nextW });
+                  // Resize ancorado no canto oposto (estilo PowerPoint).
+                  // anchorLeft/anchorTop ficam fixos; calculamos nova largura
+                  // a partir da distância horizontal do cursor até a âncora,
+                  // mantendo a proporção.
+                  const newW = Math.max(0.01, Math.min(0.8, nx - drag.anchorLeft));
+                  const newH = newW / drag.aspect;
+                  updateProp(drag.id, {
+                    w: newW,
+                    x: drag.anchorLeft + newW / 2,
+                    y: drag.anchorTop + newH,
+                  });
                 }
                 return;
               }
               if (painting.current) handlePointer(e);
             }}
+            onPointerLeave={() => { if (tool.kind === "place-prop") setGhostPos(null); }}
             onPointerUp={() => { painting.current = false; draggingPin.current = null; draggingPropRef.current = null; }}
             onPointerCancel={() => { painting.current = false; draggingPin.current = null; draggingPropRef.current = null; }}
           >
@@ -967,6 +997,7 @@ export function MapEditor() {
               const sel = selectedPropId === pi.id;
               const wPct = pi.w * 100;
               const hPct = (pi.w / def.aspectRatio) * 100;
+              const curFrame = pi.frame ?? 0;
               return (
                 <div
                   key={pi.id}
@@ -983,20 +1014,34 @@ export function MapEditor() {
                   }}
                   onPointerDown={(e) => {
                     if (tool.kind !== "select") return;
+                    if (e.button !== 0) return; // só botão esquerdo arrasta
                     e.stopPropagation();
                     setSelectedPropId(pi.id);
+                    if (!stageRef.current) return;
+                    const rect = stageRef.current.getBoundingClientRect();
+                    const nx = (e.clientX - rect.left) / rect.width;
+                    const ny = (e.clientY - rect.top) / rect.height;
                     draggingPropRef.current = {
                       id: pi.id,
                       mode: "move",
-                      startX: pi.x,
-                      startY: pi.y,
-                      startW: pi.w,
+                      offX: pi.x - nx, // preserva o ponto exato onde o usuário clicou
+                      offY: pi.y - ny,
+                      aspect: def.aspectRatio,
                     };
                     (stageRef.current as Element | null)?.setPointerCapture?.(e.pointerId);
                   }}
+                  onContextMenu={(e) => {
+                    if (tool.kind !== "select") return;
+                    if (def.frames.length <= 1) return;
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setSelectedPropId(pi.id);
+                    const next = (curFrame + 1) % def.frames.length;
+                    updateProp(pi.id, { frame: next });
+                  }}
                 >
                   <img
-                    src={def.frames[0]}
+                    src={def.frames[curFrame] ?? def.frames[0]}
                     alt=""
                     className="w-full h-full object-contain pointer-events-none select-none"
                     draggable={false}
@@ -1005,28 +1050,38 @@ export function MapEditor() {
                   {sel && tool.kind === "select" && (
                     <>
                       <div className="absolute inset-0 ring-2 ring-primary rounded pointer-events-none" />
-                      {/* Resize handle (canto inferior direito) */}
+                      {/* Resize handle (canto inferior direito) — âncora = canto superior esquerdo */}
                       <div
                         className="absolute -right-1 -bottom-1 w-3 h-3 bg-primary border border-card rounded-sm cursor-nwse-resize"
                         onPointerDown={(e) => {
                           e.stopPropagation();
                           if (!stageRef.current) return;
-                          const rect = stageRef.current.getBoundingClientRect();
+                          const hNorm = pi.w / def.aspectRatio;
                           draggingPropRef.current = {
                             id: pi.id,
                             mode: "resize",
-                            startX: (e.clientX - rect.left) / rect.width,
-                            startY: (e.clientY - rect.top) / rect.height,
-                            startW: pi.w,
+                            anchorLeft: pi.x - pi.w / 2,
+                            anchorTop: pi.y - hNorm,
+                            aspect: def.aspectRatio,
                           };
                           (stageRef.current as Element | null)?.setPointerCapture?.(e.pointerId);
                         }}
                       />
                       {/* Toolbar flutuante */}
                       <div
-                        className="absolute left-1/2 -translate-x-1/2 -top-7 flex items-center gap-1 bg-card border border-border rounded px-1 py-0.5 shadow-soft text-xs"
+                        className="absolute left-1/2 -translate-x-1/2 -top-7 flex items-center gap-1 bg-card border border-border rounded px-1 py-0.5 shadow-soft text-xs whitespace-nowrap"
                         onPointerDown={(e) => e.stopPropagation()}
+                        onContextMenu={(e) => e.stopPropagation()}
                       >
+                        {def.frames.length > 1 && (
+                          <button
+                            onClick={() => updateProp(pi.id, { frame: (curFrame + 1) % def.frames.length })}
+                            title="Alternar frame padrão (ou clique direito)"
+                            className="p-1 rounded text-muted-foreground hover:bg-muted"
+                          >
+                            <span className="text-[10px] font-mono px-0.5">{curFrame + 1}/{def.frames.length}</span>
+                          </button>
+                        )}
                         {def.interactive && (
                           <button
                             onClick={() => togglePropInteractive(pi.id)}
@@ -1049,6 +1104,33 @@ export function MapEditor() {
                 </div>
               );
             })}
+
+            {/* Preview esmaecida do prop colado ao cursor */}
+            {tool.kind === "place-prop" && ghostPos && (() => {
+              const def = getPropDef(tool.defId);
+              if (!def) return null;
+              const wPct = def.defaultW * 100;
+              const hPct = (def.defaultW / def.aspectRatio) * 100;
+              return (
+                <img
+                  src={def.frames[0]}
+                  alt=""
+                  draggable={false}
+                  className="absolute pointer-events-none select-none"
+                  style={{
+                    left: `${ghostPos.x * 100}%`,
+                    top: `${ghostPos.y * 100}%`,
+                    width: `${wPct}%`,
+                    height: `${hPct}%`,
+                    transform: "translate(-50%, -100%)",
+                    opacity: 0.45,
+                    imageRendering: "pixelated",
+                    zIndex: 80000,
+                    filter: "drop-shadow(0 0 4px rgba(0,0,0,0.5))",
+                  }}
+                />
+              );
+            })()}
 
             {tool.kind === "place-prop" && (
               <div className="absolute top-2 left-1/2 -translate-x-1/2 pointer-events-none bg-primary text-primary-foreground text-xs px-3 py-1 rounded-full shadow-soft">
