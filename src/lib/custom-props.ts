@@ -15,16 +15,19 @@ export async function loadCustomPropsFromCloud(): Promise<void> {
     console.warn("[custom-props] load falhou", error);
     return;
   }
-  const defs: PropDef[] = (data ?? []).map((r: Row) => ({
-    id: r.id,
-    label: r.label,
-    frames: (r.frames as unknown as string[]) ?? [],
-    defaultW: r.default_w ?? 0.08,
-    aspectRatio: r.aspect_ratio ?? 1,
-    interactive: ((r.frames as unknown as string[]) ?? []).length > 1,
-    interactKey: "x",
-    custom: true,
-  }));
+  const defs: PropDef[] = (data ?? []).map((r) => {
+    const frames = (Array.isArray(r.frames) ? (r.frames as unknown as string[]) : []);
+    return {
+      id: r.id,
+      label: r.label,
+      frames,
+      defaultW: r.default_w ?? 0.08,
+      aspectRatio: r.aspect_ratio ?? 1,
+      interactive: frames.length > 1,
+      interactKey: "x",
+      custom: true,
+    };
+  });
   setCustomProps(defs);
 }
 
