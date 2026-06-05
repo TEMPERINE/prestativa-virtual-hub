@@ -1446,7 +1446,7 @@ export function OfficeScene() {
       window.removeEventListener("keyup", up);
       window.removeEventListener("blur", blur);
     };
-  }, [setLocalFacing, sendReaction, teleportToMyClaim]);
+  }, [setLocalFacing, sendReaction, teleportToMyClaim, sendPos]);
 
   // movement + animation loop
   useEffect(() => {
