@@ -1091,9 +1091,14 @@ export function OfficeScene() {
       toast.info(`Você já está em ${label ?? z.label}.`);
       return;
     }
-    const sp = spawnPointForZone(zoneId);
     const rect = zoneRectFromOverrides(zoneId) ?? z.rect;
-    const target = sp ?? seatPointForRect(rect);
+    // Collect peers already in this zone so we don't land on top of them.
+    const occupied: Point[] = Object.entries(positionsRef.current)
+      .filter(([uid, p]) => uid !== meIdRef.current && p && p.zone_id === zoneId)
+      .map(([, p]) => ({ x: p.x, y: p.y }));
+    // Always pick a random walkable point inside the zone (no fixed spawn/seat)
+    // so multiple people teleporting to the same room don't stack.
+    const target = randomPointInRect(rect, occupied, 0.05);
     const from = { ...posRef.current };
 
 
