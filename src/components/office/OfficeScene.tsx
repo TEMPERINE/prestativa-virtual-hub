@@ -2602,7 +2602,7 @@ function AvatarHitArea({
   onToggle: () => void;
   menu: React.ReactNode;
 }) {
-  const anchorRef = useRef<HTMLDivElement | null>(null);
+  const anchorRef = useRef<HTMLButtonElement | null>(null);
   const [pos, setPos] = useState<{ left: number; top: number } | null>(null);
 
   useEffect(() => {
