@@ -142,6 +142,11 @@ export function OfficeScene() {
   const [facing, setFacing] = useState<Facing>("down");
   const facingRef = useRef<Facing>("down");
   const [reactions, setReactions] = useState<Record<string, { emoji: string; ts: number }>>({});
+  // Active remote-user teleport effects (so others see the sparkle/fade like a game).
+  const [remoteTeleports, setRemoteTeleports] = useState<
+    Record<string, { from: Point; to: Point; phase: "out" | "in"; id: number }>
+  >({});
+  const remoteTeleportTimers = useRef<Map<string, number[]>>(new Map());
   // Per-remote-user walking animation state. Advances frame while position is changing.
   const remoteAnimRef = useRef<Map<string, { frame: number; lastMove: number; lastX: number; lastY: number; lastTick: number }>>(new Map());
   const [remoteFrames, setRemoteFrames] = useState<Record<string, number>>({});
