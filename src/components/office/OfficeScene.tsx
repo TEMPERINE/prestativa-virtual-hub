@@ -994,7 +994,7 @@ export function OfficeScene() {
         facing: facingRef.current,
         is_online: true,
       });
-    }, 2000);
+    }, 750);
 
 
     // Load + subscribe to desk notes (post-it gifts left on workstations)
