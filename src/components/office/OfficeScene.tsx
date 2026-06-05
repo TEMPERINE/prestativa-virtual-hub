@@ -51,6 +51,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { ProfileMenu } from "@/components/profile/ProfileMenu";
+import { SavedNotesDialog } from "@/components/profile/SavedNotesDialog";
 import { EditCharacterModal } from "@/components/profile/EditCharacterModal";
 import { EditProfileModal } from "@/components/profile/EditProfileModal";
 import { OnboardingWizard } from "@/components/onboarding/OnboardingWizard";
@@ -226,6 +227,8 @@ export function OfficeScene() {
   const [placing, setPlacing] = useState<{ zoneId: string; recipientId: string; body: string } | null>(null);
   const [cursor, setCursor] = useState<{ x: number; y: number } | null>(null);
   const [openingNote, setOpeningNote] = useState<DeskNote | null>(null);
+  const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
+  const [savedNotesOpen, setSavedNotesOpen] = useState(false);
   const reactionChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const positionBroadcastChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const positionBroadcastReadyRef = useRef(false);
@@ -1045,6 +1048,33 @@ export function OfficeScene() {
     };
   }, []);
 
+  // Atalho: pressionar X dentro de uma zona que tenha um recadinho para mim,
+  // abre o recadinho (mesmo comportamento da overlay flutuante).
+  const notesRef = useRef(notes);
+  notesRef.current = notes;
+  const zoneRef = useRef(zone);
+  zoneRef.current = zone;
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      if (e.key.toLowerCase() !== "x") return;
+      const target = e.target as HTMLElement | null;
+      const tag = target?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || target?.isContentEditable) return;
+      const uid = meIdRef.current;
+      if (!uid) return;
+      const curZone = zoneRef.current;
+      const candidate = notesRef.current.find(
+        (n) => n.recipient_id === uid && n.zone_id === curZone
+      );
+      if (!candidate) return;
+      e.preventDefault();
+      setOpeningNote(candidate);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
   const claimZone = useCallback(async (zoneId: string) => {
     const uid = meIdRef.current;
     if (!uid) return;
@@ -1678,29 +1708,74 @@ export function OfficeScene() {
         {/* Desk notes (post-it gifts) sitting on workstations */}
         {notes.map((n) => {
           const isForMe = me?.id === n.recipient_id;
+          const isMine = me?.id === n.sender_id;
           const sender = profiles[n.sender_id];
+          const interactive = isForMe || isMine;
+          const isSelected = selectedNoteId === n.id && isMine;
+          const inMyZone = isForMe && zone === n.zone_id;
           return (
-            <button
+            <div
               key={n.id}
-              type="button"
-              onClick={() => isForMe && setOpeningNote(n)}
               className="absolute"
               style={{
                 left: `${n.x * 100}%`,
                 top: `${n.y * 100}%`,
                 transform: "translate(-50%, -85%)",
                 zIndex: Math.round(n.y * 1000) + 5,
-                cursor: isForMe ? "pointer" : "default",
-                pointerEvents: isForMe ? "auto" : "none",
+                pointerEvents: interactive ? "auto" : "none",
               }}
-              title={
-                isForMe
-                  ? `Recadinho de ${sender?.display_name ?? "alguém"} — clique para abrir`
-                  : `Recadinho para ${profiles[n.recipient_id]?.display_name ?? ""}`
-              }
             >
-              <GiftSprite color={sender?.avatar_color} bounce={isForMe} />
-            </button>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (isForMe) setOpeningNote(n);
+                  else if (isMine) setSelectedNoteId((cur) => (cur === n.id ? null : n.id));
+                }}
+                className="block"
+                style={{ cursor: interactive ? "pointer" : "default" }}
+                title={
+                  isForMe
+                    ? `Recadinho de ${sender?.display_name ?? "alguém"} — clique ou aperte X`
+                    : isMine
+                      ? "Seu recadinho — clique para cancelar"
+                      : `Recadinho para ${profiles[n.recipient_id]?.display_name ?? ""}`
+                }
+              >
+                <GiftSprite color={sender?.avatar_color} bounce={isForMe} />
+              </button>
+
+              {/* Overlay "Aperte X" para o destinatário quando está na mesma sala */}
+              {inMyZone && (
+                <div
+                  className="absolute left-1/2 -translate-x-1/2 -top-7 flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-black/70 backdrop-blur-sm text-[11px] text-white/90 shadow-lg whitespace-nowrap pointer-events-none"
+                  style={{ fontFamily: "ui-sans-serif, system-ui, -apple-system, sans-serif" }}
+                >
+                  <span className="opacity-80">Aperte</span>
+                  <kbd className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded bg-white/15 border border-white/20 font-bold text-white text-[10px] leading-none">X</kbd>
+                  <span className="opacity-80">para ler</span>
+                </div>
+              )}
+
+              {/* Botão excluir para quem enviou */}
+              {isSelected && (
+                <button
+                  type="button"
+                  onClick={async (e) => {
+                    e.stopPropagation();
+                    const id = n.id;
+                    const { error } = await supabase.from("desk_notes").delete().eq("id", id);
+                    if (error) { toast.error("Não foi possível excluir."); return; }
+                    setNotes((p) => p.filter((x) => x.id !== id));
+                    setSelectedNoteId(null);
+                    toast.success("Recadinho cancelado.");
+                  }}
+                  className="absolute left-1/2 -translate-x-1/2 -bottom-8 flex items-center gap-1 px-2 py-1 rounded-full bg-destructive text-destructive-foreground text-[11px] font-medium shadow-lg hover:opacity-90 whitespace-nowrap"
+                >
+                  🗑️ Cancelar recadinho
+                </button>
+              )}
+            </div>
           );
         })}
 
@@ -1883,15 +1958,7 @@ export function OfficeScene() {
       {/* Read note dialog */}
       <Dialog
         open={!!openingNote}
-        onOpenChange={(o) => {
-          if (!o && openingNote) {
-            const id = openingNote.id;
-            // Mark as read (which removes it for everyone via realtime + filter)
-            void supabase.from("desk_notes").update({ read_at: new Date().toISOString() }).eq("id", id);
-            setNotes((prev) => prev.filter((n) => n.id !== id));
-            setOpeningNote(null);
-          }
-        }}
+        onOpenChange={(o) => { if (!o) setOpeningNote(null); }}
       >
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
@@ -1909,21 +1976,46 @@ export function OfficeScene() {
           >
             {openingNote?.body}
           </div>
-          <DialogFooter>
+          <DialogFooter className="gap-2 sm:gap-2">
             <Button
-              onClick={() => {
-                if (!openingNote) return;
-                const id = openingNote.id;
-                void supabase.from("desk_notes").update({ read_at: new Date().toISOString() }).eq("id", id);
-                setNotes((prev) => prev.filter((n) => n.id !== id));
+              variant="outline"
+              onClick={() => setOpeningNote(null)}
+            >
+              Fechar
+            </Button>
+            <Button
+              className="bg-emerald-500 hover:bg-emerald-600 text-white"
+              onClick={async () => {
+                if (!openingNote || !me) return;
+                const note = openingNote;
+                const senderName = profiles[note.sender_id]?.display_name ?? null;
+                const { error: saveErr } = await supabase.from("saved_notes").insert({
+                  user_id: me.id,
+                  sender_id: note.sender_id,
+                  sender_name: senderName,
+                  body: note.body,
+                  original_created_at: note.created_at,
+                });
+                if (saveErr) { toast.error("Não foi possível guardar."); return; }
+                await supabase.from("desk_notes").update({ read_at: new Date().toISOString() }).eq("id", note.id);
+                setNotes((prev) => prev.filter((n) => n.id !== note.id));
                 setOpeningNote(null);
+                toast.success("💛 Recadinho guardado no seu perfil (30 dias).");
               }}
             >
-              Lido (some o recadinho)
+              Guardar recadinho
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {me && (
+        <SavedNotesDialog
+          open={savedNotesOpen}
+          onOpenChange={setSavedNotesOpen}
+          userId={me.id}
+        />
+      )}
 
 
       {/* Extended scenery — road on the right */}
@@ -2029,6 +2121,7 @@ export function OfficeScene() {
                 onRestartOnboarding={() => setForceOnboarding(true)}
                 onSignOut={signOut}
                 onStatusChanged={refreshMe}
+                onOpenSavedNotes={() => setSavedNotesOpen(true)}
               />
             )}
           </div>
