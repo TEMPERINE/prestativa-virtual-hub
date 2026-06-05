@@ -2062,7 +2062,7 @@ function SpriteAvatar({
               backgroundImage: `url(${sprite.sheets[srcFacing]})`,
               backgroundRepeat: "no-repeat",
               backgroundSize: `${FRAMES * 100}% 100%`,
-              backgroundPosition: `${(displayFrame / (FRAMES - 1)) * 100}% 0`,
+              backgroundPosition: `${(displayFrame / (FRAMES - 1)) * 100}% 100%`,
               imageRendering: "auto",
               visibility: active ? "visible" : "hidden",
               filter: "drop-shadow(0 2px 1px rgba(0,0,0,0.25))",
