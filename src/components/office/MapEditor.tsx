@@ -845,8 +845,35 @@ export function MapEditor() {
                     <Plus size={12} /> Adicionar zona
                   </button>
                 </div>
+
+                <div className="mt-4 pt-3 border-t border-border/60 flex flex-col gap-2">
+                  <ToolBtn
+                    active={tool.kind === "erase-zone" || (altDown && tool.kind === "zone")}
+                    onClick={() => setTool({ kind: "erase-zone" })}
+                    icon={<Eraser size={14} />}
+                    label="Apagar área"
+                  />
+                  <div>
+                    <span className="text-[10px] uppercase text-muted-foreground">Tamanho do pincel</span>
+                    <div className="flex items-center gap-1 mt-1">
+                      {[1, 2, 3, 5].map((b) => (
+                        <button
+                          key={b}
+                          onClick={() => setBrush(b)}
+                          className={`text-xs px-2 py-1 rounded flex-1 ${
+                            brush === b ? "bg-primary text-primary-foreground" : "bg-muted"
+                          }`}
+                        >
+                          {b}×{b}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
                 <p className="mt-3 text-[11px] text-muted-foreground">
                   Clique no nome pra pintar a área. <MapPin size={10} className="inline" /> define onde o avatar aparece ao teleportar. <Briefcase size={10} className="inline" /> / <Users size={10} className="inline" /> alterna entre área privada e comum.
+                  <br />Segure <kbd className="px-1 rounded bg-muted text-foreground">Alt</kbd> para usar a borracha sem trocar de ferramenta.
                 </p>
               </div>
             )}
