@@ -608,7 +608,8 @@ export function OfficeScene() {
         zone: zoneAt(cur).id, facing: facingRef.current, ts: Date.now(),
       }).catch(() => { /* noop */ });
     }, 1000);
-    })();
+
+
 
     const offline = async () => {
       const { data: u } = await supabase.auth.getUser();
@@ -687,11 +688,13 @@ export function OfficeScene() {
       supabase.removeChannel(reactionCh);
       supabase.removeChannel(positionBroadcastCh);
       supabase.removeChannel(claimsCh);
+      supabase.removeChannel(presenceCh);
       supabase.removeChannel(notesCh);
       reactionChannelRef.current = null;
       positionBroadcastChannelRef.current = null;
       positionBroadcastReadyRef.current = false;
       window.clearInterval(positionsPoll);
+      window.clearInterval(presenceHeartbeat);
       window.removeEventListener("beforeunload", offline);
       offline();
     };
