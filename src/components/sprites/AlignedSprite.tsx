@@ -142,9 +142,16 @@ export function AlignedSprite({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sprite.id, mode, facing]);
 
-  // Dimensões de referência consistentes entre skins.
+  // Dimensões de referência.
+  // - scene: usa as próprias dims do sprite (aspect ratio importa para o palco).
+  // - preview: usa uma referência GLOBAL para que skins diferentes apareçam
+  //   no mesmo tamanho no grid de seleção. Sem isso, sprites com cell maior
+  //   (ex: Latina, cabelo enorme) acabam visualmente desproporcionais.
   const refH = Math.max(...facings.map((f) => sprite.dims[f].h));
   const refW = Math.max(...facings.map((f) => sprite.dims[f].w));
+  // Referência global: a maior altura de cell entre todas as skins do catálogo.
+  // Mantida com folga (300) para que mesmo a maior skin caiba com margem.
+  const PREVIEW_REF_H = 300;
 
   const wrapperStyle: CSSProperties =
     mode === "scene"
@@ -158,9 +165,11 @@ export function AlignedSprite({
           width: size,
           height: size,
           position: "relative",
+          overflow: "hidden",
           imageRendering: "pixelated",
           ...style,
         };
+
 
   const showDropShadow = dropShadow ?? mode === "scene";
   const layers = mode === "scene" ? facings : [facing];
@@ -202,8 +211,8 @@ export function AlignedSprite({
                 position: "absolute",
                 left: "50%",
                 bottom: 0,
-                width: dim.w * (size / refH),
-                height: dim.h * (size / refH),
+                width: dim.w * (size / PREVIEW_REF_H),
+                height: dim.h * (size / PREVIEW_REF_H),
                 transform: `translate(-50%, ${dyPct}%) ${useMirror ? "scaleX(-1)" : ""}`,
                 backgroundImage: `url(${sheet})`,
                 backgroundRepeat: "no-repeat",
