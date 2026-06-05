@@ -691,7 +691,7 @@ export function MapEditor() {
                     color="#ef4444"
                   />
                   <ToolBtn
-                    active={tool.kind === "erase"}
+                    active={tool.kind === "erase" || (altDown && tool.kind === "blocked")}
                     onClick={() => setTool({ kind: "erase" })}
                     icon={<Eraser size={14} />}
                     label="Retirar bloqueio"
