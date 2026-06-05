@@ -64,7 +64,7 @@ function preferCodecs(tx: RTCRtpTransceiver, kind: "audio" | "video") {
     const preferred = caps.codecs.filter((c) => c.mimeType.toLowerCase() === want.toLowerCase());
     const others = caps.codecs.filter((c) => c.mimeType.toLowerCase() !== want.toLowerCase());
     if (!preferred.length) return;
-    type Codec = Parameters<RTCRtpTransceiver["setCodecPreferences"]>[0][number];
+    type Codec = { mimeType: string };
     const setPrefs = (tx as unknown as { setCodecPreferences?: (cs: Codec[]) => void }).setCodecPreferences;
     setPrefs?.([...preferred, ...others] as Codec[]);
   } catch { /* noop */ }
@@ -491,6 +491,29 @@ export function useRtcMesh(myId: string | null, desiredPeers: string[]): RtcMesh
       try { void ctxRef.ctx?.close(); } catch { /* noop */ }
     };
   }, [remoteStreams]);
+
+  // Pre-acquire the mic with enabled=false so toggleMic is instant later and
+  // the audio sender on every peer already has a track attached. This kills
+  // the "I clicked unmute but nothing comes out" window.
+  const prewarmMic = useCallback(async () => {
+    if (audioTrackRef.current) return;
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+      });
+      const track = stream.getAudioTracks()[0];
+      if (!track) return;
+      track.enabled = false; // muted until user toggles
+      audioTrackRef.current = track;
+      if (!localStreamRef.current) localStreamRef.current = new MediaStream();
+      localStreamRef.current.addTrack(track);
+      for (const entry of peersRef.current.values()) {
+        if (entry.audioSender) await entry.audioSender.replaceTrack(track);
+      }
+    } catch (err) {
+      console.warn("mic prewarm failed (will retry on toggle)", err);
+    }
+  }, []);
 
   // Acquire local mic
   const enableMic = useCallback(async () => {
