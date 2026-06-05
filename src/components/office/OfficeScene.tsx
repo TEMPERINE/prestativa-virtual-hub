@@ -88,9 +88,14 @@ const SPEED = 0.0042;
 const SEND_INTERVAL_MS = 120;
 const POSITION_BROADCAST_CHANNEL = "positions-broadcast-v1";
 const POSITION_PRESENCE_CHANNEL = "positions-presence-v1";
+const REMOTE_TELEPORT_MIN_DISTANCE = 0.075;
 
 const timestampForPosition = (p: Partial<Pick<RemotePos, "updated_at" | "ts">>) =>
   p.ts ?? (p.updated_at ? Date.parse(p.updated_at) : 0);
+
+const distanceBetween = (a: Point, b: Point) => Math.hypot(a.x - b.x, a.y - b.y);
+const validPoint = (p: Point | undefined): p is Point =>
+  !!p && Number.isFinite(p.x) && Number.isFinite(p.y);
 
 // "Seat" point of a zone rect — bottom-center, in front of the desk.
 // If that point collides with furniture, walk it upward until it's walkable.
@@ -129,6 +134,8 @@ export function OfficeScene() {
   const [me, setMe] = useState<Profile | null>(null);
   const [profiles, setProfiles] = useState<Record<string, Profile>>({});
   const [positions, setPositions] = useState<Record<string, RemotePos>>({});
+  const positionsRef = useRef<Record<string, RemotePos>>({});
+  positionsRef.current = positions;
   // LWW tracker — wall-clock ts of the freshest known sample per user (broadcast/presence).
   // Lets us discard stale DB poll rows that would otherwise snap remote avatars back.
   const positionFreshTs = useRef<Map<string, number>>(new Map());
@@ -147,6 +154,44 @@ export function OfficeScene() {
     Record<string, { from: Point; to: Point; phase: "out" | "in"; id: number }>
   >({});
   const remoteTeleportTimers = useRef<Map<string, number[]>>(new Map());
+  const startRemoteTeleport = useCallback((userId: string, from: Point, to: Point) => {
+    if (!userId || userId === meIdRef.current || !validPoint(from) || !validPoint(to)) return;
+    const id = Date.now() + Math.random();
+    const prevTimers = remoteTeleportTimers.current.get(userId) ?? [];
+    prevTimers.forEach((t) => window.clearTimeout(t));
+    const timers: number[] = [];
+    setRemoteTeleports((p) => ({ ...p, [userId]: { from, to, phase: "out", id } }));
+    timers.push(
+      window.setTimeout(() => {
+        setRemoteTeleports((p) =>
+          p[userId]?.id === id ? { ...p, [userId]: { ...p[userId], phase: "in" } } : p
+        );
+      }, 450)
+    );
+    timers.push(
+      window.setTimeout(() => {
+        setRemoteTeleports((p) => {
+          if (p[userId]?.id !== id) return p;
+          const next = { ...p };
+          delete next[userId];
+          return next;
+        });
+        remoteTeleportTimers.current.delete(userId);
+      }, 1100)
+    );
+    remoteTeleportTimers.current.set(userId, timers);
+  }, []);
+  const maybeStartRemoteTeleportFromCurrent = useCallback((userId: string, to: Point, incomingTs: number) => {
+    if (!userId || userId === meIdRef.current || !validPoint(to)) return;
+    if (remoteTeleportTimers.current.has(userId)) return;
+    const cur = positionsRef.current[userId];
+    if (!cur || !validPoint(cur)) return;
+    const curTs = timestampForPosition(cur) || (positionFreshTs.current.get(userId) ?? 0);
+    if (incomingTs && curTs && incomingTs < curTs) return;
+    const from = { x: cur.x, y: cur.y };
+    if (distanceBetween(from, to) < REMOTE_TELEPORT_MIN_DISTANCE) return;
+    startRemoteTeleport(userId, from, to);
+  }, [startRemoteTeleport]);
   // Per-remote-user walking animation state. Advances frame while position is changing.
   const remoteAnimRef = useRef<Map<string, { frame: number; lastMove: number; lastX: number; lastY: number; lastTick: number }>>(new Map());
   const [remoteFrames, setRemoteFrames] = useState<Record<string, number>>({});
@@ -580,6 +625,8 @@ export function OfficeScene() {
         (payload) => {
           const row = (payload.new ?? payload.old) as RemotePos & { updated_at?: string };
           if (!row) return;
+          const rowTs = timestampForPosition(row) || Date.now();
+          if (row.is_online) maybeStartRemoteTeleportFromCurrent(row.user_id, { x: row.x, y: row.y }, rowTs);
           setPositions((prev) => {
             const next = { ...prev };
             if (payload.eventType === "DELETE") {
@@ -628,6 +675,7 @@ export function OfficeScene() {
         const row = payload.payload as RemotePos;
         if (!row?.user_id) return;
         const incomingTs = timestampForPosition(row) || Date.now();
+        maybeStartRemoteTeleportFromCurrent(row.user_id, { x: row.x, y: row.y }, incomingTs);
         setPositions((prev) => {
           const curTs = timestampForPosition(prev[row.user_id] ?? {}) || (positionFreshTs.current.get(row.user_id) ?? 0);
           if (incomingTs < curTs) return prev;
@@ -641,32 +689,8 @@ export function OfficeScene() {
           from?: Point;
           to?: Point;
         };
-        if (!user_id || user_id === meIdRef.current || !from || !to) return;
-        const id = Date.now() + Math.random();
-        // Clear any previous timers for this user
-        const prevTimers = remoteTeleportTimers.current.get(user_id) ?? [];
-        prevTimers.forEach((t) => window.clearTimeout(t));
-        const timers: number[] = [];
-        setRemoteTeleports((p) => ({ ...p, [user_id]: { from, to, phase: "out", id } }));
-        timers.push(
-          window.setTimeout(() => {
-            setRemoteTeleports((p) =>
-              p[user_id]?.id === id ? { ...p, [user_id]: { ...p[user_id], phase: "in" } } : p
-            );
-          }, 450)
-        );
-        timers.push(
-          window.setTimeout(() => {
-            setRemoteTeleports((p) => {
-              if (p[user_id]?.id !== id) return p;
-              const next = { ...p };
-              delete next[user_id];
-              return next;
-            });
-            remoteTeleportTimers.current.delete(user_id);
-          }, 1100)
-        );
-        remoteTeleportTimers.current.set(user_id, timers);
+        if (!user_id || !from || !to) return;
+        startRemoteTeleport(user_id, from, to);
       });
     positionBroadcastChannelRef.current = positionBroadcastCh;
 
@@ -686,6 +710,7 @@ export function OfficeScene() {
         const prev = presenceLastTs.get(s.user_id) ?? 0;
         if (s.ts <= prev) continue;
         presenceLastTs.set(s.user_id, s.ts);
+        maybeStartRemoteTeleportFromCurrent(s.user_id, { x: s.x, y: s.y }, s.ts);
         setPositions((p) => {
           const cur = p[s.user_id];
           // Presence heartbeat is hydration-guarded (never advertises SPAWN),
@@ -835,6 +860,7 @@ export function OfficeScene() {
           if (uid && p.user_id === uid) return; // handled below
           const dbTs = p.updated_at ? Date.parse(p.updated_at) : 0;
           const freshTs = positionFreshTs.current.get(p.user_id) ?? 0;
+          if (p.is_online) maybeStartRemoteTeleportFromCurrent(p.user_id, { x: p.x, y: p.y }, dbTs || Date.now());
           // Strict LWW: DB rows older than the freshest known live sample are
           // never allowed to move a stopped avatar back to a spawn/old spot.
           if (dbTs && dbTs < freshTs) {
