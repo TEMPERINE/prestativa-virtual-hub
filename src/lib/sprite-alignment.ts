@@ -102,8 +102,11 @@ function computeOffsets(img: HTMLImageElement): number[] {
     out.push(dxPx / cellW); // normalize to cell-width units
   }
 
-  // Anchor to frame 0 (idle) so the idle pose is always perfectly centered
-  // and the walk cycle wobble cancels around it.
-  const anchor = out[0];
-  return out.map((v) => v - anchor);
+  // Use a SINGLE uniform offset for every frame (mean of all frame centroids).
+  // Per-frame compensation amplified small head/arm motion into visible
+  // horizontal "samba". A uniform offset centers the character in the cell
+  // without introducing any per-frame horizontal jitter.
+  const valid = out.filter((v) => Number.isFinite(v));
+  const mean = valid.length ? valid.reduce((a, b) => a + b, 0) / valid.length : 0;
+  return out.map(() => mean);
 }
