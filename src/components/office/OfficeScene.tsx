@@ -114,6 +114,9 @@ export function OfficeScene() {
   const [me, setMe] = useState<Profile | null>(null);
   const [profiles, setProfiles] = useState<Record<string, Profile>>({});
   const [positions, setPositions] = useState<Record<string, RemotePos>>({});
+  // LWW tracker — wall-clock ts of the freshest known sample per user (broadcast/presence).
+  // Lets us discard stale DB poll rows that would otherwise snap remote avatars back.
+  const positionFreshTs = useRef<Map<string, number>>(new Map());
   const [pos, setPos] = useState<Point>(SPAWN);
   const [zone, setZone] = useState<ZoneId>("lobby");
   const [showTeam, setShowTeam] = useState(false);
