@@ -74,6 +74,8 @@ type DeskNote = {
 
 const SPEED = 0.0042;
 const SEND_INTERVAL_MS = 120;
+const POSITION_BROADCAST_CHANNEL = "positions-broadcast-v1";
+const POSITION_PRESENCE_CHANNEL = "positions-presence-v1";
 
 // "Seat" point of a zone rect — bottom-center, in front of the desk.
 // If that point collides with furniture, walk it upward until it's walkable.
@@ -505,7 +507,7 @@ export function OfficeScene() {
     reactionChannelRef.current = reactionCh;
 
     const positionBroadcastCh = supabase
-      .channel(`positions-broadcast:${realtimeChannelSuffix}`, { config: { broadcast: { self: false } } })
+      .channel(POSITION_BROADCAST_CHANNEL, { config: { broadcast: { self: false } } })
       .on("broadcast", { event: "position" }, (payload) => {
         const row = payload.payload as RemotePos;
         if (!row?.user_id) return;
@@ -518,7 +520,7 @@ export function OfficeScene() {
     // who is actually online right now (independent of DB CDC + broadcasts).
     // Eventual consistency: we accept the freshest sample per user (LWW by ts).
     type PresenceState = { user_id: string; x: number; y: number; zone: string; facing?: Facing; ts: number };
-    const presenceCh = supabase.channel(`positions-presence:${realtimeChannelSuffix}`, {
+    const presenceCh = supabase.channel(POSITION_PRESENCE_CHANNEL, {
       config: { presence: { key: meIdRef.current ?? `anon:${realtimeChannelSuffix}` } },
     });
     const presenceLastTs = new Map<string, number>();
