@@ -542,7 +542,7 @@ export function OfficeScene() {
     });
     presenceCh.on("presence", { event: "join" }, ({ newPresences }) => mergePresence(newPresences));
     presenceCh.on("presence", { event: "leave" }, ({ leftPresences }) => {
-      const arr = leftPresences as PresenceState[];
+      const arr = leftPresences as unknown as PresenceState[];
       for (const s of arr ?? []) {
         if (!s?.user_id || s.user_id === meIdRef.current) continue;
         setPositions((p) => {
