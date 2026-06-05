@@ -479,16 +479,32 @@ export function OfficeScene() {
         "postgres_changes",
         { event: "*", schema: "public", table: "positions" },
         (payload) => {
-          const row = (payload.new ?? payload.old) as RemotePos;
+          const row = (payload.new ?? payload.old) as RemotePos & { updated_at?: string };
           if (!row) return;
           setPositions((prev) => {
             const next = { ...prev };
-            if (payload.eventType === "DELETE") delete next[row.user_id];
-            else next[row.user_id] = row;
+            if (payload.eventType === "DELETE") {
+              delete next[row.user_id];
+              return next;
+            }
+            // LWW: if a broadcast/presence sample within the last 5s already
+            // wrote a fresher position, ignore this DB row — it may be a
+            // stale heartbeat that would snap the avatar back to spawn.
+            const dbTs = row.updated_at ? Date.parse(row.updated_at) : 0;
+            const freshTs = positionFreshTs.current.get(row.user_id) ?? 0;
+            if (freshTs > dbTs && Date.now() - freshTs < 5000) {
+              const cur = prev[row.user_id];
+              if (cur) {
+                next[row.user_id] = { ...cur, is_online: row.is_online };
+                return next;
+              }
+            }
+            next[row.user_id] = row;
             return next;
           });
         }
       );
+
 
     const reactionCh = supabase
       .channel("reactions-room")
@@ -707,6 +723,10 @@ export function OfficeScene() {
       const uid = meIdRef.current;
       if (!uid) return;
       const cur = posRef.current;
+      // Don't persist while we're still on the default SPAWN sentinel —
+      // the init effect hasn't hydrated the saved position yet, and writing
+      // SPAWN here would clobber the real DB row and snap us back for peers.
+      if (cur.x === SPAWN.x && cur.y === SPAWN.y) return;
       void supabase.from("positions").upsert({
         user_id: uid,
         x: cur.x,
@@ -716,6 +736,7 @@ export function OfficeScene() {
         is_online: true,
       });
     }, 2000);
+
 
     // Load + subscribe to desk notes (post-it gifts left on workstations)
     void (async () => {
@@ -2041,7 +2062,7 @@ function SpriteAvatar({
               backgroundImage: `url(${sprite.sheets[srcFacing]})`,
               backgroundRepeat: "no-repeat",
               backgroundSize: `${FRAMES * 100}% 100%`,
-              backgroundPosition: `${(displayFrame / (FRAMES - 1)) * 100}% 0`,
+              backgroundPosition: `${(displayFrame / (FRAMES - 1)) * 100}% 100%`,
               imageRendering: "auto",
               visibility: active ? "visible" : "hidden",
               filter: "drop-shadow(0 2px 1px rgba(0,0,0,0.25))",
