@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { SpritePreview } from "./SpritePreview";
-import { LogOut, User as UserIcon, Shirt, Home, MapPin, RefreshCcw } from "lucide-react";
+import { LogOut, User as UserIcon, Shirt, Home, MapPin, RefreshCcw, StickyNote } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 
 type Status = "available" | "busy" | "away";
