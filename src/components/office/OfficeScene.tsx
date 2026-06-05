@@ -1426,6 +1426,13 @@ export function OfficeScene() {
         lastDir.current = remaining[remaining.length - 1] ?? null;
         if (lastDir.current) setLocalFacing(lastDir.current);
       }
+      // Quando o usuário para de andar (nenhuma tecla pressionada), persiste
+      // a posição final IMEDIATAMENTE no banco. Isso garante que ao recarregar
+      // a página o personagem volte exatamente onde parou — sem cair no spawn.
+      if (keysDown.current.size === 0) {
+        const cur = posRef.current;
+        sendPos(cur.x, cur.y, zoneAt(cur).id, facingRef.current, true);
+      }
     };
     const blur = () => {
       keysDown.current.clear();
