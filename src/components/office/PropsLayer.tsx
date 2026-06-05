@@ -82,6 +82,9 @@ export function PropsLayer({ selfX, selfY, focusedRect = null }: Props) {
     };
   }, []);
 
+  useEffect(() => { publishFrames(frames); }, [frames]);
+
+
   // Ação de interação reutilizável (chamada pelo teclado e pelo botão flutuante)
   const triggerInteract = useCallback((prop: PropInstance) => {
     const def = getPropDef(prop.defId);
