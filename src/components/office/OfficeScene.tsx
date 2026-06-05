@@ -1931,15 +1931,7 @@ export function OfficeScene() {
       {/* Read note dialog */}
       <Dialog
         open={!!openingNote}
-        onOpenChange={(o) => {
-          if (!o && openingNote) {
-            const id = openingNote.id;
-            // Mark as read (which removes it for everyone via realtime + filter)
-            void supabase.from("desk_notes").update({ read_at: new Date().toISOString() }).eq("id", id);
-            setNotes((prev) => prev.filter((n) => n.id !== id));
-            setOpeningNote(null);
-          }
-        }}
+        onOpenChange={(o) => { if (!o) setOpeningNote(null); }}
       >
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
@@ -1957,21 +1949,46 @@ export function OfficeScene() {
           >
             {openingNote?.body}
           </div>
-          <DialogFooter>
+          <DialogFooter className="gap-2 sm:gap-2">
             <Button
-              onClick={() => {
-                if (!openingNote) return;
-                const id = openingNote.id;
-                void supabase.from("desk_notes").update({ read_at: new Date().toISOString() }).eq("id", id);
-                setNotes((prev) => prev.filter((n) => n.id !== id));
+              variant="outline"
+              onClick={() => setOpeningNote(null)}
+            >
+              Fechar
+            </Button>
+            <Button
+              className="bg-emerald-500 hover:bg-emerald-600 text-white"
+              onClick={async () => {
+                if (!openingNote || !me) return;
+                const note = openingNote;
+                const senderName = profiles[note.sender_id]?.display_name ?? null;
+                const { error: saveErr } = await supabase.from("saved_notes").insert({
+                  user_id: me.id,
+                  sender_id: note.sender_id,
+                  sender_name: senderName,
+                  body: note.body,
+                  original_created_at: note.created_at,
+                });
+                if (saveErr) { toast.error("Não foi possível guardar."); return; }
+                await supabase.from("desk_notes").update({ read_at: new Date().toISOString() }).eq("id", note.id);
+                setNotes((prev) => prev.filter((n) => n.id !== note.id));
                 setOpeningNote(null);
+                toast.success("💛 Recadinho guardado no seu perfil (30 dias).");
               }}
             >
-              Lido (some o recadinho)
+              Guardar recadinho
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {me && (
+        <SavedNotesDialog
+          open={savedNotesOpen}
+          onOpenChange={setSavedNotesOpen}
+          userId={me.id}
+        />
+      )}
 
 
       {/* Extended scenery — road on the right */}
