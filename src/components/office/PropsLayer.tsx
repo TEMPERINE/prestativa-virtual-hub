@@ -142,6 +142,8 @@ export function PropsLayer({ selfX, selfY }: Props) {
               width: `${wPct}%`,
               height: `${hPct}%`,
               transform: "translate(-50%, -100%)",
+              objectFit: "contain",
+              objectPosition: "bottom center",
               zIndex,
               imageRendering: "pixelated",
             }}
