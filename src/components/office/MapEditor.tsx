@@ -101,6 +101,47 @@ export function MapEditor() {
   const [altDown, setAltDown] = useState(false);
   const historyRef = useRef<MapOverrides[]>([]);
   const [canUndo, setCanUndo] = useState(false);
+  // bump para re-renderizar quando o catálogo de props muda (uploads, deletes).
+  const [, setCatalogVersion] = useState(0);
+  const [uploading, setUploading] = useState(false);
+
+  // Carrega elementos personalizados da nuvem e re-renderiza quando mudam.
+  useEffect(() => {
+    void loadCustomPropsFromCloud();
+    return subscribePropCatalog(() => setCatalogVersion((v) => v + 1));
+  }, []);
+
+  const onUploadAsset = useCallback(async (file: File) => {
+    const label = window.prompt("Nome do elemento:", file.name.replace(/\.[^.]+$/, ""));
+    if (!label) return;
+    const framesStr = window.prompt(
+      "Quantos frames horizontais a imagem contém?\n(1 = imagem única; 2+ = sprite sheet dividido horizontalmente)",
+      "1"
+    );
+    if (!framesStr) return;
+    const frameCount = Math.max(1, Math.floor(Number(framesStr)) || 1);
+    setUploading(true);
+    try {
+      await uploadCustomProp({ label, file, frameCount });
+      toast.success(`"${label}" adicionado à galeria.`);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      toast.error(`Falha no upload: ${msg}`);
+    } finally {
+      setUploading(false);
+    }
+  }, []);
+
+  const onDeleteCustomProp = useCallback(async (id: string, label: string) => {
+    if (!confirm(`Remover "${label}" da galeria? Isso não apaga instâncias já colocadas no mapa.`)) return;
+    try {
+      await deleteCustomProp(id);
+      toast.success("Elemento removido da galeria.");
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      toast.error(`Falha ao remover: ${msg}`);
+    }
+  }, []);
 
   // Mouse-wheel zoom (anchored to cursor) for precise painting.
   useEffect(() => {
