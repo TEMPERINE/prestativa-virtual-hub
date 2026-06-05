@@ -17,6 +17,7 @@ import roadRight from "@/assets/scene-road-right.jpg";
 import { SPRITES, getSprite, SPRITE_FRAMES as FRAMES, type Facing } from "@/lib/sprite-catalog";
 import { ensureFrameOffsets, getFrameOffsets, subscribeFrameOffsets } from "@/lib/sprite-alignment";
 import { AlignedSprite } from "@/components/sprites/AlignedSprite";
+import { PropsLayer } from "./PropsLayer";
 
 const WALK_FRAME_MS = 110;
 
@@ -1502,6 +1503,9 @@ export function OfficeScene() {
           draggable={false}
           style={{ imageRendering: "pixelated" }}
         />
+
+        {/* Elementos sobrepostos (mobília, portas etc.) */}
+        <PropsLayer selfX={pos.x} selfY={pos.y} />
 
 
 
