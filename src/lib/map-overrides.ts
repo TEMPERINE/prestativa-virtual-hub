@@ -186,11 +186,13 @@ export async function clearOverridesInCloud(): Promise<void> {
 export function subscribeOverridesFromCloud(
   onChange: (o: MapOverrides | null) => void
 ) {
+  let cancelled = false;
   let cleanup = () => {};
   (async () => {
     const { supabase } = await import("@/integrations/supabase/client");
+    if (cancelled) return;
     const channel = supabase
-      .channel("map_overrides:global")
+      .channel(`map_overrides:global:${Date.now()}:${Math.random().toString(36).slice(2)}`)
       .on(
         "postgres_changes",
         {
@@ -220,13 +222,25 @@ export function subscribeOverridesFromCloud(
             onChange(null);
           }
         }
-      )
-      .subscribe();
+      );
+    const { data: sess } = await supabase.auth.getSession();
+    const token = sess.session?.access_token;
+    if (token) {
+      try { await supabase.realtime.setAuth(token); } catch {}
+    }
+    if (cancelled) {
+      supabase.removeChannel(channel);
+      return;
+    }
+    channel.subscribe();
     cleanup = () => {
       supabase.removeChannel(channel);
     };
   })();
-  return () => cleanup();
+  return () => {
+    cancelled = true;
+    cleanup();
+  };
 }
 
 export function newOverrides(): MapOverrides {

@@ -265,17 +265,18 @@ export function OfficeScene() {
       // Same claimed zone → always connect
       const peerClaim = Object.entries(claims).find(([, u]) => u === uid)?.[0];
       const sameZone = myClaimZone && peerClaim && peerClaim === myClaimZone;
+      const sameActiveRoom = zone !== "lobby" && p.zone === zone;
       // Proximity with hysteresis
       const dx = p.x - pos.x;
       const dy = p.y - pos.y;
       const dist = Math.hypot(dx, dy);
       const already = connectedPeersRef.current.has(uid);
       const closeEnough = already ? dist <= PROXIMITY_DISCONNECT : dist <= PROXIMITY_CONNECT;
-      if (sameZone || closeEnough) result.push(uid);
+      if (sameZone || sameActiveRoom || closeEnough) result.push(uid);
     }
     // cap to 6 peers
     return result.slice(0, 6);
-  }, [me?.id, positions, claims, pos.x, pos.y]);
+  }, [me?.id, positions, claims, pos.x, pos.y, zone]);
 
   const rtc = useRtcMesh(me?.id ?? null, desiredPeers);
   useEffect(() => {
@@ -283,12 +284,19 @@ export function OfficeScene() {
   }, [desiredPeers]);
 
   const sendPos = useCallback((x: number, y: number, z: ZoneId, f: Facing) => {
-    void supabase.auth.getUser().then(({ data }) => {
-      if (!data.user) return;
+    const knownId = meIdRef.current;
+    const write = (userId: string) => {
       void supabase.from("positions").upsert({
-        user_id: data.user.id,
+        user_id: userId,
         x, y, zone: z, facing: f, is_online: true,
       });
+    };
+    if (knownId) {
+      write(knownId);
+      return;
+    }
+    void supabase.auth.getUser().then(({ data }) => {
+      if (data.user) write(data.user.id);
     });
   }, []);
 
@@ -355,7 +363,7 @@ export function OfficeScene() {
       setProfiles(map);
       setMe(map[userData.user.id] ?? null);
 
-      const { data: posData } = await supabase.from("positions").select("user_id, x, y, zone, is_online");
+      const { data: posData } = await supabase.from("positions").select("user_id, x, y, zone, facing, is_online");
       const pmap: Record<string, RemotePos> = {};
       (posData ?? []).forEach((p) => (pmap[p.user_id] = p as RemotePos));
 
@@ -419,8 +427,9 @@ export function OfficeScene() {
     // os eventos postgres_changes (UPDATE/INSERT/DELETE) são filtrados e os
     // outros usuários parecem "congelados", mesmo com as posições sendo
     // gravadas no banco corretamente.
+    const realtimeChannelSuffix = `${Date.now()}:${Math.random().toString(36).slice(2)}`;
     const ch = supabase
-      .channel("positions-room")
+      .channel(`positions-room:${realtimeChannelSuffix}`)
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "positions" },
@@ -456,7 +465,7 @@ export function OfficeScene() {
     reactionChannelRef.current = reactionCh;
 
     const claimsCh = supabase
-      .channel("claims-room")
+      .channel(`claims-room:${realtimeChannelSuffix}`)
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "workspace_claims" },
@@ -491,6 +500,34 @@ export function OfficeScene() {
     };
     window.addEventListener("beforeunload", offline);
 
+    const syncPositions = async () => {
+      const { data } = await supabase.from("positions").select("user_id, x, y, zone, facing, is_online");
+      if (!data) return;
+      const uid = meIdRef.current;
+      setPositions(() => {
+        const next: Record<string, RemotePos> = {};
+        (data as RemotePos[]).forEach((p) => {
+          next[p.user_id] = p;
+        });
+        if (uid) {
+          const cur = posRef.current;
+          const curZone = zoneAt(cur).id;
+          next[uid] = {
+            ...(next[uid] ?? { user_id: uid, x: cur.x, y: cur.y, zone: curZone, is_online: true }),
+            x: cur.x,
+            y: cur.y,
+            zone: curZone,
+            facing: facingRef.current,
+            is_online: true,
+          };
+        }
+        return next;
+      });
+    };
+    const positionsPoll = window.setInterval(() => {
+      void syncPositions();
+    }, 1000);
+
     // Load + subscribe to desk notes (post-it gifts left on workstations)
     void (async () => {
       const { data } = await supabase
@@ -500,7 +537,7 @@ export function OfficeScene() {
       if (data) setNotes(data as DeskNote[]);
     })();
     const notesCh = supabase
-      .channel("desk-notes-room")
+      .channel(`desk-notes-room:${realtimeChannelSuffix}`)
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "desk_notes" },
@@ -533,6 +570,7 @@ export function OfficeScene() {
       supabase.removeChannel(claimsCh);
       supabase.removeChannel(notesCh);
       reactionChannelRef.current = null;
+      window.clearInterval(positionsPoll);
       window.removeEventListener("beforeunload", offline);
       offline();
     };
