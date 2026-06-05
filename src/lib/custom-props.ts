@@ -5,13 +5,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import { setCustomProps, type PropDef } from "./prop-catalog";
 
-type Row = {
-  id: string;
-  label: string;
-  frames: string[];
-  default_w: number;
-  aspect_ratio: number;
-};
 
 export async function loadCustomPropsFromCloud(): Promise<void> {
   const { data, error } = await supabase
