@@ -433,9 +433,12 @@ export function OfficeScene() {
       setProfiles(map);
       setMe(map[userData.user.id] ?? null);
 
-      const { data: posData } = await supabase.from("positions").select("user_id, x, y, zone, facing, is_online");
+      const { data: posData } = await supabase.from("positions").select("user_id, x, y, zone, facing, is_online, updated_at");
       const pmap: Record<string, RemotePos> = {};
-      (posData ?? []).forEach((p) => (pmap[p.user_id] = p as RemotePos));
+      (posData ?? []).forEach((p) => {
+        pmap[p.user_id] = p as RemotePos;
+        if (p.updated_at) positionFreshTs.current.set(p.user_id, Date.parse(p.updated_at));
+      });
 
       // Load workspace claims
       const { data: claimData } = await supabase
@@ -486,6 +489,7 @@ export function OfficeScene() {
         zone: startZone,
         facing: startFacing,
         is_online: true,
+        ts: Date.now(),
       };
       setPositions(pmap);
 
