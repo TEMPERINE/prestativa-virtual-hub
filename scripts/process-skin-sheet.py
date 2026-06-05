@@ -44,12 +44,36 @@ def remove_white_bg(arr: np.ndarray) -> np.ndarray:
 
 
 def bbox(alpha: np.ndarray) -> tuple[int, int, int, int] | None:
+    """Bbox of the TOPMOST connected character blob in the cell.
+
+    The source grid often has the next row's head/shadow bleeding into the
+    bottom of the current cell. We walk down from the first opaque row until
+    we hit a vertical gap of empty rows — everything below the gap belongs
+    to the next character and is ignored.
+    """
     mask = alpha > ALPHA_T
     if not mask.any():
         return None
-    ys = np.where(mask.any(axis=1))[0]
-    xs = np.where(mask.any(axis=0))[0]
-    return int(xs[0]), int(ys[0]), int(xs[-1]) + 1, int(ys[-1]) + 1
+    row_has = mask.any(axis=1)
+    ys_all = np.where(row_has)[0]
+    y_top = int(ys_all[0])
+    GAP = 6  # consecutive empty rows that mark the end of THIS character
+    y_bot = y_top
+    empty = 0
+    for y in range(y_top, mask.shape[0]):
+        if row_has[y]:
+            y_bot = y
+            empty = 0
+        else:
+            empty += 1
+            if empty >= GAP:
+                break
+    # Restrict horizontal bbox to this vertical slice.
+    slice_mask = mask[y_top:y_bot + 1]
+    xs = np.where(slice_mask.any(axis=0))[0]
+    if xs.size == 0:
+        return None
+    return int(xs[0]), y_top, int(xs[-1]) + 1, y_bot + 1
 
 
 def robust_center_x(mask: np.ndarray) -> float:
