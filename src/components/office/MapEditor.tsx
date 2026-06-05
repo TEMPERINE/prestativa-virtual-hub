@@ -14,17 +14,21 @@ import {
   type MapOverrides,
   type CustomZone,
   type ZoneKind,
+  type PropInstance,
 } from "@/lib/map-overrides";
 import { ZONES, COLLIDERS, FLOOR_POLY, type ZoneId } from "@/lib/office-map";
+import { PROP_CATALOG, getPropDef } from "@/lib/prop-catalog";
 import officeMap from "@/assets/office-map.jpg";
 import { toast } from "sonner";
-import { ArrowLeft, Eraser, Square, Download, Trash2, Eye, EyeOff, Undo, Plus, X, Briefcase, Users, MapPin } from "lucide-react";
+import { ArrowLeft, Eraser, Square, Download, Trash2, Eye, EyeOff, Undo, Plus, X, Briefcase, Users, MapPin, Hand, Zap, ZapOff } from "lucide-react";
 
 type Tool =
   | { kind: "blocked" }
   | { kind: "erase" }
   | { kind: "zone"; zone: ZoneId }
-  | { kind: "spawn"; zone: string };
+  | { kind: "spawn"; zone: string }
+  | { kind: "place-prop"; defId: string }
+  | { kind: "select" };
 
 // Seed overrides from the hardcoded COLLIDERS + ZONES so the user starts
 // with the current layout already painted and can tweak from there.
@@ -244,6 +248,25 @@ export function MapEditor() {
         setDirty(true);
         return;
       }
+      if (tool.kind === "place-prop") {
+        const def = getPropDef(tool.defId);
+        if (!def) return;
+        const id = `prop-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+        const inst: PropInstance = {
+          id,
+          defId: def.id,
+          x,
+          y,
+          w: def.defaultW,
+          interactive: def.interactive,
+        };
+        setOverrides((prev) => ({ ...prev, props: [...(prev.props ?? []), inst] }));
+        setSelectedPropId(id);
+        setTool({ kind: "select" });
+        setDirty(true);
+        return;
+      }
+      if (tool.kind === "select") return;
       const col = Math.max(0, Math.min(GRID_COLS - 1, Math.floor(x * GRID_COLS)));
       const row = Math.max(0, Math.min(GRID_ROWS - 1, Math.floor(y * GRID_ROWS)));
       paintCell(col, row);
@@ -251,8 +274,39 @@ export function MapEditor() {
     [paintCell, tool]
   );
 
-  const spawnPoints = overrides.spawnPoints ?? {};
+  const spawnPoints: Record<string, { x: number; y: number }> = overrides.spawnPoints ?? {};
   const draggingPin = useRef<string | null>(null);
+  const propsList = overrides.props ?? [];
+  const [selectedPropId, setSelectedPropId] = useState<string | null>(null);
+  const draggingPropRef = useRef<{ id: string; mode: "move" | "resize"; startX: number; startY: number; startW: number } | null>(null);
+
+  const updateProp = useCallback((id: string, patch: Partial<PropInstance>) => {
+    setOverrides((prev) => ({
+      ...prev,
+      props: (prev.props ?? []).map((p) => (p.id === id ? { ...p, ...patch } : p)),
+    }));
+    setDirty(true);
+  }, []);
+
+  const removeProp = useCallback((id: string) => {
+    setOverrides((prev) => ({
+      ...prev,
+      props: (prev.props ?? []).filter((p) => p.id !== id),
+    }));
+    setSelectedPropId((cur) => (cur === id ? null : cur));
+    setDirty(true);
+  }, []);
+
+  const togglePropInteractive = useCallback((id: string) => {
+    setOverrides((prev) => ({
+      ...prev,
+      props: (prev.props ?? []).map((p) =>
+        p.id === id ? { ...p, interactive: !p.interactive } : p
+      ),
+    }));
+    setDirty(true);
+  }, []);
+
 
   const removeSpawn = useCallback((zoneId: string) => {
     setOverrides((prev) => {
@@ -355,11 +409,22 @@ export function MapEditor() {
       if (e.ctrlKey && (e.key === "z" || e.key === "Z")) {
         e.preventDefault();
         undo();
+      } else if (e.key === "Escape") {
+        if (tool.kind === "place-prop" || tool.kind === "spawn") {
+          setTool({ kind: "blocked" });
+        }
+        setSelectedPropId(null);
+      } else if ((e.key === "Delete" || e.key === "Backspace") && selectedPropId) {
+        const target = e.target as HTMLElement | null;
+        const tag = target?.tagName;
+        if (tag === "INPUT" || tag === "TEXTAREA" || target?.isContentEditable) return;
+        e.preventDefault();
+        removeProp(selectedPropId);
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [undo]);
+  }, [undo, tool, selectedPropId, removeProp]);
 
   // Pre-render tiles as plain divs would be huge (2560+). Use a canvas overlay.
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -662,6 +727,79 @@ export function MapEditor() {
             </button>
           </div>
 
+          {/* ===== Galeria de elementos ===== */}
+          <div className="mt-4 pt-3 border-t border-border/60">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-xs font-semibold uppercase text-muted-foreground">Elementos</h3>
+              <button
+                onClick={() => setTool({ kind: "select" })}
+                title="Selecionar / mover elementos"
+                className={`p-1 rounded ${tool.kind === "select" ? "ring-2 ring-primary text-primary" : "text-muted-foreground hover:bg-muted"}`}
+              >
+                <Hand size={12} />
+              </button>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              {PROP_CATALOG.map((def) => {
+                const active = tool.kind === "place-prop" && tool.defId === def.id;
+                return (
+                  <button
+                    key={def.id}
+                    onClick={() => setTool({ kind: "place-prop", defId: def.id })}
+                    className={`flex flex-col items-center gap-1 p-2 rounded border ${active ? "border-primary bg-primary/10" : "border-border hover:bg-muted"}`}
+                    title={`Adicionar ${def.label}`}
+                  >
+                    <img src={def.frames[0]} alt="" className="h-12 object-contain" draggable={false} />
+                    <span className="text-[10px]">{def.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+            {tool.kind === "place-prop" && (
+              <p className="text-[10px] text-muted-foreground mt-2">
+                Clique no mapa para colocar. Esc para cancelar.
+              </p>
+            )}
+            {propsList.length > 0 && (
+              <div className="mt-3 flex flex-col gap-1">
+                <span className="text-[10px] uppercase text-muted-foreground">No mapa ({propsList.length})</span>
+                {propsList.map((pi) => {
+                  const def = getPropDef(pi.defId);
+                  if (!def) return null;
+                  const sel = selectedPropId === pi.id;
+                  return (
+                    <div
+                      key={pi.id}
+                      className={`group flex items-center gap-2 px-2 py-1 rounded text-xs ${sel ? "bg-muted ring-1 ring-primary" : "hover:bg-muted"}`}
+                    >
+                      <button
+                        onClick={() => { setTool({ kind: "select" }); setSelectedPropId(pi.id); }}
+                        className="flex-1 text-left truncate"
+                      >
+                        {def.label}
+                      </button>
+                      {def.interactive && (
+                        <button
+                          onClick={() => togglePropInteractive(pi.id)}
+                          title={pi.interactive ? "Interativo (clique para desativar)" : "Não interativo (clique para ativar)"}
+                          className={`p-0.5 ${pi.interactive ? "text-primary" : "text-muted-foreground"}`}
+                        >
+                          {pi.interactive ? <Zap size={12} /> : <ZapOff size={12} />}
+                        </button>
+                      )}
+                      <button
+                        onClick={() => removeProp(pi.id)}
+                        className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive"
+                        title="Remover"
+                      >
+                        <X size={12} />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
 
           <h3 className="text-xs font-semibold uppercase text-muted-foreground mt-4 mb-2">Legenda</h3>
           <div className="text-xs text-muted-foreground space-y-1">
@@ -670,7 +808,7 @@ export function MapEditor() {
               Bloqueado
             </div>
             <div>
-              <p className="mt-2">Clique e arraste para pintar. Use Apagar para limpar célula.</p>
+              <p className="mt-2">Clique e arraste para pintar. Use Apagar para limpar célula. Para mover elementos, ative a ferramenta de seleção.</p>
             </div>
           </div>
         </aside>
@@ -691,13 +829,21 @@ export function MapEditor() {
 
             onPointerDown={(e) => {
               if (draggingPin.current) return;
+              if (draggingPropRef.current) return;
+              // No modo seleção, clique no fundo só desseleciona
+              if (tool.kind === "select") {
+                setSelectedPropId(null);
+                return;
+              }
               (e.target as Element).setPointerCapture?.(e.pointerId);
-              painting.current = true;
-              pushHistory({
-                ...overrides,
-                blocked: overrides.blocked.slice(),
-                zones: overrides.zones.slice(),
-              });
+              if (tool.kind === "blocked" || tool.kind === "erase" || tool.kind === "zone") {
+                painting.current = true;
+                pushHistory({
+                  ...overrides,
+                  blocked: overrides.blocked.slice(),
+                  zones: overrides.zones.slice(),
+                });
+              }
               handlePointer(e);
             }}
             onPointerMove={(e) => {
@@ -705,10 +851,27 @@ export function MapEditor() {
                 moveSpawnToPointer(e, draggingPin.current);
                 return;
               }
+              if (draggingPropRef.current && stageRef.current) {
+                const rect = stageRef.current.getBoundingClientRect();
+                const nx = (e.clientX - rect.left) / rect.width;
+                const ny = (e.clientY - rect.top) / rect.height;
+                const drag = draggingPropRef.current;
+                if (drag.mode === "move") {
+                  updateProp(drag.id, {
+                    x: Math.max(0, Math.min(1, nx)),
+                    y: Math.max(0, Math.min(1, ny)),
+                  });
+                } else {
+                  const dx = nx - drag.startX;
+                  const nextW = Math.max(0.01, Math.min(0.6, drag.startW + dx * 2));
+                  updateProp(drag.id, { w: nextW });
+                }
+                return;
+              }
               if (painting.current) handlePointer(e);
             }}
-            onPointerUp={() => { painting.current = false; draggingPin.current = null; }}
-            onPointerCancel={() => { painting.current = false; draggingPin.current = null; }}
+            onPointerUp={() => { painting.current = false; draggingPin.current = null; draggingPropRef.current = null; }}
+            onPointerCancel={() => { painting.current = false; draggingPin.current = null; draggingPropRef.current = null; }}
           >
             {showImage && (
               <img
@@ -794,6 +957,102 @@ export function MapEditor() {
             {tool.kind === "spawn" && (
               <div className="absolute top-2 left-1/2 -translate-x-1/2 pointer-events-none bg-primary text-primary-foreground text-xs px-3 py-1 rounded-full shadow-soft">
                 Clique no mapa para fixar o ponto · arraste o pino para ajustes finos
+              </div>
+            )}
+
+            {/* Props (elementos) — render + handles de edição */}
+            {propsList.map((pi) => {
+              const def = getPropDef(pi.defId);
+              if (!def) return null;
+              const sel = selectedPropId === pi.id;
+              const wPct = pi.w * 100;
+              const hPct = (pi.w / def.aspectRatio) * 100;
+              return (
+                <div
+                  key={pi.id}
+                  className="absolute"
+                  style={{
+                    left: `${pi.x * 100}%`,
+                    top: `${pi.y * 100}%`,
+                    width: `${wPct}%`,
+                    height: `${hPct}%`,
+                    transform: "translate(-50%, -100%)",
+                    zIndex: 30000 + Math.round(pi.y * 5000),
+                    cursor: tool.kind === "select" ? "move" : "default",
+                    pointerEvents: tool.kind === "select" ? "auto" : "none",
+                  }}
+                  onPointerDown={(e) => {
+                    if (tool.kind !== "select") return;
+                    e.stopPropagation();
+                    setSelectedPropId(pi.id);
+                    draggingPropRef.current = {
+                      id: pi.id,
+                      mode: "move",
+                      startX: pi.x,
+                      startY: pi.y,
+                      startW: pi.w,
+                    };
+                    (stageRef.current as Element | null)?.setPointerCapture?.(e.pointerId);
+                  }}
+                >
+                  <img
+                    src={def.frames[0]}
+                    alt=""
+                    className="w-full h-full object-contain pointer-events-none select-none"
+                    draggable={false}
+                    style={{ imageRendering: "pixelated" }}
+                  />
+                  {sel && tool.kind === "select" && (
+                    <>
+                      <div className="absolute inset-0 ring-2 ring-primary rounded pointer-events-none" />
+                      {/* Resize handle (canto inferior direito) */}
+                      <div
+                        className="absolute -right-1 -bottom-1 w-3 h-3 bg-primary border border-card rounded-sm cursor-nwse-resize"
+                        onPointerDown={(e) => {
+                          e.stopPropagation();
+                          if (!stageRef.current) return;
+                          const rect = stageRef.current.getBoundingClientRect();
+                          draggingPropRef.current = {
+                            id: pi.id,
+                            mode: "resize",
+                            startX: (e.clientX - rect.left) / rect.width,
+                            startY: (e.clientY - rect.top) / rect.height,
+                            startW: pi.w,
+                          };
+                          (stageRef.current as Element | null)?.setPointerCapture?.(e.pointerId);
+                        }}
+                      />
+                      {/* Toolbar flutuante */}
+                      <div
+                        className="absolute left-1/2 -translate-x-1/2 -top-7 flex items-center gap-1 bg-card border border-border rounded px-1 py-0.5 shadow-soft text-xs"
+                        onPointerDown={(e) => e.stopPropagation()}
+                      >
+                        {def.interactive && (
+                          <button
+                            onClick={() => togglePropInteractive(pi.id)}
+                            title={pi.interactive ? "Interativo (clique para desativar)" : "Não interativo (clique para ativar)"}
+                            className={`p-1 rounded ${pi.interactive ? "text-primary" : "text-muted-foreground"} hover:bg-muted`}
+                          >
+                            {pi.interactive ? <Zap size={12} /> : <ZapOff size={12} />}
+                          </button>
+                        )}
+                        <button
+                          onClick={() => removeProp(pi.id)}
+                          title="Remover"
+                          className="p-1 rounded text-muted-foreground hover:text-destructive hover:bg-muted"
+                        >
+                          <Trash2 size={12} />
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              );
+            })}
+
+            {tool.kind === "place-prop" && (
+              <div className="absolute top-2 left-1/2 -translate-x-1/2 pointer-events-none bg-primary text-primary-foreground text-xs px-3 py-1 rounded-full shadow-soft">
+                Clique no mapa para colocar · Esc para cancelar
               </div>
             )}
           </div>

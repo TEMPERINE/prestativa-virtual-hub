@@ -164,6 +164,27 @@ export type Database = {
         }
         Relationships: []
       }
+      prop_states: {
+        Row: {
+          frame: number
+          prop_id: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          frame?: number
+          prop_id: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          frame?: number
+          prop_id?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           id: string

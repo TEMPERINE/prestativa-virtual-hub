@@ -12,16 +12,25 @@ export type CustomZone = { id: string; label: string; color: string; kind?: Zone
 
 export type SpawnPoint = { x: number; y: number };
 
+export type PropInstance = {
+  id: string;            // uuid local
+  defId: string;         // ref ao PROP_CATALOG
+  x: number;             // centro normalizado 0..1
+  y: number;
+  w: number;             // largura normalizada (altura derivada do aspectRatio)
+  interactive: boolean;  // toggle pelo editor
+};
+
 export type MapOverrides = {
   cols: number;
   rows: number;
   blocked: number[];
   zones: (ZoneId | null)[];
   customZones?: CustomZone[];
-  // Per-zone kind override (workspace=claimable, common=shared).
   zoneKinds?: Record<string, ZoneKind>;
-  // Per-zone spawn / teleport landing point (normalized 0..1).
   spawnPoints?: Record<string, SpawnPoint>;
+  // Elementos visuais sobrepostos ao mapa (mobília, portas etc.)
+  props?: PropInstance[];
 };
 
 function emptyOverrides(): MapOverrides {
