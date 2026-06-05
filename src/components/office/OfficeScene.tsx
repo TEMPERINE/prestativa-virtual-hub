@@ -592,11 +592,11 @@ export function OfficeScene() {
         const prev = presenceLastTs.get(s.user_id) ?? 0;
         if (s.ts <= prev) continue;
         presenceLastTs.set(s.user_id, s.ts);
-        positionFreshTs.current.set(s.user_id, s.ts);
         setPositions((p) => ({
           ...p,
-          [s.user_id]: { user_id: s.user_id, x: s.x, y: s.y, zone: s.zone, facing: s.facing, is_online: true },
+          [s.user_id]: { user_id: s.user_id, x: s.x, y: s.y, zone: s.zone, facing: s.facing, is_online: true, ts: s.ts },
         }));
+        positionFreshTs.current.set(s.user_id, s.ts);
       }
     };
     presenceCh.on("presence", { event: "sync" }, () => {
@@ -726,14 +726,14 @@ export function OfficeScene() {
           if (uid && p.user_id === uid) return; // handled below
           const dbTs = p.updated_at ? Date.parse(p.updated_at) : 0;
           const freshTs = positionFreshTs.current.get(p.user_id) ?? 0;
-          // Realtime broadcast/presence within the last 5s wins over DB poll.
-          // Prevents stale DB rows from snapping remote avatars back to a previous spot.
-          if (freshTs > dbTs && Date.now() - freshTs < 5000) {
-            // Keep is_online state in sync from DB while preserving live x/y.
+          // Strict LWW: DB rows older than the freshest known live sample are
+          // never allowed to move a stopped avatar back to a spawn/old spot.
+          if (dbTs && dbTs < freshTs) {
             const cur = prev[p.user_id];
             if (cur) next[p.user_id] = { ...cur, is_online: p.is_online };
             else next[p.user_id] = p;
           } else {
+            if (dbTs) positionFreshTs.current.set(p.user_id, dbTs);
             next[p.user_id] = p;
           }
         });
