@@ -134,6 +134,8 @@ export function OfficeScene() {
   const [me, setMe] = useState<Profile | null>(null);
   const [profiles, setProfiles] = useState<Record<string, Profile>>({});
   const [positions, setPositions] = useState<Record<string, RemotePos>>({});
+  const positionsRef = useRef<Record<string, RemotePos>>({});
+  positionsRef.current = positions;
   // LWW tracker — wall-clock ts of the freshest known sample per user (broadcast/presence).
   // Lets us discard stale DB poll rows that would otherwise snap remote avatars back.
   const positionFreshTs = useRef<Map<string, number>>(new Map());
@@ -179,6 +181,17 @@ export function OfficeScene() {
     );
     remoteTeleportTimers.current.set(userId, timers);
   }, []);
+  const maybeStartRemoteTeleportFromCurrent = useCallback((userId: string, to: Point, incomingTs: number) => {
+    if (!userId || userId === meIdRef.current || !validPoint(to)) return;
+    if (remoteTeleportTimers.current.has(userId)) return;
+    const cur = positionsRef.current[userId];
+    if (!cur || !validPoint(cur)) return;
+    const curTs = timestampForPosition(cur) || (positionFreshTs.current.get(userId) ?? 0);
+    if (incomingTs && curTs && incomingTs < curTs) return;
+    const from = { x: cur.x, y: cur.y };
+    if (distanceBetween(from, to) < REMOTE_TELEPORT_MIN_DISTANCE) return;
+    startRemoteTeleport(userId, from, to);
+  }, [startRemoteTeleport]);
   // Per-remote-user walking animation state. Advances frame while position is changing.
   const remoteAnimRef = useRef<Map<string, { frame: number; lastMove: number; lastX: number; lastY: number; lastTick: number }>>(new Map());
   const [remoteFrames, setRemoteFrames] = useState<Record<string, number>>({});
