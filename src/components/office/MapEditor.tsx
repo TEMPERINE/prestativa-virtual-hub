@@ -479,9 +479,20 @@ export function MapEditor() {
         e.preventDefault();
         removeProp(selectedPropId);
       }
+      if (e.altKey) setAltDown(true);
     };
+    const onKeyUp = (e: KeyboardEvent) => {
+      if (!e.altKey) setAltDown(false);
+    };
+    const onBlur = () => setAltDown(false);
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    window.addEventListener("keyup", onKeyUp);
+    window.addEventListener("blur", onBlur);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("keyup", onKeyUp);
+      window.removeEventListener("blur", onBlur);
+    };
   }, [undo, tool, selectedPropId, removeProp]);
 
   // Pre-render tiles as plain divs would be huge (2560+). Use a canvas overlay.
