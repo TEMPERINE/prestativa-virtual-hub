@@ -575,10 +575,9 @@ export function OfficeScene() {
       });
     positionBroadcastChannelRef.current = positionBroadcastCh;
 
-    // Presence channel — third source of truth for live positions. Each client
-    // tracks its own state every ~1s; presence sync/join/leave events tell us
-    // who is actually online right now (independent of DB CDC + broadcasts).
-    // Eventual consistency: we accept the freshest sample per user (LWW by ts).
+    // Presence is only an online heartbeat. It must not be allowed to move an
+    // existing avatar, because an old/hidden tab can keep heartbeating SPAWN
+    // and pull a stopped colleague back to the origin.
     type PresenceState = { user_id: string; x: number; y: number; zone: string; facing?: Facing; ts: number };
     const presenceCh = supabase.channel(POSITION_PRESENCE_CHANNEL, {
       config: { presence: { key: meIdRef.current ?? `anon:${realtimeChannelSuffix}` } },
@@ -593,8 +592,8 @@ export function OfficeScene() {
         if (s.ts <= prev) continue;
         presenceLastTs.set(s.user_id, s.ts);
         setPositions((p) => {
-          const curTs = timestampForPosition(p[s.user_id] ?? {}) || (positionFreshTs.current.get(s.user_id) ?? 0);
-          if (s.ts < curTs) return p;
+          const cur = p[s.user_id];
+          if (cur) return { ...p, [s.user_id]: { ...cur, is_online: true } };
           positionFreshTs.current.set(s.user_id, s.ts);
           return {
             ...p,
@@ -704,7 +703,7 @@ export function OfficeScene() {
       if (pbCh && positionBroadcastReadyRef.current) {
         void pbCh.send({
           type: "broadcast", event: "position",
-          payload: { user_id: uid, x: cur.x, y: cur.y, zone: curZone, facing: facingRef.current, is_online: true },
+          payload: { user_id: uid, x: cur.x, y: cur.y, zone: curZone, facing: facingRef.current, is_online: true, ts: Date.now() },
         });
       }
     };
