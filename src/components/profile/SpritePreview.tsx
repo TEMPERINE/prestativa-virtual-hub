@@ -29,34 +29,50 @@ export function SpritePreview({ spriteId, facing = "down", size = 96, animate = 
     return () => window.clearInterval(id);
   }, [animate]);
 
-  const scale = size / dim.h;
+  // Altura de referência comum a todos os sprites — garante que personagens
+  // diferentes tenham a MESMA escala (e portanto proporções consistentes)
+  // dentro do mesmo container, em vez de cada um ser esticado ao tamanho.
+  const REF_H = 255;
+  const scale = size / REF_H;
   const w = dim.w * scale;
-  const h = size;
+  const h = dim.h * scale;
 
   return (
     <div
       style={{
-        width: w,
-        height: h,
+        width: size,
+        height: size,
         overflow: "hidden",
         position: "relative",
         imageRendering: "pixelated",
-        transform: useMirror ? "scaleX(-1)" : undefined,
       }}
     >
-      <img
-        src={sheet}
-        alt={sprite.label}
+      <div
         style={{
+          position: "absolute",
+          bottom: 0,
+          left: "50%",
+          width: w,
           height: h,
-          width: w * SPRITE_FRAMES,
-          maxWidth: "none",
-          transform: `translateX(-${frame * w}px)`,
-          imageRendering: "pixelated",
-          objectFit: "cover",
+          marginLeft: -w / 2,
+          overflow: "hidden",
+          transform: useMirror ? "scaleX(-1)" : undefined,
         }}
-        draggable={false}
-      />
+      >
+        <img
+          src={sheet}
+          alt={sprite.label}
+          style={{
+            height: h,
+            width: w * SPRITE_FRAMES,
+            maxWidth: "none",
+            transform: `translateX(-${frame * w}px)`,
+            imageRendering: "pixelated",
+            objectFit: "cover",
+          }}
+          draggable={false}
+        />
+      </div>
     </div>
   );
 }
