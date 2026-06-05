@@ -730,6 +730,8 @@ export function OfficeScene() {
       window.clearInterval(positionsPoll);
       window.clearInterval(presenceHeartbeat);
       window.removeEventListener("beforeunload", offline);
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", onVisible);
       offline();
     };
   }, []);
