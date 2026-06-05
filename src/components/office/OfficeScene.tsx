@@ -2173,14 +2173,18 @@ function SpriteAvatar({
         const w = sprite.dims[srcFacing].w;
         const active = f === facing;
         const heightPct = (h / refH) * 100;
-        // Per-frame X offset (in cell-width units, sign: + = drawn right of center).
-        // We subtract it from the background-position to pull the frame back to center.
+        // Per-frame head offset (in cell-w / cell-h units). Compensate so
+        // the head stays locked frame-to-frame (no horizontal samba, no
+        // vertical bob beyond the natural reference position).
         const offsets = getFrameOffsets(sprite.sheets[srcFacing]);
-        const dxNorm = offsets ? offsets[displayFrame] ?? 0 : 0;
-        // Background-position-x % = (i/(N-1))*100 - dxNorm/(N-1)*100
-        // When mirrored (left from right sheet), the sign of dx flips visually.
-        const signedDx = useMirror ? -dxNorm : dxNorm;
+        const off = offsets ? offsets[displayFrame] ?? { dx: 0, dy: 0 } : { dx: 0, dy: 0 };
+        // When mirrored (left rendered from right sheet), X sign flips visually.
+        const signedDx = useMirror ? -off.dx : off.dx;
         const bgPosX = ((displayFrame - signedDx) / (FRAMES - 1)) * 100;
+        // For Y: background is `100% height` of the element so background-position-y
+        // in % doesn't translate directly to pixels. Use a CSS calc that shifts
+        // by a fraction of the element height instead, via translateY on the layer.
+        const dyPct = -off.dy * 100; // negative dy.y compensates downward drift
         return (
           <div
             key={f}
@@ -2188,7 +2192,7 @@ function SpriteAvatar({
               position: "absolute",
               left: "50%",
               bottom: 0,
-              transform: `translateX(-50%) ${useMirror ? "scaleX(-1)" : ""}`,
+              transform: `translate(-50%, ${dyPct}%) ${useMirror ? "scaleX(-1)" : ""}`,
               height: `${heightPct}%`,
               width: `${(w / refW) * 100}%`,
               backgroundImage: `url(${sprite.sheets[srcFacing]})`,
