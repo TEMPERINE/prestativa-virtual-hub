@@ -513,6 +513,46 @@ export function OfficeScene() {
       });
     positionBroadcastChannelRef.current = positionBroadcastCh;
 
+    // Presence channel — third source of truth for live positions. Each client
+    // tracks its own state every ~1s; presence sync/join/leave events tell us
+    // who is actually online right now (independent of DB CDC + broadcasts).
+    // Eventual consistency: we accept the freshest sample per user (LWW by ts).
+    type PresenceState = { user_id: string; x: number; y: number; zone: string; facing?: Facing; ts: number };
+    const presenceCh = supabase.channel(`positions-presence:${realtimeChannelSuffix}`, {
+      config: { presence: { key: meIdRef.current ?? `anon:${realtimeChannelSuffix}` } },
+    });
+    const presenceLastTs = new Map<string, number>();
+    const mergePresence = (raw: unknown) => {
+      const arr = raw as PresenceState[] | undefined;
+      if (!Array.isArray(arr)) return;
+      for (const s of arr) {
+        if (!s?.user_id || s.user_id === meIdRef.current) continue;
+        const prev = presenceLastTs.get(s.user_id) ?? 0;
+        if (s.ts <= prev) continue;
+        presenceLastTs.set(s.user_id, s.ts);
+        setPositions((p) => ({
+          ...p,
+          [s.user_id]: { user_id: s.user_id, x: s.x, y: s.y, zone: s.zone, facing: s.facing, is_online: true },
+        }));
+      }
+    };
+    presenceCh.on("presence", { event: "sync" }, () => {
+      const state = presenceCh.presenceState() as Record<string, PresenceState[]>;
+      for (const list of Object.values(state)) mergePresence(list);
+    });
+    presenceCh.on("presence", { event: "join" }, ({ newPresences }) => mergePresence(newPresences));
+    presenceCh.on("presence", { event: "leave" }, ({ leftPresences }) => {
+      const arr = leftPresences as PresenceState[];
+      for (const s of arr ?? []) {
+        if (!s?.user_id || s.user_id === meIdRef.current) continue;
+        setPositions((p) => {
+          const cur = p[s.user_id];
+          if (!cur) return p;
+          return { ...p, [s.user_id]: { ...cur, is_online: false } };
+        });
+      }
+    });
+
     const claimsCh = supabase
       .channel(`claims-room:${realtimeChannelSuffix}`)
       .on(
@@ -542,6 +582,32 @@ export function OfficeScene() {
         positionBroadcastReadyRef.current = status === "SUBSCRIBED";
       });
       claimsCh.subscribe();
+      presenceCh.subscribe(async (status) => {
+        if (status !== "SUBSCRIBED") return;
+        const uid = meIdRef.current;
+        if (!uid) return;
+        const cur = posRef.current;
+        try {
+          await presenceCh.track({
+            user_id: uid, x: cur.x, y: cur.y,
+            zone: zoneAt(cur).id, facing: facingRef.current, ts: Date.now(),
+          });
+        } catch { /* noop */ }
+      });
+    })();
+
+    // Heartbeat presence every second so peers detect each other within 1s of
+    // joining and the "frozen avatar" symptom can't happen even if both
+    // postgres_changes and broadcasts get dropped on flaky networks.
+    const presenceHeartbeat = window.setInterval(() => {
+      const uid = meIdRef.current;
+      if (!uid) return;
+      const cur = posRef.current;
+      void presenceCh.track({
+        user_id: uid, x: cur.x, y: cur.y,
+        zone: zoneAt(cur).id, facing: facingRef.current, ts: Date.now(),
+      }).catch(() => { /* noop */ });
+    }, 1000);
     })();
 
     const offline = async () => {
