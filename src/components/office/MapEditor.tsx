@@ -409,11 +409,22 @@ export function MapEditor() {
       if (e.ctrlKey && (e.key === "z" || e.key === "Z")) {
         e.preventDefault();
         undo();
+      } else if (e.key === "Escape") {
+        if (tool.kind === "place-prop" || tool.kind === "spawn") {
+          setTool({ kind: "blocked" });
+        }
+        setSelectedPropId(null);
+      } else if ((e.key === "Delete" || e.key === "Backspace") && selectedPropId) {
+        const target = e.target as HTMLElement | null;
+        const tag = target?.tagName;
+        if (tag === "INPUT" || tag === "TEXTAREA" || target?.isContentEditable) return;
+        e.preventDefault();
+        removeProp(selectedPropId);
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [undo]);
+  }, [undo, tool, selectedPropId, removeProp]);
 
   // Pre-render tiles as plain divs would be huge (2560+). Use a canvas overlay.
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
