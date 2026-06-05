@@ -616,207 +616,373 @@ export function MapEditor() {
       </header>
 
       <div className="flex flex-1 overflow-hidden">
-        {/* Zone palette */}
-        <aside className="w-56 border-r border-border bg-card p-3 overflow-y-auto">
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="text-xs font-semibold uppercase text-muted-foreground">Zonas (Áreas privadas)</h3>
-            <button
-              onClick={addCustomZone}
-              title="Adicionar nova zona"
-              className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded bg-primary/20 text-primary hover:bg-primary/30"
-            >
-              <Plus size={12} /> Nova
-            </button>
-          </div>
-          <div className="flex flex-col gap-1">
-            {paintableZones.map((z) => {
-              const color = ZONE_COLORS[z.id] ?? "#888";
-              const active = tool.kind === "zone" && tool.zone === z.id;
-              const k = kindOf(z.id);
+        {/* Sidebar com abas */}
+        <aside className="w-64 border-r border-border bg-card overflow-y-auto flex flex-col">
+          {/* Tabs */}
+          <div className="flex border-b border-border sticky top-0 bg-card z-10">
+            {[
+              { id: "map" as const, label: "Mapa", icon: <MapIcon size={14} /> },
+              { id: "zones" as const, label: "Áreas", icon: <LayoutGrid size={14} /> },
+              { id: "elements" as const, label: "Elementos", icon: <Boxes size={14} /> },
+            ].map((t) => {
+              const active = editorTab === t.id;
               return (
-                <div
-                  key={z.id}
-                  className={`group flex items-center gap-2 px-2 py-1.5 rounded text-sm ${
-                    active ? "ring-2 ring-primary bg-muted" : "hover:bg-muted"
+                <button
+                  key={t.id}
+                  onClick={() => {
+                    setEditorTab(t.id);
+                    if (t.id === "map" && tool.kind !== "blocked" && tool.kind !== "erase") {
+                      setTool({ kind: "blocked" });
+                    } else if (t.id === "elements" && tool.kind !== "select" && tool.kind !== "place-prop") {
+                      setTool({ kind: "select" });
+                    } else if (t.id === "zones" && (tool.kind === "blocked" || tool.kind === "erase" || tool.kind === "place-prop" || tool.kind === "select")) {
+                      // mantém ferramenta atual ou nada
+                    }
+                  }}
+                  className={`flex-1 inline-flex items-center justify-center gap-1.5 text-xs px-2 py-2 border-b-2 transition-colors ${
+                    active
+                      ? "border-primary text-foreground font-semibold"
+                      : "border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/50"
                   }`}
                 >
-                  <button
-                    onClick={() => setTool({ kind: "zone", zone: z.id })}
-                    className="flex items-center gap-2 flex-1 min-w-0 text-left"
-                  >
-                    <span
-                      className="w-4 h-4 rounded shrink-0"
-                      style={{ backgroundColor: color, opacity: 0.7 }}
-                    />
-                    <span className="truncate">{z.label}</span>
-                  </button>
-                  <button
-                    onClick={(e) => { e.stopPropagation(); setTool({ kind: "spawn", zone: z.id }); }}
-                    title={spawnPoints[z.id] ? "Ponto de teleporte definido. Clique para reposicionar." : "Definir ponto de teleporte (GPS)"}
-                    className={`shrink-0 p-1 rounded ${
-                      tool.kind === "spawn" && tool.zone === z.id
-                        ? "ring-2 ring-primary text-primary"
-                        : spawnPoints[z.id] ? "text-primary" : "text-muted-foreground"
-                    } hover:bg-muted`}
-                  >
-                    <MapPin size={12} />
-                  </button>
-                  <button
-                    onClick={(e) => { e.stopPropagation(); toggleKind(z.id); }}
-                    title={k === "workspace" ? "Local de trabalho (reivindicável). Clique para tornar Espaço comum." : "Espaço comum. Clique para tornar Local de trabalho."}
-                    className={`shrink-0 p-1 rounded ${k === "workspace" ? "text-primary" : "text-muted-foreground"} hover:bg-muted`}
-                  >
-                    {k === "workspace" ? <Briefcase size={12} /> : <Users size={12} />}
-                  </button>
-                </div>
+                  {t.icon}
+                  {t.label}
+                </button>
               );
             })}
-            {customZones.length > 0 && (
-              <div className="mt-2 pt-2 border-t border-border/50 flex flex-col gap-1">
-                <span className="text-[10px] uppercase text-muted-foreground px-1">Personalizadas</span>
-                {customZones.map((z) => {
-                  const active = tool.kind === "zone" && tool.zone === (z.id as ZoneId);
-                  const k = kindOf(z.id);
-                  return (
-                    <div
-                      key={z.id}
-                      className={`group flex items-center gap-2 px-2 py-1.5 rounded text-left text-sm ${
-                        active ? "ring-2 ring-primary bg-muted" : "hover:bg-muted"
-                      }`}
-                    >
-                      <button
-                        onClick={() => setTool({ kind: "zone", zone: z.id as ZoneId })}
-                        className="flex items-center gap-2 flex-1 min-w-0"
-                      >
-                        <span
-                          className="w-4 h-4 rounded shrink-0"
-                          style={{ backgroundColor: z.color, opacity: 0.7 }}
-                        />
-                        <span className="truncate">{z.label}</span>
-                      </button>
-                      <button
-                        onClick={(e) => { e.stopPropagation(); setTool({ kind: "spawn", zone: z.id }); }}
-                        title={spawnPoints[z.id] ? "Ponto de teleporte definido" : "Definir ponto de teleporte (GPS)"}
-                        className={`shrink-0 p-1 rounded ${
-                          tool.kind === "spawn" && tool.zone === z.id
-                            ? "ring-2 ring-primary text-primary"
-                            : spawnPoints[z.id] ? "text-primary" : "text-muted-foreground"
-                        } hover:bg-muted`}
-                      >
-                        <MapPin size={12} />
-                      </button>
-                      <button
-                        onClick={(e) => { e.stopPropagation(); toggleKind(z.id); }}
-                        title={k === "workspace" ? "Local de trabalho (reivindicável)" : "Espaço comum"}
-                        className={`shrink-0 p-1 rounded ${k === "workspace" ? "text-primary" : "text-muted-foreground"} hover:bg-muted`}
-                      >
-                        {k === "workspace" ? <Briefcase size={12} /> : <Users size={12} />}
-                      </button>
-                      <button
-                        onClick={() => removeCustomZone(z.id)}
-                        title="Remover zona"
-                        className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive"
-                      >
-                        <X size={12} />
-                      </button>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-            <button
-              onClick={addCustomZone}
-              className="mt-2 inline-flex items-center justify-center gap-1 text-xs px-2 py-1.5 rounded border border-dashed border-border hover:bg-muted text-muted-foreground"
-            >
-              <Plus size={12} /> Adicionar zona
-            </button>
           </div>
 
-          {/* ===== Galeria de elementos ===== */}
-          <div className="mt-4 pt-3 border-t border-border/60">
-            <div className="flex items-center justify-between mb-2">
-              <h3 className="text-xs font-semibold uppercase text-muted-foreground">Elementos</h3>
-              <button
-                onClick={() => setTool({ kind: "select" })}
-                title="Selecionar / mover elementos"
-                className={`p-1 rounded ${tool.kind === "select" ? "ring-2 ring-primary text-primary" : "text-muted-foreground hover:bg-muted"}`}
-              >
-                <Hand size={12} />
-              </button>
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              {PROP_CATALOG.map((def) => {
-                const active = tool.kind === "place-prop" && tool.defId === def.id;
-                return (
+          <div className="p-3 flex-1">
+            {/* ===== Aba: Mapa ===== */}
+            {editorTab === "map" && (
+              <div className="flex flex-col gap-3">
+                <h3 className="text-xs font-semibold uppercase text-muted-foreground">Paredes / Bloqueios</h3>
+                <div className="flex flex-col gap-1.5">
+                  <ToolBtn
+                    active={tool.kind === "blocked"}
+                    onClick={() => setTool({ kind: "blocked" })}
+                    icon={<Square size={14} />}
+                    label="Colocar bloqueio"
+                    color="#ef4444"
+                  />
+                  <ToolBtn
+                    active={tool.kind === "erase"}
+                    onClick={() => setTool({ kind: "erase" })}
+                    icon={<Eraser size={14} />}
+                    label="Retirar bloqueio"
+                  />
                   <button
-                    key={def.id}
-                    onClick={() => setTool({ kind: "place-prop", defId: def.id })}
-                    className={`flex flex-col items-center gap-1 p-2 rounded border ${active ? "border-primary bg-primary/10" : "border-border hover:bg-muted"}`}
-                    title={`Adicionar ${def.label}`}
+                    onClick={undo}
+                    disabled={!canUndo}
+                    className={`inline-flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded ${
+                      canUndo ? "bg-muted/60 hover:bg-muted" : "opacity-50 cursor-not-allowed"
+                    }`}
+                    title="Desfazer (Ctrl+Z)"
                   >
-                    <img src={def.frames[0]} alt="" className="h-12 object-contain" draggable={false} />
-                    <span className="text-[10px]">{def.label}</span>
+                    <Undo size={14} /> Desfazer
                   </button>
-                );
-              })}
-            </div>
-            {tool.kind === "place-prop" && (
-              <p className="text-[10px] text-muted-foreground mt-2">
-                Clique no mapa para colocar. Esc para cancelar.
-              </p>
-            )}
-            {propsList.length > 0 && (
-              <div className="mt-3 flex flex-col gap-1">
-                <span className="text-[10px] uppercase text-muted-foreground">No mapa ({propsList.length})</span>
-                {propsList.map((pi) => {
-                  const def = getPropDef(pi.defId);
-                  if (!def) return null;
-                  const sel = selectedPropId === pi.id;
-                  return (
-                    <div
-                      key={pi.id}
-                      className={`group flex items-center gap-2 px-2 py-1 rounded text-xs ${sel ? "bg-muted ring-1 ring-primary" : "hover:bg-muted"}`}
-                    >
+                </div>
+
+                <div>
+                  <span className="text-[10px] uppercase text-muted-foreground">Tamanho do pincel</span>
+                  <div className="flex items-center gap-1 mt-1">
+                    {[1, 2, 3, 5].map((b) => (
                       <button
-                        onClick={() => { setTool({ kind: "select" }); setSelectedPropId(pi.id); }}
-                        className="flex-1 text-left truncate"
+                        key={b}
+                        onClick={() => setBrush(b)}
+                        className={`text-xs px-2 py-1 rounded flex-1 ${
+                          brush === b ? "bg-primary text-primary-foreground" : "bg-muted"
+                        }`}
                       >
-                        {def.label}
+                        {b}×{b}
                       </button>
-                      {def.interactive && (
-                        <button
-                          onClick={() => togglePropInteractive(pi.id)}
-                          title={pi.interactive ? "Interativo (clique para desativar)" : "Não interativo (clique para ativar)"}
-                          className={`p-0.5 ${pi.interactive ? "text-primary" : "text-muted-foreground"}`}
-                        >
-                          {pi.interactive ? <Zap size={12} /> : <ZapOff size={12} />}
-                        </button>
-                      )}
-                      <button
-                        onClick={() => removeProp(pi.id)}
-                        className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive"
-                        title="Remover"
-                      >
-                        <X size={12} />
-                      </button>
-                    </div>
-                  );
-                })}
+                    ))}
+                  </div>
+                </div>
+
+                <div className="text-xs text-muted-foreground space-y-1 pt-2 border-t border-border/50">
+                  <div className="flex items-center gap-2">
+                    <span className="w-3 h-3 rounded" style={{ background: "rgba(239,68,68,0.55)" }} />
+                    Tile bloqueado (avatar não passa)
+                  </div>
+                  <p className="text-[11px] mt-1">Clique e arraste para pintar/apagar.</p>
+                </div>
               </div>
             )}
-          </div>
 
-          <h3 className="text-xs font-semibold uppercase text-muted-foreground mt-4 mb-2">Legenda</h3>
-          <div className="text-xs text-muted-foreground space-y-1">
-            <div className="flex items-center gap-2">
-              <span className="w-3 h-3 rounded" style={{ background: "rgba(239,68,68,0.55)" }} />
-              Bloqueado
-            </div>
-            <div>
-              <p className="mt-2">Clique e arraste para pintar. Use Apagar para limpar célula. Para mover elementos, ative a ferramenta de seleção.</p>
-            </div>
+            {/* ===== Aba: Áreas ===== */}
+            {editorTab === "zones" && (
+              <div className="flex flex-col">
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="text-xs font-semibold uppercase text-muted-foreground">Áreas / Salas</h3>
+                  <button
+                    onClick={addCustomZone}
+                    title="Adicionar nova zona"
+                    className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded bg-primary/20 text-primary hover:bg-primary/30"
+                  >
+                    <Plus size={12} /> Nova
+                  </button>
+                </div>
+                <div className="flex flex-col gap-1">
+                  {paintableZones.map((z) => {
+                    const color = ZONE_COLORS[z.id] ?? "#888";
+                    const active = tool.kind === "zone" && tool.zone === z.id;
+                    const k = kindOf(z.id);
+                    return (
+                      <div
+                        key={z.id}
+                        className={`group flex items-center gap-2 px-2 py-1.5 rounded text-sm ${
+                          active ? "ring-2 ring-primary bg-muted" : "hover:bg-muted"
+                        }`}
+                      >
+                        <button
+                          onClick={() => setTool({ kind: "zone", zone: z.id })}
+                          className="flex items-center gap-2 flex-1 min-w-0 text-left"
+                        >
+                          <span className="w-4 h-4 rounded shrink-0" style={{ backgroundColor: color, opacity: 0.7 }} />
+                          <span className="truncate">{z.label}</span>
+                        </button>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setTool({ kind: "spawn", zone: z.id }); }}
+                          title={spawnPoints[z.id] ? "Ponto de teleporte definido. Clique para reposicionar." : "Definir ponto de teleporte"}
+                          className={`shrink-0 p-1 rounded ${
+                            tool.kind === "spawn" && tool.zone === z.id
+                              ? "ring-2 ring-primary text-primary"
+                              : spawnPoints[z.id] ? "text-primary" : "text-muted-foreground"
+                          } hover:bg-muted`}
+                        >
+                          <MapPin size={12} />
+                        </button>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); toggleKind(z.id); }}
+                          title={k === "workspace" ? "Local de trabalho (reivindicável)" : "Espaço comum"}
+                          className={`shrink-0 p-1 rounded ${k === "workspace" ? "text-primary" : "text-muted-foreground"} hover:bg-muted`}
+                        >
+                          {k === "workspace" ? <Briefcase size={12} /> : <Users size={12} />}
+                        </button>
+                      </div>
+                    );
+                  })}
+                  {customZones.length > 0 && (
+                    <div className="mt-2 pt-2 border-t border-border/50 flex flex-col gap-1">
+                      <span className="text-[10px] uppercase text-muted-foreground px-1">Personalizadas</span>
+                      {customZones.map((z) => {
+                        const active = tool.kind === "zone" && tool.zone === (z.id as ZoneId);
+                        const k = kindOf(z.id);
+                        return (
+                          <div
+                            key={z.id}
+                            className={`group flex items-center gap-2 px-2 py-1.5 rounded text-left text-sm ${
+                              active ? "ring-2 ring-primary bg-muted" : "hover:bg-muted"
+                            }`}
+                          >
+                            <button
+                              onClick={() => setTool({ kind: "zone", zone: z.id as ZoneId })}
+                              className="flex items-center gap-2 flex-1 min-w-0"
+                            >
+                              <span className="w-4 h-4 rounded shrink-0" style={{ backgroundColor: z.color, opacity: 0.7 }} />
+                              <span className="truncate">{z.label}</span>
+                            </button>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); setTool({ kind: "spawn", zone: z.id }); }}
+                              title={spawnPoints[z.id] ? "Ponto de teleporte definido" : "Definir ponto de teleporte"}
+                              className={`shrink-0 p-1 rounded ${
+                                tool.kind === "spawn" && tool.zone === z.id
+                                  ? "ring-2 ring-primary text-primary"
+                                  : spawnPoints[z.id] ? "text-primary" : "text-muted-foreground"
+                              } hover:bg-muted`}
+                            >
+                              <MapPin size={12} />
+                            </button>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); toggleKind(z.id); }}
+                              title={k === "workspace" ? "Local de trabalho (reivindicável)" : "Espaço comum"}
+                              className={`shrink-0 p-1 rounded ${k === "workspace" ? "text-primary" : "text-muted-foreground"} hover:bg-muted`}
+                            >
+                              {k === "workspace" ? <Briefcase size={12} /> : <Users size={12} />}
+                            </button>
+                            <button
+                              onClick={() => removeCustomZone(z.id)}
+                              title="Remover zona"
+                              className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive"
+                            >
+                              <X size={12} />
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                  <button
+                    onClick={addCustomZone}
+                    className="mt-2 inline-flex items-center justify-center gap-1 text-xs px-2 py-1.5 rounded border border-dashed border-border hover:bg-muted text-muted-foreground"
+                  >
+                    <Plus size={12} /> Adicionar zona
+                  </button>
+                </div>
+                <p className="mt-3 text-[11px] text-muted-foreground">
+                  Clique no nome pra pintar a área. <MapPin size={10} className="inline" /> define onde o avatar aparece ao teleportar. <Briefcase size={10} className="inline" /> / <Users size={10} className="inline" /> alterna entre área privada e comum.
+                </p>
+              </div>
+            )}
+
+            {/* ===== Aba: Elementos ===== */}
+            {editorTab === "elements" && (
+              <div className="flex flex-col">
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="text-xs font-semibold uppercase text-muted-foreground">Galeria</h3>
+                  <button
+                    onClick={() => setTool({ kind: "select" })}
+                    title="Selecionar / mover elementos"
+                    className={`p-1 rounded ${tool.kind === "select" ? "ring-2 ring-primary text-primary" : "text-muted-foreground hover:bg-muted"}`}
+                  >
+                    <Hand size={12} />
+                  </button>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  {PROP_CATALOG.map((def) => {
+                    const active = tool.kind === "place-prop" && tool.defId === def.id;
+                    return (
+                      <button
+                        key={def.id}
+                        onClick={() => setTool({ kind: "place-prop", defId: def.id })}
+                        className={`flex flex-col items-center gap-1 p-2 rounded border ${active ? "border-primary bg-primary/10" : "border-border hover:bg-muted"}`}
+                        title={`Adicionar ${def.label}`}
+                      >
+                        <img src={def.frames[0]} alt="" className="h-12 object-contain" draggable={false} />
+                        <span className="text-[10px]">{def.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+                {tool.kind === "place-prop" && (
+                  <p className="text-[10px] text-muted-foreground mt-2">Clique no mapa para colocar. Esc para cancelar.</p>
+                )}
+
+                {propsList.length > 0 && (
+                  <div className="mt-3 flex flex-col gap-1">
+                    <span className="text-[10px] uppercase text-muted-foreground">No mapa ({propsList.length})</span>
+                    {propsList.map((pi) => {
+                      const def = getPropDef(pi.defId);
+                      if (!def) return null;
+                      const sel = selectedPropId === pi.id;
+                      return (
+                        <div
+                          key={pi.id}
+                          className={`group flex items-center gap-2 px-2 py-1 rounded text-xs ${sel ? "bg-muted ring-1 ring-primary" : "hover:bg-muted"}`}
+                        >
+                          <button
+                            onClick={() => { setTool({ kind: "select" }); setSelectedPropId(pi.id); }}
+                            className="flex-1 text-left truncate"
+                          >
+                            {def.label}
+                            {pi.actions && pi.actions.length > 0 && (
+                              <Lock size={10} className="inline ml-1 text-primary" />
+                            )}
+                          </button>
+                          {def.interactive && (
+                            <button
+                              onClick={() => togglePropInteractive(pi.id)}
+                              title={pi.interactive ? "Interativo (clique para desativar)" : "Não interativo (clique para ativar)"}
+                              className={`p-0.5 ${pi.interactive ? "text-primary" : "text-muted-foreground"}`}
+                            >
+                              {pi.interactive ? <Zap size={12} /> : <ZapOff size={12} />}
+                            </button>
+                          )}
+                          <button
+                            onClick={() => removeProp(pi.id)}
+                            className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive"
+                            title="Remover"
+                          >
+                            <X size={12} />
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* ===== Ações do elemento selecionado ===== */}
+                {(() => {
+                  const sel = propsList.find((p) => p.id === selectedPropId);
+                  if (!sel) return null;
+                  const def = getPropDef(sel.defId);
+                  if (!def) return null;
+                  if (!def.interactive || def.frames.length < 2) return null;
+                  const allZones = [
+                    ...paintableZones.map((z) => ({ id: z.id as string, label: z.label })),
+                    ...customZones.map((z) => ({ id: z.id, label: z.label })),
+                  ];
+                  const gateActions = (sel.actions ?? []).filter(
+                    (a): a is Extract<PropAction, { type: "gate-zone" }> => a.type === "gate-zone"
+                  );
+                  const usedZones = new Set(gateActions.map((a) => a.zoneId));
+                  const available = allZones.filter((z) => !usedZones.has(z.id));
+                  return (
+                    <div className="mt-4 pt-3 border-t border-border/60">
+                      <h3 className="text-xs font-semibold uppercase text-muted-foreground mb-2 flex items-center gap-1">
+                        <Lock size={12} /> Ações de "{def.label}"
+                      </h3>
+                      {gateActions.length === 0 && (
+                        <p className="text-[11px] text-muted-foreground mb-2">
+                          Nenhuma ação. Adicione abaixo para que o elemento afete o mundo.
+                        </p>
+                      )}
+                      <div className="flex flex-col gap-1 mb-2">
+                        {gateActions.map((a, i) => {
+                          const z = allZones.find((zz) => zz.id === a.zoneId);
+                          const frameLabel = a.blockedFrame === 0 ? "Frame 1 (fechada)" : `Frame ${a.blockedFrame + 1}`;
+                          return (
+                            <div key={i} className="flex items-center gap-2 px-2 py-1 rounded bg-muted/50 text-[11px]">
+                              <Lock size={10} className="text-primary shrink-0" />
+                              <span className="flex-1 truncate">
+                                Tranca <b>{z?.label ?? a.zoneId}</b>
+                                <span className="text-muted-foreground"> · {frameLabel}</span>
+                              </span>
+                              <button
+                                onClick={() => {
+                                  const idx = (sel.actions ?? []).findIndex(
+                                    (aa) => aa.type === "gate-zone" && aa.zoneId === a.zoneId
+                                  );
+                                  if (idx >= 0) removePropAction(sel.id, idx);
+                                }}
+                                className="text-muted-foreground hover:text-destructive"
+                              >
+                                <X size={10} />
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                      {available.length > 0 ? (
+                        <select
+                          className="w-full text-[11px] px-2 py-1 rounded bg-muted border border-border"
+                          value=""
+                          onChange={(e) => {
+                            const zoneId = e.target.value;
+                            if (!zoneId) return;
+                            addPropAction(sel.id, { type: "gate-zone", zoneId, blockedFrame: 0 });
+                          }}
+                        >
+                          <option value="">+ Trancar uma sala…</option>
+                          {available.map((z) => (
+                            <option key={z.id} value={z.id}>{z.label}</option>
+                          ))}
+                        </select>
+                      ) : (
+                        <p className="text-[10px] text-muted-foreground">Todas as salas já estão trancadas por este elemento.</p>
+                      )}
+                      <p className="text-[10px] text-muted-foreground mt-2">
+                        Enquanto o frame 1 (fechada) estiver ativo, ninguém entra nem sai da sala. Aperte X no jogo para abrir.
+                      </p>
+                    </div>
+                  );
+                })()}
+              </div>
+            )}
           </div>
         </aside>
+
 
         {/* Stage */}
         <main
