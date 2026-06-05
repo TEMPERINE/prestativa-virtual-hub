@@ -2578,6 +2578,70 @@ function TeleportFx({ point, phase }: { point: Point; phase: "out" | "in" }) {
 
 
 /** Animated sprite avatar — delega 100% para AlignedSprite (regra única). */
+function AvatarInteractionMenu({
+  profile,
+  onClose,
+  onFollow,
+  onLead,
+}: {
+  profile: Profile;
+  onClose: () => void;
+  onFollow: () => void;
+  onLead: () => void;
+}) {
+  return (
+    <div
+      data-avatar-menu
+      className="absolute left-full ml-3 -top-6 w-56 rounded-xl bg-popover text-popover-foreground shadow-2xl border pointer-events-auto"
+      style={{ zIndex: 1_000_000 }}
+      onMouseDown={(e) => e.stopPropagation()}
+      onClick={(e) => e.stopPropagation()}
+    >
+      <div className="flex items-center gap-2 px-3 py-2 border-b">
+        <span className="w-2 h-2 rounded-full bg-green-500 shrink-0" />
+        <div className="text-sm font-semibold truncate" style={{ color: profile.avatar_color }}>
+          {profile.display_name}
+        </div>
+        <button
+          type="button"
+          onClick={onClose}
+          className="ml-auto p-1 rounded hover:bg-muted text-muted-foreground"
+          aria-label="Fechar"
+        >
+          <XIcon className="w-3.5 h-3.5" />
+        </button>
+      </div>
+      <div className="p-1">
+        <button
+          type="button"
+          onClick={() => {
+            const bits = [profile.tagline, profile.status].filter(Boolean).join(" • ");
+            toast(profile.display_name, { description: bits || "Perfil sem descrição." });
+            onClose();
+          }}
+          className="w-full flex items-center gap-2 px-2 py-2 text-sm rounded hover:bg-muted text-left"
+        >
+          <UserIcon className="w-4 h-4" /> Ver perfil
+        </button>
+        <button
+          type="button"
+          onClick={onFollow}
+          className="w-full flex items-center gap-2 px-2 py-2 text-sm rounded hover:bg-muted text-left"
+        >
+          <Footprints className="w-4 h-4" /> Seguir
+        </button>
+        <button
+          type="button"
+          onClick={onLead}
+          className="w-full flex items-center gap-2 px-2 py-2 text-sm rounded hover:bg-muted text-left"
+        >
+          <UserPlus className="w-4 h-4" /> Pedir para conduzir
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function SpriteAvatar({
   facing,
   frame,
