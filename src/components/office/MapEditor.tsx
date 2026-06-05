@@ -26,6 +26,7 @@ import { ArrowLeft, Eraser, Square, Download, Trash2, Eye, EyeOff, Undo, Plus, X
 type Tool =
   | { kind: "blocked" }
   | { kind: "erase" }
+  | { kind: "erase-zone" }
   | { kind: "zone"; zone: ZoneId }
   | { kind: "spawn"; zone: string }
   | { kind: "place-prop"; defId: string }
