@@ -38,6 +38,7 @@ import { toast } from "sonner";
 import { LogOut, Mic, MicOff, Video, VideoOff, MonitorUp, Users, Pencil, User as UserIcon, Hand, MessageCircle, StickyNote, X as XIcon, Plus, Minus, Locate, ChevronLeft, ChevronRight } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import { useRtcMesh } from "@/lib/rtc/useRtcMesh";
+import { installAudioUnlockListeners, unlockAudioPlayback } from "@/lib/rtc/audio-unlock";
 import { RemoteVideoTiles } from "./RemoteVideoTiles";
 import { CamPreviewAndPicker } from "./CamPreviewAndPicker";
 import { ScreenShareViewer } from "./ScreenShareViewer";
@@ -288,6 +289,33 @@ export function OfficeScene() {
   useEffect(() => {
     connectedPeersRef.current = new Set(desiredPeers);
   }, [desiredPeers]);
+
+  // Warm-start mic the moment we know the user — getUserMedia runs once,
+  // the track stays disabled until the user clicks unmute. This removes the
+  // 1–3s permission/negotiation delay from the first unmute and ensures
+  // peers already have an audio sender attached when they connect.
+  // Also wires global audio unlock so remote <audio> tags can autoplay.
+  const prewarmMic = rtc.prewarmMic;
+  useEffect(() => {
+    if (!me?.id) return;
+    void prewarmMic();
+  }, [me?.id, prewarmMic]);
+  useEffect(() => {
+    const off = installAudioUnlockListeners();
+    return off;
+  }, []);
+
+  // Keep realtime authenticated forever: re-attach JWT on every token refresh,
+  // otherwise the websocket silently loses access to RLS-protected tables
+  // after ~1h and movement events stop arriving.
+  useEffect(() => {
+    const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
+      if ((event === "TOKEN_REFRESHED" || event === "SIGNED_IN") && session?.access_token) {
+        try { void supabase.realtime.setAuth(session.access_token); } catch { /* noop */ }
+      }
+    });
+    return () => { sub.subscription.unsubscribe(); };
+  }, []);
 
   const sendPos = useCallback((x: number, y: number, z: ZoneId, f: Facing, persistNow = false) => {
     const knownId = meIdRef.current;
