@@ -730,7 +730,7 @@ export function MapEditor() {
                     <span className="w-3 h-3 rounded" style={{ background: "rgba(239,68,68,0.55)" }} />
                     Tile bloqueado (avatar não passa)
                   </div>
-                  <p className="text-[11px] mt-1">Clique e arraste para pintar/apagar.</p>
+                  <p className="text-[11px] mt-1">Clique e arraste para pintar/apagar. Segure <kbd className="px-1 rounded bg-muted text-foreground">Alt</kbd> para usar a borracha rapidamente.</p>
                 </div>
               </div>
             )}
