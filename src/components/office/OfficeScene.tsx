@@ -2651,7 +2651,7 @@ function PlacementLayer({
             top: `${targetRect.y1 * 100}%`,
             width: `${(targetRect.x2 - targetRect.x1) * 100}%`,
             height: `${(targetRect.y2 - targetRect.y1) * 100}%`,
-            zIndex: 91,
+            zIndex: 200001,
             outline: "2px dashed color-mix(in oklab, var(--primary) 80%, transparent)",
             background: "color-mix(in oklab, var(--primary) 12%, transparent)",
             boxShadow: "0 0 0 9999px rgba(0,0,0,0.001)",
