@@ -29,7 +29,6 @@ import afroRight from "@/assets/sprites/afro-right.png";
 import japaDown from "@/assets/sprites/japa-down.png";
 import japaUp from "@/assets/sprites/japa-up.png";
 import japaLeft from "@/assets/sprites/japa-left.png";
-import japaRight from "@/assets/sprites/japa-right.png";
 
 export type Facing = "up" | "down" | "left" | "right";
 
@@ -115,14 +114,14 @@ export const SPRITES: SpriteDef[] = [
     id: "japa",
     label: "Japa",
     gender: "f",
-    sheets: { up: japaUp, down: japaDown, left: japaLeft, right: japaRight },
+    sheets: { up: japaUp, down: japaDown, left: japaLeft, right: japaLeft },
     dims: {
       down: { w: 128, h: 248 },
       up: { w: 126, h: 250 },
       left: { w: 126, h: 236 },
-      right: { w: 126, h: 218 },
+      right: { w: 126, h: 236 },
     },
-    mirrorLeftFromRight: false,
+    mirrorLeftFromRight: true,
   },
 ];
 

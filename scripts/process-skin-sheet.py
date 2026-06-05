@@ -101,7 +101,12 @@ def process(src_path: str, skin_id: str, rows: int, cols: int, out_dir: str):
 
     os.makedirs(out_dir, exist_ok=True)
 
+    # Skip the "right" row: by convention we mirror "left" at render time
+    # (smaller bundle + guaranteed symmetry). Process only down/up/left.
+    facings_to_emit = [f for f in FACINGS[:rows] if f != "right"]
     for r, facing in enumerate(FACINGS[:rows]):
+        if facing == "right":
+            continue
         # Pass 1: per-frame bbox and center metrics within each row cell.
         frames = []   # list of (frame_rgba, cx_in_frame, foot_y_in_frame)
         max_w_left = 0
