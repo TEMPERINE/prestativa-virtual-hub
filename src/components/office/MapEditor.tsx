@@ -485,21 +485,23 @@ export function MapEditor() {
     canvas.height = rows;
     const ctx = canvas.getContext("2d")!;
     ctx.clearRect(0, 0, cols, rows);
+    const showZones = editorTab === "zones";
+    const showBlocked = editorTab === "map";
     for (let r = 0; r < rows; r++) {
       for (let c = 0; c < cols; c++) {
         const i = cellIndex(c, r, cols);
         const zid = overrides.zones[i];
-        if (zid) {
+        if (showZones && zid) {
           ctx.fillStyle = zoneColorOf(zid) + "66"; // ~40% alpha
           ctx.fillRect(c, r, 1, 1);
         }
-        if (overrides.blocked[i]) {
+        if (showBlocked && overrides.blocked[i]) {
           ctx.fillStyle = "rgba(239, 68, 68, 0.55)"; // red
           ctx.fillRect(c, r, 1, 1);
         }
       }
     }
-  }, [overrides, zoneColorOf]);
+  }, [overrides, zoneColorOf, editorTab]);
 
   // Effective-collision overlay: shows EXACTLY what the game blocks for
   // the avatar (FLOOR_POLY + painted blocked OR default COLLIDERS).
