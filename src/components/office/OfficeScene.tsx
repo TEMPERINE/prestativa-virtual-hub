@@ -1284,7 +1284,7 @@ export function OfficeScene() {
     const uid = me?.id;
     if (!uid) return;
     const ch = supabase
-      .channel(`lead-events-${uid}`, { config: { broadcast: { self: false } } })
+      .channel(`lead-events`, { config: { broadcast: { self: false } } })
       .on("broadcast", { event: "lead-request" }, ({ payload }) => {
         const p = payload as { from?: string; to?: string; fromName?: string };
         if (!p?.from || p.to !== uid) return;
