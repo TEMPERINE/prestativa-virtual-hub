@@ -82,45 +82,46 @@ function computeOffsets(img: HTMLImageElement): FrameOffset[] {
   // Per-frame head metrics.
   const headX: number[] = new Array(SPRITE_FRAMES).fill(NaN);
   const headTopY: number[] = new Array(SPRITE_FRAMES).fill(NaN);
-  // Min opaque pixels in a row to consider it "real content" (skip stray AA pixels).
-  const MIN_ROW_PIXELS = Math.max(2, Math.floor(cellW * 0.02));
-  // Head band height: ~22% of cell height starting from the topmost opaque row.
+  // Min opaque pixels in a row to consider it "real content" (skip stray AA
+  // pixels and hair wisps that move between frames).
+  const MIN_ROW_PIXELS = Math.max(4, Math.floor(cellW * 0.05));
+  // Head band height: ~22% of cell height starting from the topmost solid row.
   const HEAD_BAND = Math.max(6, Math.floor(h * 0.22));
 
   for (let f = 0; f < SPRITE_FRAMES; f++) {
     const x0 = f * cellW;
     const x1 = x0 + cellW;
 
-    // 1. Find topmost opaque row in this cell.
+    // 1. Find topmost SOLID row (>= MIN_ROW_PIXELS opaque pixels).
     let topY = -1;
     for (let y = 0; y < h; y++) {
       const rowOff = y * w * 4;
       let rowCount = 0;
       for (let x = x0; x < x1; x++) {
-        if (data[rowOff + x * 4 + 3] > ALPHA_THRESHOLD) {
-          rowCount++;
-          if (rowCount >= MIN_ROW_PIXELS) break;
-        }
+        if (data[rowOff + x * 4 + 3] > ALPHA_THRESHOLD) rowCount++;
       }
       if (rowCount >= MIN_ROW_PIXELS) { topY = y; break; }
     }
     if (topY < 0) continue;
     headTopY[f] = topY;
 
-    // 2. Centroid X within head band [topY, topY+HEAD_BAND).
+    // 2. Horizontal bounding box of the head band → midpoint is much more
+    //    stable across frames than a pixel-mass centroid (which shifts when
+    //    arms raise/lower or hair sways asymmetrically).
     const yEnd = Math.min(h, topY + HEAD_BAND);
-    let sumX = 0;
-    let count = 0;
+    let minX = cellW;
+    let maxX = -1;
     for (let y = topY; y < yEnd; y++) {
       const rowOff = y * w * 4;
       for (let x = x0; x < x1; x++) {
         if (data[rowOff + x * 4 + 3] > ALPHA_THRESHOLD) {
-          sumX += x - x0;
-          count++;
+          const lx = x - x0;
+          if (lx < minX) minX = lx;
+          if (lx > maxX) maxX = lx;
         }
       }
     }
-    if (count > 0) headX[f] = sumX / count;
+    if (maxX >= 0) headX[f] = (minX + maxX) / 2;
   }
 
   // Reference = mean across valid frames. We anchor to the AVERAGE head
