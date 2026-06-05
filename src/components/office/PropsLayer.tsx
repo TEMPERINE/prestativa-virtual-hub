@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { loadOverrides, subscribeOverridesFromCloud, type PropInstance } from "@/lib/map-overrides";
 import { getPropDef } from "@/lib/prop-catalog";
+import { publishProps, publishFrames } from "@/lib/prop-gates";
 
 const INTERACT_RADIUS = 0.06; // distância (em fração do mapa) para o avatar poder interagir
 
@@ -39,6 +40,10 @@ export function PropsLayer({ selfX, selfY, focusedRect = null }: Props) {
       unsub();
     };
   }, []);
+
+  // Publica props/frames atuais no store global para que o sistema de
+  // movimento (OfficeScene) saiba quais zonas estão trancadas.
+  useEffect(() => { publishProps(propsList); }, [propsList]);
 
   // Carrega estados (frames) e escuta realtime
   useEffect(() => {
