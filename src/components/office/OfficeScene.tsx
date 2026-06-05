@@ -710,6 +710,7 @@ export function OfficeScene() {
         const prev = presenceLastTs.get(s.user_id) ?? 0;
         if (s.ts <= prev) continue;
         presenceLastTs.set(s.user_id, s.ts);
+        maybeStartRemoteTeleportFromCurrent(s.user_id, { x: s.x, y: s.y }, s.ts);
         setPositions((p) => {
           const cur = p[s.user_id];
           // Presence heartbeat is hydration-guarded (never advertises SPAWN),
