@@ -1,5 +1,5 @@
-// Catálogo de personagens disponíveis. Cada sprite tem 4 sheets direcionais
-// (down/up/left/right) com 6 frames horizontais (0 = idle, 1..5 = caminhada).
+// Catálogo de personagens disponíveis. Skins antigas podem ter 4 sheets;
+// skins novas usam down/up/left e renderizam right espelhado do left.
 
 import avatarDown from "@/assets/avatar-down.png";
 import avatarUp from "@/assets/avatar-up.png";
@@ -41,7 +41,7 @@ export type SpriteDef = {
   gender: "m" | "f" | "n";
   sheets: SpriteSheets;
   dims: SpriteDims;
-  /** Quando true, a folha "left" é renderizada espelhando a "right" (mais consistente). */
+  /** Legado: quando true, a folha "left" é renderizada espelhando a "right". */
   mirrorLeftFromRight?: boolean;
   /** Quando true, a folha "right" é renderizada espelhando a "left" (padrão para skins novas). */
   mirrorRightFromLeft?: boolean;
