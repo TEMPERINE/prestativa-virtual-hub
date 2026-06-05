@@ -325,6 +325,33 @@ export function MapEditor() {
     setDirty(true);
   }, []);
 
+  const addPropAction = useCallback((id: string, action: PropAction) => {
+    setOverrides((prev) => ({
+      ...prev,
+      props: (prev.props ?? []).map((p) => {
+        if (p.id !== id) return p;
+        const cur = p.actions ?? [];
+        // evita duplicar gate-zone para a mesma zona
+        if (action.type === "gate-zone" &&
+            cur.some((a) => a.type === "gate-zone" && a.zoneId === action.zoneId)) {
+          return p;
+        }
+        return { ...p, actions: [...cur, action] };
+      }),
+    }));
+    setDirty(true);
+  }, []);
+
+  const removePropAction = useCallback((id: string, idx: number) => {
+    setOverrides((prev) => ({
+      ...prev,
+      props: (prev.props ?? []).map((p) =>
+        p.id === id ? { ...p, actions: (p.actions ?? []).filter((_, i) => i !== idx) } : p
+      ),
+    }));
+    setDirty(true);
+  }, []);
+
 
   const removeSpawn = useCallback((zoneId: string) => {
     setOverrides((prev) => {
