@@ -226,6 +226,8 @@ export function OfficeScene() {
   const [placing, setPlacing] = useState<{ zoneId: string; recipientId: string; body: string } | null>(null);
   const [cursor, setCursor] = useState<{ x: number; y: number } | null>(null);
   const [openingNote, setOpeningNote] = useState<DeskNote | null>(null);
+  const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
+  const [savedNotesOpen, setSavedNotesOpen] = useState(false);
   const reactionChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const positionBroadcastChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const positionBroadcastReadyRef = useRef(false);
