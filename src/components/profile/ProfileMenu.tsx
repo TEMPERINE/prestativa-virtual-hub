@@ -34,6 +34,7 @@ type Props = {
   onRestartOnboarding: () => void;
   onSignOut: () => void;
   onStatusChanged: () => void;
+  onOpenSavedNotes: () => void;
 };
 
 export function ProfileMenu(p: Props) {
