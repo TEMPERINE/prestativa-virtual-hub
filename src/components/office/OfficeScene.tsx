@@ -128,6 +128,26 @@ function randomCorridorPoint(): Point {
   return SPAWN;
 }
 
+// Random walkable point inside a given zone rect. Used by teleport so two
+// avatars don't stack on the same fixed seat point.
+function randomPointInRect(
+  rect: { x1: number; y1: number; x2: number; y2: number },
+  avoid: Point[] = [],
+  minDist = 0.04,
+): Point {
+  const pad = 0.008;
+  for (let i = 0; i < 120; i++) {
+    const x = rect.x1 + pad + Math.random() * Math.max(0, rect.x2 - rect.x1 - pad * 2);
+    const y = rect.y1 + pad + Math.random() * Math.max(0, rect.y2 - rect.y1 - pad * 2);
+    const p = { x, y };
+    if (collides(p)) continue;
+    if (avoid.some((a) => Math.hypot(a.x - x, a.y - y) < minDist)) continue;
+    return p;
+  }
+  // Fallback to seat point.
+  return seatPointForRect(rect);
+}
+
 export function OfficeScene() {
   const sceneRef = useRef<HTMLDivElement | null>(null);
   const stageRef = useRef<HTMLDivElement | null>(null);
@@ -1071,9 +1091,14 @@ export function OfficeScene() {
       toast.info(`Você já está em ${label ?? z.label}.`);
       return;
     }
-    const sp = spawnPointForZone(zoneId);
     const rect = zoneRectFromOverrides(zoneId) ?? z.rect;
-    const target = sp ?? seatPointForRect(rect);
+    // Collect peers already in this zone so we don't land on top of them.
+    const occupied: Point[] = Object.entries(positionsRef.current)
+      .filter(([uid, p]) => uid !== meIdRef.current && p && p.zone === zoneId)
+      .map(([, p]) => ({ x: p.x, y: p.y }));
+    // Always pick a random walkable point inside the zone (no fixed spawn/seat)
+    // so multiple people teleporting to the same room don't stack.
+    const target = randomPointInRect(rect, occupied, 0.05);
     const from = { ...posRef.current };
 
 
@@ -1572,7 +1597,7 @@ export function OfficeScene() {
                   : isMe
                   ? "none"
                   : "left 120ms linear, top 120ms linear",
-                zIndex: focusedZone ? (inFocus ? 60 : 20) : Math.round(renderPoint.y * 1000),
+                zIndex: (focusedZone ? (inFocus ? 60000 : 20000) : 0) + Math.round(renderPoint.y * 1000),
                 opacity: tpOpacity,
                 filter: tpData
                   ? `drop-shadow(0 0 18px var(--primary)) drop-shadow(0 0 36px var(--primary-glow)) brightness(${tpData.phase === "out" ? 1.8 : 1.4})`
