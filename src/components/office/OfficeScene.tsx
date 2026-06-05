@@ -533,10 +533,11 @@ export function OfficeScene() {
 
 
   const lastGatedToastRef = useRef(0);
-  const tryMove = useCallback((dir: Facing) => {
+  const tryMove = useCallback((dir: Facing, stepFactor = 1) => {
     const cur = posRef.current;
-    const dx = dir === "left" ? -SPEED : dir === "right" ? SPEED : 0;
-    const dy = dir === "up" ? -SPEED : dir === "down" ? SPEED : 0;
+    const step = SPEED * Math.max(MIN_STEP_FACTOR, Math.min(MAX_STEP_FACTOR, stepFactor));
+    const dx = dir === "left" ? -step : dir === "right" ? step : 0;
+    const dy = dir === "up" ? -step : dir === "down" ? step : 0;
     let nx = cur.x + dx;
     let ny = cur.y + dy;
     if (collides({ x: nx, y: cur.y })) nx = cur.x;
