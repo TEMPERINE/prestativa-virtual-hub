@@ -868,25 +868,38 @@ export function MapEditor() {
                 moveSpawnToPointer(e, draggingPin.current);
                 return;
               }
-              if (draggingPropRef.current && stageRef.current) {
-                const rect = stageRef.current.getBoundingClientRect();
-                const nx = (e.clientX - rect.left) / rect.width;
-                const ny = (e.clientY - rect.top) / rect.height;
+              if (!stageRef.current) return;
+              const rect = stageRef.current.getBoundingClientRect();
+              const nx = (e.clientX - rect.left) / rect.width;
+              const ny = (e.clientY - rect.top) / rect.height;
+              if (tool.kind === "place-prop") {
+                setGhostPos({ x: nx, y: ny });
+              }
+              if (draggingPropRef.current) {
                 const drag = draggingPropRef.current;
                 if (drag.mode === "move") {
                   updateProp(drag.id, {
-                    x: Math.max(0, Math.min(1, nx)),
-                    y: Math.max(0, Math.min(1, ny)),
+                    x: Math.max(0, Math.min(1, nx + drag.offX)),
+                    y: Math.max(0, Math.min(1, ny + drag.offY)),
                   });
                 } else {
-                  const dx = nx - drag.startX;
-                  const nextW = Math.max(0.01, Math.min(0.6, drag.startW + dx * 2));
-                  updateProp(drag.id, { w: nextW });
+                  // Resize ancorado no canto oposto (estilo PowerPoint).
+                  // anchorLeft/anchorTop ficam fixos; calculamos nova largura
+                  // a partir da distância horizontal do cursor até a âncora,
+                  // mantendo a proporção.
+                  const newW = Math.max(0.01, Math.min(0.8, nx - drag.anchorLeft));
+                  const newH = newW / drag.aspect;
+                  updateProp(drag.id, {
+                    w: newW,
+                    x: drag.anchorLeft + newW / 2,
+                    y: drag.anchorTop + newH,
+                  });
                 }
                 return;
               }
               if (painting.current) handlePointer(e);
             }}
+            onPointerLeave={() => { if (tool.kind === "place-prop") setGhostPos(null); }}
             onPointerUp={() => { painting.current = false; draggingPin.current = null; draggingPropRef.current = null; }}
             onPointerCancel={() => { painting.current = false; draggingPin.current = null; draggingPropRef.current = null; }}
           >
