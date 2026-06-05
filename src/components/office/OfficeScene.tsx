@@ -1216,6 +1216,128 @@ export function OfficeScene() {
     };
   }, []);
 
+  // ===== Follow / Lead (Seguir / Pedir para conduzir) =====
+  // followingUid: when set, my avatar auto-walks behind this user until I press
+  // a movement key (or the other side cancels).
+  const [followingUid, setFollowingUid] = useState<string | null>(null);
+  const followingUidRef = useRef<string | null>(null);
+  useEffect(() => { followingUidRef.current = followingUid; }, [followingUid]);
+  const profilesRef = useRef<Record<string, Profile>>({});
+  profilesRef.current = profiles;
+  const leadChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  const [hoveredAvatarUid, setHoveredAvatarUid] = useState<string | null>(null);
+  const [avatarMenuUid, setAvatarMenuUid] = useState<string | null>(null);
+
+  const broadcastFollowStop = useCallback((toUid: string) => {
+    const ch = leadChannelRef.current;
+    const from = meIdRef.current;
+    if (!ch || !from || !toUid) return;
+    void ch.send({ type: "broadcast", event: "follow-stop", payload: { from, to: toUid } });
+  }, []);
+
+  const stopFollowing = useCallback((notify = true) => {
+    const cur = followingUidRef.current;
+    if (!cur) return;
+    if (notify) broadcastFollowStop(cur);
+    followingUidRef.current = null;
+    setFollowingUid(null);
+    autoWalkRef.current = null;
+  }, [broadcastFollowStop]);
+
+  const startFollowing = useCallback((uid: string) => {
+    if (!uid || uid === meIdRef.current) return;
+    followingUidRef.current = uid;
+    setFollowingUid(uid);
+    const name = profilesRef.current[uid]?.display_name ?? "personagem";
+    toast.success(`Seguindo ${name}. Pressione qualquer direção para parar.`);
+  }, []);
+
+  const requestLead = useCallback((uid: string) => {
+    const ch = leadChannelRef.current;
+    const from = meIdRef.current;
+    if (!ch || !from) { toast.error("Conexão indisponível."); return; }
+    const fromName = profilesRef.current[from]?.display_name ?? "Alguém";
+    void ch.send({ type: "broadcast", event: "lead-request", payload: { from, to: uid, fromName } });
+    const target = profilesRef.current[uid]?.display_name ?? "personagem";
+    toast.info(`Pedido enviado a ${target}. Aguardando resposta...`);
+  }, []);
+
+  const acceptLead = useCallback((fromUid: string) => {
+    const ch = leadChannelRef.current;
+    const me = meIdRef.current;
+    if (!ch || !me) return;
+    void ch.send({ type: "broadcast", event: "lead-accept", payload: { from: me, to: fromUid } });
+    // Requester is the leader → I (receiver) will follow them
+    startFollowing(fromUid);
+  }, [startFollowing]);
+
+  const declineLead = useCallback((fromUid: string) => {
+    const ch = leadChannelRef.current;
+    const me = meIdRef.current;
+    if (!ch || !me) return;
+    void ch.send({ type: "broadcast", event: "lead-decline", payload: { from: me, to: fromUid } });
+  }, []);
+
+  // Lead channel — separate from positions so we can subscribe independently
+  // once we know our user id (the broadcast handlers need stable closures).
+  useEffect(() => {
+    const uid = me?.id;
+    if (!uid) return;
+    const ch = supabase
+      .channel(`lead-events-${uid}`, { config: { broadcast: { self: false } } })
+      .on("broadcast", { event: "lead-request" }, ({ payload }) => {
+        const p = payload as { from?: string; to?: string; fromName?: string };
+        if (!p?.from || p.to !== uid) return;
+        const from = p.from;
+        toast(`${p.fromName ?? "Alguém"} pediu para te conduzir`, {
+          description: "Aceite para seguir essa pessoa até onde ela for.",
+          duration: 20000,
+          action: { label: "Aceitar", onClick: () => acceptLead(from) },
+          cancel: { label: "Recusar", onClick: () => declineLead(from) },
+        });
+      })
+      .on("broadcast", { event: "lead-accept" }, ({ payload }) => {
+        const p = payload as { from?: string; to?: string };
+        if (!p?.from || p.to !== uid) return;
+        const name = profilesRef.current[p.from]?.display_name ?? "Alguém";
+        toast.success(`${name} aceitou! Pode começar a andar — ${name} vai te seguir.`);
+      })
+      .on("broadcast", { event: "lead-decline" }, ({ payload }) => {
+        const p = payload as { from?: string; to?: string };
+        if (!p?.from || p.to !== uid) return;
+        toast.info("Pedido recusado.");
+      })
+      .on("broadcast", { event: "follow-stop" }, ({ payload }) => {
+        const p = payload as { from?: string; to?: string };
+        if (!p?.from || p.to !== uid) return;
+        const name = profilesRef.current[p.from]?.display_name ?? "Alguém";
+        toast.info(`${name} parou de te seguir.`);
+      })
+      .subscribe();
+    leadChannelRef.current = ch;
+    return () => {
+      supabase.removeChannel(ch);
+      if (leadChannelRef.current === ch) leadChannelRef.current = null;
+    };
+  }, [me?.id, acceptLead, declineLead]);
+
+  // Close avatar menu on outside click / Esc
+  useEffect(() => {
+    if (!avatarMenuUid) return;
+    const onDoc = (e: MouseEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (!t || !t.closest("[data-avatar-menu]")) setAvatarMenuUid(null);
+    };
+    const onEsc = (e: KeyboardEvent) => { if (e.key === "Escape") setAvatarMenuUid(null); };
+    document.addEventListener("mousedown", onDoc);
+    window.addEventListener("keydown", onEsc);
+    return () => {
+      document.removeEventListener("mousedown", onDoc);
+      window.removeEventListener("keydown", onEsc);
+    };
+  }, [avatarMenuUid]);
+
+
 
 
 
