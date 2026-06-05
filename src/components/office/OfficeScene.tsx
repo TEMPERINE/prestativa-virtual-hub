@@ -2623,7 +2623,7 @@ function PlacementLayer({
     <>
       <div
         className="absolute inset-0"
-        style={{ zIndex: 90, cursor: "crosshair", background: "rgba(0,0,0,0.18)" }}
+        style={{ zIndex: 200000, cursor: "crosshair", background: "rgba(0,0,0,0.18)" }}
         onMouseMove={(e) => {
           const rect = e.currentTarget.getBoundingClientRect();
           const x = (e.clientX - rect.left) / rect.width;
