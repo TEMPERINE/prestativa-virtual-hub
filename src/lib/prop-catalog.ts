@@ -20,9 +20,11 @@ export type PropDef = {
   depthRefY?: number;
   /** Aparece na frente dos avatares quando há uma sala focada. */
   foregroundWhenFocused?: boolean;
+  /** Elementos carregados pelo usuário (galeria personalizada). */
+  custom?: boolean;
 };
 
-export const PROP_CATALOG: PropDef[] = [
+export const BUILTIN_PROPS: PropDef[] = [
   {
     id: "door",
     label: "Porta",
@@ -36,6 +38,28 @@ export const PROP_CATALOG: PropDef[] = [
     foregroundWhenFocused: true,
   },
 ];
+
+// Registry mutável: builtins + custom props carregados da nuvem.
+export const PROP_CATALOG: PropDef[] = [...BUILTIN_PROPS];
+
+type Listener = () => void;
+const listeners = new Set<Listener>();
+
+export function subscribePropCatalog(cb: Listener): () => void {
+  listeners.add(cb);
+  return () => listeners.delete(cb);
+}
+
+function notify() {
+  for (const cb of listeners) cb();
+}
+
+export function setCustomProps(defs: PropDef[]) {
+  // remove os custom anteriores e adiciona os novos preservando os builtins.
+  PROP_CATALOG.length = 0;
+  PROP_CATALOG.push(...BUILTIN_PROPS, ...defs.map((d) => ({ ...d, custom: true })));
+  notify();
+}
 
 export function getPropDef(id: string): PropDef | undefined {
   return PROP_CATALOG.find((p) => p.id === id);
