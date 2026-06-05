@@ -413,6 +413,12 @@ export function OfficeScene() {
       });
     })();
 
+    // IMPORTANT: garantir que o socket de realtime carregue o JWT do usuário
+    // ANTES de assinar canais. As tabelas abaixo têm RLS exigindo o role
+    // `authenticated`; se assinarmos enquanto o socket ainda está anônimo,
+    // os eventos postgres_changes (UPDATE/INSERT/DELETE) são filtrados e os
+    // outros usuários parecem "congelados", mesmo com as posições sendo
+    // gravadas no banco corretamente.
     const ch = supabase
       .channel("positions-room")
       .on(
@@ -428,8 +434,7 @@ export function OfficeScene() {
             return next;
           });
         }
-      )
-      .subscribe();
+      );
 
     const reactionCh = supabase
       .channel("reactions-room")
@@ -447,8 +452,7 @@ export function OfficeScene() {
             return next;
           });
         }, REACTION_DURATION_MS);
-      })
-      .subscribe();
+      });
     reactionChannelRef.current = reactionCh;
 
     const claimsCh = supabase
@@ -466,8 +470,18 @@ export function OfficeScene() {
             return next;
           });
         }
-      )
-      .subscribe();
+      );
+
+    void (async () => {
+      const { data: sess } = await supabase.auth.getSession();
+      const token = sess.session?.access_token;
+      if (token) {
+        try { await supabase.realtime.setAuth(token); } catch { /* noop */ }
+      }
+      ch.subscribe();
+      reactionCh.subscribe();
+      claimsCh.subscribe();
+    })();
 
     const offline = async () => {
       const { data: u } = await supabase.auth.getUser();
@@ -502,8 +516,16 @@ export function OfficeScene() {
             return [...without, row];
           });
         }
-      )
-      .subscribe();
+      );
+    // assina depois que o JWT estiver hidratado no socket de realtime
+    void (async () => {
+      const { data: sess } = await supabase.auth.getSession();
+      const token = sess.session?.access_token;
+      if (token) {
+        try { await supabase.realtime.setAuth(token); } catch { /* noop */ }
+      }
+      notesCh.subscribe();
+    })();
 
     return () => {
       supabase.removeChannel(ch);
