@@ -38,9 +38,10 @@ import latinaDown from "@/assets/sprites/latina-down.png";
 import latinaUp from "@/assets/sprites/latina-up.png";
 import latinaLeft from "@/assets/sprites/latina-left.png";
 
-import cruellaDown from "@/assets/sprites/cruella-down.png";
-import cruellaUp from "@/assets/sprites/cruella-up.png";
-import cruellaLeft from "@/assets/sprites/cruella-left.png";
+import indiDown from "@/assets/sprites/indi-down.png";
+import indiUp from "@/assets/sprites/indi-up.png";
+import indiLeft from "@/assets/sprites/indi-left.png";
+import indiRight from "@/assets/sprites/indi-right.png";
 
 export type Facing = "up" | "down" | "left" | "right";
 
@@ -164,17 +165,16 @@ export const SPRITES: SpriteDef[] = [
     mirrorRightFromLeft: true,
   },
   {
-    id: "cruella",
-    label: "Cruella",
+    id: "indi",
+    label: "Indi",
     gender: "f",
-    sheets: { up: cruellaUp, down: cruellaDown, left: cruellaLeft, right: cruellaLeft },
+    sheets: { up: indiUp, down: indiDown, left: indiLeft, right: indiRight },
     dims: {
-      down: { w: 180, h: 256 },
-      up: { w: 168, h: 252 },
-      left: { w: 164, h: 252 },
-      right: { w: 164, h: 252 },
+      down: { w: 108, h: 232 },
+      up: { w: 106, h: 232 },
+      left: { w: 154, h: 232 },
+      right: { w: 162, h: 232 },
     },
-    mirrorRightFromLeft: true,
   },
 ];
 

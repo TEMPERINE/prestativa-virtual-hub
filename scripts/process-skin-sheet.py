@@ -153,7 +153,7 @@ def robust_center_x(mask: np.ndarray) -> float:
     return float(np.average(np.arange(len(cc)), weights=cc))
 
 
-def process(src_path: str, skin_id: str, rows: int, cols: int, out_dir: str, out_cols: int):
+def process(src_path: str, skin_id: str, rows: int, cols: int, out_dir: str, out_cols: int, include_right: bool = False):
     img = Image.open(src_path).convert("RGBA")
     arr = np.array(img)
     arr = remove_white_bg(arr)
@@ -173,7 +173,7 @@ def process(src_path: str, skin_id: str, rows: int, cols: int, out_dir: str, out
     # ------------------------------------------------------------------
     facing_frames: dict[str, list] = {}   # facing -> list[(crop, cx, foot_y) | None]
     for r, facing in enumerate(FACINGS[:rows]):
-        if facing == "right":
+        if facing == "right" and not include_right:
             continue
         frames = []
         # Bleed margin below the strict row to capture feet/shoes that the
@@ -292,9 +292,11 @@ def main():
     ap.add_argument("--out-cols", type=int, default=6,
                     help="Number of frames per output sheet; pads with idle frame.")
     ap.add_argument("--out", default="src/assets/sprites")
+    ap.add_argument("--include-right", action="store_true",
+                    help="Also process the 4th row as 'right' (skip default mirror).")
     args = ap.parse_args()
     print(f"Processing {args.source} -> skin '{args.skin_id}'")
-    process(args.source, args.skin_id, args.rows, args.cols, args.out, args.out_cols)
+    process(args.source, args.skin_id, args.rows, args.cols, args.out, args.out_cols, args.include_right)
 
 
 
