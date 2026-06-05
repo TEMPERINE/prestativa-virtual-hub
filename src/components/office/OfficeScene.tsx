@@ -16,6 +16,7 @@ import parkLeft from "@/assets/scene-park-left.jpg";
 import roadRight from "@/assets/scene-road-right.jpg";
 import { SPRITES, getSprite, SPRITE_FRAMES as FRAMES, type Facing } from "@/lib/sprite-catalog";
 import { ensureFrameOffsets, getFrameOffsets, subscribeFrameOffsets } from "@/lib/sprite-alignment";
+import { AlignedSprite } from "@/components/sprites/AlignedSprite";
 
 const WALK_FRAME_MS = 110;
 
