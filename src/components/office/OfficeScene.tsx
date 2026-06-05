@@ -75,6 +75,13 @@ type RemotePos = {
   updated_at?: string;
   ts?: number;
 };
+type LocalSavedPosition = {
+  x: number;
+  y: number;
+  zone?: string;
+  facing?: Facing;
+  ts: number;
+};
 type DeskNote = {
   id: string;
   zone_id: string;
@@ -102,6 +109,38 @@ const timestampForPosition = (p: Partial<Pick<RemotePos, "updated_at" | "ts">>) 
 const distanceBetween = (a: Point, b: Point) => Math.hypot(a.x - b.x, a.y - b.y);
 const validPoint = (p: Point | undefined): p is Point =>
   !!p && Number.isFinite(p.x) && Number.isFinite(p.y);
+const LAST_POSITION_KEY_PREFIX = "office:last-position:v1:";
+
+function readLocalSavedPosition(userId: string): LocalSavedPosition | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(`${LAST_POSITION_KEY_PREFIX}${userId}`);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<LocalSavedPosition>;
+    if (!Number.isFinite(parsed.x) || !Number.isFinite(parsed.y)) return null;
+    return {
+      x: parsed.x,
+      y: parsed.y,
+      zone: typeof parsed.zone === "string" ? parsed.zone : undefined,
+      facing: parsed.facing,
+      ts: Number.isFinite(parsed.ts) ? parsed.ts! : 0,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function writeLocalSavedPosition(userId: string, point: Point, zone: string, facing: Facing) {
+  if (typeof window === "undefined" || !validPoint(point)) return;
+  try {
+    window.localStorage.setItem(
+      `${LAST_POSITION_KEY_PREFIX}${userId}`,
+      JSON.stringify({ x: point.x, y: point.y, zone, facing, ts: Date.now() } satisfies LocalSavedPosition),
+    );
+  } catch {
+    // localStorage can be unavailable in private modes; DB persistence remains the source of truth.
+  }
+}
 
 // "Seat" point of a zone rect — bottom-center, in front of the desk.
 // If that point collides with furniture, walk it upward until it's walkable.
