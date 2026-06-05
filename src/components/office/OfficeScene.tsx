@@ -1850,30 +1850,28 @@ export function OfficeScene() {
                   />
                   {/* Hover/click hit-area for remote avatars (sits over the sprite) */}
                   {!isMe && (
-                    <div
-                      data-avatar-menu
-                      className="absolute left-1/2 -translate-x-1/2 pointer-events-auto"
-                      style={{ bottom: 0, width: 72, height: 110, cursor: "pointer", zIndex: 9999 }}
-                      onMouseEnter={() => {
+                    <AvatarHitArea
+                      profileId={profile.id}
+                      displayName={profile.display_name}
+                      isOpen={avatarMenuUid === profile.id}
+                      onHoverIn={() => {
                         setHoveredAvatarUid(profile.id);
-                        // Sprite tem prioridade sobre o hover da mesa
                         setHoveredZone(null);
                       }}
-                      onMouseLeave={() => setHoveredAvatarUid((c) => (c === profile.id ? null : c))}
-                      onMouseDown={(e) => e.stopPropagation()}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setAvatarMenuUid((cur) => (cur === profile.id ? null : profile.id));
-                      }}
-                      title={`Interagir com ${profile.display_name}`}
-                    />
-                  )}
-                  {!isMe && avatarMenuUid === profile.id && (
-                    <AvatarInteractionMenu
-                      profile={profile}
-                      onClose={() => setAvatarMenuUid(null)}
-                      onFollow={() => { startFollowing(profile.id); setAvatarMenuUid(null); }}
-                      onLead={() => { requestLead(profile.id); setAvatarMenuUid(null); }}
+                      onHoverOut={() =>
+                        setHoveredAvatarUid((c) => (c === profile.id ? null : c))
+                      }
+                      onToggle={() =>
+                        setAvatarMenuUid((cur) => (cur === profile.id ? null : profile.id))
+                      }
+                      menu={
+                        <AvatarInteractionMenu
+                          profile={profile}
+                          onClose={() => setAvatarMenuUid(null)}
+                          onFollow={() => { startFollowing(profile.id); setAvatarMenuUid(null); }}
+                          onLead={() => { requestLead(profile.id); setAvatarMenuUid(null); }}
+                        />
+                      }
                     />
                   )}
                 </div>
