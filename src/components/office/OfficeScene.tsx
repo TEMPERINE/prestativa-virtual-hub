@@ -61,7 +61,16 @@ type Profile = {
   status?: "available" | "busy" | "away" | null;
   onboarded_at?: string | null;
 };
-type RemotePos = { user_id: string; x: number; y: number; zone: string; is_online: boolean; facing?: Facing };
+type RemotePos = {
+  user_id: string;
+  x: number;
+  y: number;
+  zone: string;
+  is_online: boolean;
+  facing?: Facing;
+  updated_at?: string;
+  ts?: number;
+};
 type DeskNote = {
   id: string;
   zone_id: string;
@@ -78,6 +87,9 @@ const SPEED = 0.0042;
 const SEND_INTERVAL_MS = 120;
 const POSITION_BROADCAST_CHANNEL = "positions-broadcast-v1";
 const POSITION_PRESENCE_CHANNEL = "positions-presence-v1";
+
+const timestampForPosition = (p: Partial<Pick<RemotePos, "updated_at" | "ts">>) =>
+  p.ts ?? (p.updated_at ? Date.parse(p.updated_at) : 0);
 
 // "Seat" point of a zone rect — bottom-center, in front of the desk.
 // If that point collides with furniture, walk it upward until it's walkable.
@@ -331,7 +343,7 @@ export function OfficeScene() {
     if (!positionHydratedRef.current) return;
     const knownId = meIdRef.current;
     const write = (userId: string) => {
-      const payload = { user_id: userId, x, y, zone: z, facing: f, is_online: true };
+      const payload = { user_id: userId, x, y, zone: z, facing: f, is_online: true, ts: Date.now() };
       const ch = positionBroadcastChannelRef.current;
       if (ch && positionBroadcastReadyRef.current) {
         void ch.send({ type: "broadcast", event: "position", payload });
@@ -339,7 +351,14 @@ export function OfficeScene() {
       const now = performance.now();
       if (persistNow || now - lastPersisted.current > 1000) {
         lastPersisted.current = now;
-        void supabase.from("positions").upsert(payload);
+        void supabase.from("positions").upsert({
+          user_id: userId,
+          x,
+          y,
+          zone: z,
+          facing: f,
+          is_online: true,
+        });
       }
     };
     if (knownId) {
@@ -414,9 +433,12 @@ export function OfficeScene() {
       setProfiles(map);
       setMe(map[userData.user.id] ?? null);
 
-      const { data: posData } = await supabase.from("positions").select("user_id, x, y, zone, facing, is_online");
+      const { data: posData } = await supabase.from("positions").select("user_id, x, y, zone, facing, is_online, updated_at");
       const pmap: Record<string, RemotePos> = {};
-      (posData ?? []).forEach((p) => (pmap[p.user_id] = p as RemotePos));
+      (posData ?? []).forEach((p) => {
+        pmap[p.user_id] = p as RemotePos;
+        if (p.updated_at) positionFreshTs.current.set(p.user_id, Date.parse(p.updated_at));
+      });
 
       // Load workspace claims
       const { data: claimData } = await supabase
@@ -467,6 +489,7 @@ export function OfficeScene() {
         zone: startZone,
         facing: startFacing,
         is_online: true,
+        ts: Date.now(),
       };
       setPositions(pmap);
 
@@ -501,18 +524,16 @@ export function OfficeScene() {
               delete next[row.user_id];
               return next;
             }
-            // LWW: if a broadcast/presence sample within the last 5s already
-            // wrote a fresher position, ignore this DB row — it may be a
-            // stale heartbeat that would snap the avatar back to spawn.
             const dbTs = row.updated_at ? Date.parse(row.updated_at) : 0;
             const freshTs = positionFreshTs.current.get(row.user_id) ?? 0;
-            if (freshTs > dbTs && Date.now() - freshTs < 5000) {
+            if (dbTs && dbTs < freshTs) {
               const cur = prev[row.user_id];
               if (cur) {
                 next[row.user_id] = { ...cur, is_online: row.is_online };
                 return next;
               }
             }
+            if (dbTs) positionFreshTs.current.set(row.user_id, dbTs);
             next[row.user_id] = row;
             return next;
           });
@@ -544,15 +565,19 @@ export function OfficeScene() {
       .on("broadcast", { event: "position" }, (payload) => {
         const row = payload.payload as RemotePos;
         if (!row?.user_id) return;
-        positionFreshTs.current.set(row.user_id, Date.now());
-        setPositions((prev) => ({ ...prev, [row.user_id]: row }));
+        const incomingTs = timestampForPosition(row) || Date.now();
+        setPositions((prev) => {
+          const curTs = timestampForPosition(prev[row.user_id] ?? {}) || (positionFreshTs.current.get(row.user_id) ?? 0);
+          if (incomingTs < curTs) return prev;
+          positionFreshTs.current.set(row.user_id, incomingTs);
+          return { ...prev, [row.user_id]: { ...row, ts: incomingTs } };
+        });
       });
     positionBroadcastChannelRef.current = positionBroadcastCh;
 
-    // Presence channel — third source of truth for live positions. Each client
-    // tracks its own state every ~1s; presence sync/join/leave events tell us
-    // who is actually online right now (independent of DB CDC + broadcasts).
-    // Eventual consistency: we accept the freshest sample per user (LWW by ts).
+    // Presence is only an online heartbeat. It must not be allowed to move an
+    // existing avatar, because an old/hidden tab can keep heartbeating SPAWN
+    // and pull a stopped colleague back to the origin.
     type PresenceState = { user_id: string; x: number; y: number; zone: string; facing?: Facing; ts: number };
     const presenceCh = supabase.channel(POSITION_PRESENCE_CHANNEL, {
       config: { presence: { key: meIdRef.current ?? `anon:${realtimeChannelSuffix}` } },
@@ -566,11 +591,15 @@ export function OfficeScene() {
         const prev = presenceLastTs.get(s.user_id) ?? 0;
         if (s.ts <= prev) continue;
         presenceLastTs.set(s.user_id, s.ts);
-        positionFreshTs.current.set(s.user_id, s.ts);
-        setPositions((p) => ({
-          ...p,
-          [s.user_id]: { user_id: s.user_id, x: s.x, y: s.y, zone: s.zone, facing: s.facing, is_online: true },
-        }));
+        setPositions((p) => {
+          const cur = p[s.user_id];
+          if (cur) return { ...p, [s.user_id]: { ...cur, is_online: true } };
+          positionFreshTs.current.set(s.user_id, s.ts);
+          return {
+            ...p,
+            [s.user_id]: { user_id: s.user_id, x: s.x, y: s.y, zone: s.zone, facing: s.facing, is_online: true, ts: s.ts },
+          };
+        });
       }
     };
     presenceCh.on("presence", { event: "sync" }, () => {
@@ -674,7 +703,7 @@ export function OfficeScene() {
       if (pbCh && positionBroadcastReadyRef.current) {
         void pbCh.send({
           type: "broadcast", event: "position",
-          payload: { user_id: uid, x: cur.x, y: cur.y, zone: curZone, facing: facingRef.current, is_online: true },
+          payload: { user_id: uid, x: cur.x, y: cur.y, zone: curZone, facing: facingRef.current, is_online: true, ts: Date.now() },
         });
       }
     };
@@ -700,14 +729,14 @@ export function OfficeScene() {
           if (uid && p.user_id === uid) return; // handled below
           const dbTs = p.updated_at ? Date.parse(p.updated_at) : 0;
           const freshTs = positionFreshTs.current.get(p.user_id) ?? 0;
-          // Realtime broadcast/presence within the last 5s wins over DB poll.
-          // Prevents stale DB rows from snapping remote avatars back to a previous spot.
-          if (freshTs > dbTs && Date.now() - freshTs < 5000) {
-            // Keep is_online state in sync from DB while preserving live x/y.
+          // Strict LWW: DB rows older than the freshest known live sample are
+          // never allowed to move a stopped avatar back to a spawn/old spot.
+          if (dbTs && dbTs < freshTs) {
             const cur = prev[p.user_id];
             if (cur) next[p.user_id] = { ...cur, is_online: p.is_online };
             else next[p.user_id] = p;
           } else {
+            if (dbTs) positionFreshTs.current.set(p.user_id, dbTs);
             next[p.user_id] = p;
           }
         });
