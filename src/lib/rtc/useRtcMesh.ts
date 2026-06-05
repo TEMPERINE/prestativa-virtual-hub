@@ -67,6 +67,7 @@ export function useRtcMesh(myId: string | null, desiredPeers: string[]): RtcMesh
   const videoTrackRef = useRef<MediaStreamTrack | null>(null);
   const screenTrackRef = useRef<MediaStreamTrack | null>(null);
   const desiredRef = useRef<Set<string>>(new Set());
+  const disconnectTimersRef = useRef<Map<string, number>>(new Map());
 
   const sendSignal = useCallback((msg: Omit<SignalMsg, "from">) => {
     const ch = channelRef.current;
@@ -178,6 +179,11 @@ export function useRtcMesh(myId: string | null, desiredPeers: string[]): RtcMesh
   }, [myId, sendSignal]);
 
   const destroyPeer = useCallback((peerId: string) => {
+    const pending = disconnectTimersRef.current.get(peerId);
+    if (pending) {
+      window.clearTimeout(pending);
+      disconnectTimersRef.current.delete(peerId);
+    }
     const entry = peersRef.current.get(peerId);
     if (!entry) return;
     try { entry.pc.close(); } catch { /* noop */ }
@@ -292,6 +298,8 @@ export function useRtcMesh(myId: string | null, desiredPeers: string[]): RtcMesh
       }
       channelReadyRef.current = false;
       pendingSignalsRef.current = [];
+      for (const timer of disconnectTimersRef.current.values()) window.clearTimeout(timer);
+      disconnectTimersRef.current.clear();
       supabase.removeChannel(ch);
       channelRef.current = null;
     };
