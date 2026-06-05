@@ -128,6 +128,26 @@ function randomCorridorPoint(): Point {
   return SPAWN;
 }
 
+// Random walkable point inside a given zone rect. Used by teleport so two
+// avatars don't stack on the same fixed seat point.
+function randomPointInRect(
+  rect: { x1: number; y1: number; x2: number; y2: number },
+  avoid: Point[] = [],
+  minDist = 0.04,
+): Point {
+  const pad = 0.008;
+  for (let i = 0; i < 120; i++) {
+    const x = rect.x1 + pad + Math.random() * Math.max(0, rect.x2 - rect.x1 - pad * 2);
+    const y = rect.y1 + pad + Math.random() * Math.max(0, rect.y2 - rect.y1 - pad * 2);
+    const p = { x, y };
+    if (collides(p)) continue;
+    if (avoid.some((a) => Math.hypot(a.x - x, a.y - y) < minDist)) continue;
+    return p;
+  }
+  // Fallback to seat point.
+  return seatPointForRect(rect);
+}
+
 export function OfficeScene() {
   const sceneRef = useRef<HTMLDivElement | null>(null);
   const stageRef = useRef<HTMLDivElement | null>(null);
