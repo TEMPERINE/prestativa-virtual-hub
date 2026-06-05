@@ -38,6 +38,10 @@ import latinaDown from "@/assets/sprites/latina-down.png";
 import latinaUp from "@/assets/sprites/latina-up.png";
 import latinaLeft from "@/assets/sprites/latina-left.png";
 
+import cruellaDown from "@/assets/sprites/cruella-down.png";
+import cruellaUp from "@/assets/sprites/cruella-up.png";
+import cruellaLeft from "@/assets/sprites/cruella-left.png";
+
 export type Facing = "up" | "down" | "left" | "right";
 
 export type SpriteSheets = Record<Facing, string>;
