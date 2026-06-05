@@ -265,17 +265,18 @@ export function OfficeScene() {
       // Same claimed zone → always connect
       const peerClaim = Object.entries(claims).find(([, u]) => u === uid)?.[0];
       const sameZone = myClaimZone && peerClaim && peerClaim === myClaimZone;
+      const sameActiveRoom = zone !== "lobby" && p.zone === zone;
       // Proximity with hysteresis
       const dx = p.x - pos.x;
       const dy = p.y - pos.y;
       const dist = Math.hypot(dx, dy);
       const already = connectedPeersRef.current.has(uid);
       const closeEnough = already ? dist <= PROXIMITY_DISCONNECT : dist <= PROXIMITY_CONNECT;
-      if (sameZone || closeEnough) result.push(uid);
+      if (sameZone || sameActiveRoom || closeEnough) result.push(uid);
     }
     // cap to 6 peers
     return result.slice(0, 6);
-  }, [me?.id, positions, claims, pos.x, pos.y]);
+  }, [me?.id, positions, claims, pos.x, pos.y, zone]);
 
   const rtc = useRtcMesh(me?.id ?? null, desiredPeers);
   useEffect(() => {
@@ -355,7 +356,7 @@ export function OfficeScene() {
       setProfiles(map);
       setMe(map[userData.user.id] ?? null);
 
-      const { data: posData } = await supabase.from("positions").select("user_id, x, y, zone, is_online");
+      const { data: posData } = await supabase.from("positions").select("user_id, x, y, zone, facing, is_online");
       const pmap: Record<string, RemotePos> = {};
       (posData ?? []).forEach((p) => (pmap[p.user_id] = p as RemotePos));
 
