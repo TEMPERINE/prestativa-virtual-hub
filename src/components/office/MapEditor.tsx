@@ -15,12 +15,13 @@ import {
   type CustomZone,
   type ZoneKind,
   type PropInstance,
+  type PropAction,
 } from "@/lib/map-overrides";
 import { ZONES, COLLIDERS, FLOOR_POLY, type ZoneId } from "@/lib/office-map";
 import { PROP_CATALOG, getPropDef } from "@/lib/prop-catalog";
 import officeMap from "@/assets/office-map.jpg";
 import { toast } from "sonner";
-import { ArrowLeft, Eraser, Square, Download, Trash2, Eye, EyeOff, Undo, Plus, X, Briefcase, Users, MapPin, Hand, Zap, ZapOff } from "lucide-react";
+import { ArrowLeft, Eraser, Square, Download, Trash2, Eye, EyeOff, Undo, Plus, X, Briefcase, Users, MapPin, Hand, Zap, ZapOff, Lock, Map as MapIcon, Boxes, LayoutGrid } from "lucide-react";
 
 type Tool =
   | { kind: "blocked" }
