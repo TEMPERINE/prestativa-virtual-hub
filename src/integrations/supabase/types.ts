@@ -185,6 +185,36 @@ export type Database = {
         }
         Relationships: []
       }
+      saved_notes: {
+        Row: {
+          body: string
+          id: string
+          original_created_at: string
+          saved_at: string
+          sender_id: string
+          sender_name: string | null
+          user_id: string
+        }
+        Insert: {
+          body: string
+          id?: string
+          original_created_at: string
+          saved_at?: string
+          sender_id: string
+          sender_name?: string | null
+          user_id: string
+        }
+        Update: {
+          body?: string
+          id?: string
+          original_created_at?: string
+          saved_at?: string
+          sender_id?: string
+          sender_name?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           id: string
