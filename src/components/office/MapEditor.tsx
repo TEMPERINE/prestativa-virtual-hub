@@ -97,6 +97,7 @@ export function MapEditor() {
   const [showEffective, setShowEffective] = useState(true);
   const [dirty, setDirty] = useState(!loadOverrides());
   const painting = useRef(false);
+  const [altDown, setAltDown] = useState(false);
   const historyRef = useRef<MapOverrides[]>([]);
   const [canUndo, setCanUndo] = useState(false);
 
