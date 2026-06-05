@@ -1018,6 +1018,19 @@ export function OfficeScene() {
     const id = Date.now();
     setTeleport({ from, to: target, phase: "out", id });
 
+    // Tell peers immediately so they see the sparkle/fade at the origin,
+    // BEFORE the position snaps. Without this, remote viewers only see the
+    // avatar slide between points.
+    const uid = meIdRef.current;
+    const ch = positionBroadcastChannelRef.current;
+    if (uid && ch && positionBroadcastReadyRef.current) {
+      void ch.send({
+        type: "broadcast",
+        event: "teleport",
+        payload: { user_id: uid, from, to: target },
+      });
+    }
+
     // Phase 1: fade out + sparkle at origin
     teleportTimers.current.push(
       window.setTimeout(() => {
