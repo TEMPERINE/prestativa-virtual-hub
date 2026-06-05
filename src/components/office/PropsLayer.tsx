@@ -126,9 +126,11 @@ export function PropsLayer({ selfX, selfY }: Props) {
         const src = def.frames[frame] ?? def.frames[0];
         const wPct = p.w * 100;
         const hPct = (p.w / def.aspectRatio) * 100;
-        // z-index ordenado por y (mais embaixo = mais à frente). Faixa: 30000..40000
-        // (abaixo dos avatares, que usam zIndex maior).
-        const zIndex = 30000 + Math.round(p.y * 5000);
+        // Mesma escala dos avatares (Math.round(y * 1000)) para que props e
+        // personagens se ordenem corretamente por perspectiva: quem está mais
+        // embaixo na tela aparece na frente. Acima do cenário (z >= 1) e
+        // ainda abaixo do overlay de foco (20000+).
+        const zIndex = Math.max(1, Math.round(p.y * 1000));
         return (
           <img
             key={p.id}
