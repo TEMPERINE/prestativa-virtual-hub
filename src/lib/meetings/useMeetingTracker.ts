@@ -1,0 +1,94 @@
+import { useEffect, useRef } from "react";
+import { supabase } from "@/integrations/supabase/client";
+
+type Args = {
+  /** Id e label da zona em que o usuário está agora. */
+  zoneId: string;
+  zoneLabel: string;
+  /** Se a zona atual é uma sala de reunião (suporta vídeo). */
+  isMeetingZone: boolean;
+  /** Quantos peers conectados via RTC. */
+  peerCount: number;
+  /** O user já está autenticado? Se null/false, hook não faz nada. */
+  enabled: boolean;
+};
+
+/**
+ * Registra automaticamente entradas e saídas em "reuniões" — agrupando todos
+ * que estão simultaneamente numa sala de reunião (zona com supportsVideo) e
+ * com pelo menos 1 outro peer conectado. Persiste em `meetings` e
+ * `meeting_participants` via RPCs SECURITY DEFINER no banco.
+ *
+ * A lógica é defensiva: só uma reunião ativa por vez para o usuário. Se ele
+ * sai da sala ou todos os peers caem, fechamos a participação. Se ele troca
+ * de sala, fecha a anterior e abre uma nova.
+ */
+export function useMeetingTracker({
+  zoneId,
+  zoneLabel,
+  isMeetingZone,
+  peerCount,
+  enabled,
+}: Args) {
+  const activeMeetingRef = useRef<string | null>(null);
+  const activeZoneRef = useRef<string | null>(null);
+  const inFlightRef = useRef(false);
+
+  // Debounce: evita criar reunião por flutuação rápida de peers (ICE bouncing).
+  useEffect(() => {
+    if (!enabled) return;
+
+    const shouldBeIn = isMeetingZone && peerCount >= 1;
+    const sameZone = activeZoneRef.current === zoneId;
+
+    // Caso 1: deveria estar numa reunião e ainda não está (ou trocou de zona).
+    if (shouldBeIn && (!activeMeetingRef.current || !sameZone)) {
+      const timer = window.setTimeout(async () => {
+        if (inFlightRef.current) return;
+        inFlightRef.current = true;
+        try {
+          // Se trocou de zona com reunião ativa, sai da anterior antes.
+          if (activeMeetingRef.current && !sameZone) {
+            const prev = activeMeetingRef.current;
+            activeMeetingRef.current = null;
+            await supabase.rpc("meeting_leave", { _meeting_id: prev });
+          }
+          const { data, error } = await supabase.rpc("meeting_join", {
+            _zone_id: zoneId,
+            _zone_label: zoneLabel,
+          });
+          if (!error && data) {
+            activeMeetingRef.current = data as string;
+            activeZoneRef.current = zoneId;
+          }
+        } finally {
+          inFlightRef.current = false;
+        }
+      }, 1500);
+      return () => window.clearTimeout(timer);
+    }
+
+    // Caso 2: já está registrado mas não deveria mais estar.
+    if (!shouldBeIn && activeMeetingRef.current) {
+      const timer = window.setTimeout(async () => {
+        const id = activeMeetingRef.current;
+        if (!id) return;
+        activeMeetingRef.current = null;
+        activeZoneRef.current = null;
+        await supabase.rpc("meeting_leave", { _meeting_id: id });
+      }, 4000); // tolera quedas rápidas de peer / reconexão
+      return () => window.clearTimeout(timer);
+    }
+  }, [enabled, isMeetingZone, peerCount, zoneId, zoneLabel]);
+
+  // Limpa ao desmontar (sair do escritório / refresh).
+  useEffect(() => {
+    return () => {
+      const id = activeMeetingRef.current;
+      if (id) {
+        activeMeetingRef.current = null;
+        void supabase.rpc("meeting_leave", { _meeting_id: id });
+      }
+    };
+  }, []);
+}
