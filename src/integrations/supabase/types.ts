@@ -138,6 +138,10 @@ export type Database = {
           ended_at: string | null
           host_id: string | null
           id: string
+          recorded_by: string | null
+          recording_duration_seconds: number | null
+          recording_path: string | null
+          recording_uploaded_at: string | null
           started_at: string
           title: string | null
           zone_id: string
@@ -147,6 +151,10 @@ export type Database = {
           ended_at?: string | null
           host_id?: string | null
           id?: string
+          recorded_by?: string | null
+          recording_duration_seconds?: number | null
+          recording_path?: string | null
+          recording_uploaded_at?: string | null
           started_at?: string
           title?: string | null
           zone_id: string
@@ -156,6 +164,10 @@ export type Database = {
           ended_at?: string | null
           host_id?: string | null
           id?: string
+          recorded_by?: string | null
+          recording_duration_seconds?: number | null
+          recording_path?: string | null
+          recording_uploaded_at?: string | null
           started_at?: string
           title?: string | null
           zone_id?: string
@@ -355,11 +367,19 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_meeting_participant: {
+        Args: { _meeting_id: string; _user_id: string }
+        Returns: boolean
+      }
       meeting_join: {
         Args: { _zone_id: string; _zone_label: string }
         Returns: string
       }
       meeting_leave: { Args: { _meeting_id: string }; Returns: undefined }
+      meeting_set_recording: {
+        Args: { _duration_seconds: number; _meeting_id: string; _path: string }
+        Returns: undefined
+      }
     }
     Enums: {
       app_role: "admin" | "supervisor" | "member"
