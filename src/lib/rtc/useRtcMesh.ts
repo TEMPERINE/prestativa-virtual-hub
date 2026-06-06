@@ -330,6 +330,27 @@ export function useRtcMesh(myId: string | null, desiredPeers: string[]): RtcMesh
       return;
     }
 
+    if (msg.type === "renegotiate") {
+      // The other side asked us to renegotiate (because they changed a track
+      // and they are not the offerer). Only act if we are the offerer.
+      const e = peersRef.current.get(peerId);
+      if (!e || !e.isOfferer) return;
+      if (e.pc.signalingState !== "stable") return;
+      try {
+        e.makingOffer = true;
+        const offer = await e.pc.createOffer();
+        if (e.pc.signalingState !== "stable") return;
+        await e.pc.setLocalDescription(offer);
+        sendSignal({ to: peerId, type: "offer", sdp: e.pc.localDescription! });
+      } catch (err) {
+        console.error("renegotiate failed", err);
+      } finally {
+        e.makingOffer = false;
+      }
+      return;
+    }
+
+
     // Make sure peer exists for incoming offer/answer/ice
     let entry = peersRef.current.get(peerId);
     if (!entry) {
