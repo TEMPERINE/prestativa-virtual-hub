@@ -48,6 +48,12 @@ export type RtcMeshState = {
   videoDevices: MediaDeviceInfo[];
   selectedVideoDeviceId: string | null;
   setVideoDevice: (deviceId: string) => Promise<void>;
+  audioInputDevices: MediaDeviceInfo[];
+  selectedAudioInputDeviceId: string | null;
+  setAudioInputDevice: (deviceId: string) => Promise<void>;
+  audioOutputDevices: MediaDeviceInfo[];
+  selectedAudioOutputDeviceId: string | null;
+  setAudioOutputDevice: (deviceId: string) => Promise<void>;
   prewarmMic: () => Promise<void>;
 };
 
