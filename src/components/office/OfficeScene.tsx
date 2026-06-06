@@ -195,7 +195,7 @@ function randomPointInRect(
   return seatPointForRect(rect);
 }
 
-export function OfficeScene() {
+export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
   const sceneRef = useRef<HTMLDivElement | null>(null);
   const stageRef = useRef<HTMLDivElement | null>(null);
   const [me, setMe] = useState<Profile | null>(null);
