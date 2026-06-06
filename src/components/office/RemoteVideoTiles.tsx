@@ -67,26 +67,28 @@ export function RemoteVideoTiles({
                 isSelf
               />
             )}
-            {/* Remote tiles */}
-            {connectedPeers.map((peerId) => {
-              const profile = profiles[peerId] ?? {
-                id: peerId,
-                display_name: "Convidado",
-                avatar_color: "#475569",
-              };
-              const stream = streams[peerId];
-              return (
-                <Tile
-                  key={peerId}
-                  profile={profile}
-                  stream={stream ?? null}
-                  hasVideo={hasLiveVideo(stream)}
-                  micOn={true}
-                  speaking={!!speakingPeers[peerId]}
-                  handRaised={!!raisedHands[peerId]}
-                />
-              );
-            })}
+            {/* Remote tiles — pessoas com a mão levantada vão pro topo */}
+            {[...connectedPeers]
+              .sort((a, b) => Number(!!raisedHands[b]) - Number(!!raisedHands[a]))
+              .map((peerId) => {
+                const profile = profiles[peerId] ?? {
+                  id: peerId,
+                  display_name: "Convidado",
+                  avatar_color: "#475569",
+                };
+                const stream = streams[peerId];
+                return (
+                  <Tile
+                    key={peerId}
+                    profile={profile}
+                    stream={stream ?? null}
+                    hasVideo={hasLiveVideo(stream)}
+                    micOn={true}
+                    speaking={!!speakingPeers[peerId]}
+                    handRaised={!!raisedHands[peerId]}
+                  />
+                );
+              })}
           </div>
         </div>
       )}
@@ -111,16 +113,22 @@ function Tile({
   handRaised?: boolean;
   isSelf?: boolean;
 }) {
+  const borderColor = handRaised
+    ? "border-amber-400"
+    : speaking
+    ? "border-emerald-400"
+    : "border-white/15";
+  const glow = handRaised
+    ? "0 0 0 2px color-mix(in oklab, #fbbf24 75%, transparent), 0 8px 28px -8px rgba(251,191,36,0.45)"
+    : speaking
+    ? "0 0 0 2px color-mix(in oklab, #34d399 70%, transparent), 0 6px 24px -8px rgba(0,0,0,0.45)"
+    : undefined;
   return (
     <div
-      className={`relative w-48 h-28 rounded-xl overflow-hidden shadow-lg border-2 transition-all ${
-        speaking ? "border-emerald-400" : "border-white/15"
-      }`}
+      className={`relative w-48 h-28 rounded-xl overflow-hidden shadow-lg border-2 transition-all ${borderColor}`}
       style={{
         background: profile.avatar_color || "#1f2937",
-        boxShadow: speaking
-          ? "0 0 0 2px color-mix(in oklab, #34d399 70%, transparent), 0 6px 24px -8px rgba(0,0,0,0.45)"
-          : undefined,
+        boxShadow: glow,
       }}
     >
       {hasVideo && stream ? (
@@ -143,10 +151,11 @@ function Tile({
       {/* Raised hand badge (top-left) */}
       {handRaised && (
         <div
-          className="absolute top-1.5 left-1.5 w-7 h-7 rounded-full flex items-center justify-center bg-amber-400 text-amber-950 shadow-md animate-pulse"
+          className="absolute top-1.5 left-1.5 px-2 h-7 rounded-full flex items-center gap-1 bg-amber-400 text-amber-950 shadow-md ring-2 ring-amber-200/70 animate-pulse"
           title="Mão levantada"
         >
           <Hand className="w-4 h-4" />
+          <span className="text-[10px] font-semibold tracking-wide">MÃO</span>
         </div>
       )}
 
