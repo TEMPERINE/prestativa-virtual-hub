@@ -1,28 +1,39 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { Minimize2, MonitorUp, X } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import { Mic, MicOff, Minimize2, MonitorUp, VideoOff } from "lucide-react";
 
 type Profile = { id: string; display_name: string; avatar_color: string };
-type Rect = { x1: number; y1: number; x2: number; y2: number };
+
+type Participant = {
+  id: string;
+  profile: Profile;
+  stream: MediaStream | null;
+  hasVideo: boolean;
+  micOn: boolean;
+  speaking: boolean;
+  isSelf?: boolean;
+};
 
 export function ScreenShareViewer({
   localStream,
   remoteStreams,
   profiles,
   onStopLocal,
-  anchorRect,
+  participants = [],
 }: {
   localStream: MediaStream | null;
   remoteStreams: Record<string, MediaStream>;
   profiles: Record<string, Profile>;
   onStopLocal: () => void;
-  anchorRect: Rect | null;
+  participants?: Participant[];
+  /** Mantido para compatibilidade — ignorado nesta versão (full screen sempre). */
+  anchorRect?: unknown;
 }) {
   const remotes = Object.entries(remoteStreams).filter(([, s]) =>
     s.getVideoTracks().some((t) => t.readyState === "live"),
   );
   const hasLocal = !!localStream;
   const [activeKey, setActiveKey] = useState<string | null>(null);
-  // Meeting-style: full screen by default whenever there is a share.
   const [meetingMode, setMeetingMode] = useState(true);
 
   useEffect(() => {
@@ -30,15 +41,14 @@ export function ScreenShareViewer({
     if (!activeKey || !keys.includes(activeKey)) setActiveKey(keys[0] ?? null);
   }, [hasLocal, remotes, activeKey]);
 
-  // Whenever a new share starts (had none before, now has one), open meeting mode.
   const hadShareRef = useRef(false);
   useEffect(() => {
     const hasAny = hasLocal || remotes.length > 0;
     if (hasAny && !hadShareRef.current) setMeetingMode(true);
+    if (!hasAny) setMeetingMode(true); // resetar p/ próxima vez
     hadShareRef.current = hasAny;
   }, [hasLocal, remotes.length]);
 
-  // ESC exits meeting mode.
   useEffect(() => {
     if (!meetingMode) return;
     const onKey = (e: KeyboardEvent) => {
@@ -50,34 +60,6 @@ export function ScreenShareViewer({
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [meetingMode]);
-
-  const placement = useMemo(() => {
-    if (!anchorRect) {
-      return {
-        left: "50%",
-        top: "auto",
-        bottom: "4%",
-        width: "min(90%, 520px)",
-        aspectRatio: "16 / 9",
-        transform: "translateX(-50%)",
-      } as const;
-    }
-    const cx = (anchorRect.x1 + anchorRect.x2) / 2;
-    const zoneW = anchorRect.x2 - anchorRect.x1;
-    const zoneH = anchorRect.y2 - anchorRect.y1;
-    const widthPct = Math.max(22, Math.min(46, zoneW * 100 * 1.2));
-    const dockInside = zoneH > 0.22;
-    const topPct = dockInside ? (anchorRect.y1 + 0.015) * 100 : Math.max(2, anchorRect.y1 * 100 - 2);
-    const halfW = widthPct / 2;
-    const leftPct = Math.min(100 - halfW - 1, Math.max(halfW + 1, cx * 100));
-    return {
-      left: `${leftPct}%`,
-      top: `${topPct}%`,
-      width: `${widthPct}%`,
-      aspectRatio: "16 / 9",
-      transform: dockInside ? "translateX(-50%)" : "translate(-50%, -100%)",
-    } as const;
-  }, [anchorRect]);
 
   if (!hasLocal && remotes.length === 0) return null;
 
@@ -91,22 +73,31 @@ export function ScreenShareViewer({
         : "";
 
   if (meetingMode) {
-    return (
-      <div className="fixed inset-0 z-[200] bg-black/95 flex flex-col pointer-events-auto">
-        <div className="flex items-center justify-between px-4 py-2 bg-black/80 text-white text-sm shrink-0 border-b border-white/10">
+    const overlay = (
+      <div
+        className="fixed inset-0 flex flex-col pointer-events-auto"
+        style={{ zIndex: 2147483600 }}
+      >
+        {/* Backdrop 50% sobre o cenário */}
+        <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
+
+        {/* Header da reunião */}
+        <div className="relative flex items-center justify-between px-4 py-2.5 bg-black/85 text-white shrink-0 border-b border-white/10">
           <div className="flex items-center gap-2 min-w-0">
-            <MonitorUp className="w-4 h-4 text-primary" />
-            <span className="truncate font-medium">{activeLabel}</span>
-            <span className="text-white/50 text-xs ml-2 hidden sm:inline">
-              Pressione ESC para sair
-            </span>
+            <div className="w-8 h-8 rounded-lg bg-primary/20 flex items-center justify-center">
+              <MonitorUp className="w-4 h-4 text-primary" />
+            </div>
+            <div className="min-w-0">
+              <div className="text-sm font-medium truncate">{activeLabel}</div>
+              <div className="text-[11px] text-white/55">Modo reunião • ESC para sair</div>
+            </div>
           </div>
           <div className="flex items-center gap-2">
             {hasLocal && (
               <button
                 type="button"
                 onClick={onStopLocal}
-                className="px-3 py-1 rounded-md bg-red-500/90 hover:bg-red-500 text-white text-xs font-medium"
+                className="px-3 py-1.5 rounded-md bg-red-500/90 hover:bg-red-500 text-white text-xs font-medium"
               >
                 Parar compartilhamento
               </button>
@@ -114,7 +105,7 @@ export function ScreenShareViewer({
             <button
               type="button"
               onClick={() => setMeetingMode(false)}
-              className="inline-flex items-center gap-1 px-3 py-1 rounded-md bg-white/10 hover:bg-white/20 text-white text-xs"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-white/10 hover:bg-white/20 text-white text-xs"
               title="Sair do modo reunião (ESC)"
             >
               <Minimize2 className="w-3.5 h-3.5" />
@@ -122,11 +113,17 @@ export function ScreenShareViewer({
             </button>
           </div>
         </div>
-        <div className="flex-1 relative bg-black min-h-0">
-          {activeStream && <ScreenEl stream={activeStream} muted={activeKey === "__local__"} />}
+
+        {/* Palco com vídeo principal */}
+        <div className="relative flex-1 min-h-0 p-4">
+          <div className="w-full h-full rounded-xl overflow-hidden bg-black border border-white/10 shadow-2xl relative">
+            {activeStream && <ScreenEl stream={activeStream} muted={activeKey === "__local__"} />}
+          </div>
         </div>
+
+        {/* Seletor de telas (quando há mais de uma) */}
         {(hasLocal ? 1 : 0) + remotes.length > 1 && (
-          <div className="flex items-center justify-center gap-2 px-3 py-2 bg-black/80 overflow-x-auto shrink-0 border-t border-white/10">
+          <div className="relative flex items-center justify-center gap-2 px-3 pb-2 shrink-0">
             {hasLocal && (
               <Thumb label="Você" active={activeKey === "__local__"} onClick={() => setActiveKey("__local__")} />
             )}
@@ -140,15 +137,34 @@ export function ScreenShareViewer({
             ))}
           </div>
         )}
+
+        {/* Faixa de participantes (estilo Meet) */}
+        {participants.length > 0 && (
+          <div className="relative shrink-0 px-3 pb-3">
+            <div className="flex items-center gap-2 overflow-x-auto py-1">
+              {participants.map((p) => (
+                <ParticipantTile key={p.id} p={p} />
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     );
+
+    if (typeof document !== "undefined") {
+      return createPortal(overlay, document.body);
+    }
+    return overlay;
   }
 
-  // Compact docked mode: small floating panel with a button to re-enter meeting mode.
-  return (
-    <div className="absolute z-[115] pointer-events-auto transition-all duration-300 ease-out" style={placement}>
-      <div className="relative w-full h-full rounded-2xl overflow-hidden bg-black/85 border border-white/15 shadow-2xl flex flex-col min-h-0">
-        <div className="flex items-center justify-between px-3 py-1.5 bg-black/60 text-white text-xs shrink-0">
+  // Modo compacto: pequeno painel flutuante no canto inferior central.
+  const compact = (
+    <div
+      className="fixed bottom-4 left-1/2 -translate-x-1/2 pointer-events-auto"
+      style={{ zIndex: 2147483500, width: "min(420px, 90vw)" }}
+    >
+      <div className="rounded-2xl overflow-hidden bg-black/85 border border-white/15 shadow-2xl flex flex-col">
+        <div className="flex items-center justify-between px-3 py-1.5 bg-black/60 text-white text-xs">
           <div className="flex items-center gap-2 min-w-0">
             <MonitorUp className="w-3.5 h-3.5 text-primary" />
             <span className="truncate">{activeLabel}</span>
@@ -167,7 +183,6 @@ export function ScreenShareViewer({
               type="button"
               onClick={() => setMeetingMode(true)}
               className="px-2 py-0.5 rounded-md bg-primary/90 hover:bg-primary text-primary-foreground text-[10px] font-medium"
-              title="Entrar no modo reunião"
             >
               Abrir
             </button>
@@ -176,26 +191,62 @@ export function ScreenShareViewer({
         <button
           type="button"
           onClick={() => setMeetingMode(true)}
-          className="flex-1 relative bg-black min-h-0 cursor-zoom-in"
+          className="relative bg-black aspect-video cursor-zoom-in"
           title="Abrir em modo reunião"
         >
           {activeStream && <ScreenEl stream={activeStream} muted={activeKey === "__local__"} />}
         </button>
-        {(hasLocal ? 1 : 0) + remotes.length > 1 && (
-          <div className="flex items-center gap-1 px-2 py-1 bg-black/60 overflow-x-auto shrink-0">
-            {hasLocal && (
-              <Thumb label="Você" active={activeKey === "__local__"} onClick={() => setActiveKey("__local__")} />
-            )}
-            {remotes.map(([id]) => (
-              <Thumb
-                key={id}
-                label={profiles[id]?.display_name ?? "Convidado"}
-                active={activeKey === id}
-                onClick={() => setActiveKey(id)}
-              />
-            ))}
+      </div>
+    </div>
+  );
+
+  if (typeof document !== "undefined") {
+    return createPortal(compact, document.body);
+  }
+  return compact;
+}
+
+function initials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return "?";
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+
+function ParticipantTile({ p }: { p: Participant }) {
+  return (
+    <div
+      className={`relative w-40 h-24 rounded-lg overflow-hidden shrink-0 border-2 transition-colors ${
+        p.speaking ? "border-primary" : "border-white/15"
+      }`}
+      style={{ background: p.profile.avatar_color || "#1f2937" }}
+    >
+      {p.hasVideo && p.stream ? (
+        <VideoEl stream={p.stream} mirrored={!!p.isSelf} />
+      ) : (
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-1 bg-black/40">
+          <div
+            className="w-10 h-10 rounded-full flex items-center justify-center text-white text-sm font-semibold"
+            style={{ background: p.profile.avatar_color || "#475569" }}
+          >
+            {initials(p.profile.display_name)}
           </div>
+          <div className="flex items-center gap-1 text-[10px] text-white/80">
+            <VideoOff className="w-3 h-3" />
+            <span>sem vídeo</span>
+          </div>
+        </div>
+      )}
+      <div className="absolute bottom-0 inset-x-0 px-2 py-1 bg-black/55 text-white text-[11px] flex items-center gap-1.5">
+        {p.micOn ? (
+          <Mic className={`w-3 h-3 shrink-0 ${p.speaking ? "text-primary" : "text-white/80"}`} />
+        ) : (
+          <MicOff className="w-3 h-3 shrink-0 text-red-400" />
         )}
+        <span className="truncate">
+          {p.profile.display_name}
+          {p.isSelf ? " (você)" : ""}
+        </span>
       </div>
     </div>
   );
@@ -206,7 +257,7 @@ function Thumb({ label, active, onClick }: { label: string; active: boolean; onC
     <button
       type="button"
       onClick={onClick}
-      className={`shrink-0 px-2 py-1 rounded-md text-[10px] truncate max-w-[140px] ${
+      className={`shrink-0 px-2.5 py-1 rounded-md text-[11px] truncate max-w-[160px] ${
         active ? "bg-primary text-primary-foreground" : "bg-white/10 text-white/80 hover:bg-white/20"
       }`}
     >
@@ -230,6 +281,26 @@ function ScreenEl({ stream, muted }: { stream: MediaStream; muted: boolean }) {
       playsInline
       muted={muted}
       className="absolute inset-0 w-full h-full object-contain bg-black"
+    />
+  );
+}
+
+function VideoEl({ stream, mirrored }: { stream: MediaStream; mirrored?: boolean }) {
+  const ref = useRef<HTMLVideoElement | null>(null);
+  useEffect(() => {
+    if (ref.current && ref.current.srcObject !== stream) {
+      ref.current.srcObject = stream;
+      ref.current.play?.().catch(() => {});
+    }
+  }, [stream]);
+  return (
+    <video
+      ref={ref}
+      autoPlay
+      playsInline
+      muted
+      className="w-full h-full object-cover"
+      style={mirrored ? { transform: "scaleX(-1)" } : undefined}
     />
   );
 }
