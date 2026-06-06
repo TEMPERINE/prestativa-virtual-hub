@@ -109,8 +109,17 @@ export function useMeetingRecorder({ getLocalAudioTrack, remoteStreams }: Args) 
     try {
       displayStream = await navigator.mediaDevices.getDisplayMedia({
         video: { frameRate: 15 },
-        audio: true,
-      });
+        audio: {
+          echoCancellation: false,
+          noiseSuppression: false,
+          autoGainControl: false,
+        },
+        // Hints específicos do Chromium para já vir com áudio do sistema marcado.
+        systemAudio: "include",
+        selfBrowserSurface: "include",
+        surfaceSwitching: "include",
+        preferCurrentTab: false,
+      } as unknown as DisplayMediaStreamOptions);
     } catch (err) {
       const name = (err as { name?: string })?.name;
       if (name === "NotAllowedError") {
