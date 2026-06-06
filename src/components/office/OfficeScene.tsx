@@ -2661,6 +2661,9 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
             <IconButton active={showTeam} onClick={() => setShowTeam(!showTeam)} title="Equipe">
               <Users className="w-4 h-4" />
             </IconButton>
+            <IconButton active={shortcutsOpen} onClick={() => setShortcutsOpen(true)} title="Atalhos do teclado (?)">
+              <HelpCircle className="w-4 h-4" />
+            </IconButton>
             <Link
               to="/office/editor"
               title="Editor de mapa"
