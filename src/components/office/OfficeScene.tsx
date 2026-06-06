@@ -2432,26 +2432,64 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
                 Em chamada com {rtc.connectedPeers.length}
               </div>
             )}
-            <IconButton
-              active={rtc.micOn}
-              onClick={() => {
-                void unlockAudioPlayback();
-                rtc.toggleMic().catch(() => toast.error("Não foi possível acessar o microfone"));
-              }}
-              title="Microfone"
-            >
-              {rtc.micOn ? <Mic className="w-4 h-4" /> : <MicOff className="w-4 h-4" />}
-            </IconButton>
-            <IconButton
-              active={rtc.camOn}
-              onClick={() => {
-                void unlockAudioPlayback();
-                rtc.toggleCam().catch(() => toast.error("Não foi possível acessar a câmera"));
-              }}
-              title="Câmera"
-            >
-              {rtc.camOn ? <Video className="w-4 h-4" /> : <VideoOff className="w-4 h-4" />}
-            </IconButton>
+            <div className="flex items-center">
+              <IconButton
+                active={rtc.micOn}
+                onClick={() => {
+                  void unlockAudioPlayback();
+                  rtc.toggleMic().catch(() => toast.error("Não foi possível acessar o microfone"));
+                }}
+                title="Microfone"
+              >
+                {rtc.micOn ? <Mic className="w-4 h-4" /> : <MicOff className="w-4 h-4" />}
+              </IconButton>
+              <DeviceMenu
+                title="Configurações de áudio"
+                sections={[
+                  {
+                    label: "Microfone",
+                    devices: rtc.audioInputDevices,
+                    selectedId: rtc.selectedAudioInputDeviceId,
+                    onSelect: (id) =>
+                      rtc.setAudioInputDevice(id).catch(() => toast.error("Falha ao trocar microfone")),
+                    fallbackLabel: "Microfone do sistema",
+                  },
+                  {
+                    label: "Caixas de som",
+                    devices: rtc.audioOutputDevices,
+                    selectedId: rtc.selectedAudioOutputDeviceId,
+                    onSelect: (id) =>
+                      rtc.setAudioOutputDevice(id).catch(() => toast.error("Falha ao trocar saída de áudio")),
+                    fallbackLabel: "Saída padrão",
+                  },
+                ]}
+              />
+            </div>
+            <div className="flex items-center">
+              <IconButton
+                active={rtc.camOn}
+                onClick={() => {
+                  void unlockAudioPlayback();
+                  rtc.toggleCam().catch(() => toast.error("Não foi possível acessar a câmera"));
+                }}
+                title="Câmera"
+              >
+                {rtc.camOn ? <Video className="w-4 h-4" /> : <VideoOff className="w-4 h-4" />}
+              </IconButton>
+              <DeviceMenu
+                title="Configurações de câmera"
+                sections={[
+                  {
+                    label: "Câmera",
+                    devices: rtc.videoDevices,
+                    selectedId: rtc.selectedVideoDeviceId,
+                    onSelect: (id) =>
+                      rtc.setVideoDevice(id).catch(() => toast.error("Falha ao trocar câmera")),
+                    fallbackLabel: "Câmera do sistema",
+                  },
+                ]}
+              />
+            </div>
             <CamPreviewAndPicker
               stream={rtc.localVideoStream}
               devices={rtc.videoDevices}
