@@ -206,6 +206,15 @@ export function useRtcMesh(myId: string | null, desiredPeers: string[]): RtcMesh
       if (!target.getTracks().find((rt) => rt.id === e.track.id)) target.addTrack(e.track);
       if (isScreen) {
         setRemoteScreenStreams((prev) => ({ ...prev, [peerId]: remoteScreenStream }));
+        // Re-publish when media actually starts flowing (covers cases where
+        // ontrack fired before the sender attached a real track).
+        e.track.onunmute = () => {
+          setRemoteScreenStreams((prev) => ({ ...prev, [peerId]: remoteScreenStream }));
+        };
+        e.track.onmute = () => {
+          // Keep the entry; the viewer's filter on readyState handles cleanup
+          // when the track actually ends.
+        };
         e.track.onended = () => {
           target.removeTrack(e.track);
           setRemoteScreenStreams((prev) => {
@@ -221,6 +230,7 @@ export function useRtcMesh(myId: string | null, desiredPeers: string[]): RtcMesh
         setRemoteStreams((prev) => ({ ...prev, [peerId]: remoteStream }));
       }
     };
+
 
     // ICE restart watchdog: keep media alive across transient network blips.
     // We DO NOT destroy the PC — restartIce() renegotiates without touching the
