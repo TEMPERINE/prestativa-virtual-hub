@@ -2715,6 +2715,20 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
         </div>
       )}
 
+      {/* Minimapa */}
+      <Minimap
+        myId={me?.id ?? null}
+        myPos={pos}
+        positions={positions}
+        profiles={profiles}
+        onTeleport={(zoneId, label) => teleportToZone(zoneId, label)}
+      />
+
+      {/* Modal de atalhos */}
+      <ShortcutsModal open={shortcutsOpen} onOpenChange={setShortcutsOpen} />
+
+
+
       {/* Team panel side toggle — always visible on right edge */}
       <button
         type="button"
