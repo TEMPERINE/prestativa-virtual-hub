@@ -6,7 +6,7 @@ import remarkGfm from "remark-gfm";
 import { supabase } from "@/integrations/supabase/client";
 import {
   ArrowLeft, Users, Clock, Video, Sparkles, Loader2, FileText, ChevronDown,
-  Folder, FolderPlus, FolderOpen, Inbox, Pencil, Trash2, Check, X, FolderInput,
+  Folder, FolderPlus, FolderOpen, Inbox, Pencil, Trash2, FolderInput,
 } from "lucide-react";
 import { generateMeetingAi } from "@/lib/meetings/ai.functions";
 import {
