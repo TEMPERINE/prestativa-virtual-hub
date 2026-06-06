@@ -402,7 +402,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
     setFacing(nextFacing);
   }, []);
 
-  // ---- WebRTC mesh: voice/video by proximity or same claimed zone ----
+  // ---- WebRTC mesh: voice/video by proximity or same physical room ----
   // Raio de "conversa de corredor": só conecta quando os personagens estão
   // bem próximos (cerca da distância de um sprite) e desconecta rapidamente
   // assim que a bolha de papo é rompida.
@@ -412,14 +412,12 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
   const desiredPeers = useMemo(() => {
     const meId = me?.id;
     if (!meId) return [] as string[];
-    const myClaimZone = Object.entries(claims).find(([, uid]) => uid === meId)?.[0];
     const candidates: { uid: string; score: number }[] = [];
     for (const [uid, p] of Object.entries(positions)) {
       if (uid === meId) continue;
       if (!p.is_online) continue;
-      // Same claimed zone → always connect
-      const peerClaim = Object.entries(claims).find(([, u]) => u === uid)?.[0];
-      const sameZone = myClaimZone && peerClaim && peerClaim === myClaimZone;
+      // Same physical room/area → connect only while both avatars are there.
+      // A claimed desk alone must not pull users into a call from elsewhere.
       const sameActiveRoom = zone !== "lobby" && p.zone === zone;
       // Proximity with hysteresis
       const dx = p.x - pos.x;
@@ -427,14 +425,14 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
       const dist = Math.hypot(dx, dy);
       const already = connectedPeersRef.current.has(uid);
       const closeEnough = already ? dist <= PROXIMITY_DISCONNECT : dist <= PROXIMITY_CONNECT;
-      if (sameZone || sameActiveRoom || closeEnough) {
-        const score = (sameZone ? 0 : sameActiveRoom ? 1 : 2) + dist;
+      if (sameActiveRoom || closeEnough) {
+        const score = (sameActiveRoom ? 0 : 1) + dist;
         candidates.push({ uid, score });
       }
     }
     // A browser mesh is capped to keep the room stable with ~15 collaborators.
     return candidates.sort((a, b) => a.score - b.score).slice(0, 14).map((c) => c.uid);
-  }, [me?.id, positions, claims, pos.x, pos.y, zone]);
+  }, [me?.id, positions, pos.x, pos.y, zone]);
 
   const rtc = useRtcMesh(me?.id ?? null, desiredPeers);
   useEffect(() => {
