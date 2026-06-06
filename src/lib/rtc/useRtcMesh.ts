@@ -598,12 +598,16 @@ export function useRtcMesh(myId: string | null, desiredPeers: string[]): RtcMesh
       const track = await acquireMic(selectedAudioInputDeviceId ?? undefined);
       if (track) track.enabled = true;
       setMicOn(true);
-      void refreshDevices();
+      try {
+        const all = await navigator.mediaDevices.enumerateDevices();
+        setAudioInputDevices(all.filter((d) => d.kind === "audioinput"));
+        setAudioOutputDevices(all.filter((d) => d.kind === "audiooutput"));
+      } catch { /* noop */ }
     } catch (err) {
       console.error("mic access denied", err);
       throw err;
     }
-  }, [acquireMic, selectedAudioInputDeviceId, refreshDevices]);
+  }, [acquireMic, selectedAudioInputDeviceId]);
 
   const disableMic = useCallback(() => {
     if (audioTrackRef.current) {
