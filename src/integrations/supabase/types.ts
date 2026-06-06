@@ -135,6 +135,9 @@ export type Database = {
       }
       meetings: {
         Row: {
+          ai_error: string | null
+          ai_generated_at: string | null
+          ai_status: string
           ended_at: string | null
           host_id: string | null
           id: string
@@ -143,11 +146,16 @@ export type Database = {
           recording_path: string | null
           recording_uploaded_at: string | null
           started_at: string
+          summary: string | null
           title: string | null
+          transcript: string | null
           zone_id: string
           zone_label: string
         }
         Insert: {
+          ai_error?: string | null
+          ai_generated_at?: string | null
+          ai_status?: string
           ended_at?: string | null
           host_id?: string | null
           id?: string
@@ -156,11 +164,16 @@ export type Database = {
           recording_path?: string | null
           recording_uploaded_at?: string | null
           started_at?: string
+          summary?: string | null
           title?: string | null
+          transcript?: string | null
           zone_id: string
           zone_label: string
         }
         Update: {
+          ai_error?: string | null
+          ai_generated_at?: string | null
+          ai_status?: string
           ended_at?: string | null
           host_id?: string | null
           id?: string
@@ -169,7 +182,9 @@ export type Database = {
           recording_path?: string | null
           recording_uploaded_at?: string | null
           started_at?: string
+          summary?: string | null
           title?: string | null
+          transcript?: string | null
           zone_id?: string
           zone_label?: string
         }
@@ -376,6 +391,18 @@ export type Database = {
         Returns: string
       }
       meeting_leave: { Args: { _meeting_id: string }; Returns: undefined }
+      meeting_mark_ai_processing: {
+        Args: { _meeting_id: string }
+        Returns: undefined
+      }
+      meeting_set_ai_error: {
+        Args: { _error: string; _meeting_id: string }
+        Returns: undefined
+      }
+      meeting_set_ai_result: {
+        Args: { _meeting_id: string; _summary: string; _transcript: string }
+        Returns: undefined
+      }
       meeting_set_recording: {
         Args: { _duration_seconds: number; _meeting_id: string; _path: string }
         Returns: undefined
