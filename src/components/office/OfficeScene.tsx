@@ -40,9 +40,7 @@ const EMOJI_MAP: Record<string, string> = {
 };
 const REACTION_DURATION_MS = 3000;
 import { toast } from "sonner";
-import { LogOut, Mic, MicOff, Video, VideoOff, MonitorUp, Users, Pencil, User as UserIcon, MessageCircle, StickyNote, X as XIcon, Plus, Minus, Locate, ChevronLeft, ChevronRight, Footprints, UserPlus, Hand, HelpCircle } from "lucide-react";
-import { Minimap } from "./Minimap";
-import { ShortcutsModal } from "./ShortcutsModal";
+import { LogOut, Mic, MicOff, Video, VideoOff, MonitorUp, Users, Pencil, User as UserIcon, MessageCircle, StickyNote, X as XIcon, Plus, Minus, Locate, ChevronLeft, ChevronRight, Footprints, UserPlus, Hand } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import { useRtcMesh } from "@/lib/rtc/useRtcMesh";
 import { installAudioUnlockListeners, unlockAudioPlayback } from "@/lib/rtc/audio-unlock";
@@ -220,7 +218,6 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
   const [facing, setFacing] = useState<Facing>("down");
   const facingRef = useRef<Facing>("down");
   const [reactions, setReactions] = useState<Record<string, { emoji: string; ts: number }>>({});
-  const [shortcutsOpen, setShortcutsOpen] = useState(false);
   // Active remote-user teleport effects (so others see the sparkle/fade like a game).
   const [remoteTeleports, setRemoteTeleports] = useState<
     Record<string, { from: Point; to: Point; phase: "out" | "in"; id: number }>
@@ -1285,12 +1282,6 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
       if (e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey && e.key.toLowerCase() === "h") {
         e.preventDefault();
         toggleRaiseHand();
-        return;
-      }
-      // ? = abrir lista de atalhos
-      if (!e.altKey && !e.ctrlKey && !e.metaKey && (e.key === "?" || (e.shiftKey && e.key === "/"))) {
-        e.preventDefault();
-        setShortcutsOpen((v) => !v);
         return;
       }
     };
@@ -2653,16 +2644,13 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
             <IconButton
               active={!!(me && raisedHands[me.id])}
               onClick={toggleRaiseHand}
-              title={me && raisedHands[me.id] ? "Abaixar a mão (Alt+H)" : "Levantar a mão (Alt+H)"}
+              title={me && raisedHands[me.id] ? "Abaixar a mão (Ctrl+Alt+H)" : "Levantar a mão (Ctrl+Alt+H)"}
             >
               <Hand className="w-4 h-4" />
             </IconButton>
 
             <IconButton active={showTeam} onClick={() => setShowTeam(!showTeam)} title="Equipe">
               <Users className="w-4 h-4" />
-            </IconButton>
-            <IconButton active={shortcutsOpen} onClick={() => setShortcutsOpen(true)} title="Atalhos do teclado (?)">
-              <HelpCircle className="w-4 h-4" />
             </IconButton>
             <Link
               to="/office/editor"
@@ -2714,20 +2702,6 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
           </div>
         </div>
       )}
-
-      {/* Minimapa */}
-      <Minimap
-        myId={me?.id ?? null}
-        myPos={pos}
-        positions={positions}
-        profiles={profiles}
-        onTeleport={(zoneId, label) => teleportToZone(zoneId, label)}
-      />
-
-      {/* Modal de atalhos */}
-      <ShortcutsModal open={shortcutsOpen} onOpenChange={setShortcutsOpen} />
-
-
 
       {/* Team panel side toggle — always visible on right edge */}
       <button
