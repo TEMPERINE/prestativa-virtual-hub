@@ -2653,7 +2653,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
             <IconButton
               active={!!(me && raisedHands[me.id])}
               onClick={toggleRaiseHand}
-              title={me && raisedHands[me.id] ? "Abaixar a mão (Ctrl+Alt+H)" : "Levantar a mão (Ctrl+Alt+H)"}
+              title={me && raisedHands[me.id] ? "Abaixar a mão (Alt+H)" : "Levantar a mão (Alt+H)"}
             >
               <Hand className="w-4 h-4" />
             </IconButton>
