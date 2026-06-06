@@ -56,6 +56,7 @@ export type RtcMeshState = {
   selectedAudioOutputDeviceId: string | null;
   setAudioOutputDevice: (deviceId: string) => Promise<void>;
   prewarmMic: () => Promise<void>;
+  getLocalAudioTrack: () => MediaStreamTrack | null;
 };
 
 
