@@ -663,9 +663,11 @@ function AiPanel({
 function RecordingPlayer({
   path,
   durationSec,
+  active = true,
 }: {
   path: string;
   durationSec: number | null;
+  active?: boolean;
 }) {
   const [url, setUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -682,9 +684,10 @@ function RecordingPlayer({
   };
 
   useEffect(() => {
+    if (!active) return;
     void load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [path]);
+  }, [path, active]);
 
   return (
     <div className="mt-3 border-t pt-3">
