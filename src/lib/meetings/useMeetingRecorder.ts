@@ -84,6 +84,10 @@ export function useMeetingRecorder({ getLocalAudioTrack, remoteStreams }: Args) 
       try { src.disconnect(); } catch { /* noop */ }
     }
     sourcesRef.current.clear();
+    if (ownedMicStreamRef.current) {
+      ownedMicStreamRef.current.getTracks().forEach((t) => { try { t.stop(); } catch { /* noop */ } });
+      ownedMicStreamRef.current = null;
+    }
     if (audioCtxRef.current) {
       void audioCtxRef.current.close().catch(() => {});
       audioCtxRef.current = null;
