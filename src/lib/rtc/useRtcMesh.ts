@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { getIceServers, type IceServer } from "@/lib/rtc/ice.functions";
 
-type SignalType = "offer" | "answer" | "ice" | "bye" | "hello";
+type SignalType = "offer" | "answer" | "ice" | "bye" | "hello" | "renegotiate";
 type SignalMsg = {
   from: string;
   to: string;
@@ -206,6 +206,15 @@ export function useRtcMesh(myId: string | null, desiredPeers: string[]): RtcMesh
       if (!target.getTracks().find((rt) => rt.id === e.track.id)) target.addTrack(e.track);
       if (isScreen) {
         setRemoteScreenStreams((prev) => ({ ...prev, [peerId]: remoteScreenStream }));
+        // Re-publish when media actually starts flowing (covers cases where
+        // ontrack fired before the sender attached a real track).
+        e.track.onunmute = () => {
+          setRemoteScreenStreams((prev) => ({ ...prev, [peerId]: remoteScreenStream }));
+        };
+        e.track.onmute = () => {
+          // Keep the entry; the viewer's filter on readyState handles cleanup
+          // when the track actually ends.
+        };
         e.track.onended = () => {
           target.removeTrack(e.track);
           setRemoteScreenStreams((prev) => {
@@ -221,6 +230,7 @@ export function useRtcMesh(myId: string | null, desiredPeers: string[]): RtcMesh
         setRemoteStreams((prev) => ({ ...prev, [peerId]: remoteStream }));
       }
     };
+
 
     // ICE restart watchdog: keep media alive across transient network blips.
     // We DO NOT destroy the PC — restartIce() renegotiates without touching the
@@ -329,6 +339,27 @@ export function useRtcMesh(myId: string | null, desiredPeers: string[]): RtcMesh
       }
       return;
     }
+
+    if (msg.type === "renegotiate") {
+      // The other side asked us to renegotiate (because they changed a track
+      // and they are not the offerer). Only act if we are the offerer.
+      const e = peersRef.current.get(peerId);
+      if (!e || !e.isOfferer) return;
+      if (e.pc.signalingState !== "stable") return;
+      try {
+        e.makingOffer = true;
+        const offer = await e.pc.createOffer();
+        if (e.pc.signalingState !== "stable") return;
+        await e.pc.setLocalDescription(offer);
+        sendSignal({ to: peerId, type: "offer", sdp: e.pc.localDescription! });
+      } catch (err) {
+        console.error("renegotiate failed", err);
+      } finally {
+        e.makingOffer = false;
+      }
+      return;
+    }
+
 
     // Make sure peer exists for incoming offer/answer/ice
     let entry = peersRef.current.get(peerId);
@@ -641,6 +672,32 @@ export function useRtcMesh(myId: string | null, desiredPeers: string[]): RtcMesh
     }
   }, [camOn, acquireCam]);
 
+  // Force every existing peer to renegotiate so that newly-added/removed
+  // tracks (in particular screen share) propagate correctly. replaceTrack
+  // alone does not always cause the remote side to start rendering the
+  // new stream — we need a fresh offer/answer exchange.
+  const renegotiateAll = useCallback(async () => {
+    for (const [peerId, entry] of peersRef.current.entries()) {
+      try {
+        if (entry.isOfferer) {
+          if (entry.pc.signalingState !== "stable") continue;
+          entry.makingOffer = true;
+          const offer = await entry.pc.createOffer();
+          if (entry.pc.signalingState !== "stable") { entry.makingOffer = false; continue; }
+          await entry.pc.setLocalDescription(offer);
+          sendSignal({ to: peerId, type: "offer", sdp: entry.pc.localDescription! });
+          entry.makingOffer = false;
+        } else {
+          // Ask the offerer to drive the renegotiation.
+          sendSignal({ to: peerId, type: "renegotiate" });
+        }
+      } catch (err) {
+        console.error("renegotiate peer failed", err);
+        entry.makingOffer = false;
+      }
+    }
+  }, [sendSignal]);
+
   // ---------- Screen share ----------
   const stopScreenInternal = useCallback(() => {
     const track = screenTrackRef.current;
@@ -656,7 +713,8 @@ export function useRtcMesh(myId: string | null, desiredPeers: string[]): RtcMesh
     }
     setLocalScreenStream(null);
     setScreenOn(false);
-  }, [localScreenStream]);
+    void renegotiateAll();
+  }, [localScreenStream, renegotiateAll]);
 
   const enableScreen = useCallback(async () => {
     try {
@@ -674,11 +732,13 @@ export function useRtcMesh(myId: string | null, desiredPeers: string[]): RtcMesh
       }
       track.onended = () => { stopScreenInternal(); };
       setScreenOn(true);
+      void renegotiateAll();
     } catch (err) {
       console.error("screen share failed", err);
       throw err;
     }
-  }, [stopScreenInternal]);
+  }, [stopScreenInternal, renegotiateAll]);
+
 
   const toggleScreen = useCallback(async () => {
     if (screenOn) stopScreenInternal();
