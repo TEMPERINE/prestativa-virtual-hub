@@ -60,9 +60,9 @@ export function useMeetingTracker({
           if (activeMeetingRef.current && !sameZone) {
             const prev = activeMeetingRef.current;
             activeMeetingRef.current = null;
-            await supabase.rpc("meeting_leave", { _meeting_id: prev });
+            await rpc("meeting_leave", { _meeting_id: prev });
           }
-          const { data, error } = await supabase.rpc("meeting_join", {
+          const { data, error } = await rpc("meeting_join", {
             _zone_id: zoneId,
             _zone_label: zoneLabel,
           });
@@ -84,7 +84,7 @@ export function useMeetingTracker({
         if (!id) return;
         activeMeetingRef.current = null;
         activeZoneRef.current = null;
-        await supabase.rpc("meeting_leave", { _meeting_id: id });
+        await rpc("meeting_leave", { _meeting_id: id });
       }, 4000); // tolera quedas rápidas de peer / reconexão
       return () => window.clearTimeout(timer);
     }
@@ -96,7 +96,7 @@ export function useMeetingTracker({
       const id = activeMeetingRef.current;
       if (id) {
         activeMeetingRef.current = null;
-        void supabase.rpc("meeting_leave", { _meeting_id: id });
+        void rpc("meeting_leave", { _meeting_id: id });
       }
     };
   }, []);
