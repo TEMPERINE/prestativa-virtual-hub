@@ -132,6 +132,15 @@ function MeetingsPage() {
                 meeting={m}
                 participants={participantsByMeeting[m.id] ?? []}
                 hostProfile={m.host_id ? profiles[m.host_id] : undefined}
+                onAiUpdated={(transcript, summary) => {
+                  setMeetings((prev) =>
+                    prev.map((row) =>
+                      row.id === m.id
+                        ? { ...row, transcript, summary, ai_status: "done", ai_error: null }
+                        : row,
+                    ),
+                  );
+                }}
               />
             ))}
           </ul>
@@ -158,10 +167,12 @@ function MeetingCard({
   meeting,
   participants,
   hostProfile,
+  onAiUpdated,
 }: {
   meeting: MeetingRow;
   participants: ParticipantRow[];
   hostProfile?: { display_name: string; avatar_color: string };
+  onAiUpdated: (transcript: string, summary: string) => void;
 }) {
   const start = new Date(meeting.started_at);
   const end = meeting.ended_at ? new Date(meeting.ended_at) : null;
@@ -215,9 +226,92 @@ function MeetingCard({
               durationSec={meeting.recording_duration_seconds ?? null}
             />
           )}
+
+          {meeting.recording_path && (
+            <AiPanel meeting={meeting} onAiUpdated={onAiUpdated} />
+          )}
         </div>
       </div>
     </li>
+  );
+}
+
+function AiPanel({
+  meeting,
+  onAiUpdated,
+}: {
+  meeting: MeetingRow;
+  onAiUpdated: (transcript: string, summary: string) => void;
+}) {
+  const generate = useServerFn(generateMeetingAi);
+  const [busy, setBusy] = useState(meeting.ai_status === "processing");
+  const [openTranscript, setOpenTranscript] = useState(false);
+  const hasAi = !!(meeting.summary || meeting.transcript);
+
+  const run = async () => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      const res = await generate({ data: { meetingId: meeting.id } });
+      onAiUpdated(res.transcript, res.summary);
+      toast.success("Transcrição e resumo prontos.");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Falha ao gerar.";
+      toast.error(msg);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="mt-3 border-t pt-3">
+      <div className="flex items-center gap-2 text-xs text-muted-foreground mb-2">
+        <Sparkles className="w-3 h-3" />
+        <span>Resumo automático</span>
+        <button
+          onClick={run}
+          disabled={busy}
+          className="ml-auto inline-flex items-center gap-1 text-primary hover:underline disabled:opacity-60 disabled:no-underline"
+        >
+          {busy ? (
+            <>
+              <Loader2 className="w-3 h-3 animate-spin" /> Processando…
+            </>
+          ) : hasAi ? (
+            "Refazer"
+          ) : (
+            "Gerar transcrição + resumo"
+          )}
+        </button>
+      </div>
+      {meeting.ai_error && !busy && (
+        <div className="text-xs text-destructive">{meeting.ai_error}</div>
+      )}
+      {meeting.summary && (
+        <div className="text-sm whitespace-pre-wrap leading-relaxed bg-muted/40 rounded-md p-3">
+          {meeting.summary}
+        </div>
+      )}
+      {meeting.transcript && (
+        <div className="mt-2">
+          <button
+            onClick={() => setOpenTranscript((v) => !v)}
+            className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+          >
+            <FileText className="w-3 h-3" />
+            {openTranscript ? "Esconder" : "Ver"} transcrição completa
+            <ChevronDown
+              className={`w-3 h-3 transition-transform ${openTranscript ? "rotate-180" : ""}`}
+            />
+          </button>
+          {openTranscript && (
+            <pre className="mt-2 text-xs whitespace-pre-wrap font-sans bg-muted/30 rounded-md p-3 max-h-96 overflow-auto">
+              {meeting.transcript}
+            </pre>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
 
