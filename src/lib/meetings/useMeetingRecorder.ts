@@ -114,16 +114,12 @@ export function useMeetingRecorder({ getLocalAudioTrack, remoteStreams }: Args) 
           noiseSuppression: false,
           autoGainControl: false,
         },
-        // Hints para o Chrome priorizar áudio do sistema/aba já habilitado.
-        // @ts-expect-error — opções específicas do Chromium ainda não tipadas.
+        // Hints específicos do Chromium para já vir com áudio do sistema marcado.
         systemAudio: "include",
-        // @ts-expect-error
         selfBrowserSurface: "include",
-        // @ts-expect-error
         surfaceSwitching: "include",
-        // @ts-expect-error
         preferCurrentTab: false,
-      } as DisplayMediaStreamOptions);
+      } as unknown as DisplayMediaStreamOptions);
     } catch (err) {
       const name = (err as { name?: string })?.name;
       if (name === "NotAllowedError") {
