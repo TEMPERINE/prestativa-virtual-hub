@@ -2744,16 +2744,33 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
               <Hand className="w-4 h-4" />
             </IconButton>
 
-            {/* Botão de gravação — só aparece numa reunião ativa */}
-            {activeMeetingId && (
+            {/* Botão de gravação — aparece em qualquer sala de reunião (mesmo sozinho).
+                Se não houver reunião ativa ainda, criamos sob demanda via meeting_join. */}
+            {!!currentZone.supportsVideo && (
               <button
-                onClick={() => {
+                onClick={async () => {
                   if (recorder.isUploading) return;
                   if (recorder.isRecording) {
                     void recorder.stop();
-                  } else {
-                    void recorder.start(activeMeetingId);
+                    return;
                   }
+                  let meetingId = activeMeetingId;
+                  if (!meetingId) {
+                    try {
+                      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                      const { data, error } = await (supabase as any).rpc("meeting_join", {
+                        _zone_id: currentZone.id,
+                        _zone_label: currentZone.label,
+                      });
+                      if (error || !data) throw error ?? new Error("no meeting id");
+                      meetingId = data as string;
+                    } catch (err) {
+                      console.error("[rec] failed to ensure meeting:", err);
+                      toast.error("Não foi possível iniciar a gravação.");
+                      return;
+                    }
+                  }
+                  void recorder.start(meetingId);
                 }}
                 disabled={recorder.isUploading}
                 title={
