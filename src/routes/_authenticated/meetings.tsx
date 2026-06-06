@@ -7,6 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import {
   ArrowLeft, Users, Clock, Video, Sparkles, Loader2, FileText, ChevronDown,
   Folder, FolderPlus, FolderOpen, Inbox, Pencil, Trash2, FolderInput,
+  Search, Star, Download, Check, X, AlertCircle, CheckCircle2,
 } from "lucide-react";
 import { generateMeetingAi } from "@/lib/meetings/ai.functions";
 import {
@@ -51,10 +52,9 @@ type ParticipantRow = {
 type FolderRow = { id: string; name: string };
 type FolderItemRow = { folder_id: string; meeting_id: string };
 
-/** "all" = Minhas reuniões; "unfiled" = sem pasta; uuid = pasta específica. */
-type FolderSel = "all" | "unfiled" | string;
+/** "all" | "unfiled" | "favorites" | uuid de pasta */
+type FolderSel = "all" | "unfiled" | "favorites" | string;
 
-// Tipos auto-gen ainda não conhecem as tabelas novas — wrapper sem types.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const sb = supabase as any;
 
@@ -67,10 +67,11 @@ function MeetingsPage() {
   const [profiles, setProfiles] = useState<Record<string, { display_name: string; avatar_color: string }>>({});
   const [folders, setFolders] = useState<FolderRow[]>([]);
   const [folderItems, setFolderItems] = useState<FolderItemRow[]>([]);
+  const [favorites, setFavorites] = useState<Set<string>>(new Set());
   const [selected, setSelected] = useState<FolderSel>("all");
   const [userId, setUserId] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
 
-  // Loader inicial
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -79,7 +80,7 @@ function MeetingsPage() {
       const uid = auth.user?.id ?? null;
       setUserId(uid);
 
-      const [{ data: ms }, { data: fs }, { data: fis }] = await Promise.all([
+      const [{ data: ms }, { data: fs }, { data: fis }, { data: favs }] = await Promise.all([
         supabase
           .from("meetings" as never)
           .select("id, zone_id, zone_label, title, started_at, ended_at, host_id, recording_path, recording_duration_seconds, transcript, summary, ai_status, ai_error")
@@ -87,12 +88,14 @@ function MeetingsPage() {
           .limit(200),
         sb.from("meeting_folders").select("id, name").order("name"),
         sb.from("meeting_folder_items").select("folder_id, meeting_id"),
+        sb.from("meeting_favorites").select("meeting_id"),
       ]);
       if (cancelled) return;
       const meetingList = (ms ?? []) as MeetingRow[];
       setMeetings(meetingList);
       setFolders((fs ?? []) as FolderRow[]);
       setFolderItems((fis ?? []) as FolderItemRow[]);
+      setFavorites(new Set(((favs ?? []) as { meeting_id: string }[]).map((f) => f.meeting_id)));
 
       if (meetingList.length > 0) {
         const ids = meetingList.map((m) => m.id);
@@ -126,7 +129,6 @@ function MeetingsPage() {
     return () => { cancelled = true; };
   }, []);
 
-  // Mapas auxiliares
   const foldersByMeeting = useMemo(() => {
     const m: Record<string, Set<string>> = {};
     for (const fi of folderItems) {
@@ -147,12 +149,21 @@ function MeetingsPage() {
   );
 
   const visibleMeetings = useMemo(() => {
-    if (selected === "all") return meetings;
-    if (selected === "unfiled") {
-      return meetings.filter((m) => !foldersByMeeting[m.id] || foldersByMeeting[m.id].size === 0);
-    }
-    return meetings.filter((m) => foldersByMeeting[m.id]?.has(selected));
-  }, [meetings, foldersByMeeting, selected]);
+    let base: MeetingRow[];
+    if (selected === "all") base = meetings;
+    else if (selected === "favorites") base = meetings.filter((m) => favorites.has(m.id));
+    else if (selected === "unfiled") base = meetings.filter((m) => !foldersByMeeting[m.id] || foldersByMeeting[m.id].size === 0);
+    else base = meetings.filter((m) => foldersByMeeting[m.id]?.has(selected));
+
+    const q = query.trim().toLowerCase();
+    if (!q) return base;
+    return base.filter((m) => {
+      const hay = [m.title ?? "", m.zone_label, m.summary ?? "", m.transcript ?? ""]
+        .join(" ")
+        .toLowerCase();
+      return hay.includes(q);
+    });
+  }, [meetings, foldersByMeeting, favorites, selected, query]);
 
   // CRUD pastas
   const createFolder = async () => {
@@ -163,10 +174,7 @@ function MeetingsPage() {
       .insert({ user_id: userId, name })
       .select("id, name")
       .single();
-    if (error) {
-      alert(error.message);
-      return;
-    }
+    if (error) { alert(error.message); return; }
     setFolders((prev) => [...prev, data as FolderRow].sort((a, b) => a.name.localeCompare(b.name)));
     setSelected((data as FolderRow).id);
   };
@@ -188,7 +196,6 @@ function MeetingsPage() {
     if (selected === f.id) setSelected("all");
   };
 
-  // Toggle vínculo reunião↔pasta
   const toggleMembership = async (meetingId: string, folderId: string, isMember: boolean) => {
     if (!userId) return;
     if (isMember) {
@@ -208,8 +215,41 @@ function MeetingsPage() {
     }
   };
 
+  const toggleFavorite = async (meetingId: string) => {
+    if (!userId) return;
+    const isFav = favorites.has(meetingId);
+    if (isFav) {
+      const { error } = await sb
+        .from("meeting_favorites")
+        .delete()
+        .eq("user_id", userId)
+        .eq("meeting_id", meetingId);
+      if (error) return alert(error.message);
+      setFavorites((prev) => { const n = new Set(prev); n.delete(meetingId); return n; });
+    } else {
+      const { error } = await sb
+        .from("meeting_favorites")
+        .insert({ user_id: userId, meeting_id: meetingId });
+      if (error) return alert(error.message);
+      setFavorites((prev) => new Set(prev).add(meetingId));
+    }
+  };
+
+  const renameMeeting = async (meetingId: string, newTitle: string) => {
+    const trimmed = newTitle.trim();
+    const { error } = await sb.rpc("meeting_set_title", {
+      _meeting_id: meetingId,
+      _title: trimmed,
+    });
+    if (error) { alert(error.message); return; }
+    setMeetings((prev) =>
+      prev.map((m) => (m.id === meetingId ? { ...m, title: trimmed || null } : m)),
+    );
+  };
+
   const currentTitle =
     selected === "all" ? "Minhas reuniões"
+    : selected === "favorites" ? "Favoritas"
     : selected === "unfiled" ? "Sem pasta"
     : folders.find((f) => f.id === selected)?.name ?? "Pasta";
 
@@ -224,7 +264,19 @@ function MeetingsPage() {
             <ArrowLeft className="w-4 h-4" />
             Voltar ao escritório
           </Link>
-          <div className="ml-auto text-sm font-semibold">{currentTitle}</div>
+          <div className="ml-auto flex items-center gap-3">
+            <div className="relative">
+              <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+              <input
+                type="search"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Buscar em títulos, resumos…"
+                className="pl-8 pr-3 py-1.5 text-sm rounded-md border bg-background w-64 focus:outline-none focus:ring-2 focus:ring-primary/40"
+              />
+            </div>
+            <div className="text-sm font-semibold">{currentTitle}</div>
+          </div>
         </div>
       </header>
 
@@ -234,6 +286,7 @@ function MeetingsPage() {
           selected={selected}
           onSelect={setSelected}
           allCount={meetings.length}
+          favoritesCount={favorites.size}
           unfiledCount={unfiledCount}
           countsByFolder={countsByFolder}
           onCreate={createFolder}
@@ -245,7 +298,7 @@ function MeetingsPage() {
           {loading ? (
             <div className="text-sm text-muted-foreground">Carregando…</div>
           ) : visibleMeetings.length === 0 ? (
-            <EmptyState selected={selected} />
+            <EmptyState selected={selected} hasQuery={!!query.trim()} />
           ) : (
             <ul className="space-y-3">
               {visibleMeetings.map((m) => (
@@ -256,6 +309,9 @@ function MeetingsPage() {
                   hostProfile={m.host_id ? profiles[m.host_id] : undefined}
                   folders={folders}
                   meetingFolderIds={foldersByMeeting[m.id] ?? new Set()}
+                  isFavorite={favorites.has(m.id)}
+                  onToggleFavorite={() => toggleFavorite(m.id)}
+                  onRename={(t) => renameMeeting(m.id, t)}
                   onToggleFolder={(folderId, isMember) => toggleMembership(m.id, folderId, isMember)}
                   onCreateFolder={createFolder}
                   onAiUpdated={(transcript, summary) => {
@@ -278,13 +334,14 @@ function MeetingsPage() {
 }
 
 function FolderExplorer({
-  folders, selected, onSelect, allCount, unfiledCount, countsByFolder,
+  folders, selected, onSelect, allCount, favoritesCount, unfiledCount, countsByFolder,
   onCreate, onRename, onDelete,
 }: {
   folders: FolderRow[];
   selected: FolderSel;
   onSelect: (s: FolderSel) => void;
   allCount: number;
+  favoritesCount: number;
   unfiledCount: number;
   countsByFolder: Record<string, number>;
   onCreate: () => void;
@@ -311,6 +368,13 @@ function FolderExplorer({
             count={allCount}
             active={selected === "all"}
             onClick={() => onSelect("all")}
+          />
+          <FolderItem
+            icon={<Star className={`w-4 h-4 ${selected === "favorites" ? "fill-current" : ""}`} />}
+            label="Favoritas"
+            count={favoritesCount}
+            active={selected === "favorites"}
+            onClick={() => onSelect("favorites")}
           />
           {folders.map((f) => (
             <FolderItem
@@ -388,16 +452,29 @@ function FolderItem({
   );
 }
 
-function EmptyState({ selected }: { selected: FolderSel }) {
+function EmptyState({ selected, hasQuery }: { selected: FolderSel; hasQuery: boolean }) {
+  if (hasQuery) {
+    return (
+      <div className="border border-dashed rounded-xl p-10 text-center">
+        <Search className="w-8 h-8 mx-auto text-muted-foreground mb-3" />
+        <div className="font-semibold mb-1">Nada encontrado</div>
+        <div className="text-sm text-muted-foreground">Tente outros termos ou limpe a busca.</div>
+      </div>
+    );
+  }
   return (
     <div className="border border-dashed rounded-xl p-10 text-center">
       <Video className="w-8 h-8 mx-auto text-muted-foreground mb-3" />
       <div className="font-semibold mb-1">
-        {selected === "all" ? "Nenhuma reunião por aqui ainda" : "Esta pasta está vazia"}
+        {selected === "all" ? "Nenhuma reunião por aqui ainda"
+        : selected === "favorites" ? "Sem favoritas ainda"
+        : "Esta pasta está vazia"}
       </div>
       <div className="text-sm text-muted-foreground">
         {selected === "all"
           ? "Entre numa sala de reunião com pelo menos mais uma pessoa para começar seu histórico."
+          : selected === "favorites"
+          ? "Toque na estrela em qualquer reunião para favoritar."
           : "Mova reuniões para esta pasta usando o botão de pasta no card."}
       </div>
     </div>
@@ -410,6 +487,9 @@ function MeetingCard({
   hostProfile,
   folders,
   meetingFolderIds,
+  isFavorite,
+  onToggleFavorite,
+  onRename,
   onToggleFolder,
   onCreateFolder,
   onAiUpdated,
@@ -419,6 +499,9 @@ function MeetingCard({
   hostProfile?: { display_name: string; avatar_color: string };
   folders: FolderRow[];
   meetingFolderIds: Set<string>;
+  isFavorite: boolean;
+  onToggleFavorite: () => void;
+  onRename: (newTitle: string) => void;
   onToggleFolder: (folderId: string, isMember: boolean) => void;
   onCreateFolder: () => void;
   onAiUpdated: (transcript: string, summary: string) => void;
@@ -430,7 +513,17 @@ function MeetingCard({
     : null;
   const isLive = !end;
   const [open, setOpen] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(meeting.title ?? meeting.zone_label);
   const hasContent = !!(meeting.recording_path || meeting.summary || meeting.transcript);
+
+  const commitRename = () => {
+    setEditing(false);
+    const next = draft.trim();
+    const current = meeting.title ?? "";
+    if (next === current) return;
+    onRename(next);
+  };
 
   return (
     <li className="border rounded-xl bg-card overflow-hidden">
@@ -456,20 +549,62 @@ function MeetingCard({
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-baseline gap-2 flex-wrap">
-            <button
-              type="button"
-              onClick={() => hasContent && setOpen((v) => !v)}
-              className="font-semibold truncate text-left hover:underline"
-            >
-              {meeting.title ?? meeting.zone_label}
-            </button>
+            {editing ? (
+              <div className="flex items-center gap-1 flex-1 min-w-0">
+                <input
+                  autoFocus
+                  value={draft}
+                  onChange={(e) => setDraft(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") commitRename();
+                    if (e.key === "Escape") { setDraft(meeting.title ?? meeting.zone_label); setEditing(false); }
+                  }}
+                  className="flex-1 min-w-0 text-sm font-semibold border rounded px-2 py-0.5 focus:outline-none focus:ring-2 focus:ring-primary/40"
+                />
+                <button onClick={commitRename} className="p-1 text-emerald-600 hover:bg-muted rounded" title="Salvar">
+                  <Check className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  onClick={() => { setDraft(meeting.title ?? meeting.zone_label); setEditing(false); }}
+                  className="p-1 text-muted-foreground hover:bg-muted rounded"
+                  title="Cancelar"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  onClick={() => hasContent && setOpen((v) => !v)}
+                  className="font-semibold truncate text-left hover:underline"
+                >
+                  {meeting.title ?? meeting.zone_label}
+                </button>
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); setDraft(meeting.title ?? meeting.zone_label); setEditing(true); }}
+                  className="p-0.5 text-muted-foreground hover:text-foreground rounded"
+                  title="Renomear reunião"
+                >
+                  <Pencil className="w-3 h-3" />
+                </button>
+              </>
+            )}
             {isLive && (
               <span className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
                 Em andamento
               </span>
             )}
-            <div className="ml-auto">
+            <div className="ml-auto flex items-center gap-1">
+              <button
+                onClick={onToggleFavorite}
+                title={isFavorite ? "Remover dos favoritos" : "Favoritar"}
+                className={`p-1 rounded hover:bg-muted ${isFavorite ? "text-amber-500" : "text-muted-foreground hover:text-foreground"}`}
+              >
+                <Star className={`w-4 h-4 ${isFavorite ? "fill-current" : ""}`} />
+              </button>
               <DropdownMenu>
                 <DropdownMenuTrigger className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground border rounded px-2 py-1">
                   <FolderInput className="w-3 h-3" />
@@ -522,6 +657,7 @@ function MeetingCard({
               {participants.length || "—"} participação{participants.length === 1 ? "" : "s"} sua{participants.length === 1 ? "" : "s"}
             </span>
             <span className="text-muted-foreground/80">· {meeting.zone_label}</span>
+            <AiStatusBadge meeting={meeting} />
           </div>
 
           <div
@@ -547,6 +683,39 @@ function MeetingCard({
   );
 }
 
+function AiStatusBadge({ meeting }: { meeting: MeetingRow }) {
+  const status = meeting.ai_status;
+  const hasAi = !!(meeting.summary || meeting.transcript);
+  if (hasAi && status !== "error") {
+    return (
+      <span className="inline-flex items-center gap-1 text-emerald-700">
+        <CheckCircle2 className="w-3 h-3" /> Resumo pronto
+      </span>
+    );
+  }
+  if (status === "processing") {
+    return (
+      <span className="inline-flex items-center gap-1 text-primary">
+        <Loader2 className="w-3 h-3 animate-spin" /> Gerando resumo…
+      </span>
+    );
+  }
+  if (status === "error") {
+    return (
+      <span className="inline-flex items-center gap-1 text-destructive">
+        <AlertCircle className="w-3 h-3" /> Falha no resumo
+      </span>
+    );
+  }
+  if (meeting.recording_path) {
+    return (
+      <span className="inline-flex items-center gap-1 text-muted-foreground">
+        <Sparkles className="w-3 h-3" /> Pendente
+      </span>
+    );
+  }
+  return null;
+}
 
 const mdComponents = {
   h1: (p: any) => <h3 className="text-base font-semibold mt-3 mb-1" {...p} />,
@@ -563,7 +732,21 @@ const mdComponents = {
   code: (p: any) => <code className="px-1 py-0.5 rounded bg-muted text-[0.85em]" {...p} />,
 };
 
+function downloadText(filename: string, content: string, mime = "text/markdown;charset=utf-8") {
+  const blob = new Blob([content], { type: mime });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
 
+function safeFilename(s: string): string {
+  return s.replace(/[\\/:*?"<>|]+/g, "-").replace(/\s+/g, "_").slice(0, 80) || "reuniao";
+}
 
 function AiPanel({
   meeting,
@@ -584,13 +767,12 @@ function AiPanel({
       const res = await generate({ data: { meetingId: meeting.id } });
       onAiUpdated(res.transcript, res.summary);
     } catch {
-      // erro fica salvo em meeting.ai_error via servidor; refletido no próximo carregamento
+      // erro fica salvo em meeting.ai_error via servidor
     } finally {
       setBusy(false);
     }
   };
 
-  // Auto-trigger: gera assim que o card aparece, se ainda não tem resumo.
   useEffect(() => {
     if (triedRef.current) return;
     if (hasAi) return;
@@ -600,33 +782,69 @@ function AiPanel({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [meeting.id]);
 
+  const baseName = safeFilename(meeting.title ?? meeting.zone_label);
+  const dateStr = new Date(meeting.started_at).toISOString().slice(0, 10);
+
+  const exportSummary = () => {
+    if (!meeting.summary) return;
+    const header = `# ${meeting.title ?? meeting.zone_label}\n\n_${new Date(meeting.started_at).toLocaleString("pt-BR")}_\n\n`;
+    downloadText(`${dateStr}_${baseName}_resumo.md`, header + meeting.summary);
+  };
+
+  const exportTranscript = () => {
+    if (!meeting.transcript) return;
+    const header = `# Transcrição — ${meeting.title ?? meeting.zone_label}\n\n_${new Date(meeting.started_at).toLocaleString("pt-BR")}_\n\n`;
+    downloadText(`${dateStr}_${baseName}_transcricao.md`, header + meeting.transcript);
+  };
+
   return (
     <div className="mt-3 border-t pt-3">
       <div className="flex items-center gap-2 text-xs text-muted-foreground mb-2">
         <Sparkles className="w-3 h-3" />
         <span>Resumo automático</span>
-        {busy ? (
-          <span className="ml-auto inline-flex items-center gap-1 text-muted-foreground">
-            <Loader2 className="w-3 h-3 animate-spin" /> Gerando…
-          </span>
-        ) : hasAi ? (
-          <button
-            onClick={() => void run()}
-            className="ml-auto text-primary hover:underline"
-          >
-            Refazer
-          </button>
-        ) : meeting.ai_status === "error" ? (
-          <button
-            onClick={() => void run()}
-            className="ml-auto text-primary hover:underline"
-          >
-            Tentar novamente
-          </button>
-        ) : null}
+        <div className="ml-auto flex items-center gap-2">
+          {busy ? (
+            <span className="inline-flex items-center gap-1 text-muted-foreground">
+              <Loader2 className="w-3 h-3 animate-spin" /> Gerando…
+            </span>
+          ) : hasAi ? (
+            <>
+              <button
+                onClick={exportSummary}
+                className="inline-flex items-center gap-1 text-muted-foreground hover:text-foreground"
+                title="Baixar resumo (.md)"
+              >
+                <Download className="w-3 h-3" /> Resumo
+              </button>
+              <button
+                onClick={() => void run()}
+                className="text-primary hover:underline"
+              >
+                Refazer
+              </button>
+            </>
+          ) : meeting.ai_status === "error" ? (
+            <button
+              onClick={() => void run()}
+              className="text-primary hover:underline"
+            >
+              Tentar novamente
+            </button>
+          ) : null}
+        </div>
       </div>
       {meeting.ai_error && !busy && (
-        <div className="text-xs text-destructive mb-2">{meeting.ai_error}</div>
+        <div className="text-xs text-destructive mb-2 inline-flex items-center gap-1">
+          <AlertCircle className="w-3 h-3" /> {meeting.ai_error}
+        </div>
+      )}
+      {busy && !meeting.summary && (
+        <div className="text-sm bg-muted/40 rounded-md p-4 space-y-2 animate-pulse">
+          <div className="h-3 bg-muted rounded w-3/4" />
+          <div className="h-3 bg-muted rounded w-full" />
+          <div className="h-3 bg-muted rounded w-5/6" />
+          <div className="h-3 bg-muted rounded w-2/3" />
+        </div>
       )}
       {meeting.summary && (
         <div className="text-sm leading-relaxed bg-muted/40 rounded-md p-3">
@@ -637,16 +855,25 @@ function AiPanel({
       )}
       {meeting.transcript && (
         <div className="mt-2">
-          <button
-            onClick={() => setOpenTranscript((v) => !v)}
-            className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
-          >
-            <FileText className="w-3 h-3" />
-            {openTranscript ? "Esconder" : "Ver"} transcrição completa
-            <ChevronDown
-              className={`w-3 h-3 transition-transform ${openTranscript ? "rotate-180" : ""}`}
-            />
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setOpenTranscript((v) => !v)}
+              className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+            >
+              <FileText className="w-3 h-3" />
+              {openTranscript ? "Esconder" : "Ver"} transcrição completa
+              <ChevronDown
+                className={`w-3 h-3 transition-transform ${openTranscript ? "rotate-180" : ""}`}
+              />
+            </button>
+            <button
+              onClick={exportTranscript}
+              className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+              title="Baixar transcrição (.md)"
+            >
+              <Download className="w-3 h-3" /> Transcrição
+            </button>
+          </div>
           {openTranscript && (
             <div className="mt-2 text-xs bg-muted/30 rounded-md p-3 max-h-96 overflow-auto">
               <ReactMarkdown remarkPlugins={[remarkGfm]} components={mdComponents}>
@@ -677,7 +904,7 @@ function RecordingPlayer({
     setLoading(true);
     const { data, error } = await supabase.storage
       .from("meeting-recordings")
-      .createSignedUrl(path, 60 * 60); // 1h
+      .createSignedUrl(path, 60 * 60);
     setLoading(false);
     if (error || !data?.signedUrl) return;
     setUrl(data.signedUrl);
@@ -698,9 +925,9 @@ function RecordingPlayer({
           <a
             href={url}
             download
-            className="ml-auto text-primary hover:underline"
+            className="ml-auto inline-flex items-center gap-1 text-primary hover:underline"
           >
-            Baixar
+            <Download className="w-3 h-3" /> Baixar vídeo
           </a>
         )}
       </div>
@@ -712,8 +939,8 @@ function RecordingPlayer({
           preload="metadata"
         />
       ) : (
-        <div className="text-xs text-muted-foreground">
-          {loading ? "Carregando gravação…" : "Gravação indisponível."}
+        <div className="text-xs text-muted-foreground inline-flex items-center gap-1">
+          {loading ? <><Loader2 className="w-3 h-3 animate-spin" /> Carregando gravação…</> : "Gravação indisponível."}
         </div>
       )}
     </div>
@@ -725,4 +952,3 @@ function formatDur(sec: number): string {
   const s = sec % 60;
   return `${m}m ${String(s).padStart(2, "0")}s`;
 }
-
