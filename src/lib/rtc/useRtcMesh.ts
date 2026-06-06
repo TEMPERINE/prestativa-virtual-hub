@@ -613,6 +613,8 @@ export function useRtcMesh(myId: string | null, desiredPeers: string[]): RtcMesh
     try {
       const all = await navigator.mediaDevices.enumerateDevices();
       setVideoDevices(all.filter((d) => d.kind === "videoinput"));
+      setAudioInputDevices(all.filter((d) => d.kind === "audioinput"));
+      setAudioOutputDevices(all.filter((d) => d.kind === "audiooutput"));
     } catch { /* noop */ }
   }, []);
 
