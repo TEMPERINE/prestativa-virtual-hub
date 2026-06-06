@@ -275,9 +275,13 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
   const [openingNote, setOpeningNote] = useState<DeskNote | null>(null);
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
   const [savedNotesOpen, setSavedNotesOpen] = useState(false);
+  const [raisedHands, setRaisedHands] = useState<Record<string, boolean>>({});
+  const handChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  const handChannelReadyRef = useRef(false);
   const reactionChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const positionBroadcastChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const positionBroadcastReadyRef = useRef(false);
+
   const meIdRef = useRef<string | null>(null);
   const accessTokenRef = useRef<string | null>(null);
   const [myEmail, setMyEmail] = useState<string>("");
