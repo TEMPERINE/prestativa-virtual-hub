@@ -1802,6 +1802,17 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
       : currentZone;
   }, [currentZone]);
 
+  // Histórico "Minhas reuniões" — registra entrada/saída quando o usuário
+  // está numa sala de reunião (supportsVideo) com pelo menos 1 outro peer.
+  useMeetingTracker({
+    zoneId: currentZone.id,
+    zoneLabel: currentZone.label,
+    isMeetingZone: !!currentZone.supportsVideo,
+    peerCount: rtc.connectedPeers.length,
+    enabled: !!me?.id,
+  });
+
+
   // All workspace zones (built-in + custom) with their effective rect for hover overlays.
   const workspaceZones = useMemo(() => {
     const out: { id: string; label: string; rect: { x1: number; y1: number; x2: number; y2: number } }[] = [];
