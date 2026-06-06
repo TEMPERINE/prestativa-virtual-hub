@@ -237,6 +237,23 @@ function MeetingCard({
   );
 }
 
+const mdComponents = {
+  h1: (p: any) => <h3 className="text-base font-semibold mt-3 mb-1" {...p} />,
+  h2: (p: any) => <h3 className="text-base font-semibold mt-3 mb-1" {...p} />,
+  h3: (p: any) => <h4 className="text-sm font-semibold mt-3 mb-1" {...p} />,
+  h4: (p: any) => <h5 className="text-sm font-semibold mt-2 mb-1" {...p} />,
+  p: (p: any) => <p className="my-1" {...p} />,
+  ul: (p: any) => <ul className="list-disc pl-5 my-1 space-y-0.5" {...p} />,
+  ol: (p: any) => <ol className="list-decimal pl-5 my-1 space-y-0.5" {...p} />,
+  li: (p: any) => <li className="my-0" {...p} />,
+  strong: (p: any) => <strong className="font-semibold" {...p} />,
+  em: (p: any) => <em className="italic" {...p} />,
+  a: (p: any) => <a className="text-primary hover:underline" {...p} />,
+  code: (p: any) => <code className="px-1 py-0.5 rounded bg-muted text-[0.85em]" {...p} />,
+};
+
+
+
 function AiPanel({
   meeting,
   onAiUpdated,
