@@ -43,6 +43,7 @@ export type RtcMeshState = {
   remoteScreenStreams: Record<string, MediaStream>;
   connectedPeers: string[];
   speakingPeers: Record<string, boolean>;
+  selfSpeaking: boolean;
   localVideoStream: MediaStream | null;
   localScreenStream: MediaStream | null;
   videoDevices: MediaDeviceInfo[];
@@ -56,6 +57,7 @@ export type RtcMeshState = {
   setAudioOutputDevice: (deviceId: string) => Promise<void>;
   prewarmMic: () => Promise<void>;
 };
+
 
 // Apply codec preferences so the SDP offers Opus first (with DTX/FEC) for
 // audio and VP8 first for video — best cross-browser stability for a mesh.
@@ -85,6 +87,8 @@ export function useRtcMesh(myId: string | null, desiredPeers: string[]): RtcMesh
   const [remoteScreenStreams, setRemoteScreenStreams] = useState<Record<string, MediaStream>>({});
   const [connectedPeers, setConnectedPeers] = useState<string[]>([]);
   const [speakingPeers, setSpeakingPeers] = useState<Record<string, boolean>>({});
+  const [selfSpeaking, setSelfSpeaking] = useState(false);
+
   const [localVideoStream, setLocalVideoStream] = useState<MediaStream | null>(null);
   const [localScreenStream, setLocalScreenStream] = useState<MediaStream | null>(null);
   const [videoDevices, setVideoDevices] = useState<MediaDeviceInfo[]>([]);
