@@ -103,34 +103,44 @@ export function useMeetingRecorder({ getLocalAudioTrack, remoteStreams }: Args) 
   const start = useCallback(async (meetingId: string) => {
     if (isRecording) return;
 
-    // 1) Pede captura de tela (com áudio do sistema/aba quando disponível).
-    //    Precisa rodar dentro do gesto do usuário (clique).
+    // 1) Captura de tela.
+    //    - No app desktop (Electron), usamos `window.prestativaDesktop.getScreenStream()`
+    //      exposto via preload — captura a janela do app sem nenhum diálogo.
+    //    - No navegador, caímos no `getDisplayMedia` com `preferCurrentTab` (o próprio
+    //      diálogo "Compartilhar esta aba?" funciona como confirmação de gravação).
     let displayStream: MediaStream;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const desktop = (window as any).prestativaDesktop as
+      | { getScreenStream?: () => Promise<MediaStream> }
+      | undefined;
     try {
-      displayStream = await navigator.mediaDevices.getDisplayMedia({
-        video: { frameRate: 15 },
-        audio: {
-          echoCancellation: false,
-          noiseSuppression: false,
-          autoGainControl: false,
-        },
-        // Limita o diálogo do Chrome à aba atual — o usuário só confirma "Compartilhar".
-        // Equivale a gravar tudo que está acontecendo no cenário (vídeo+áudio).
-        preferCurrentTab: true,
-        systemAudio: "include",
-        selfBrowserSurface: "include",
-        surfaceSwitching: "exclude",
-      } as unknown as DisplayMediaStreamOptions);
+      if (desktop?.getScreenStream) {
+        displayStream = await desktop.getScreenStream();
+      } else {
+        displayStream = await navigator.mediaDevices.getDisplayMedia({
+          video: { frameRate: 15 },
+          audio: {
+            echoCancellation: false,
+            noiseSuppression: false,
+            autoGainControl: false,
+          },
+          preferCurrentTab: true,
+          systemAudio: "include",
+          selfBrowserSurface: "include",
+          surfaceSwitching: "exclude",
+        } as unknown as DisplayMediaStreamOptions);
+      }
     } catch (err) {
       const name = (err as { name?: string })?.name;
       if (name === "NotAllowedError") {
-        toast.error("Você precisa compartilhar a tela para gravar.");
+        toast.error("Você precisa confirmar para gravar a reunião.");
       } else {
         console.error("[recorder] getDisplayMedia error:", err);
         toast.error("Não foi possível capturar a tela.");
       }
       return;
     }
+
     displayStreamRef.current = displayStream;
 
     // Se o usuário parar pela barra nativa do navegador, finalizamos.
