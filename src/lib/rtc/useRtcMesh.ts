@@ -48,6 +48,12 @@ export type RtcMeshState = {
   videoDevices: MediaDeviceInfo[];
   selectedVideoDeviceId: string | null;
   setVideoDevice: (deviceId: string) => Promise<void>;
+  audioInputDevices: MediaDeviceInfo[];
+  selectedAudioInputDeviceId: string | null;
+  setAudioInputDevice: (deviceId: string) => Promise<void>;
+  audioOutputDevices: MediaDeviceInfo[];
+  selectedAudioOutputDeviceId: string | null;
+  setAudioOutputDevice: (deviceId: string) => Promise<void>;
   prewarmMic: () => Promise<void>;
 };
 
@@ -83,6 +89,10 @@ export function useRtcMesh(myId: string | null, desiredPeers: string[]): RtcMesh
   const [localScreenStream, setLocalScreenStream] = useState<MediaStream | null>(null);
   const [videoDevices, setVideoDevices] = useState<MediaDeviceInfo[]>([]);
   const [selectedVideoDeviceId, setSelectedVideoDeviceId] = useState<string | null>(null);
+  const [audioInputDevices, setAudioInputDevices] = useState<MediaDeviceInfo[]>([]);
+  const [selectedAudioInputDeviceId, setSelectedAudioInputDeviceId] = useState<string | null>(null);
+  const [audioOutputDevices, setAudioOutputDevices] = useState<MediaDeviceInfo[]>([]);
+  const [selectedAudioOutputDeviceId, setSelectedAudioOutputDeviceId] = useState<string | null>(null);
 
   const peersRef = useRef<Map<string, PeerEntry>>(new Map());
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
@@ -541,30 +551,43 @@ export function useRtcMesh(myId: string | null, desiredPeers: string[]): RtcMesh
     };
   }, [remoteStreams]);
 
-  // Pre-acquire the mic with enabled=false so toggleMic is instant later and
-  // the audio sender on every peer already has a track attached. This kills
-  // the "I clicked unmute but nothing comes out" window.
+  const acquireMic = useCallback(async (deviceId?: string): Promise<MediaStreamTrack | null> => {
+    const audioConstraints: MediaTrackConstraints = {
+      echoCancellation: true,
+      noiseSuppression: true,
+      autoGainControl: true,
+      ...(deviceId ? { deviceId: { exact: deviceId } } : {}),
+    };
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: audioConstraints });
+    const track = stream.getAudioTracks()[0];
+    if (!track) return null;
+    if (audioTrackRef.current) {
+      try { audioTrackRef.current.stop(); } catch { /* noop */ }
+      if (localStreamRef.current) {
+        localStreamRef.current.getAudioTracks().forEach((t) => localStreamRef.current!.removeTrack(t));
+      }
+    }
+    audioTrackRef.current = track;
+    if (!localStreamRef.current) localStreamRef.current = new MediaStream();
+    localStreamRef.current.addTrack(track);
+    setSelectedAudioInputDeviceId(track.getSettings().deviceId ?? deviceId ?? null);
+    for (const entry of peersRef.current.values()) {
+      if (entry.audioSender) await entry.audioSender.replaceTrack(track);
+    }
+    return track;
+  }, []);
+
+  // Pre-acquire the mic with enabled=false so toggleMic is instant later.
   const prewarmMic = useCallback(async () => {
     if (audioTrackRef.current) return;
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
-      });
-      const track = stream.getAudioTracks()[0];
-      if (!track) return;
-      track.enabled = false; // muted until user toggles
-      audioTrackRef.current = track;
-      if (!localStreamRef.current) localStreamRef.current = new MediaStream();
-      localStreamRef.current.addTrack(track);
-      for (const entry of peersRef.current.values()) {
-        if (entry.audioSender) await entry.audioSender.replaceTrack(track);
-      }
+      const track = await acquireMic(selectedAudioInputDeviceId ?? undefined);
+      if (track) track.enabled = false; // muted until user toggles
     } catch (err) {
       console.warn("mic prewarm failed (will retry on toggle)", err);
     }
-  }, []);
+  }, [acquireMic, selectedAudioInputDeviceId]);
 
-  // Acquire local mic
   const enableMic = useCallback(async () => {
     if (audioTrackRef.current) {
       audioTrackRef.current.enabled = true;
@@ -572,26 +595,49 @@ export function useRtcMesh(myId: string | null, desiredPeers: string[]): RtcMesh
       return;
     }
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const track = stream.getAudioTracks()[0];
-      audioTrackRef.current = track;
-      if (!localStreamRef.current) localStreamRef.current = new MediaStream();
-      localStreamRef.current.addTrack(track);
-      for (const entry of peersRef.current.values()) {
-        if (entry.audioSender) await entry.audioSender.replaceTrack(track);
-      }
+      const track = await acquireMic(selectedAudioInputDeviceId ?? undefined);
+      if (track) track.enabled = true;
       setMicOn(true);
+      try {
+        const all = await navigator.mediaDevices.enumerateDevices();
+        setAudioInputDevices(all.filter((d) => d.kind === "audioinput"));
+        setAudioOutputDevices(all.filter((d) => d.kind === "audiooutput"));
+      } catch { /* noop */ }
     } catch (err) {
       console.error("mic access denied", err);
       throw err;
     }
-  }, []);
+  }, [acquireMic, selectedAudioInputDeviceId]);
 
   const disableMic = useCallback(() => {
     if (audioTrackRef.current) {
       audioTrackRef.current.enabled = false;
     }
     setMicOn(false);
+  }, []);
+
+  const setAudioInputDevice = useCallback(async (deviceId: string) => {
+    setSelectedAudioInputDeviceId(deviceId);
+    if (audioTrackRef.current) {
+      const wasEnabled = audioTrackRef.current.enabled;
+      try {
+        const track = await acquireMic(deviceId);
+        if (track) track.enabled = wasEnabled;
+      } catch (err) { console.error("change mic failed", err); }
+    }
+  }, [acquireMic]);
+
+  const setAudioOutputDevice = useCallback(async (deviceId: string) => {
+    setSelectedAudioOutputDeviceId(deviceId);
+    // Apply to every <audio>/<video> element in the page that supports setSinkId.
+    type Sinkable = HTMLMediaElement & { setSinkId?: (id: string) => Promise<void> };
+    const els = document.querySelectorAll<HTMLMediaElement>("audio, video");
+    for (const el of Array.from(els)) {
+      const s = el as Sinkable;
+      if (typeof s.setSinkId === "function") {
+        try { await s.setSinkId(deviceId); } catch { /* noop */ }
+      }
+    }
   }, []);
 
   const toggleMic = useCallback(async () => {
@@ -603,6 +649,8 @@ export function useRtcMesh(myId: string | null, desiredPeers: string[]): RtcMesh
     try {
       const all = await navigator.mediaDevices.enumerateDevices();
       setVideoDevices(all.filter((d) => d.kind === "videoinput"));
+      setAudioInputDevices(all.filter((d) => d.kind === "audioinput"));
+      setAudioOutputDevices(all.filter((d) => d.kind === "audiooutput"));
     } catch { /* noop */ }
   }, []);
 
@@ -769,6 +817,12 @@ export function useRtcMesh(myId: string | null, desiredPeers: string[]): RtcMesh
     videoDevices,
     selectedVideoDeviceId,
     setVideoDevice,
+    audioInputDevices,
+    selectedAudioInputDeviceId,
+    setAudioInputDevice,
+    audioOutputDevices,
+    selectedAudioOutputDeviceId,
+    setAudioOutputDevice,
     prewarmMic,
   };
 }
