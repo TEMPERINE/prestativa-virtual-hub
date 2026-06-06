@@ -1,7 +1,10 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
+import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
-import { ArrowLeft, Users, Clock, Video } from "lucide-react";
+import { ArrowLeft, Users, Clock, Video, Sparkles, Loader2, FileText, ChevronDown } from "lucide-react";
+import { toast } from "sonner";
+import { generateMeetingAi } from "@/lib/meetings/ai.functions";
 
 export const Route = createFileRoute("/_authenticated/meetings")({
   head: () => ({
@@ -23,6 +26,10 @@ type MeetingRow = {
   host_id: string | null;
   recording_path: string | null;
   recording_duration_seconds: number | null;
+  transcript: string | null;
+  summary: string | null;
+  ai_status: string | null;
+  ai_error: string | null;
 };
 
 type ParticipantRow = {
@@ -48,7 +55,7 @@ function MeetingsPage() {
       // RLS já filtra: o usuário só vê reuniões em que participou.
       const { data: ms } = await supabase
         .from("meetings" as never)
-        .select("id, zone_id, zone_label, title, started_at, ended_at, host_id, recording_path, recording_duration_seconds")
+        .select("id, zone_id, zone_label, title, started_at, ended_at, host_id, recording_path, recording_duration_seconds, transcript, summary, ai_status, ai_error")
         .order("started_at", { ascending: false })
         .limit(100);
       if (cancelled) return;
