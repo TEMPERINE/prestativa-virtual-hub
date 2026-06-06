@@ -45,6 +45,7 @@ export function useMeetingRecorder({ getLocalAudioTrack, remoteStreams }: Args) 
   const meetingIdRef = useRef<string | null>(null);
   const startedAtRef = useRef<number>(0);
   const tickRef = useRef<number | null>(null);
+  const ownedMicStreamRef = useRef<MediaStream | null>(null);
 
   // Reconecta peers remotos no mix enquanto gravando (entram/saem da call).
   useEffect(() => {
