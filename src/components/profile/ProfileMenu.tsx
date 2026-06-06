@@ -1,7 +1,8 @@
 import { useState } from "react";
+import { Link } from "@tanstack/react-router";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { SpritePreview } from "./SpritePreview";
-import { LogOut, User as UserIcon, Shirt, Home, MapPin, RefreshCcw, StickyNote } from "lucide-react";
+import { LogOut, User as UserIcon, Shirt, Home, MapPin, RefreshCcw, StickyNote, Video } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 
 type Status = "available" | "busy" | "away";
@@ -100,6 +101,14 @@ export function ProfileMenu(p: Props) {
           <MenuItem icon={<MapPin className="w-4 h-4" />} label="Ir até minha mesa" hint="Ctrl+D" disabled={!p.hasClaim} onClick={() => { setOpen(false); p.onGoToMyDesk(); }} />
           <MenuItem icon={<Home className="w-4 h-4" />} label="Me leve ao saguão" onClick={() => { setOpen(false); p.onGoToLobby(); }} />
           <MenuItem icon={<StickyNote className="w-4 h-4" />} label="Recadinhos guardados" onClick={() => { setOpen(false); p.onOpenSavedNotes(); }} />
+          <Link
+            to="/meetings"
+            onClick={() => setOpen(false)}
+            className="w-full flex items-center gap-2 px-2 py-1.5 text-sm rounded hover:bg-muted text-left"
+          >
+            <Video className="w-4 h-4" />
+            <span className="flex-1">Minhas reuniões</span>
+          </Link>
           <MenuItem icon={<RefreshCcw className="w-4 h-4" />} label="Refazer onboarding" onClick={() => { setOpen(false); p.onRestartOnboarding(); }} />
         </div>
 
