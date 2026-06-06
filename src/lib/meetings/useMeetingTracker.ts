@@ -1,6 +1,15 @@
 import { useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
+// Os tipos auto-gerados ainda não conhecem as RPCs `meeting_join` /
+// `meeting_leave`. Usamos um wrapper sem types para evitar ruído de TS — as
+// funções estão definidas como SECURITY DEFINER no banco.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const rpc = (supabase as any).rpc.bind(supabase) as (
+  fn: string,
+  args: Record<string, unknown>,
+) => Promise<{ data: unknown; error: unknown }>;
+
 type Args = {
   /** Id e label da zona em que o usuário está agora. */
   zoneId: string;
