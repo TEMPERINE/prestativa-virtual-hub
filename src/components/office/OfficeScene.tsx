@@ -2744,6 +2744,54 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
               <Hand className="w-4 h-4" />
             </IconButton>
 
+            {/* Botão de gravação — só aparece numa reunião ativa */}
+            {activeMeetingId && (
+              <button
+                onClick={() => {
+                  if (recorder.isUploading) return;
+                  if (recorder.isRecording) {
+                    void recorder.stop();
+                  } else {
+                    void recorder.start(activeMeetingId);
+                  }
+                }}
+                disabled={recorder.isUploading}
+                title={
+                  recorder.isUploading
+                    ? "Enviando gravação…"
+                    : recorder.isRecording
+                    ? `Parar gravação (${formatRecTime(recorder.elapsedSeconds)})`
+                    : "Gravar reunião"
+                }
+                className={`inline-flex items-center gap-1.5 h-8 px-2.5 rounded-md text-xs font-medium transition ${
+                  recorder.isRecording
+                    ? "bg-red-500/15 text-red-600 hover:bg-red-500/25 ring-1 ring-red-500/40"
+                    : "text-foreground/70 hover:text-foreground hover:bg-foreground/10"
+                } disabled:opacity-60 disabled:cursor-not-allowed`}
+              >
+                {recorder.isUploading ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    <span className="hidden md:inline">Enviando…</span>
+                  </>
+                ) : recorder.isRecording ? (
+                  <>
+                    <Square className="w-3 h-3 fill-current" />
+                    <span className="font-mono tabular-nums">
+                      {formatRecTime(recorder.elapsedSeconds)}
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <Circle className="w-3 h-3 fill-red-500 text-red-500" />
+                    <span className="hidden md:inline">Gravar</span>
+                  </>
+                )}
+              </button>
+            )}
+
+
+
             <IconButton active={showTeam} onClick={() => setShowTeam(!showTeam)} title="Equipe">
               <Users className="w-4 h-4" />
             </IconButton>
