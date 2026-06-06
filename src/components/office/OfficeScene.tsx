@@ -2369,9 +2369,15 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
 
       {/* Remote video/audio tiles */}
       <RemoteVideoTiles
+        myId={me?.id ?? null}
+        myProfile={me ? { id: me.id, display_name: me.display_name, avatar_color: me.avatar_color } : null}
+        localStream={rtc.localVideoStream}
+        localCamOn={rtc.camOn}
+        localMicOn={rtc.micOn}
         streams={rtc.remoteStreams}
         profiles={profiles}
         speakingPeers={rtc.speakingPeers}
+        connectedPeers={rtc.connectedPeers}
       />
 
 
