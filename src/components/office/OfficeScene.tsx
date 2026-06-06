@@ -1287,6 +1287,12 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
         toggleRaiseHand();
         return;
       }
+      // ? = abrir lista de atalhos
+      if (!e.altKey && !e.ctrlKey && !e.metaKey && (e.key === "?" || (e.shiftKey && e.key === "/"))) {
+        e.preventDefault();
+        setShortcutsOpen((v) => !v);
+        return;
+      }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
