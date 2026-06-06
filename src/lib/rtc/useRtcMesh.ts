@@ -350,6 +350,15 @@ export function useRtcMesh(myId: string | null, desiredPeers: string[]): RtcMesh
       return;
     }
 
+    // Never accept a media negotiation from someone who is not currently in
+    // our proximity/room set. This prevents stale peers from pulling the user
+    // into a call after they already left the area.
+    if (!desiredRef.current.has(peerId)) {
+      sendSignal({ to: peerId, type: "bye" });
+      destroyPeer(peerId);
+      return;
+    }
+
     if (msg.type === "renegotiate") {
       // The other side asked us to renegotiate (because they changed a track
       // and they are not the offerer). Only act if we are the offerer.
@@ -486,7 +495,7 @@ export function useRtcMesh(myId: string | null, desiredPeers: string[]): RtcMesh
             sendSignal({ to: peerId, type: "bye" });
             destroyPeer(peerId);
           }
-        }, 8000);
+        }, 1200);
         disconnectTimersRef.current.set(peerId, timer);
       }
     }
