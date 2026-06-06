@@ -1258,6 +1258,32 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
     prevConnectedRef.current = cur;
   }, [rtc.connectedPeers, profiles]);
 
+  // -------- HUD de atalhos da reunião --------
+  // Mostra o HUD por alguns segundos quando o usuário entra numa call ou usa
+  // um atalho. Some sozinho para não poluir a UI.
+  const [shortcutsHudVisible, setShortcutsHudVisible] = useState(false);
+  const shortcutsHudTimerRef = useRef<number | null>(null);
+  const pingShortcutsHud = useCallback((ms = 3500) => {
+    setShortcutsHudVisible(true);
+    if (shortcutsHudTimerRef.current) window.clearTimeout(shortcutsHudTimerRef.current);
+    shortcutsHudTimerRef.current = window.setTimeout(() => {
+      setShortcutsHudVisible(false);
+      shortcutsHudTimerRef.current = null;
+    }, ms);
+  }, []);
+  // Mostra o HUD ao entrar numa chamada
+  const inCallRef = useRef(false);
+  useEffect(() => {
+    const inCall = rtc.connectedPeers.length > 0;
+    if (inCall && !inCallRef.current) {
+      pingShortcutsHud(6000);
+    }
+    inCallRef.current = inCall;
+  }, [rtc.connectedPeers.length, pingShortcutsHud]);
+  useEffect(() => () => {
+    if (shortcutsHudTimerRef.current) window.clearTimeout(shortcutsHudTimerRef.current);
+  }, []);
+
   // -------- Atalhos estilo Meet --------
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -1268,26 +1294,39 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
       if (e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey && e.key.toLowerCase() === "m") {
         e.preventDefault();
         void unlockAudioPlayback();
-        rtc.toggleMic().catch(() => toast.error("Não foi possível acessar o microfone"));
+        const willBeOn = !rtc.micOn;
+        rtc.toggleMic()
+          .then(() => {
+            pingShortcutsHud(2500);
+            toast(willBeOn ? "🎤 Microfone ligado" : "🔇 Microfone desligado", { duration: 1400 });
+          })
+          .catch(() => toast.error("Não foi possível acessar o microfone"));
         return;
       }
       // Alt + V = cam
       if (e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey && e.key.toLowerCase() === "v") {
         e.preventDefault();
         void unlockAudioPlayback();
-        rtc.toggleCam().catch(() => toast.error("Não foi possível acessar a câmera"));
+        const willBeOn = !rtc.camOn;
+        rtc.toggleCam()
+          .then(() => {
+            pingShortcutsHud(2500);
+            toast(willBeOn ? "📷 Câmera ligada" : "📷 Câmera desligada", { duration: 1400 });
+          })
+          .catch(() => toast.error("Não foi possível acessar a câmera"));
         return;
       }
       // Alt + H = levantar a mão
       if (e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey && e.key.toLowerCase() === "h") {
         e.preventDefault();
         toggleRaiseHand();
+        pingShortcutsHud(2500);
         return;
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [rtc, toggleRaiseHand]);
+  }, [rtc, toggleRaiseHand, pingShortcutsHud]);
 
 
   const claimZone = useCallback(async (zoneId: string) => {
