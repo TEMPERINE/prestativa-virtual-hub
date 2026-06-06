@@ -809,6 +809,28 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
         };
         if (!user_id || !from || !to) return;
         startRemoteTeleport(user_id, from, to);
+        // Crava o destino em positions[user_id] já no aviso de teleport — sem
+        // isso, se o broadcast de "position" pós-snap se perder/atrasar, o
+        // avatar volta a renderizar no ponto antigo quando o efeito termina
+        // (e pode ficar fora do enquadramento, parecendo que "sumiu" até
+        // o próximo poll do DB rodar).
+        const ts = Date.now();
+        positionFreshTs.current.set(user_id, ts);
+        setPositions((prev) => {
+          const cur = prev[user_id];
+          return {
+            ...prev,
+            [user_id]: {
+              user_id,
+              x: to.x,
+              y: to.y,
+              zone: zoneAt(to).id,
+              facing: cur?.facing ?? "down",
+              is_online: true,
+              ts,
+            },
+          };
+        });
       });
     positionBroadcastChannelRef.current = positionBroadcastCh;
 
