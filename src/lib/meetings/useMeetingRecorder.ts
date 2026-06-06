@@ -99,7 +99,6 @@ export function useMeetingRecorder({ getLocalAudioTrack, remoteStreams }: Args) 
     setElapsedSeconds(0);
   }, []);
 
-  const ownedMicStreamRef = useRef<MediaStream | null>(null);
 
   const start = useCallback(async (meetingId: string) => {
     if (isRecording) return;
