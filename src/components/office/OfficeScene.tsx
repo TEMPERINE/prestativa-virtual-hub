@@ -1184,6 +1184,112 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
+  // -------- Levantar a mão (broadcast realtime) --------
+  const toggleRaiseHand = useCallback(() => {
+    const uid = meIdRef.current;
+    if (!uid) return;
+    setRaisedHands((prev) => {
+      const next = { ...prev };
+      const newVal = !prev[uid];
+      if (newVal) next[uid] = true;
+      else delete next[uid];
+      const ch = handChannelRef.current;
+      if (ch && handChannelReadyRef.current) {
+        void ch.send({ type: "broadcast", event: "hand", payload: { user_id: uid, raised: newVal } });
+      }
+      if (newVal) toast.success("✋ Você levantou a mão", { duration: 1800 });
+      return next;
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!me?.id) return;
+    const ch = supabase
+      .channel("meet-hands-v1", { config: { broadcast: { self: false } } })
+      .on("broadcast", { event: "hand" }, (payload) => {
+        const { user_id, raised } = (payload.payload ?? {}) as { user_id?: string; raised?: boolean };
+        if (!user_id) return;
+        setRaisedHands((prev) => {
+          const next = { ...prev };
+          if (raised) next[user_id] = true;
+          else delete next[user_id];
+          return next;
+        });
+        if (raised) {
+          const name = profiles[user_id]?.display_name ?? "Alguém";
+          toast(`✋ ${name} levantou a mão`, { duration: 2500 });
+        }
+      });
+    handChannelRef.current = ch;
+    void ch.subscribe((status) => {
+      handChannelReadyRef.current = status === "SUBSCRIBED";
+    });
+    return () => {
+      handChannelReadyRef.current = false;
+      supabase.removeChannel(ch);
+      handChannelRef.current = null;
+    };
+    // intentionally not depending on profiles (only need name at toast time, read via closure of latest)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [me?.id]);
+
+  // -------- Toasts entrada/saída da chamada --------
+  const prevConnectedRef = useRef<string[]>([]);
+  useEffect(() => {
+    const prev = prevConnectedRef.current;
+    const cur = rtc.connectedPeers;
+    const entered = cur.filter((p) => !prev.includes(p));
+    const left = prev.filter((p) => !cur.includes(p));
+    for (const id of entered) {
+      const name = profiles[id]?.display_name ?? "Alguém";
+      toast(`🎧 ${name} entrou na chamada`, { duration: 2200 });
+    }
+    for (const id of left) {
+      const name = profiles[id]?.display_name ?? "Alguém";
+      toast(`👋 ${name} saiu da chamada`, { duration: 2200 });
+      // Limpa mão levantada caso saia da chamada
+      setRaisedHands((p) => {
+        if (!p[id]) return p;
+        const next = { ...p };
+        delete next[id];
+        return next;
+      });
+    }
+    prevConnectedRef.current = cur;
+  }, [rtc.connectedPeers, profiles]);
+
+  // -------- Atalhos estilo Meet --------
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      const tag = target?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || target?.isContentEditable) return;
+      // Ctrl/Cmd + D = mic
+      if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && e.key.toLowerCase() === "d") {
+        e.preventDefault();
+        void unlockAudioPlayback();
+        rtc.toggleMic().catch(() => toast.error("Não foi possível acessar o microfone"));
+        return;
+      }
+      // Ctrl/Cmd + E = cam
+      if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && e.key.toLowerCase() === "e") {
+        e.preventDefault();
+        void unlockAudioPlayback();
+        rtc.toggleCam().catch(() => toast.error("Não foi possível acessar a câmera"));
+        return;
+      }
+      // Ctrl/Cmd + Alt + H = levantar a mão
+      if ((e.ctrlKey || e.metaKey) && e.altKey && e.key.toLowerCase() === "h") {
+        e.preventDefault();
+        toggleRaiseHand();
+        return;
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [rtc, toggleRaiseHand]);
+
+
   const claimZone = useCallback(async (zoneId: string) => {
     const uid = meIdRef.current;
     if (!uid) return;
