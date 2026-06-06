@@ -21,6 +21,8 @@ type MeetingRow = {
   started_at: string;
   ended_at: string | null;
   host_id: string | null;
+  recording_path: string | null;
+  recording_duration_seconds: number | null;
 };
 
 type ParticipantRow = {
