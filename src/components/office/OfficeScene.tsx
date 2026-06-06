@@ -195,7 +195,7 @@ function randomPointInRect(
   return seatPointForRect(rect);
 }
 
-export function OfficeScene() {
+export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
   const sceneRef = useRef<HTMLDivElement | null>(null);
   const stageRef = useRef<HTMLDivElement | null>(null);
   const [me, setMe] = useState<Profile | null>(null);
@@ -625,7 +625,7 @@ export function OfficeScene() {
   useEffect(() => {
     (async () => {
       const { data: userData } = await supabase.auth.getUser();
-      if (!userData.user) return;
+      if (!userData.user) { try { onHydrated?.(); } catch { /* noop */ } return; }
       meIdRef.current = userData.user.id;
       setMyEmail(userData.user.email ?? "");
       const { data: profs } = await supabase.from("profiles").select("id, display_name, avatar_color, sprite_id, tagline, status, onboarded_at");
@@ -692,6 +692,9 @@ export function OfficeScene() {
       setFacing(startFacing);
       positionHydratedRef.current = true;
       writeLocalSavedPosition(userData.user.id, safeStart, startZone, startFacing);
+      // Sinaliza pro preloader que a posição real já foi resolvida — só
+      // depois disso o office aparece (sem flash de snap pro spawn).
+      try { onHydrated?.(); } catch { /* noop */ }
 
       pmap[userData.user.id] = {
         user_id: userData.user.id,

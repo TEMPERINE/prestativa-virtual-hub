@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { OfficeScene } from "@/components/office/OfficeScene";
 import { PreloadScreen } from "@/components/office/PreloadScreen";
 
@@ -14,15 +14,38 @@ export const Route = createFileRoute("/_authenticated/office")({
 });
 
 function OfficePage() {
+  // O preloader só pode finalizar (fade out) quando a OfficeScene
+  // confirmar que já leu a última posição salva do personagem. Assim o
+  // usuário nunca vê o avatar "pulando" do spawn pro último ponto salvo.
+  const [sceneHydrated, setSceneHydrated] = useState(false);
   const [ready, setReady] = useState(false);
+  const hydratedRef = useRef(false);
+
+  const handleHydrated = useCallback(() => {
+    if (hydratedRef.current) return;
+    hydratedRef.current = true;
+    setSceneHydrated(true);
+  }, []);
+
+  // Fallback: se algo travar a hidratação, libera depois de 8s pra não
+  // prender o usuário na tela de loading pra sempre.
+  useEffect(() => {
+    if (sceneHydrated) return;
+    const id = window.setTimeout(() => setSceneHydrated(true), 8000);
+    return () => window.clearTimeout(id);
+  }, [sceneHydrated]);
+
   return (
     <>
-      {/* OfficeScene monta em paralelo, mas o preloader cobre a tela até tudo
-          estar pronto pra evitar flash de mapa em branco/baixa qualidade. */}
       <div style={{ visibility: ready ? "visible" : "hidden" }}>
-        <OfficeScene />
+        <OfficeScene onHydrated={handleHydrated} />
       </div>
-      {!ready && <PreloadScreen onReady={() => setReady(true)} />}
+      {!ready && (
+        <PreloadScreen
+          canFinish={sceneHydrated}
+          onReady={() => setReady(true)}
+        />
+      )}
     </>
   );
 }
