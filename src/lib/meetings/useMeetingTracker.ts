@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
 // Os tipos auto-gerados ainda não conhecem as RPCs `meeting_join` /
@@ -39,9 +39,15 @@ export function useMeetingTracker({
   peerCount,
   enabled,
 }: Args) {
+  const [activeMeetingId, setActiveMeetingId] = useState<string | null>(null);
   const activeMeetingRef = useRef<string | null>(null);
   const activeZoneRef = useRef<string | null>(null);
   const inFlightRef = useRef(false);
+
+  const setActive = (id: string | null) => {
+    activeMeetingRef.current = id;
+    setActiveMeetingId(id);
+  };
 
   // Debounce: evita criar reunião por flutuação rápida de peers (ICE bouncing).
   useEffect(() => {
@@ -59,7 +65,7 @@ export function useMeetingTracker({
           // Se trocou de zona com reunião ativa, sai da anterior antes.
           if (activeMeetingRef.current && !sameZone) {
             const prev = activeMeetingRef.current;
-            activeMeetingRef.current = null;
+            setActive(null);
             await rpc("meeting_leave", { _meeting_id: prev });
           }
           const { data, error } = await rpc("meeting_join", {
@@ -67,7 +73,7 @@ export function useMeetingTracker({
             _zone_label: zoneLabel,
           });
           if (!error && data) {
-            activeMeetingRef.current = data as string;
+            setActive(data as string);
             activeZoneRef.current = zoneId;
           }
         } finally {
@@ -82,7 +88,7 @@ export function useMeetingTracker({
       const timer = window.setTimeout(async () => {
         const id = activeMeetingRef.current;
         if (!id) return;
-        activeMeetingRef.current = null;
+        setActive(null);
         activeZoneRef.current = null;
         await rpc("meeting_leave", { _meeting_id: id });
       }, 4000); // tolera quedas rápidas de peer / reconexão
@@ -100,4 +106,6 @@ export function useMeetingTracker({
       }
     };
   }, []);
+
+  return { activeMeetingId };
 }

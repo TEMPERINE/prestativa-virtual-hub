@@ -21,6 +21,8 @@ type MeetingRow = {
   started_at: string;
   ended_at: string | null;
   host_id: string | null;
+  recording_path: string | null;
+  recording_duration_seconds: number | null;
 };
 
 type ParticipantRow = {
@@ -46,7 +48,7 @@ function MeetingsPage() {
       // RLS já filtra: o usuário só vê reuniões em que participou.
       const { data: ms } = await supabase
         .from("meetings" as never)
-        .select("id, zone_id, zone_label, title, started_at, ended_at, host_id")
+        .select("id, zone_id, zone_label, title, started_at, ended_at, host_id, recording_path, recording_duration_seconds")
         .order("started_at", { ascending: false })
         .limit(100);
       if (cancelled) return;
@@ -199,8 +201,74 @@ function MeetingCard({
             </span>
             <span className="text-muted-foreground/80">· {meeting.zone_label}</span>
           </div>
+
+          {meeting.recording_path && (
+            <RecordingPlayer
+              path={meeting.recording_path}
+              durationSec={meeting.recording_duration_seconds ?? null}
+            />
+          )}
         </div>
       </div>
     </li>
   );
 }
+
+function RecordingPlayer({
+  path,
+  durationSec,
+}: {
+  path: string;
+  durationSec: number | null;
+}) {
+  const [url, setUrl] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  const load = async () => {
+    if (url || loading) return;
+    setLoading(true);
+    const { data, error } = await supabase.storage
+      .from("meeting-recordings")
+      .createSignedUrl(path, 60 * 60); // 1h
+    setLoading(false);
+    if (error || !data?.signedUrl) return;
+    setUrl(data.signedUrl);
+  };
+
+  useEffect(() => {
+    void load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [path]);
+
+  return (
+    <div className="mt-3 border-t pt-3">
+      <div className="flex items-center gap-2 text-xs text-muted-foreground mb-2">
+        <Video className="w-3 h-3" />
+        <span>Gravação{durationSec ? ` · ${formatDur(durationSec)}` : ""}</span>
+        {url && (
+          <a
+            href={url}
+            download
+            className="ml-auto text-primary hover:underline"
+          >
+            Baixar
+          </a>
+        )}
+      </div>
+      {url ? (
+        <audio controls src={url} className="w-full h-9" preload="metadata" />
+      ) : (
+        <div className="text-xs text-muted-foreground">
+          {loading ? "Carregando áudio…" : "Gravação indisponível."}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function formatDur(sec: number): string {
+  const m = Math.floor(sec / 60);
+  const s = sec % 60;
+  return `${m}m ${String(s).padStart(2, "0")}s`;
+}
+
