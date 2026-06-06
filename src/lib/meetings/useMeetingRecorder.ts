@@ -114,11 +114,12 @@ export function useMeetingRecorder({ getLocalAudioTrack, remoteStreams }: Args) 
           noiseSuppression: false,
           autoGainControl: false,
         },
-        // Hints específicos do Chromium para já vir com áudio do sistema marcado.
+        // Limita o diálogo do Chrome à aba atual — o usuário só confirma "Compartilhar".
+        // Equivale a gravar tudo que está acontecendo no cenário (vídeo+áudio).
+        preferCurrentTab: true,
         systemAudio: "include",
         selfBrowserSurface: "include",
-        surfaceSwitching: "include",
-        preferCurrentTab: false,
+        surfaceSwitching: "exclude",
       } as unknown as DisplayMediaStreamOptions);
     } catch (err) {
       const name = (err as { name?: string })?.name;
