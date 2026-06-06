@@ -57,6 +57,7 @@ import { SavedNotesDialog } from "@/components/profile/SavedNotesDialog";
 import { EditCharacterModal } from "@/components/profile/EditCharacterModal";
 import { EditProfileModal } from "@/components/profile/EditProfileModal";
 import { OnboardingWizard } from "@/components/onboarding/OnboardingWizard";
+import { useMeetingTracker } from "@/lib/meetings/useMeetingTracker";
 
 type Profile = {
   id: string;
