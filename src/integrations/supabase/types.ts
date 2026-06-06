@@ -101,6 +101,27 @@ export type Database = {
         }
         Relationships: []
       }
+      meeting_favorites: {
+        Row: {
+          created_at: string
+          id: string
+          meeting_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          meeting_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          meeting_id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       meeting_folder_items: {
         Row: {
           created_at: string
@@ -461,6 +482,10 @@ export type Database = {
       }
       meeting_set_recording: {
         Args: { _duration_seconds: number; _meeting_id: string; _path: string }
+        Returns: undefined
+      }
+      meeting_set_title: {
+        Args: { _meeting_id: string; _title: string }
         Returns: undefined
       }
     }
