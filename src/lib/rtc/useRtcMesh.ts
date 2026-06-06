@@ -870,5 +870,7 @@ export function useRtcMesh(myId: string | null, desiredPeers: string[]): RtcMesh
     selectedAudioOutputDeviceId,
     setAudioOutputDevice,
     prewarmMic,
+    // Para gravação client-side: acessa o track local de áudio em uso.
+    getLocalAudioTrack: () => audioTrackRef.current,
   };
 }
