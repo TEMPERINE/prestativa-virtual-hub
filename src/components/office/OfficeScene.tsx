@@ -1264,22 +1264,22 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
       const target = e.target as HTMLElement | null;
       const tag = target?.tagName;
       if (tag === "INPUT" || tag === "TEXTAREA" || target?.isContentEditable) return;
-      // Ctrl/Cmd + D = mic
-      if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && e.key.toLowerCase() === "d") {
+      // Alt + M = mic
+      if (e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey && e.key.toLowerCase() === "m") {
         e.preventDefault();
         void unlockAudioPlayback();
         rtc.toggleMic().catch(() => toast.error("Não foi possível acessar o microfone"));
         return;
       }
-      // Ctrl/Cmd + E = cam
-      if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && e.key.toLowerCase() === "e") {
+      // Alt + V = cam
+      if (e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey && e.key.toLowerCase() === "v") {
         e.preventDefault();
         void unlockAudioPlayback();
         rtc.toggleCam().catch(() => toast.error("Não foi possível acessar a câmera"));
         return;
       }
-      // Ctrl/Cmd + Alt + H = levantar a mão
-      if ((e.ctrlKey || e.metaKey) && e.altKey && e.key.toLowerCase() === "h") {
+      // Alt + H = levantar a mão
+      if (e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey && e.key.toLowerCase() === "h") {
         e.preventDefault();
         toggleRaiseHand();
         return;
