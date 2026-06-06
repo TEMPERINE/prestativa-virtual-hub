@@ -13,6 +13,7 @@ import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedOfficeRouteImport } from './routes/_authenticated/office'
+import { Route as AuthenticatedMeetingsRouteImport } from './routes/_authenticated/meetings'
 import { Route as AuthenticatedOfficeEditorRouteImport } from './routes/_authenticated/office_.editor'
 
 const AuthRoute = AuthRouteImport.update({
@@ -34,6 +35,11 @@ const AuthenticatedOfficeRoute = AuthenticatedOfficeRouteImport.update({
   path: '/office',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedMeetingsRoute = AuthenticatedMeetingsRouteImport.update({
+  id: '/meetings',
+  path: '/meetings',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedOfficeEditorRoute =
   AuthenticatedOfficeEditorRouteImport.update({
     id: '/office_/editor',
@@ -44,12 +50,14 @@ const AuthenticatedOfficeEditorRoute =
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
+  '/meetings': typeof AuthenticatedMeetingsRoute
   '/office': typeof AuthenticatedOfficeRoute
   '/office/editor': typeof AuthenticatedOfficeEditorRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
+  '/meetings': typeof AuthenticatedMeetingsRoute
   '/office': typeof AuthenticatedOfficeRoute
   '/office/editor': typeof AuthenticatedOfficeEditorRoute
 }
@@ -58,19 +66,21 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/auth': typeof AuthRoute
+  '/_authenticated/meetings': typeof AuthenticatedMeetingsRoute
   '/_authenticated/office': typeof AuthenticatedOfficeRoute
   '/_authenticated/office_/editor': typeof AuthenticatedOfficeEditorRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/auth' | '/office' | '/office/editor'
+  fullPaths: '/' | '/auth' | '/meetings' | '/office' | '/office/editor'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/auth' | '/office' | '/office/editor'
+  to: '/' | '/auth' | '/meetings' | '/office' | '/office/editor'
   id:
     | '__root__'
     | '/'
     | '/_authenticated'
     | '/auth'
+    | '/_authenticated/meetings'
     | '/_authenticated/office'
     | '/_authenticated/office_/editor'
   fileRoutesById: FileRoutesById
@@ -111,6 +121,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedOfficeRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/meetings': {
+      id: '/_authenticated/meetings'
+      path: '/meetings'
+      fullPath: '/meetings'
+      preLoaderRoute: typeof AuthenticatedMeetingsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/office_/editor': {
       id: '/_authenticated/office_/editor'
       path: '/office/editor'
@@ -122,11 +139,13 @@ declare module '@tanstack/react-router' {
 }
 
 interface AuthenticatedRouteRouteChildren {
+  AuthenticatedMeetingsRoute: typeof AuthenticatedMeetingsRoute
   AuthenticatedOfficeRoute: typeof AuthenticatedOfficeRoute
   AuthenticatedOfficeEditorRoute: typeof AuthenticatedOfficeEditorRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
+  AuthenticatedMeetingsRoute: AuthenticatedMeetingsRoute,
   AuthenticatedOfficeRoute: AuthenticatedOfficeRoute,
   AuthenticatedOfficeEditorRoute: AuthenticatedOfficeEditorRoute,
 }
@@ -142,3 +161,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
