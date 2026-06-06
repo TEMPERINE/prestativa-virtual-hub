@@ -2641,6 +2641,14 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
                 <MonitorUp className="w-4 h-4" />
               </IconButton>
             )}
+            <IconButton
+              active={!!(me && raisedHands[me.id])}
+              onClick={toggleRaiseHand}
+              title={me && raisedHands[me.id] ? "Abaixar a mão (Ctrl+Alt+H)" : "Levantar a mão (Ctrl+Alt+H)"}
+            >
+              <Hand className="w-4 h-4" />
+            </IconButton>
+
             <IconButton active={showTeam} onClick={() => setShowTeam(!showTeam)} title="Equipe">
               <Users className="w-4 h-4" />
             </IconButton>
