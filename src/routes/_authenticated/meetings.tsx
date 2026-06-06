@@ -256,10 +256,15 @@ function RecordingPlayer({
         )}
       </div>
       {url ? (
-        <audio controls src={url} className="w-full h-9" preload="metadata" />
+        <video
+          controls
+          src={url}
+          className="w-full rounded-md bg-black aspect-video"
+          preload="metadata"
+        />
       ) : (
         <div className="text-xs text-muted-foreground">
-          {loading ? "Carregando áudio…" : "Gravação indisponível."}
+          {loading ? "Carregando gravação…" : "Gravação indisponível."}
         </div>
       )}
     </div>
