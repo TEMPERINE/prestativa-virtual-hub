@@ -301,8 +301,8 @@ function AiPanel({
         <div className="text-xs text-destructive mb-2">{meeting.ai_error}</div>
       )}
       {meeting.summary && (
-        <div className="text-sm leading-relaxed bg-muted/40 rounded-md p-3 prose prose-sm max-w-none dark:prose-invert prose-headings:font-semibold prose-headings:mt-3 prose-headings:mb-1 prose-p:my-1 prose-ul:my-1 prose-li:my-0">
-          <ReactMarkdown remarkPlugins={[remarkGfm]}>
+        <div className="text-sm leading-relaxed bg-muted/40 rounded-md p-3">
+          <ReactMarkdown remarkPlugins={[remarkGfm]} components={mdComponents}>
             {meeting.summary}
           </ReactMarkdown>
         </div>
@@ -320,8 +320,8 @@ function AiPanel({
             />
           </button>
           {openTranscript && (
-            <div className="mt-2 text-xs bg-muted/30 rounded-md p-3 max-h-96 overflow-auto prose prose-sm max-w-none dark:prose-invert prose-p:my-1">
-              <ReactMarkdown remarkPlugins={[remarkGfm]}>
+            <div className="mt-2 text-xs bg-muted/30 rounded-md p-3 max-h-96 overflow-auto">
+              <ReactMarkdown remarkPlugins={[remarkGfm]} components={mdComponents}>
                 {meeting.transcript}
               </ReactMarkdown>
             </div>
