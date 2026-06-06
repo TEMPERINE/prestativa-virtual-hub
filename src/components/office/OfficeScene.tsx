@@ -2168,7 +2168,43 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
           remoteStreams={rtc.remoteScreenStreams}
           profiles={profiles}
           onStopLocal={() => { rtc.toggleScreen().catch(() => {}); }}
-          anchorRect={focusedZone?.rect ?? null}
+          participants={(() => {
+            const list: Array<{
+              id: string;
+              profile: { id: string; display_name: string; avatar_color: string };
+              stream: MediaStream | null;
+              hasVideo: boolean;
+              micOn: boolean;
+              speaking: boolean;
+              isSelf?: boolean;
+            }> = [];
+            const hasLive = (s: MediaStream | null) =>
+              !!s && s.getVideoTracks().some((t) => t.enabled && t.readyState === "live" && !t.muted);
+            if (me) {
+              list.push({
+                id: me.id,
+                profile: { id: me.id, display_name: me.display_name, avatar_color: me.avatar_color },
+                stream: rtc.localVideoStream,
+                hasVideo: rtc.camOn && hasLive(rtc.localVideoStream),
+                micOn: rtc.micOn,
+                speaking: false,
+                isSelf: true,
+              });
+            }
+            for (const peerId of rtc.connectedPeers) {
+              const p = profiles[peerId] ?? { id: peerId, display_name: "Convidado", avatar_color: "#475569" };
+              const stream = rtc.remoteStreams[peerId] ?? null;
+              list.push({
+                id: peerId,
+                profile: p,
+                stream,
+                hasVideo: hasLive(stream),
+                micOn: true,
+                speaking: !!rtc.speakingPeers[peerId],
+              });
+            }
+            return list;
+          })()}
         />
         </div>
         </div>
