@@ -2569,6 +2569,40 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
         raisedHands={raisedHands}
       />
 
+      {/* HUD de atalhos de reunião — aparece ao entrar numa call e ao usar um atalho */}
+      {rtc.connectedPeers.length > 0 && (
+        <div
+          className={`absolute bottom-3 left-1/2 -translate-x-1/2 z-[110] pointer-events-none transition-all duration-300 ${
+            shortcutsHudVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-2"
+          }`}
+        >
+          <div
+            className="flex items-center gap-3 px-3 py-1.5 rounded-full text-[11px] text-white/90 backdrop-blur-md shadow-lg"
+            style={{
+              background: "color-mix(in oklab, #0b0f1a 78%, transparent)",
+              border: "1px solid color-mix(in oklab, #ffffff 14%, transparent)",
+            }}
+          >
+            <span className="inline-flex items-center gap-1.5">
+              <kbd className="px-1.5 py-0.5 rounded bg-white/10 font-mono text-[10px]">Alt+M</kbd>
+              mic
+            </span>
+            <span className="w-px h-3 bg-white/15" />
+            <span className="inline-flex items-center gap-1.5">
+              <kbd className="px-1.5 py-0.5 rounded bg-white/10 font-mono text-[10px]">Alt+V</kbd>
+              câmera
+            </span>
+            <span className="w-px h-3 bg-white/15" />
+            <span className="inline-flex items-center gap-1.5">
+              <kbd className="px-1.5 py-0.5 rounded bg-white/10 font-mono text-[10px]">Alt+H</kbd>
+              levantar a mão
+            </span>
+          </div>
+        </div>
+      )}
+
+
+
 
 
       {/* Topbar — slim, sticky, sophisticated */}
