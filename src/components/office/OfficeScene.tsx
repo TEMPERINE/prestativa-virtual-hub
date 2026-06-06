@@ -3111,10 +3111,10 @@ function IconButton({
       type="button"
       onClick={onClick}
       title={title}
-      className={`w-9 h-9 rounded-lg flex items-center justify-center transition ${
+      className={`w-8 h-8 rounded-md flex items-center justify-center transition ${
         active
-          ? "bg-primary text-primary-foreground shadow-glow"
-          : "bg-muted/60 hover:bg-muted text-foreground"
+          ? "bg-primary text-primary-foreground shadow-[0_0_0_1px_color-mix(in_oklab,var(--primary)_50%,transparent)]"
+          : "text-foreground/75 hover:text-foreground hover:bg-foreground/10"
       }`}
     >
       {children}
