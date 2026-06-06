@@ -429,21 +429,40 @@ function MeetingCard({
     ? Math.max(1, Math.round((end.getTime() - start.getTime()) / 60000))
     : null;
   const isLive = !end;
+  const [open, setOpen] = useState(false);
+  const hasContent = !!(meeting.recording_path || meeting.summary || meeting.transcript);
 
   return (
-    <li className="border rounded-xl p-4 bg-card">
-      <div className="flex items-start gap-3">
+    <li className="border rounded-xl bg-card overflow-hidden">
+      <div className="p-4 flex items-start gap-3">
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          disabled={!hasContent}
+          aria-expanded={open}
+          aria-label={open ? "Recolher reunião" : "Expandir reunião"}
+          className={`mt-1 p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted shrink-0 transition-colors ${hasContent ? "" : "opacity-30 cursor-default"}`}
+        >
+          <ChevronDown
+            className={`w-4 h-4 transition-transform duration-200 ${open ? "rotate-180" : ""}`}
+          />
+        </button>
         <div
-          className="w-10 h-10 rounded-lg flex items-center justify-center text-white shrink-0"
+          className="w-10 h-10 rounded-lg flex items-center justify-center text-white shrink-0 cursor-pointer"
           style={{ background: hostProfile?.avatar_color ?? "#475569" }}
+          onClick={() => hasContent && setOpen((v) => !v)}
         >
           <Video className="w-4 h-4" />
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-baseline gap-2 flex-wrap">
-            <div className="font-semibold truncate">
+            <button
+              type="button"
+              onClick={() => hasContent && setOpen((v) => !v)}
+              className="font-semibold truncate text-left hover:underline"
+            >
               {meeting.title ?? meeting.zone_label}
-            </div>
+            </button>
             {isLive && (
               <span className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
@@ -505,16 +524,23 @@ function MeetingCard({
             <span className="text-muted-foreground/80">· {meeting.zone_label}</span>
           </div>
 
-          {meeting.recording_path && (
-            <RecordingPlayer
-              path={meeting.recording_path}
-              durationSec={meeting.recording_duration_seconds ?? null}
-            />
-          )}
+          <div
+            className={`grid transition-[grid-template-rows] duration-300 ease-in-out ${open ? "grid-rows-[1fr]" : "grid-rows-[0fr]"}`}
+          >
+            <div className="overflow-hidden">
+              {meeting.recording_path && (
+                <RecordingPlayer
+                  path={meeting.recording_path}
+                  durationSec={meeting.recording_duration_seconds ?? null}
+                  active={open}
+                />
+              )}
 
-          {meeting.recording_path && (
-            <AiPanel meeting={meeting} onAiUpdated={onAiUpdated} />
-          )}
+              {meeting.recording_path && (
+                <AiPanel meeting={meeting} onAiUpdated={onAiUpdated} />
+              )}
+            </div>
+          </div>
         </div>
       </div>
     </li>
