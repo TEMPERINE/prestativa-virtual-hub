@@ -2418,18 +2418,38 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
       />
 
 
-      {/* Topbar */}
-      <div className="absolute top-0 left-0 right-0 p-4 pointer-events-none z-[100]">
-        <div className="glass-panel rounded-2xl shadow-soft px-4 py-2.5 flex items-center justify-between pointer-events-auto">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl gradient-primary flex items-center justify-center shadow-glow">
-              <span className="text-sm font-bold text-primary-foreground">P</span>
+      {/* Topbar — slim, sticky, sophisticated */}
+      <div className="absolute top-0 left-0 right-0 pointer-events-none z-[100]">
+        <div
+          className="pointer-events-auto flex items-center justify-between h-11 pl-3 pr-2 backdrop-blur-xl"
+          style={{
+            background:
+              "linear-gradient(180deg, color-mix(in oklab, var(--card) 78%, transparent) 0%, color-mix(in oklab, var(--card) 60%, transparent) 100%)",
+            borderBottom: "1px solid color-mix(in oklab, var(--border) 70%, transparent)",
+            boxShadow: "0 1px 0 0 color-mix(in oklab, var(--foreground) 4%, transparent), 0 8px 24px -16px color-mix(in oklab, var(--foreground) 25%, transparent)",
+          }}
+        >
+          <div className="flex items-center gap-2 min-w-0">
+            <img
+              src={prestativaIcon.url}
+              alt="Prestativa"
+              className="w-6 h-6 rounded-md object-contain"
+              draggable={false}
+            />
+            <div className="flex items-baseline gap-1.5 min-w-0">
+              <span className="text-[13px] font-semibold tracking-tight text-foreground">Prestativa</span>
+              <span className="text-[11px] text-muted-foreground font-medium hidden sm:inline">Virtual Office</span>
             </div>
+            <span className="hidden md:inline mx-2 h-4 w-px bg-border/80" aria-hidden />
+            <span className="hidden md:inline text-[11px] text-muted-foreground truncate">
+              {currentZone.label}
+            </span>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1">
             {rtc.connectedPeers.length > 0 && (
-              <div className="text-xs text-muted-foreground px-2 hidden sm:block">
+              <div className="text-[11px] text-muted-foreground px-2 hidden sm:flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_8px_var(--color-emerald-500,#10b981)]" />
                 Em chamada com {rtc.connectedPeers.length}
               </div>
             )}
