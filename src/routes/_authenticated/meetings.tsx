@@ -48,7 +48,7 @@ function MeetingsPage() {
       // RLS já filtra: o usuário só vê reuniões em que participou.
       const { data: ms } = await supabase
         .from("meetings" as never)
-        .select("id, zone_id, zone_label, title, started_at, ended_at, host_id")
+        .select("id, zone_id, zone_label, title, started_at, ended_at, host_id, recording_path, recording_duration_seconds")
         .order("started_at", { ascending: false })
         .limit(100);
       if (cancelled) return;
