@@ -955,3 +955,90 @@ function formatDur(sec: number): string {
   const s = sec % 60;
   return `${m}m ${String(s).padStart(2, "0")}s`;
 }
+
+function PersonalNotes({ meetingId, active }: { meetingId: string; active: boolean }) {
+  const [body, setBody] = useState("");
+  const [noteId, setNoteId] = useState<string | null>(null);
+  const [loaded, setLoaded] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [savedAt, setSavedAt] = useState<number | null>(null);
+  const loadedRef = useRef(false);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Carrega ao expandir (uma única vez)
+  useEffect(() => {
+    if (!active || loadedRef.current) return;
+    loadedRef.current = true;
+    (async () => {
+      const { data: auth } = await supabase.auth.getUser();
+      const uid = auth.user?.id;
+      if (!uid) { setLoaded(true); return; }
+      const { data } = await sb
+        .from("meeting_notes")
+        .select("id, body")
+        .eq("meeting_id", meetingId)
+        .eq("user_id", uid)
+        .maybeSingle();
+      if (data) {
+        setNoteId(data.id);
+        setBody(data.body ?? "");
+      }
+      setLoaded(true);
+    })();
+  }, [active, meetingId]);
+
+  // Auto-save com debounce
+  useEffect(() => {
+    if (!loaded) return;
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(async () => {
+      const { data: auth } = await supabase.auth.getUser();
+      const uid = auth.user?.id;
+      if (!uid) return;
+      setSaving(true);
+      try {
+        if (noteId) {
+          await sb.from("meeting_notes").update({ body }).eq("id", noteId);
+        } else if (body.trim().length > 0) {
+          const { data } = await sb
+            .from("meeting_notes")
+            .insert({ meeting_id: meetingId, user_id: uid, body })
+            .select("id")
+            .single();
+          if (data) setNoteId(data.id);
+        }
+        setSavedAt(Date.now());
+      } finally {
+        setSaving(false);
+      }
+    }, 700);
+    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [body, loaded]);
+
+  return (
+    <section className="mt-4 rounded-lg border bg-muted/30 p-3">
+      <div className="flex items-center justify-between mb-2">
+        <h4 className="text-sm font-semibold inline-flex items-center gap-1.5">
+          <Pencil className="w-3.5 h-3.5" /> Minhas anotações
+          <span className="text-[10px] font-normal text-muted-foreground">(privadas)</span>
+        </h4>
+        <span className="text-[11px] text-muted-foreground">
+          {saving ? (
+            <span className="inline-flex items-center gap-1"><Loader2 className="w-3 h-3 animate-spin" /> Salvando…</span>
+          ) : savedAt ? (
+            <span className="inline-flex items-center gap-1 text-emerald-700"><Check className="w-3 h-3" /> Salvo</span>
+          ) : null}
+        </span>
+      </div>
+      <textarea
+        value={body}
+        onChange={(e) => setBody(e.target.value)}
+        disabled={!loaded}
+        placeholder={loaded ? "Escreva aqui suas anotações pessoais sobre esta reunião…" : "Carregando…"}
+        rows={4}
+        className="w-full resize-y rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-50"
+      />
+    </section>
+  );
+}
