@@ -28,14 +28,18 @@ function preload(src: string): Promise<void> {
   });
 }
 
-type Props = { onReady: () => void };
+type Props = { onReady: () => void; canFinish?: boolean };
 
-export function PreloadScreen({ onReady }: Props) {
+export function PreloadScreen({ onReady, canFinish = true }: Props) {
   const [loaded, setLoaded] = useState(0);
+  const [assetsLoaded, setAssetsLoaded] = useState(false);
   const [frame, setFrame] = useState(0);
   const [done, setDone] = useState(false);
   const total = CRITICAL_ASSETS.length;
-  const pct = Math.round((loaded / total) * 100);
+  // Enquanto a cena externa não está pronta (canFinish=false), trava a barra
+  // visível em 99% pra dar feedback de que ainda falta um passo.
+  const rawPct = Math.round((loaded / total) * 100);
+  const pct = assetsLoaded && !canFinish ? 99 : rawPct;
 
   // Carrega assets em paralelo, contabiliza progresso individual
   useEffect(() => {
@@ -51,15 +55,22 @@ export function PreloadScreen({ onReady }: Props) {
       )
     ).then(() => {
       if (cancelled) return;
-      // pequena pausa pra mostrar o 100%
-      window.setTimeout(() => {
-        if (cancelled) return;
-        setDone(true);
-        window.setTimeout(onReady, 380);
-      }, 280);
+      setAssetsLoaded(true);
     });
     return () => { cancelled = true; };
-  }, [onReady]);
+  }, []);
+
+  // Só finaliza quando assets carregaram E a cena externa autorizou (canFinish).
+  useEffect(() => {
+    if (!assetsLoaded || !canFinish) return;
+    const t1 = window.setTimeout(() => {
+      setDone(true);
+      const t2 = window.setTimeout(onReady, 380);
+      // cleanup do segundo timer fica implícito (componente desmonta logo)
+      return () => window.clearTimeout(t2);
+    }, 280);
+    return () => window.clearTimeout(t1);
+  }, [assetsLoaded, canFinish, onReady]);
 
   // Anima sprite (cycle de frames)
   useEffect(() => {
