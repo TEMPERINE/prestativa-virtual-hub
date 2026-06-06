@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { getIceServers, type IceServer } from "@/lib/rtc/ice.functions";
 
-type SignalType = "offer" | "answer" | "ice" | "bye" | "hello";
+type SignalType = "offer" | "answer" | "ice" | "bye" | "hello" | "renegotiate";
 type SignalMsg = {
   from: string;
   to: string;
