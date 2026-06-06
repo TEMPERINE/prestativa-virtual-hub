@@ -2611,7 +2611,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
                   void unlockAudioPlayback();
                   rtc.toggleMic().catch(() => toast.error("Não foi possível acessar o microfone"));
                 }}
-                title="Microfone"
+                title={rtc.micOn ? "Desligar microfone (Alt+M)" : "Ligar microfone (Alt+M)"}
               >
                 {rtc.micOn ? <Mic className="w-4 h-4" /> : <MicOff className="w-4 h-4" />}
               </IconButton>
@@ -2644,7 +2644,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
                   void unlockAudioPlayback();
                   rtc.toggleCam().catch(() => toast.error("Não foi possível acessar a câmera"));
                 }}
-                title="Câmera"
+                title={rtc.camOn ? "Desligar câmera (Alt+V)" : "Ligar câmera (Alt+V)"}
               >
                 {rtc.camOn ? <Video className="w-4 h-4" /> : <VideoOff className="w-4 h-4" />}
               </IconButton>
