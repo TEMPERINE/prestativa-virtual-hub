@@ -1,11 +1,18 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { supabase } from "@/integrations/supabase/client";
-import { ArrowLeft, Users, Clock, Video, Sparkles, Loader2, FileText, ChevronDown } from "lucide-react";
+import {
+  ArrowLeft, Users, Clock, Video, Sparkles, Loader2, FileText, ChevronDown,
+  Folder, FolderPlus, FolderOpen, Inbox, Pencil, Trash2, FolderInput,
+} from "lucide-react";
 import { generateMeetingAi } from "@/lib/meetings/ai.functions";
+import {
+  DropdownMenu, DropdownMenuTrigger, DropdownMenuContent,
+  DropdownMenuItem, DropdownMenuCheckboxItem, DropdownMenuSeparator, DropdownMenuLabel,
+} from "@/components/ui/dropdown-menu";
 
 export const Route = createFileRoute("/_authenticated/meetings")({
   head: () => ({
@@ -41,6 +48,16 @@ type ParticipantRow = {
   profiles?: { display_name: string; avatar_color: string } | null;
 };
 
+type FolderRow = { id: string; name: string };
+type FolderItemRow = { folder_id: string; meeting_id: string };
+
+/** "all" = Minhas reuniões; "unfiled" = sem pasta; uuid = pasta específica. */
+type FolderSel = "all" | "unfiled" | string;
+
+// Tipos auto-gen ainda não conhecem as tabelas novas — wrapper sem types.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const sb = supabase as any;
+
 function MeetingsPage() {
   const [loading, setLoading] = useState(true);
   const [meetings, setMeetings] = useState<MeetingRow[]>([]);
@@ -48,67 +65,158 @@ function MeetingsPage() {
     Record<string, ParticipantRow[]>
   >({});
   const [profiles, setProfiles] = useState<Record<string, { display_name: string; avatar_color: string }>>({});
+  const [folders, setFolders] = useState<FolderRow[]>([]);
+  const [folderItems, setFolderItems] = useState<FolderItemRow[]>([]);
+  const [selected, setSelected] = useState<FolderSel>("all");
+  const [userId, setUserId] = useState<string | null>(null);
 
+  // Loader inicial
   useEffect(() => {
     let cancelled = false;
     (async () => {
       setLoading(true);
-      // RLS já filtra: o usuário só vê reuniões em que participou.
-      const { data: ms } = await supabase
-        .from("meetings" as never)
-        .select("id, zone_id, zone_label, title, started_at, ended_at, host_id, recording_path, recording_duration_seconds, transcript, summary, ai_status, ai_error")
-        .order("started_at", { ascending: false })
-        .limit(100);
+      const { data: auth } = await supabase.auth.getUser();
+      const uid = auth.user?.id ?? null;
+      setUserId(uid);
+
+      const [{ data: ms }, { data: fs }, { data: fis }] = await Promise.all([
+        supabase
+          .from("meetings" as never)
+          .select("id, zone_id, zone_label, title, started_at, ended_at, host_id, recording_path, recording_duration_seconds, transcript, summary, ai_status, ai_error")
+          .order("started_at", { ascending: false })
+          .limit(200),
+        sb.from("meeting_folders").select("id, name").order("name"),
+        sb.from("meeting_folder_items").select("folder_id, meeting_id"),
+      ]);
       if (cancelled) return;
       const meetingList = (ms ?? []) as MeetingRow[];
       setMeetings(meetingList);
+      setFolders((fs ?? []) as FolderRow[]);
+      setFolderItems((fis ?? []) as FolderItemRow[]);
 
-      if (meetingList.length === 0) {
-        setLoading(false);
-        return;
-      }
-
-      // Pega participantes só das próprias reuniões (RLS filtra o resto: o
-      // usuário só consegue ler os próprios registros). Pra mostrar a lista
-      // completa de participantes, precisaríamos relaxar a RLS. Por ora
-      // mostramos o total via host + perfis dos próprios registros.
-      const ids = meetingList.map((m) => m.id);
-      const { data: parts } = await supabase
-        .from("meeting_participants" as never)
-        .select("meeting_id, user_id, joined_at, left_at")
-        .in("meeting_id", ids);
-      const byMeeting: Record<string, ParticipantRow[]> = {};
-      for (const p of (parts ?? []) as ParticipantRow[]) {
-        (byMeeting[p.meeting_id] ??= []).push(p);
-      }
-      setParticipantsByMeeting(byMeeting);
-
-      // Carrega nomes dos hosts
-      const userIds = Array.from(
-        new Set(meetingList.map((m) => m.host_id).filter(Boolean) as string[]),
-      );
-      if (userIds.length > 0) {
-        const { data: profs } = await supabase
-          .from("profiles")
-          .select("id, display_name, avatar_color")
-          .in("id", userIds);
-        const map: Record<string, { display_name: string; avatar_color: string }> = {};
-        for (const p of profs ?? []) {
-          map[p.id] = { display_name: p.display_name, avatar_color: p.avatar_color };
+      if (meetingList.length > 0) {
+        const ids = meetingList.map((m) => m.id);
+        const { data: parts } = await supabase
+          .from("meeting_participants" as never)
+          .select("meeting_id, user_id, joined_at, left_at")
+          .in("meeting_id", ids);
+        const byMeeting: Record<string, ParticipantRow[]> = {};
+        for (const p of (parts ?? []) as ParticipantRow[]) {
+          (byMeeting[p.meeting_id] ??= []).push(p);
         }
-        setProfiles(map);
+        setParticipantsByMeeting(byMeeting);
+
+        const userIds = Array.from(
+          new Set(meetingList.map((m) => m.host_id).filter(Boolean) as string[]),
+        );
+        if (userIds.length > 0) {
+          const { data: profs } = await supabase
+            .from("profiles")
+            .select("id, display_name, avatar_color")
+            .in("id", userIds);
+          const map: Record<string, { display_name: string; avatar_color: string }> = {};
+          for (const p of profs ?? []) {
+            map[p.id] = { display_name: p.display_name, avatar_color: p.avatar_color };
+          }
+          setProfiles(map);
+        }
       }
       setLoading(false);
     })();
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, []);
+
+  // Mapas auxiliares
+  const foldersByMeeting = useMemo(() => {
+    const m: Record<string, Set<string>> = {};
+    for (const fi of folderItems) {
+      (m[fi.meeting_id] ??= new Set()).add(fi.folder_id);
+    }
+    return m;
+  }, [folderItems]);
+
+  const countsByFolder = useMemo(() => {
+    const c: Record<string, number> = {};
+    for (const fi of folderItems) c[fi.folder_id] = (c[fi.folder_id] ?? 0) + 1;
+    return c;
+  }, [folderItems]);
+
+  const unfiledCount = useMemo(
+    () => meetings.filter((m) => !foldersByMeeting[m.id] || foldersByMeeting[m.id].size === 0).length,
+    [meetings, foldersByMeeting],
+  );
+
+  const visibleMeetings = useMemo(() => {
+    if (selected === "all") return meetings;
+    if (selected === "unfiled") {
+      return meetings.filter((m) => !foldersByMeeting[m.id] || foldersByMeeting[m.id].size === 0);
+    }
+    return meetings.filter((m) => foldersByMeeting[m.id]?.has(selected));
+  }, [meetings, foldersByMeeting, selected]);
+
+  // CRUD pastas
+  const createFolder = async () => {
+    const name = window.prompt("Nome da nova pasta:")?.trim();
+    if (!name || !userId) return;
+    const { data, error } = await sb
+      .from("meeting_folders")
+      .insert({ user_id: userId, name })
+      .select("id, name")
+      .single();
+    if (error) {
+      alert(error.message);
+      return;
+    }
+    setFolders((prev) => [...prev, data as FolderRow].sort((a, b) => a.name.localeCompare(b.name)));
+    setSelected((data as FolderRow).id);
+  };
+
+  const renameFolder = async (f: FolderRow) => {
+    const name = window.prompt("Renomear pasta:", f.name)?.trim();
+    if (!name || name === f.name) return;
+    const { error } = await sb.from("meeting_folders").update({ name }).eq("id", f.id);
+    if (error) return alert(error.message);
+    setFolders((prev) => prev.map((x) => (x.id === f.id ? { ...x, name } : x)).sort((a, b) => a.name.localeCompare(b.name)));
+  };
+
+  const deleteFolder = async (f: FolderRow) => {
+    if (!window.confirm(`Excluir a pasta "${f.name}"? As reuniões continuam no histórico.`)) return;
+    const { error } = await sb.from("meeting_folders").delete().eq("id", f.id);
+    if (error) return alert(error.message);
+    setFolders((prev) => prev.filter((x) => x.id !== f.id));
+    setFolderItems((prev) => prev.filter((x) => x.folder_id !== f.id));
+    if (selected === f.id) setSelected("all");
+  };
+
+  // Toggle vínculo reunião↔pasta
+  const toggleMembership = async (meetingId: string, folderId: string, isMember: boolean) => {
+    if (!userId) return;
+    if (isMember) {
+      const { error } = await sb
+        .from("meeting_folder_items")
+        .delete()
+        .eq("meeting_id", meetingId)
+        .eq("folder_id", folderId);
+      if (error) return alert(error.message);
+      setFolderItems((prev) => prev.filter((fi) => !(fi.meeting_id === meetingId && fi.folder_id === folderId)));
+    } else {
+      const { error } = await sb
+        .from("meeting_folder_items")
+        .insert({ user_id: userId, meeting_id: meetingId, folder_id: folderId });
+      if (error) return alert(error.message);
+      setFolderItems((prev) => [...prev, { folder_id: folderId, meeting_id: meetingId }]);
+    }
+  };
+
+  const currentTitle =
+    selected === "all" ? "Minhas reuniões"
+    : selected === "unfiled" ? "Sem pasta"
+    : folders.find((f) => f.id === selected)?.name ?? "Pasta";
 
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b sticky top-0 bg-background/90 backdrop-blur z-10">
-        <div className="max-w-3xl mx-auto px-4 h-14 flex items-center gap-3">
+        <div className="max-w-6xl mx-auto px-4 h-14 flex items-center gap-3">
           <Link
             to="/office"
             className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
@@ -116,49 +224,181 @@ function MeetingsPage() {
             <ArrowLeft className="w-4 h-4" />
             Voltar ao escritório
           </Link>
-          <div className="ml-auto text-sm font-semibold">Minhas reuniões</div>
+          <div className="ml-auto text-sm font-semibold">{currentTitle}</div>
         </div>
       </header>
 
-      <main className="max-w-3xl mx-auto px-4 py-6">
-        {loading ? (
-          <div className="text-sm text-muted-foreground">Carregando…</div>
-        ) : meetings.length === 0 ? (
-          <EmptyState />
-        ) : (
-          <ul className="space-y-3">
-            {meetings.map((m) => (
-              <MeetingCard
-                key={m.id}
-                meeting={m}
-                participants={participantsByMeeting[m.id] ?? []}
-                hostProfile={m.host_id ? profiles[m.host_id] : undefined}
-                onAiUpdated={(transcript, summary) => {
-                  setMeetings((prev) =>
-                    prev.map((row) =>
-                      row.id === m.id
-                        ? { ...row, transcript, summary, ai_status: "done", ai_error: null }
-                        : row,
-                    ),
-                  );
-                }}
-              />
-            ))}
-          </ul>
-        )}
-      </main>
+      <div className="max-w-6xl mx-auto px-4 py-6 flex gap-6">
+        <FolderExplorer
+          folders={folders}
+          selected={selected}
+          onSelect={setSelected}
+          allCount={meetings.length}
+          unfiledCount={unfiledCount}
+          countsByFolder={countsByFolder}
+          onCreate={createFolder}
+          onRename={renameFolder}
+          onDelete={deleteFolder}
+        />
+
+        <main className="flex-1 min-w-0">
+          {loading ? (
+            <div className="text-sm text-muted-foreground">Carregando…</div>
+          ) : visibleMeetings.length === 0 ? (
+            <EmptyState selected={selected} />
+          ) : (
+            <ul className="space-y-3">
+              {visibleMeetings.map((m) => (
+                <MeetingCard
+                  key={m.id}
+                  meeting={m}
+                  participants={participantsByMeeting[m.id] ?? []}
+                  hostProfile={m.host_id ? profiles[m.host_id] : undefined}
+                  folders={folders}
+                  meetingFolderIds={foldersByMeeting[m.id] ?? new Set()}
+                  onToggleFolder={(folderId, isMember) => toggleMembership(m.id, folderId, isMember)}
+                  onCreateFolder={createFolder}
+                  onAiUpdated={(transcript, summary) => {
+                    setMeetings((prev) =>
+                      prev.map((row) =>
+                        row.id === m.id
+                          ? { ...row, transcript, summary, ai_status: "done", ai_error: null }
+                          : row,
+                      ),
+                    );
+                  }}
+                />
+              ))}
+            </ul>
+          )}
+        </main>
+      </div>
     </div>
   );
 }
 
-function EmptyState() {
+function FolderExplorer({
+  folders, selected, onSelect, allCount, unfiledCount, countsByFolder,
+  onCreate, onRename, onDelete,
+}: {
+  folders: FolderRow[];
+  selected: FolderSel;
+  onSelect: (s: FolderSel) => void;
+  allCount: number;
+  unfiledCount: number;
+  countsByFolder: Record<string, number>;
+  onCreate: () => void;
+  onRename: (f: FolderRow) => void;
+  onDelete: (f: FolderRow) => void;
+}) {
+  return (
+    <aside className="w-56 shrink-0">
+      <div className="sticky top-20">
+        <div className="flex items-center justify-between mb-2 px-1">
+          <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Pastas</span>
+          <button
+            onClick={onCreate}
+            title="Nova pasta"
+            className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground"
+          >
+            <FolderPlus className="w-4 h-4" />
+          </button>
+        </div>
+        <nav className="space-y-0.5">
+          <FolderItem
+            icon={<Inbox className="w-4 h-4" />}
+            label="Minhas reuniões"
+            count={allCount}
+            active={selected === "all"}
+            onClick={() => onSelect("all")}
+          />
+          {folders.map((f) => (
+            <FolderItem
+              key={f.id}
+              icon={selected === f.id ? <FolderOpen className="w-4 h-4" /> : <Folder className="w-4 h-4" />}
+              label={f.name}
+              count={countsByFolder[f.id] ?? 0}
+              active={selected === f.id}
+              onClick={() => onSelect(f.id)}
+              onRename={() => onRename(f)}
+              onDelete={() => onDelete(f)}
+            />
+          ))}
+          {unfiledCount > 0 && (
+            <FolderItem
+              icon={<Folder className="w-4 h-4 opacity-50" />}
+              label="Sem pasta"
+              count={unfiledCount}
+              active={selected === "unfiled"}
+              onClick={() => onSelect("unfiled")}
+              muted
+            />
+          )}
+        </nav>
+      </div>
+    </aside>
+  );
+}
+
+function FolderItem({
+  icon, label, count, active, onClick, onRename, onDelete, muted,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  count: number;
+  active: boolean;
+  onClick: () => void;
+  onRename?: () => void;
+  onDelete?: () => void;
+  muted?: boolean;
+}) {
+  return (
+    <div
+      className={`group flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer ${
+        active ? "bg-primary/10 text-primary" : muted ? "text-muted-foreground hover:bg-muted/50" : "hover:bg-muted/50"
+      }`}
+      onClick={onClick}
+    >
+      <span className="shrink-0">{icon}</span>
+      <span className="flex-1 text-sm truncate">{label}</span>
+      <span className="text-xs text-muted-foreground tabular-nums">{count}</span>
+      {(onRename || onDelete) && (
+        <div className="opacity-0 group-hover:opacity-100 flex items-center gap-0.5">
+          {onRename && (
+            <button
+              onClick={(e) => { e.stopPropagation(); onRename(); }}
+              className="p-0.5 rounded hover:bg-background"
+              title="Renomear"
+            >
+              <Pencil className="w-3 h-3" />
+            </button>
+          )}
+          {onDelete && (
+            <button
+              onClick={(e) => { e.stopPropagation(); onDelete(); }}
+              className="p-0.5 rounded hover:bg-background text-destructive"
+              title="Excluir"
+            >
+              <Trash2 className="w-3 h-3" />
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function EmptyState({ selected }: { selected: FolderSel }) {
   return (
     <div className="border border-dashed rounded-xl p-10 text-center">
       <Video className="w-8 h-8 mx-auto text-muted-foreground mb-3" />
-      <div className="font-semibold mb-1">Nenhuma reunião por aqui ainda</div>
+      <div className="font-semibold mb-1">
+        {selected === "all" ? "Nenhuma reunião por aqui ainda" : "Esta pasta está vazia"}
+      </div>
       <div className="text-sm text-muted-foreground">
-        Entre numa sala de reunião com pelo menos mais uma pessoa para começar
-        seu histórico.
+        {selected === "all"
+          ? "Entre numa sala de reunião com pelo menos mais uma pessoa para começar seu histórico."
+          : "Mova reuniões para esta pasta usando o botão de pasta no card."}
       </div>
     </div>
   );
@@ -168,11 +408,19 @@ function MeetingCard({
   meeting,
   participants,
   hostProfile,
+  folders,
+  meetingFolderIds,
+  onToggleFolder,
+  onCreateFolder,
   onAiUpdated,
 }: {
   meeting: MeetingRow;
   participants: ParticipantRow[];
   hostProfile?: { display_name: string; avatar_color: string };
+  folders: FolderRow[];
+  meetingFolderIds: Set<string>;
+  onToggleFolder: (folderId: string, isMember: boolean) => void;
+  onCreateFolder: () => void;
   onAiUpdated: (transcript: string, summary: string) => void;
 }) {
   const start = new Date(meeting.started_at);
@@ -202,6 +450,42 @@ function MeetingCard({
                 Em andamento
               </span>
             )}
+            <div className="ml-auto">
+              <DropdownMenu>
+                <DropdownMenuTrigger className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground border rounded px-2 py-1">
+                  <FolderInput className="w-3 h-3" />
+                  {meetingFolderIds.size > 0
+                    ? `${meetingFolderIds.size} pasta${meetingFolderIds.size === 1 ? "" : "s"}`
+                    : "Mover para pasta"}
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  <DropdownMenuLabel className="text-xs">Organizar em pastas</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  {folders.length === 0 && (
+                    <div className="px-2 py-1.5 text-xs text-muted-foreground">
+                      Nenhuma pasta ainda.
+                    </div>
+                  )}
+                  {folders.map((f) => {
+                    const isMember = meetingFolderIds.has(f.id);
+                    return (
+                      <DropdownMenuCheckboxItem
+                        key={f.id}
+                        checked={isMember}
+                        onCheckedChange={() => onToggleFolder(f.id, isMember)}
+                        onSelect={(e) => e.preventDefault()}
+                      >
+                        {f.name}
+                      </DropdownMenuCheckboxItem>
+                    );
+                  })}
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onSelect={onCreateFolder}>
+                    <FolderPlus className="w-3 h-3 mr-2" /> Nova pasta…
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
           </div>
           <div className="text-xs text-muted-foreground mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1">
             <span className="inline-flex items-center gap-1">
@@ -236,6 +520,7 @@ function MeetingCard({
     </li>
   );
 }
+
 
 const mdComponents = {
   h1: (p: any) => <h3 className="text-base font-semibold mt-3 mb-1" {...p} />,
