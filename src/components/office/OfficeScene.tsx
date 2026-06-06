@@ -46,6 +46,7 @@ import { useRtcMesh } from "@/lib/rtc/useRtcMesh";
 import { installAudioUnlockListeners, unlockAudioPlayback } from "@/lib/rtc/audio-unlock";
 import { RemoteVideoTiles } from "./RemoteVideoTiles";
 import { CamPreviewAndPicker } from "./CamPreviewAndPicker";
+import { DeviceMenu } from "./DeviceMenu";
 import { ScreenShareViewer } from "./ScreenShareViewer";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
