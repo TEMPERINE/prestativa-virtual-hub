@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Maximize2, Minimize2, MonitorUp } from "lucide-react";
+import { Minimize2, MonitorUp, X } from "lucide-react";
 
 type Profile = { id: string; display_name: string; avatar_color: string };
 type Rect = { x1: number; y1: number; x2: number; y2: number };
@@ -22,27 +22,36 @@ export function ScreenShareViewer({
   );
   const hasLocal = !!localStream;
   const [activeKey, setActiveKey] = useState<string | null>(null);
-  const [expanded, setExpanded] = useState(false);
+  // Meeting-style: full screen by default whenever there is a share.
+  const [meetingMode, setMeetingMode] = useState(true);
 
   useEffect(() => {
     const keys = [...(hasLocal ? ["__local__"] : []), ...remotes.map(([id]) => id)];
     if (!activeKey || !keys.includes(activeKey)) setActiveKey(keys[0] ?? null);
   }, [hasLocal, remotes, activeKey]);
 
-  // Compute consistent, zone-aligned placement inside the stage.
-  // We position the viewer above the zone (or centered for very tall zones)
-  // and size it relative to zone width with sane clamps so it remains
-  // responsive across viewports and zone sizes.
+  // Whenever a new share starts (had none before, now has one), open meeting mode.
+  const hadShareRef = useRef(false);
+  useEffect(() => {
+    const hasAny = hasLocal || remotes.length > 0;
+    if (hasAny && !hadShareRef.current) setMeetingMode(true);
+    hadShareRef.current = hasAny;
+  }, [hasLocal, remotes.length]);
+
+  // ESC exits meeting mode.
+  useEffect(() => {
+    if (!meetingMode) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        setMeetingMode(false);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [meetingMode]);
+
   const placement = useMemo(() => {
-    if (expanded) {
-      return {
-        left: "2%",
-        top: "2%",
-        width: "96%",
-        height: "96%",
-        transform: "none",
-      } as const;
-    }
     if (!anchorRect) {
       return {
         left: "50%",
@@ -56,15 +65,9 @@ export function ScreenShareViewer({
     const cx = (anchorRect.x1 + anchorRect.x2) / 2;
     const zoneW = anchorRect.x2 - anchorRect.x1;
     const zoneH = anchorRect.y2 - anchorRect.y1;
-    // Width: ~1.2× zone width, clamped between 22% and 46% of stage.
     const widthPct = Math.max(22, Math.min(46, zoneW * 100 * 1.2));
-    // If zone is tall enough, dock viewer at top inside the zone.
-    // Otherwise float just above the zone top edge.
     const dockInside = zoneH > 0.22;
-    const topPct = dockInside
-      ? (anchorRect.y1 + 0.015) * 100
-      : Math.max(2, anchorRect.y1 * 100 - 2);
-    // Clamp horizontal so it stays on-stage.
+    const topPct = dockInside ? (anchorRect.y1 + 0.015) * 100 : Math.max(2, anchorRect.y1 * 100 - 2);
     const halfW = widthPct / 2;
     const leftPct = Math.min(100 - halfW - 1, Math.max(halfW + 1, cx * 100));
     return {
@@ -74,16 +77,12 @@ export function ScreenShareViewer({
       aspectRatio: "16 / 9",
       transform: dockInside ? "translateX(-50%)" : "translate(-50%, -100%)",
     } as const;
-  }, [expanded, anchorRect]);
+  }, [anchorRect]);
 
   if (!hasLocal && remotes.length === 0) return null;
 
   const activeStream =
-    activeKey === "__local__"
-      ? localStream
-      : activeKey
-        ? remoteStreams[activeKey]
-        : null;
+    activeKey === "__local__" ? localStream : activeKey ? remoteStreams[activeKey] : null;
   const activeLabel =
     activeKey === "__local__"
       ? "Sua tela"
@@ -91,11 +90,63 @@ export function ScreenShareViewer({
         ? `Tela de ${profiles[activeKey]?.display_name ?? "Convidado"}`
         : "";
 
+  if (meetingMode) {
+    return (
+      <div className="fixed inset-0 z-[200] bg-black/95 flex flex-col pointer-events-auto">
+        <div className="flex items-center justify-between px-4 py-2 bg-black/80 text-white text-sm shrink-0 border-b border-white/10">
+          <div className="flex items-center gap-2 min-w-0">
+            <MonitorUp className="w-4 h-4 text-primary" />
+            <span className="truncate font-medium">{activeLabel}</span>
+            <span className="text-white/50 text-xs ml-2 hidden sm:inline">
+              Pressione ESC para sair
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            {hasLocal && (
+              <button
+                type="button"
+                onClick={onStopLocal}
+                className="px-3 py-1 rounded-md bg-red-500/90 hover:bg-red-500 text-white text-xs font-medium"
+              >
+                Parar compartilhamento
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => setMeetingMode(false)}
+              className="inline-flex items-center gap-1 px-3 py-1 rounded-md bg-white/10 hover:bg-white/20 text-white text-xs"
+              title="Sair do modo reunião (ESC)"
+            >
+              <Minimize2 className="w-3.5 h-3.5" />
+              <span>Sair</span>
+            </button>
+          </div>
+        </div>
+        <div className="flex-1 relative bg-black min-h-0">
+          {activeStream && <ScreenEl stream={activeStream} muted={activeKey === "__local__"} />}
+        </div>
+        {(hasLocal ? 1 : 0) + remotes.length > 1 && (
+          <div className="flex items-center justify-center gap-2 px-3 py-2 bg-black/80 overflow-x-auto shrink-0 border-t border-white/10">
+            {hasLocal && (
+              <Thumb label="Você" active={activeKey === "__local__"} onClick={() => setActiveKey("__local__")} />
+            )}
+            {remotes.map(([id]) => (
+              <Thumb
+                key={id}
+                label={profiles[id]?.display_name ?? "Convidado"}
+                active={activeKey === id}
+                onClick={() => setActiveKey(id)}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // Compact docked mode: small floating panel with a button to re-enter meeting mode.
   return (
-    <div
-      className="absolute z-[115] pointer-events-auto transition-all duration-300 ease-out"
-      style={placement}
-    >
+    <div className="absolute z-[115] pointer-events-auto transition-all duration-300 ease-out" style={placement}>
       <div className="relative w-full h-full rounded-2xl overflow-hidden bg-black/85 border border-white/15 shadow-2xl flex flex-col min-h-0">
         <div className="flex items-center justify-between px-3 py-1.5 bg-black/60 text-white text-xs shrink-0">
           <div className="flex items-center gap-2 min-w-0">
@@ -108,32 +159,32 @@ export function ScreenShareViewer({
                 type="button"
                 onClick={onStopLocal}
                 className="px-2 py-0.5 rounded-md bg-red-500/80 hover:bg-red-500 text-white text-[10px]"
-                title="Parar de compartilhar"
               >
                 Parar
               </button>
             )}
             <button
               type="button"
-              onClick={() => setExpanded((v) => !v)}
-              className="inline-flex w-6 h-6 items-center justify-center rounded-md hover:bg-white/10"
-              title={expanded ? "Recolher" : "Expandir"}
+              onClick={() => setMeetingMode(true)}
+              className="px-2 py-0.5 rounded-md bg-primary/90 hover:bg-primary text-primary-foreground text-[10px] font-medium"
+              title="Entrar no modo reunião"
             >
-              {expanded ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
+              Abrir
             </button>
           </div>
         </div>
-        <div className="flex-1 relative bg-black min-h-0">
+        <button
+          type="button"
+          onClick={() => setMeetingMode(true)}
+          className="flex-1 relative bg-black min-h-0 cursor-zoom-in"
+          title="Abrir em modo reunião"
+        >
           {activeStream && <ScreenEl stream={activeStream} muted={activeKey === "__local__"} />}
-        </div>
+        </button>
         {(hasLocal ? 1 : 0) + remotes.length > 1 && (
           <div className="flex items-center gap-1 px-2 py-1 bg-black/60 overflow-x-auto shrink-0">
             {hasLocal && (
-              <Thumb
-                label="Você"
-                active={activeKey === "__local__"}
-                onClick={() => setActiveKey("__local__")}
-              />
+              <Thumb label="Você" active={activeKey === "__local__"} onClick={() => setActiveKey("__local__")} />
             )}
             {remotes.map(([id]) => (
               <Thumb
