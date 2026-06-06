@@ -817,6 +817,12 @@ export function useRtcMesh(myId: string | null, desiredPeers: string[]): RtcMesh
     videoDevices,
     selectedVideoDeviceId,
     setVideoDevice,
+    audioInputDevices,
+    selectedAudioInputDeviceId,
+    setAudioInputDevice,
+    audioOutputDevices,
+    selectedAudioOutputDeviceId,
+    setAudioOutputDevice,
     prewarmMic,
   };
 }
