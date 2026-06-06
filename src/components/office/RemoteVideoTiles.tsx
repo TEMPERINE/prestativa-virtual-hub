@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { Mic, MicOff, VideoOff } from "lucide-react";
+import { Mic, MicOff, VideoOff, Hand } from "lucide-react";
 
 type Profile = { id: string; display_name: string; avatar_color: string };
 
@@ -10,11 +10,13 @@ type Props = {
   localStream: MediaStream | null;
   localCamOn: boolean;
   localMicOn: boolean;
+  selfSpeaking?: boolean;
   // Remotes
   streams: Record<string, MediaStream>;
   profiles: Record<string, Profile>;
   speakingPeers: Record<string, boolean>;
   connectedPeers: string[];
+  raisedHands?: Record<string, boolean>;
 };
 
 function initials(name: string): string {
@@ -35,14 +37,13 @@ export function RemoteVideoTiles({
   localStream,
   localCamOn,
   localMicOn,
+  selfSpeaking = false,
   streams,
   profiles,
   speakingPeers,
   connectedPeers,
+  raisedHands = {},
 }: Props) {
-  // Hidden audio for all remotes (audio plays even without video).
-  // We render the strip only if at least one tile exists (always true once
-  // user is identified — the local tile is always present in a call).
   const hasAnyone = !!myId && (connectedPeers.length > 0 || localCamOn || localMicOn);
 
   return (
@@ -61,7 +62,8 @@ export function RemoteVideoTiles({
                 stream={localStream}
                 hasVideo={localCamOn && hasLiveVideo(localStream)}
                 micOn={localMicOn}
-                speaking={false}
+                speaking={localMicOn && selfSpeaking}
+                handRaised={!!raisedHands[myProfile.id]}
                 isSelf
               />
             )}
@@ -79,10 +81,9 @@ export function RemoteVideoTiles({
                   profile={profile}
                   stream={stream ?? null}
                   hasVideo={hasLiveVideo(stream)}
-                  // We don't get remote mic state directly; infer from
-                  // speaking detection (false when quiet doesn't mean muted).
                   micOn={true}
                   speaking={!!speakingPeers[peerId]}
+                  handRaised={!!raisedHands[peerId]}
                 />
               );
             })}
@@ -99,6 +100,7 @@ function Tile({
   hasVideo,
   micOn,
   speaking,
+  handRaised,
   isSelf,
 }: {
   profile: Profile;
@@ -106,14 +108,20 @@ function Tile({
   hasVideo: boolean;
   micOn: boolean;
   speaking: boolean;
+  handRaised?: boolean;
   isSelf?: boolean;
 }) {
   return (
     <div
-      className={`relative w-48 h-28 rounded-xl overflow-hidden shadow-lg border-2 transition-colors ${
-        speaking ? "border-primary" : "border-white/15"
+      className={`relative w-48 h-28 rounded-xl overflow-hidden shadow-lg border-2 transition-all ${
+        speaking ? "border-emerald-400" : "border-white/15"
       }`}
-      style={{ background: profile.avatar_color || "#1f2937" }}
+      style={{
+        background: profile.avatar_color || "#1f2937",
+        boxShadow: speaking
+          ? "0 0 0 2px color-mix(in oklab, #34d399 70%, transparent), 0 6px 24px -8px rgba(0,0,0,0.45)"
+          : undefined,
+      }}
     >
       {hasVideo && stream ? (
         <VideoEl stream={stream} mirrored={!!isSelf} />
@@ -132,10 +140,20 @@ function Tile({
         </div>
       )}
 
+      {/* Raised hand badge (top-left) */}
+      {handRaised && (
+        <div
+          className="absolute top-1.5 left-1.5 w-7 h-7 rounded-full flex items-center justify-center bg-amber-400 text-amber-950 shadow-md animate-pulse"
+          title="Mão levantada"
+        >
+          <Hand className="w-4 h-4" />
+        </div>
+      )}
+
       {/* Bottom name + mic state bar (Meet-like) */}
       <div className="absolute bottom-0 inset-x-0 px-2 py-1 bg-black/55 text-white text-xs flex items-center gap-1.5">
         {micOn ? (
-          <Mic className={`w-3 h-3 shrink-0 ${speaking ? "text-primary" : "text-white/80"}`} />
+          <Mic className={`w-3 h-3 shrink-0 ${speaking ? "text-emerald-400" : "text-white/80"}`} />
         ) : (
           <MicOff className="w-3 h-3 shrink-0 text-red-400" />
         )}
