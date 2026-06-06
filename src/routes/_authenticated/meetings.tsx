@@ -675,6 +675,9 @@ function MeetingCard({
               {meeting.recording_path && (
                 <AiPanel meeting={meeting} onAiUpdated={onAiUpdated} />
               )}
+
+              <PersonalNotes meetingId={meeting.id} active={open} />
+
             </div>
           </div>
         </div>
