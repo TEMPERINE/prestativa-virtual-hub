@@ -692,6 +692,9 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
       setFacing(startFacing);
       positionHydratedRef.current = true;
       writeLocalSavedPosition(userData.user.id, safeStart, startZone, startFacing);
+      // Sinaliza pro preloader que a posição real já foi resolvida — só
+      // depois disso o office aparece (sem flash de snap pro spawn).
+      try { onHydrated?.(); } catch { /* noop */ }
 
       pmap[userData.user.id] = {
         user_id: userData.user.id,
