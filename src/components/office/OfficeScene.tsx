@@ -2536,7 +2536,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
             <Link
               to="/office/editor"
               title="Editor de mapa"
-              className="inline-flex items-center justify-center w-9 h-9 rounded-full bg-foreground text-background shadow-lg hover:bg-foreground/85 transition"
+              className="inline-flex items-center justify-center w-8 h-8 rounded-md text-foreground/70 hover:text-foreground hover:bg-foreground/10 transition"
             >
               <Pencil className="w-4 h-4" />
             </Link>
