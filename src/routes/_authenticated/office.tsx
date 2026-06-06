@@ -14,10 +14,9 @@ export const Route = createFileRoute("/_authenticated/office")({
 });
 
 function OfficePage() {
-  // Dois gates: assets carregados + posição real do personagem resolvida.
-  // Só quando AMBOS estão prontos o preloader some — assim o usuário nunca
-  // vê o avatar "pulando" do spawn pro último ponto salvo.
-  const [assetsReady, setAssetsReady] = useState(false);
+  // O preloader só pode finalizar (fade out) quando a OfficeScene
+  // confirmar que já leu a última posição salva do personagem. Assim o
+  // usuário nunca vê o avatar "pulando" do spawn pro último ponto salvo.
   const [sceneHydrated, setSceneHydrated] = useState(false);
   const [ready, setReady] = useState(false);
   const hydratedRef = useRef(false);
@@ -27,14 +26,6 @@ function OfficePage() {
     hydratedRef.current = true;
     setSceneHydrated(true);
   }, []);
-
-  useEffect(() => {
-    if (assetsReady && sceneHydrated) {
-      // pequeno delay garante que o primeiro frame do office já pintou
-      const id = window.setTimeout(() => setReady(true), 120);
-      return () => window.clearTimeout(id);
-    }
-  }, [assetsReady, sceneHydrated]);
 
   // Fallback: se algo travar a hidratação, libera depois de 8s pra não
   // prender o usuário na tela de loading pra sempre.
@@ -49,7 +40,12 @@ function OfficePage() {
       <div style={{ visibility: ready ? "visible" : "hidden" }}>
         <OfficeScene onHydrated={handleHydrated} />
       </div>
-      {!ready && <PreloadScreen onReady={() => setAssetsReady(true)} />}
+      {!ready && (
+        <PreloadScreen
+          canFinish={sceneHydrated}
+          onReady={() => setReady(true)}
+        />
+      )}
     </>
   );
 }
