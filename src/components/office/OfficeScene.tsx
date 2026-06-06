@@ -661,7 +661,18 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
       const dbTs = timestampForPosition(existing ?? {});
       const dbLooksLikeSpawn = hasSavedPos && existing.x === SPAWN.x && existing.y === SPAWN.y;
       const localLooksLikeSpawn = !!localSaved && localSaved.x === SPAWN.x && localSaved.y === SPAWN.y;
-      const localWins = !!localSaved && (!hasSavedPos || localSaved.ts >= dbTs - 1500 || (dbLooksLikeSpawn && !localLooksLikeSpawn));
+      // ESTRITAMENTE o mais novo vence — não dá pra dar grace window pro
+      // localStorage, porque se a última escrita local falhou silenciosamente
+      // (cota cheia, modo anônimo, aba congelada), o valor antigo "ganharia"
+      // do DB recente e o avatar voltaria pro penúltimo ponto. Em empate
+      // perfeito o localStorage decide só pra estabilizar o tie-break.
+      const localTs = localSaved?.ts ?? 0;
+      const localWins =
+        !!localSaved && (
+          !hasSavedPos ||
+          (dbLooksLikeSpawn && !localLooksLikeSpawn) ||
+          localTs > dbTs
+        );
       if (localWins) {
         // The browser copy is written on every movement/unload before the DB
         // roundtrip finishes, so on hard refresh it is the safest resume point.
