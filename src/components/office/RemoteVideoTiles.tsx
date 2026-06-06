@@ -51,7 +51,7 @@ export function RemoteVideoTiles({
       {hasAnyone && (
         <div
           className="absolute right-3 z-[110] flex flex-col gap-2 pointer-events-none"
-          style={{ top: "5.25rem", maxHeight: "calc(100vh - 6rem)" }}
+          style={{ top: "3.25rem", maxHeight: "calc(100vh - 4rem)" }}
         >
           <div className="flex flex-col gap-2 overflow-y-auto pr-1 pointer-events-auto">
             {/* Self tile */}
