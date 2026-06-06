@@ -2520,11 +2520,14 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
         localStream={rtc.localVideoStream}
         localCamOn={rtc.camOn}
         localMicOn={rtc.micOn}
+        selfSpeaking={rtc.selfSpeaking}
         streams={rtc.remoteStreams}
         profiles={profiles}
         speakingPeers={rtc.speakingPeers}
         connectedPeers={rtc.connectedPeers}
+        raisedHands={raisedHands}
       />
+
 
 
       {/* Topbar — slim, sticky, sophisticated */}
