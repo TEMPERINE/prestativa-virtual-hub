@@ -45,6 +45,7 @@ export function useMeetingRecorder({ getLocalAudioTrack, remoteStreams }: Args) 
   const meetingIdRef = useRef<string | null>(null);
   const startedAtRef = useRef<number>(0);
   const tickRef = useRef<number | null>(null);
+  const ownedMicStreamRef = useRef<MediaStream | null>(null);
 
   // Reconecta peers remotos no mix enquanto gravando (entram/saem da call).
   useEffect(() => {
@@ -84,6 +85,10 @@ export function useMeetingRecorder({ getLocalAudioTrack, remoteStreams }: Args) 
       try { src.disconnect(); } catch { /* noop */ }
     }
     sourcesRef.current.clear();
+    if (ownedMicStreamRef.current) {
+      ownedMicStreamRef.current.getTracks().forEach((t) => { try { t.stop(); } catch { /* noop */ } });
+      ownedMicStreamRef.current = null;
+    }
     if (audioCtxRef.current) {
       void audioCtxRef.current.close().catch(() => {});
       audioCtxRef.current = null;
@@ -94,12 +99,31 @@ export function useMeetingRecorder({ getLocalAudioTrack, remoteStreams }: Args) 
     setElapsedSeconds(0);
   }, []);
 
+
   const start = useCallback(async (meetingId: string) => {
     if (isRecording) return;
-    const localTrack = getLocalAudioTrack();
-    if (!localTrack && Object.keys(remoteStreams).length === 0) {
-      toast.error("Sem áudio para gravar. Ligue o microfone primeiro.");
-      return;
+    const callTrack = getLocalAudioTrack();
+    // Track da call serve só se existir E estiver habilitado (não mutado).
+    const usableCallTrack = callTrack && callTrack.enabled && callTrack.readyState === "live"
+      ? callTrack
+      : null;
+
+    // Se não houver mic utilizável da call, peça um stream dedicado para
+    // a gravação. Mantém isso dentro do gesto do usuário (clique → handler).
+    let ownedMic: MediaStream | null = null;
+    if (!usableCallTrack) {
+      try {
+        ownedMic = await navigator.mediaDevices.getUserMedia({
+          audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+        });
+        ownedMicStreamRef.current = ownedMic;
+      } catch (err) {
+        console.warn("[recorder] sem mic dedicado:", err);
+        if (Object.keys(remoteStreams).length === 0) {
+          toast.error("Permissão de microfone negada. Habilite o mic e tente de novo.");
+          return;
+        }
+      }
     }
 
     try {
@@ -107,15 +131,23 @@ export function useMeetingRecorder({ getLocalAudioTrack, remoteStreams }: Args) 
       const AudioCtor: typeof AudioContext = (window as any).AudioContext || (window as any).webkitAudioContext;
       const ctx = new AudioCtor();
       audioCtxRef.current = ctx;
+      // resume() é necessário em alguns browsers quando o contexto nasce suspenso.
+      if (ctx.state === "suspended") {
+        try { await ctx.resume(); } catch { /* noop */ }
+      }
       const dest = ctx.createMediaStreamDestination();
       destinationRef.current = dest;
 
-      // Mic local
-      if (localTrack) {
-        const localStream = new MediaStream([localTrack]);
+      // Mic local (preferência: track da call → senão stream dedicado)
+      if (usableCallTrack) {
+        const localStream = new MediaStream([usableCallTrack]);
         const src = ctx.createMediaStreamSource(localStream);
         src.connect(dest);
         sourcesRef.current.set(localStream, src);
+      } else if (ownedMic && ownedMic.getAudioTracks().length > 0) {
+        const src = ctx.createMediaStreamSource(ownedMic);
+        src.connect(dest);
+        sourcesRef.current.set(ownedMic, src);
       }
       // Peers
       for (const stream of Object.values(remoteStreams)) {
