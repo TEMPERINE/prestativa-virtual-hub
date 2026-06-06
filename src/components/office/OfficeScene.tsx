@@ -58,6 +58,7 @@ import { EditCharacterModal } from "@/components/profile/EditCharacterModal";
 import { EditProfileModal } from "@/components/profile/EditProfileModal";
 import { OnboardingWizard } from "@/components/onboarding/OnboardingWizard";
 import { useMeetingTracker } from "@/lib/meetings/useMeetingTracker";
+import { useMeetingRecorder } from "@/lib/meetings/useMeetingRecorder";
 
 type Profile = {
   id: string;
@@ -1805,13 +1806,20 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
 
   // Histórico "Minhas reuniões" — registra entrada/saída quando o usuário
   // está numa sala de reunião (supportsVideo) com pelo menos 1 outro peer.
-  useMeetingTracker({
+  const { activeMeetingId } = useMeetingTracker({
     zoneId: currentZone.id,
     zoneLabel: currentZone.label,
     isMeetingZone: !!currentZone.supportsVideo,
     peerCount: rtc.connectedPeers.length,
     enabled: !!me?.id,
   });
+
+  // Gravação manual (botão). Mixa mic + áudio dos peers e envia ao storage.
+  const recorder = useMeetingRecorder({
+    getLocalAudioTrack: rtc.getLocalAudioTrack,
+    remoteStreams: rtc.remoteStreams,
+  });
+
 
 
   // All workspace zones (built-in + custom) with their effective rect for hover overlays.
