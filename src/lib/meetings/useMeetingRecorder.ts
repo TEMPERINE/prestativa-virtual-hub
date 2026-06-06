@@ -9,28 +9,25 @@ const rpc = (supabase as any).rpc.bind(supabase) as (
 ) => Promise<{ data: unknown; error: unknown }>;
 
 type Args = {
-  /** Função que retorna o track local de áudio (mic). */
+  /** Track de áudio local da call (mic). */
   getLocalAudioTrack: () => MediaStreamTrack | null;
-  /** Streams remotas (uma por peer). Vamos usar os audio tracks dela. */
+  /** Streams remotas (uma por peer). Usamos os audio tracks. */
   remoteStreams: Record<string, MediaStream>;
 };
 
 export type RecorderState = {
   isRecording: boolean;
   isUploading: boolean;
-  /** Segundos desde o início. Útil para mostrar timer. */
   elapsedSeconds: number;
   start: (meetingId: string) => Promise<void>;
   stop: () => Promise<void>;
 };
 
 /**
- * Gravação client-side, manual (botão). Mixa o microfone local + áudio de
- * todos os peers via Web Audio API e empacota em audio/webm (Opus).
- *
- * O arquivo é enviado pro bucket privado `meeting-recordings` no path
- * `<meeting_id>/<timestamp>.webm`. As RLS no storage garantem que só
- * participantes da reunião conseguem ler/enviar.
+ * Gravação estilo Loom: captura **tela + áudio** via `getDisplayMedia`
+ * e mixa com o microfone local + áudio dos peers via Web Audio API.
+ * Resultado: arquivo `video/webm` enviado pro bucket privado
+ * `meeting-recordings` no path `<meeting_id>/<timestamp>.webm`.
  */
 export function useMeetingRecorder({ getLocalAudioTrack, remoteStreams }: Args) {
   const [isRecording, setIsRecording] = useState(false);
@@ -46,24 +43,24 @@ export function useMeetingRecorder({ getLocalAudioTrack, remoteStreams }: Args) 
   const startedAtRef = useRef<number>(0);
   const tickRef = useRef<number | null>(null);
   const ownedMicStreamRef = useRef<MediaStream | null>(null);
+  const displayStreamRef = useRef<MediaStream | null>(null);
+  const remoteStreamsRef = useRef(remoteStreams);
+  remoteStreamsRef.current = remoteStreams;
 
-  // Reconecta peers remotos no mix enquanto gravando (entram/saem da call).
+  // Reconecta peers remotos no mix enquanto gravando.
   useEffect(() => {
     if (!isRecording) return;
     const ctx = audioCtxRef.current;
     const dest = destinationRef.current;
     if (!ctx || !dest) return;
-
-    const currentStreams = new Set(Object.values(remoteStreams));
-    // Remove peers que saíram
+    const current = new Set(Object.values(remoteStreams));
     for (const [stream, source] of sourcesRef.current) {
-      if (!currentStreams.has(stream)) {
+      if (!current.has(stream) && stream !== ownedMicStreamRef.current && stream !== displayStreamRef.current) {
         try { source.disconnect(); } catch { /* noop */ }
         sourcesRef.current.delete(stream);
       }
     }
-    // Adiciona peers novos
-    for (const stream of currentStreams) {
+    for (const stream of current) {
       if (sourcesRef.current.has(stream)) continue;
       if (stream.getAudioTracks().length === 0) continue;
       try {
@@ -89,6 +86,10 @@ export function useMeetingRecorder({ getLocalAudioTrack, remoteStreams }: Args) 
       ownedMicStreamRef.current.getTracks().forEach((t) => { try { t.stop(); } catch { /* noop */ } });
       ownedMicStreamRef.current = null;
     }
+    if (displayStreamRef.current) {
+      displayStreamRef.current.getTracks().forEach((t) => { try { t.stop(); } catch { /* noop */ } });
+      displayStreamRef.current = null;
+    }
     if (audioCtxRef.current) {
       void audioCtxRef.current.close().catch(() => {});
       audioCtxRef.current = null;
@@ -99,17 +100,44 @@ export function useMeetingRecorder({ getLocalAudioTrack, remoteStreams }: Args) 
     setElapsedSeconds(0);
   }, []);
 
-
   const start = useCallback(async (meetingId: string) => {
     if (isRecording) return;
+
+    // 1) Pede captura de tela (com áudio do sistema/aba quando disponível).
+    //    Precisa rodar dentro do gesto do usuário (clique).
+    let displayStream: MediaStream;
+    try {
+      displayStream = await navigator.mediaDevices.getDisplayMedia({
+        video: { frameRate: 15 },
+        audio: true,
+      });
+    } catch (err) {
+      const name = (err as { name?: string })?.name;
+      if (name === "NotAllowedError") {
+        toast.error("Você precisa compartilhar a tela para gravar.");
+      } else {
+        console.error("[recorder] getDisplayMedia error:", err);
+        toast.error("Não foi possível capturar a tela.");
+      }
+      return;
+    }
+    displayStreamRef.current = displayStream;
+
+    // Se o usuário parar pela barra nativa do navegador, finalizamos.
+    const videoTrack = displayStream.getVideoTracks()[0];
+    if (videoTrack) {
+      videoTrack.addEventListener("ended", () => {
+        if (recorderRef.current && recorderRef.current.state !== "inactive") {
+          void stopRef.current?.();
+        }
+      });
+    }
+
+    // 2) Mic — usa o track da call se utilizável; senão pede um dedicado.
     const callTrack = getLocalAudioTrack();
-    // Track da call serve só se existir E estiver habilitado (não mutado).
     const usableCallTrack = callTrack && callTrack.enabled && callTrack.readyState === "live"
       ? callTrack
       : null;
-
-    // Se não houver mic utilizável da call, peça um stream dedicado para
-    // a gravação. Mantém isso dentro do gesto do usuário (clique → handler).
     let ownedMic: MediaStream | null = null;
     if (!usableCallTrack) {
       try {
@@ -119,10 +147,6 @@ export function useMeetingRecorder({ getLocalAudioTrack, remoteStreams }: Args) 
         ownedMicStreamRef.current = ownedMic;
       } catch (err) {
         console.warn("[recorder] sem mic dedicado:", err);
-        if (Object.keys(remoteStreams).length === 0) {
-          toast.error("Permissão de microfone negada. Habilite o mic e tente de novo.");
-          return;
-        }
       }
     }
 
@@ -131,53 +155,74 @@ export function useMeetingRecorder({ getLocalAudioTrack, remoteStreams }: Args) 
       const AudioCtor: typeof AudioContext = (window as any).AudioContext || (window as any).webkitAudioContext;
       const ctx = new AudioCtor();
       audioCtxRef.current = ctx;
-      // resume() é necessário em alguns browsers quando o contexto nasce suspenso.
       if (ctx.state === "suspended") {
         try { await ctx.resume(); } catch { /* noop */ }
       }
       const dest = ctx.createMediaStreamDestination();
       destinationRef.current = dest;
 
-      // Mic local (preferência: track da call → senão stream dedicado)
+      // Áudio do sistema (vem do displayStream se o usuário marcou "compartilhar áudio").
+      if (displayStream.getAudioTracks().length > 0) {
+        try {
+          const src = ctx.createMediaStreamSource(new MediaStream(displayStream.getAudioTracks()));
+          src.connect(dest);
+          sourcesRef.current.set(displayStream, src);
+        } catch (err) {
+          console.warn("[recorder] não conectou áudio do sistema:", err);
+        }
+      }
+      // Mic
       if (usableCallTrack) {
-        const localStream = new MediaStream([usableCallTrack]);
-        const src = ctx.createMediaStreamSource(localStream);
+        const ms = new MediaStream([usableCallTrack]);
+        const src = ctx.createMediaStreamSource(ms);
         src.connect(dest);
-        sourcesRef.current.set(localStream, src);
+        sourcesRef.current.set(ms, src);
       } else if (ownedMic && ownedMic.getAudioTracks().length > 0) {
         const src = ctx.createMediaStreamSource(ownedMic);
         src.connect(dest);
         sourcesRef.current.set(ownedMic, src);
       }
       // Peers
-      for (const stream of Object.values(remoteStreams)) {
+      for (const stream of Object.values(remoteStreamsRef.current)) {
         if (stream.getAudioTracks().length === 0) continue;
-        const src = ctx.createMediaStreamSource(stream);
-        src.connect(dest);
-        sourcesRef.current.set(stream, src);
+        try {
+          const src = ctx.createMediaStreamSource(stream);
+          src.connect(dest);
+          sourcesRef.current.set(stream, src);
+        } catch { /* noop */ }
       }
 
+      // Monta o stream final: vídeo da tela + áudio mixado.
+      const finalStream = new MediaStream();
+      displayStream.getVideoTracks().forEach((t) => finalStream.addTrack(t));
+      dest.stream.getAudioTracks().forEach((t) => finalStream.addTrack(t));
+
       const mime = pickMime();
-      const recorder = new MediaRecorder(dest.stream, mime ? { mimeType: mime, audioBitsPerSecond: 96000 } : { audioBitsPerSecond: 96000 });
+      const recorder = new MediaRecorder(
+        finalStream,
+        mime
+          ? { mimeType: mime, videoBitsPerSecond: 1_500_000, audioBitsPerSecond: 96_000 }
+          : { videoBitsPerSecond: 1_500_000, audioBitsPerSecond: 96_000 },
+      );
       recorderRef.current = recorder;
       chunksRef.current = [];
       recorder.ondataavailable = (e) => {
         if (e.data && e.data.size > 0) chunksRef.current.push(e.data);
       };
-      recorder.start(2000); // flush a cada 2s
+      recorder.start(2000);
       meetingIdRef.current = meetingId;
       startedAtRef.current = Date.now();
       setIsRecording(true);
       tickRef.current = window.setInterval(() => {
         setElapsedSeconds(Math.floor((Date.now() - startedAtRef.current) / 1000));
       }, 1000);
-      toast.success("🎙️ Gravando reunião…");
+      toast.success("🔴 Gravando tela + áudio…");
     } catch (err) {
       console.error("[recorder] start error:", err);
       toast.error("Não foi possível iniciar a gravação.");
       cleanup();
     }
-  }, [isRecording, getLocalAudioTrack, remoteStreams, cleanup]);
+  }, [isRecording, getLocalAudioTrack, cleanup]);
 
   const stop = useCallback(async () => {
     const recorder = recorderRef.current;
@@ -191,14 +236,13 @@ export function useMeetingRecorder({ getLocalAudioTrack, remoteStreams }: Args) 
     setIsUploading(true);
     const durationSec = Math.max(1, Math.floor((Date.now() - startedAtRef.current) / 1000));
 
-    // Aguarda último dataavailable
     const stopped = new Promise<void>((resolve) => {
       recorder.onstop = () => resolve();
     });
     try { recorder.stop(); } catch { /* noop */ }
     await stopped;
 
-    const mime = recorder.mimeType || "audio/webm";
+    const mime = recorder.mimeType || "video/webm";
     const blob = new Blob(chunksRef.current, { type: mime });
     cleanup();
 
@@ -227,7 +271,10 @@ export function useMeetingRecorder({ getLocalAudioTrack, remoteStreams }: Args) 
     }
   }, [cleanup]);
 
-  // Para gravação ao desmontar
+  // Workaround: o handler "ended" do videoTrack precisa chamar a versão atual de stop.
+  const stopRef = useRef<typeof stop | null>(null);
+  stopRef.current = stop;
+
   useEffect(() => {
     return () => {
       if (recorderRef.current && recorderRef.current.state !== "inactive") {
@@ -243,9 +290,11 @@ export function useMeetingRecorder({ getLocalAudioTrack, remoteStreams }: Args) 
 
 function pickMime(): string | null {
   const candidates = [
-    "audio/webm;codecs=opus",
-    "audio/webm",
-    "audio/mp4",
+    "video/webm;codecs=vp9,opus",
+    "video/webm;codecs=vp8,opus",
+    "video/webm;codecs=h264,opus",
+    "video/webm",
+    "video/mp4",
   ];
   if (typeof MediaRecorder === "undefined") return null;
   for (const c of candidates) {
