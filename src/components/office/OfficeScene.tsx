@@ -47,6 +47,7 @@ import { installAudioUnlockListeners, unlockAudioPlayback } from "@/lib/rtc/audi
 import { RemoteVideoTiles } from "./RemoteVideoTiles";
 import { CamPreviewAndPicker } from "./CamPreviewAndPicker";
 import { DeviceMenu } from "./DeviceMenu";
+import prestativaIcon from "@/assets/prestativa-icon.png.asset.json";
 import { ScreenShareViewer } from "./ScreenShareViewer";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
