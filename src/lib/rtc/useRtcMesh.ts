@@ -43,6 +43,7 @@ export type RtcMeshState = {
   remoteScreenStreams: Record<string, MediaStream>;
   connectedPeers: string[];
   speakingPeers: Record<string, boolean>;
+  selfSpeaking: boolean;
   localVideoStream: MediaStream | null;
   localScreenStream: MediaStream | null;
   videoDevices: MediaDeviceInfo[];
@@ -56,6 +57,7 @@ export type RtcMeshState = {
   setAudioOutputDevice: (deviceId: string) => Promise<void>;
   prewarmMic: () => Promise<void>;
 };
+
 
 // Apply codec preferences so the SDP offers Opus first (with DTX/FEC) for
 // audio and VP8 first for video — best cross-browser stability for a mesh.
@@ -85,6 +87,8 @@ export function useRtcMesh(myId: string | null, desiredPeers: string[]): RtcMesh
   const [remoteScreenStreams, setRemoteScreenStreams] = useState<Record<string, MediaStream>>({});
   const [connectedPeers, setConnectedPeers] = useState<string[]>([]);
   const [speakingPeers, setSpeakingPeers] = useState<Record<string, boolean>>({});
+  const [selfSpeaking, setSelfSpeaking] = useState(false);
+
   const [localVideoStream, setLocalVideoStream] = useState<MediaStream | null>(null);
   const [localScreenStream, setLocalScreenStream] = useState<MediaStream | null>(null);
   const [videoDevices, setVideoDevices] = useState<MediaDeviceInfo[]>([]);
@@ -560,6 +564,37 @@ export function useRtcMesh(myId: string | null, desiredPeers: string[]): RtcMesh
     };
   }, [remoteStreams]);
 
+  // Self speaking detection (analyse local mic level only when mic is on).
+  useEffect(() => {
+    if (!micOn) { setSelfSpeaking(false); return; }
+    const track = audioTrackRef.current;
+    if (!track) return;
+    let ctx: AudioContext | null = null;
+    let raf = 0;
+    try {
+      ctx = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
+      const src = ctx.createMediaStreamSource(new MediaStream([track]));
+      const analyser = ctx.createAnalyser();
+      analyser.fftSize = 512;
+      src.connect(analyser);
+      const data = new Uint8Array(new ArrayBuffer(analyser.frequencyBinCount));
+      const tick = () => {
+        analyser.getByteFrequencyData(data);
+        let sum = 0;
+        for (let i = 0; i < data.length; i++) sum += data[i];
+        setSelfSpeaking(sum / data.length > 12);
+        raf = requestAnimationFrame(tick);
+      };
+      raf = requestAnimationFrame(tick);
+    } catch { /* noop */ }
+    return () => {
+      cancelAnimationFrame(raf);
+      try { void ctx?.close(); } catch { /* noop */ }
+      setSelfSpeaking(false);
+    };
+  }, [micOn]);
+
+
   const acquireMic = useCallback(async (deviceId?: string): Promise<MediaStreamTrack | null> => {
     const audioConstraints: MediaTrackConstraints = {
       echoCancellation: true,
@@ -821,6 +856,8 @@ export function useRtcMesh(myId: string | null, desiredPeers: string[]): RtcMesh
     remoteScreenStreams,
     connectedPeers,
     speakingPeers,
+    selfSpeaking,
+
     localVideoStream,
     localScreenStream,
     videoDevices,
