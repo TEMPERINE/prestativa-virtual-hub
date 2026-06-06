@@ -101,6 +101,68 @@ export type Database = {
         }
         Relationships: []
       }
+      meeting_participants: {
+        Row: {
+          id: string
+          joined_at: string
+          left_at: string | null
+          meeting_id: string
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          joined_at?: string
+          left_at?: string | null
+          meeting_id: string
+          user_id: string
+        }
+        Update: {
+          id?: string
+          joined_at?: string
+          left_at?: string | null
+          meeting_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "meeting_participants_meeting_id_fkey"
+            columns: ["meeting_id"]
+            isOneToOne: false
+            referencedRelation: "meetings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      meetings: {
+        Row: {
+          ended_at: string | null
+          host_id: string | null
+          id: string
+          started_at: string
+          title: string | null
+          zone_id: string
+          zone_label: string
+        }
+        Insert: {
+          ended_at?: string | null
+          host_id?: string | null
+          id?: string
+          started_at?: string
+          title?: string | null
+          zone_id: string
+          zone_label: string
+        }
+        Update: {
+          ended_at?: string | null
+          host_id?: string | null
+          id?: string
+          started_at?: string
+          title?: string | null
+          zone_id?: string
+          zone_label?: string
+        }
+        Relationships: []
+      }
       messages: {
         Row: {
           body: string
@@ -293,6 +355,11 @@ export type Database = {
         }
         Returns: boolean
       }
+      meeting_join: {
+        Args: { _zone_id: string; _zone_label: string }
+        Returns: string
+      }
+      meeting_leave: { Args: { _meeting_id: string }; Returns: undefined }
     }
     Enums: {
       app_role: "admin" | "supervisor" | "member"
