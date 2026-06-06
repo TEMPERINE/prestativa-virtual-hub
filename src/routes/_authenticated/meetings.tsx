@@ -1,9 +1,10 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { supabase } from "@/integrations/supabase/client";
 import { ArrowLeft, Users, Clock, Video, Sparkles, Loader2, FileText, ChevronDown } from "lucide-react";
-import { toast } from "sonner";
 import { generateMeetingAi } from "@/lib/meetings/ai.functions";
 
 export const Route = createFileRoute("/_authenticated/meetings")({
@@ -236,6 +237,23 @@ function MeetingCard({
   );
 }
 
+const mdComponents = {
+  h1: (p: any) => <h3 className="text-base font-semibold mt-3 mb-1" {...p} />,
+  h2: (p: any) => <h3 className="text-base font-semibold mt-3 mb-1" {...p} />,
+  h3: (p: any) => <h4 className="text-sm font-semibold mt-3 mb-1" {...p} />,
+  h4: (p: any) => <h5 className="text-sm font-semibold mt-2 mb-1" {...p} />,
+  p: (p: any) => <p className="my-1" {...p} />,
+  ul: (p: any) => <ul className="list-disc pl-5 my-1 space-y-0.5" {...p} />,
+  ol: (p: any) => <ol className="list-decimal pl-5 my-1 space-y-0.5" {...p} />,
+  li: (p: any) => <li className="my-0" {...p} />,
+  strong: (p: any) => <strong className="font-semibold" {...p} />,
+  em: (p: any) => <em className="italic" {...p} />,
+  a: (p: any) => <a className="text-primary hover:underline" {...p} />,
+  code: (p: any) => <code className="px-1 py-0.5 rounded bg-muted text-[0.85em]" {...p} />,
+};
+
+
+
 function AiPanel({
   meeting,
   onAiUpdated,
@@ -244,52 +262,66 @@ function AiPanel({
   onAiUpdated: (transcript: string, summary: string) => void;
 }) {
   const generate = useServerFn(generateMeetingAi);
-  const [busy, setBusy] = useState(meeting.ai_status === "processing");
-  const [openTranscript, setOpenTranscript] = useState(false);
   const hasAi = !!(meeting.summary || meeting.transcript);
+  const [busy, setBusy] = useState(meeting.ai_status === "processing" || (!hasAi && meeting.ai_status !== "error"));
+  const [openTranscript, setOpenTranscript] = useState(false);
+  const triedRef = useRef(false);
 
   const run = async () => {
-    if (busy) return;
     setBusy(true);
     try {
       const res = await generate({ data: { meetingId: meeting.id } });
       onAiUpdated(res.transcript, res.summary);
-      toast.success("Transcrição e resumo prontos.");
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "Falha ao gerar.";
-      toast.error(msg);
+    } catch {
+      // erro fica salvo em meeting.ai_error via servidor; refletido no próximo carregamento
     } finally {
       setBusy(false);
     }
   };
+
+  // Auto-trigger: gera assim que o card aparece, se ainda não tem resumo.
+  useEffect(() => {
+    if (triedRef.current) return;
+    if (hasAi) return;
+    if (meeting.ai_status === "error") return;
+    triedRef.current = true;
+    void run();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [meeting.id]);
 
   return (
     <div className="mt-3 border-t pt-3">
       <div className="flex items-center gap-2 text-xs text-muted-foreground mb-2">
         <Sparkles className="w-3 h-3" />
         <span>Resumo automático</span>
-        <button
-          onClick={run}
-          disabled={busy}
-          className="ml-auto inline-flex items-center gap-1 text-primary hover:underline disabled:opacity-60 disabled:no-underline"
-        >
-          {busy ? (
-            <>
-              <Loader2 className="w-3 h-3 animate-spin" /> Processando…
-            </>
-          ) : hasAi ? (
-            "Refazer"
-          ) : (
-            "Gerar transcrição + resumo"
-          )}
-        </button>
+        {busy ? (
+          <span className="ml-auto inline-flex items-center gap-1 text-muted-foreground">
+            <Loader2 className="w-3 h-3 animate-spin" /> Gerando…
+          </span>
+        ) : hasAi ? (
+          <button
+            onClick={() => void run()}
+            className="ml-auto text-primary hover:underline"
+          >
+            Refazer
+          </button>
+        ) : meeting.ai_status === "error" ? (
+          <button
+            onClick={() => void run()}
+            className="ml-auto text-primary hover:underline"
+          >
+            Tentar novamente
+          </button>
+        ) : null}
       </div>
       {meeting.ai_error && !busy && (
-        <div className="text-xs text-destructive">{meeting.ai_error}</div>
+        <div className="text-xs text-destructive mb-2">{meeting.ai_error}</div>
       )}
       {meeting.summary && (
-        <div className="text-sm whitespace-pre-wrap leading-relaxed bg-muted/40 rounded-md p-3">
-          {meeting.summary}
+        <div className="text-sm leading-relaxed bg-muted/40 rounded-md p-3">
+          <ReactMarkdown remarkPlugins={[remarkGfm]} components={mdComponents}>
+            {meeting.summary}
+          </ReactMarkdown>
         </div>
       )}
       {meeting.transcript && (
@@ -305,9 +337,11 @@ function AiPanel({
             />
           </button>
           {openTranscript && (
-            <pre className="mt-2 text-xs whitespace-pre-wrap font-sans bg-muted/30 rounded-md p-3 max-h-96 overflow-auto">
-              {meeting.transcript}
-            </pre>
+            <div className="mt-2 text-xs bg-muted/30 rounded-md p-3 max-h-96 overflow-auto">
+              <ReactMarkdown remarkPlugins={[remarkGfm]} components={mdComponents}>
+                {meeting.transcript}
+              </ReactMarkdown>
+            </div>
           )}
         </div>
       )}
