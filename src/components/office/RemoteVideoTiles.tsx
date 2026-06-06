@@ -67,26 +67,28 @@ export function RemoteVideoTiles({
                 isSelf
               />
             )}
-            {/* Remote tiles */}
-            {connectedPeers.map((peerId) => {
-              const profile = profiles[peerId] ?? {
-                id: peerId,
-                display_name: "Convidado",
-                avatar_color: "#475569",
-              };
-              const stream = streams[peerId];
-              return (
-                <Tile
-                  key={peerId}
-                  profile={profile}
-                  stream={stream ?? null}
-                  hasVideo={hasLiveVideo(stream)}
-                  micOn={true}
-                  speaking={!!speakingPeers[peerId]}
-                  handRaised={!!raisedHands[peerId]}
-                />
-              );
-            })}
+            {/* Remote tiles — pessoas com a mão levantada vão pro topo */}
+            {[...connectedPeers]
+              .sort((a, b) => Number(!!raisedHands[b]) - Number(!!raisedHands[a]))
+              .map((peerId) => {
+                const profile = profiles[peerId] ?? {
+                  id: peerId,
+                  display_name: "Convidado",
+                  avatar_color: "#475569",
+                };
+                const stream = streams[peerId];
+                return (
+                  <Tile
+                    key={peerId}
+                    profile={profile}
+                    stream={stream ?? null}
+                    hasVideo={hasLiveVideo(stream)}
+                    micOn={true}
+                    speaking={!!speakingPeers[peerId]}
+                    handRaised={!!raisedHands[peerId]}
+                  />
+                );
+              })}
           </div>
         </div>
       )}
