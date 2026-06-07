@@ -1,15 +1,10 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
 
-// Legacy route: now redirects to the workspace hub (or the last-used
-// workspace, when available) so existing links keep working.
+// Legacy: sempre manda o usuário para o hub de seleção de workspaces.
+// Quem tem mais de um precisa escolher onde estar online — só é possível
+// estar presente em um escritório por vez.
 export const Route = createFileRoute("/_authenticated/office")({
   beforeLoad: () => {
-    if (typeof window !== "undefined") {
-      const last = window.localStorage.getItem("lastWorkspaceId");
-      if (last) {
-        throw redirect({ to: "/workspaces/$workspaceId", params: { workspaceId: last } });
-      }
-    }
     throw redirect({ to: "/workspaces" });
   },
   component: () => null,
