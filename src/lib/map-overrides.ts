@@ -211,17 +211,19 @@ export function subscribeOverridesFromCloud(
   let cancelled = false;
   let cleanup = () => {};
   (async () => {
+    const ws = await getWs();
+    if (!ws) return;
     const { supabase } = await import("@/integrations/supabase/client");
     if (cancelled) return;
     const channel = supabase
-      .channel(`map_overrides:global:${Date.now()}:${Math.random().toString(36).slice(2)}`)
+      .channel(`map_overrides:${ws}:${Date.now()}:${Math.random().toString(36).slice(2)}`)
       .on(
         "postgres_changes",
         {
           event: "*",
           schema: "public",
           table: "map_overrides",
-          filter: `id=eq.${CLOUD_ID}`,
+          filter: `workspace_id=eq.${ws}`,
         },
         (payload) => {
           const next =
