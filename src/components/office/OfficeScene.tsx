@@ -818,7 +818,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
 
 
     const reactionCh = supabase
-      .channel("reactions-room")
+      .channel(`reactions-room:${wsSuffix}`)
       .on("broadcast", { event: "reaction" }, (payload) => {
         const { user_id, emoji } = (payload.payload ?? {}) as { user_id?: string; emoji?: string };
         if (!user_id || !emoji) return;
