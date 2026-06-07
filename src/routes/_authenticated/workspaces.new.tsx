@@ -179,7 +179,14 @@ function NewWorkspacePage() {
             />
           )}
           {step === 2 && (
-            <StepTheme themeId={themeId} setThemeId={setThemeId} />
+            <StepTheme
+              themeId={themeId}
+              setThemeId={setThemeId}
+              customThemeUrl={customThemeUrl}
+              setCustomThemeUrl={setCustomThemeUrl}
+              customThemeLabel={customThemeLabel}
+              setCustomThemeLabel={setCustomThemeLabel}
+            />
           )}
           {step === 3 && (
             <StepSeed
@@ -334,10 +341,52 @@ function StepIdentity({
 function StepTheme({
   themeId,
   setThemeId,
+  customThemeUrl,
+  setCustomThemeUrl,
+  customThemeLabel,
+  setCustomThemeLabel,
 }: {
   themeId: string;
   setThemeId: (id: string) => void;
+  customThemeUrl: string | null;
+  setCustomThemeUrl: (u: string | null) => void;
+  customThemeLabel: string;
+  setCustomThemeLabel: (s: string) => void;
 }) {
+  const [uploading, setUploading] = useState(false);
+
+  const onUpload = async (file: File) => {
+    if (!file.type.startsWith("image/")) {
+      toast.error("Selecione um arquivo de imagem.");
+      return;
+    }
+    if (file.size > 8 * 1024 * 1024) {
+      toast.error("Imagem muito grande (máx 8MB).");
+      return;
+    }
+    setUploading(true);
+    try {
+      const { data: u } = await supabase.auth.getUser();
+      const uid = u.user?.id ?? "anon";
+      const ext = file.name.split(".").pop()?.toLowerCase() || "png";
+      const path = `${uid}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+      const { error } = await supabase.storage
+        .from("office-theme-bg")
+        .upload(path, file, { upsert: false, contentType: file.type });
+      if (error) {
+        toast.error(error.message);
+        return;
+      }
+      const { data: pub } = supabase.storage.from("office-theme-bg").getPublicUrl(path);
+      setCustomThemeUrl(pub.publicUrl);
+      if (!customThemeLabel) setCustomThemeLabel(file.name.replace(/\.[^.]+$/, ""));
+      setThemeId("custom");
+      toast.success("Imagem enviada!");
+    } finally {
+      setUploading(false);
+    }
+  };
+
   return (
     <div>
       <div className="text-xs font-medium uppercase tracking-wider text-muted-foreground mb-3">
@@ -377,6 +426,85 @@ function StepTheme({
             </button>
           );
         })}
+
+        {/* Card Custom */}
+        <label
+          className={`text-left rounded-xl overflow-hidden border-2 transition cursor-pointer block ${
+            themeId === "custom"
+              ? "border-primary shadow-glow"
+              : "border-dashed border-border hover:border-primary/40"
+          }`}
+        >
+          <input
+            type="file"
+            accept="image/*"
+            className="hidden"
+            disabled={uploading}
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) onUpload(f);
+              e.target.value = "";
+            }}
+          />
+          <div className="aspect-video bg-muted flex items-center justify-center relative">
+            {customThemeUrl ? (
+              <img
+                src={customThemeUrl}
+                alt="Tema personalizado"
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <div className="flex flex-col items-center text-muted-foreground text-xs gap-1">
+                {uploading ? (
+                  <Loader2 size={20} className="animate-spin" />
+                ) : (
+                  <Upload size={20} />
+                )}
+                <span>{uploading ? "Enviando…" : "Enviar nova imagem"}</span>
+              </div>
+            )}
+            {customThemeUrl && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setCustomThemeUrl(null);
+                  setCustomThemeLabel("");
+                  if (themeId === "custom") setThemeId(OFFICE_THEMES[0].id);
+                }}
+                className="absolute top-2 right-2 p-1 rounded-full bg-background/80 hover:bg-background"
+                aria-label="Remover imagem"
+              >
+                <XIcon size={12} />
+              </button>
+            )}
+          </div>
+          <div className="p-3">
+            <div className="flex items-center justify-between mb-1">
+              <div className="font-medium text-sm">
+                {customThemeUrl ? (
+                  <input
+                    type="text"
+                    value={customThemeLabel}
+                    onClick={(e) => e.stopPropagation()}
+                    onChange={(e) => setCustomThemeLabel(e.target.value)}
+                    placeholder="Nome do tema"
+                    className="bg-transparent border-b border-border focus:outline-none focus:border-primary text-sm w-full"
+                  />
+                ) : (
+                  "Tema personalizado"
+                )}
+              </div>
+              {themeId === "custom" && <Check size={14} className="text-primary" />}
+            </div>
+            <div className="text-xs text-muted-foreground line-clamp-2">
+              {customThemeUrl
+                ? "Clique no card para usar este tema."
+                : "Faça upload de uma imagem (PNG/JPG/WEBP, até 8MB) para criar um tema novo."}
+            </div>
+          </div>
+        </label>
       </div>
     </div>
   );
