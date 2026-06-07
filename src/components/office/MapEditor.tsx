@@ -688,12 +688,36 @@ export function MapEditor() {
         {/* Sidebar com abas */}
         <aside className="w-64 border-r border-border bg-card overflow-y-auto flex flex-col">
           {/* Tabs */}
-          <div className="flex border-b border-border sticky top-0 bg-card z-10">
+          <div className="flex gap-1 p-2 border-b border-border sticky top-0 bg-gradient-to-r from-card via-card to-card z-10">
             {[
-              { id: "map" as const, label: "Mapa", icon: <MapIcon size={14} /> },
-              { id: "zones" as const, label: "Áreas", icon: <LayoutGrid size={14} /> },
-              { id: "elements" as const, label: "Elementos", icon: <Boxes size={14} /> },
-              { id: "theme" as const, label: "Tema", icon: <Palette size={14} /> },
+              {
+                id: "map" as const,
+                label: "Mapa",
+                icon: <MapIcon size={14} />,
+                activeBg: "bg-gradient-to-br from-pink-500 to-rose-500",
+                hoverBg: "hover:bg-pink-500/10 hover:text-pink-500",
+              },
+              {
+                id: "zones" as const,
+                label: "Áreas",
+                icon: <LayoutGrid size={14} />,
+                activeBg: "bg-gradient-to-br from-sky-500 to-blue-600",
+                hoverBg: "hover:bg-sky-500/10 hover:text-sky-500",
+              },
+              {
+                id: "elements" as const,
+                label: "Elementos",
+                icon: <Boxes size={14} />,
+                activeBg: "bg-gradient-to-br from-amber-500 to-orange-500",
+                hoverBg: "hover:bg-amber-500/10 hover:text-amber-500",
+              },
+              {
+                id: "theme" as const,
+                label: "Tema",
+                icon: <Palette size={14} />,
+                activeBg: "bg-gradient-to-br from-violet-500 to-fuchsia-500",
+                hoverBg: "hover:bg-violet-500/10 hover:text-violet-500",
+              },
             ].map((t) => {
               const active = editorTab === t.id;
               return (
@@ -709,10 +733,10 @@ export function MapEditor() {
                       // mantém ferramenta atual; usuário escolhe uma zona ou borracha
                     }
                   }}
-                  className={`flex-1 inline-flex items-center justify-center gap-1.5 text-xs px-2 py-2 border-b-2 transition-colors ${
+                  className={`flex-1 inline-flex items-center justify-center gap-1.5 text-xs px-2 py-2 rounded-md transition-all ${
                     active
-                      ? "border-primary text-foreground font-semibold"
-                      : "border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                      ? `${t.activeBg} text-white font-semibold shadow-md shadow-black/20 scale-[1.02]`
+                      : `text-muted-foreground ${t.hoverBg}`
                   }`}
                 >
                   {t.icon}
