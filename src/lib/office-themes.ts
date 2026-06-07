@@ -6,6 +6,7 @@
 
 import officeMapDefault from "@/assets/office-map.webp";
 import officeMapCopa from "@/assets/office-map-copa.jpg.asset.json";
+import officeMapJunino from "@/assets/office-map-junino.jpg.asset.json";
 import {
   loadOverrides,
   newOverrides,
@@ -32,6 +33,12 @@ export const OFFICE_THEMES: OfficeTheme[] = [
     label: "Rumo ao Hexa",
     description: "Decoração temática verde e amarela para a Copa.",
     url: officeMapCopa.url,
+  },
+  {
+    id: "festa-junina",
+    label: "Festa Junina",
+    description: "Bandeirinhas, girassóis e xadrez vermelho — arraiá no escritório.",
+    url: officeMapJunino.url,
   },
 ];
 
