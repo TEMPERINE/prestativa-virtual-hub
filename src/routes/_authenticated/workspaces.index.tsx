@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Building2, LogOut, ArrowRight, Sparkles, Mail } from "lucide-react";
+import { Building2, LogOut, ArrowRight, Sparkles, Mail, Plus } from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/workspaces/")({
@@ -31,6 +31,7 @@ function WorkspacesHubPage() {
   const [profile, setProfile] = useState<{ display_name: string } | null>(null);
   const [workspaces, setWorkspaces] = useState<WorkspaceCard[]>([]);
   const [invites, setInvites] = useState<InviteRow[]>([]);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [busyToken, setBusyToken] = useState<string | null>(null);
 
   const load = async () => {
@@ -49,6 +50,12 @@ function WorkspacesHubPage() {
       return;
     }
     setProfile({ display_name: prof.display_name });
+
+    const { data: roles } = await supabase
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", u.user.id);
+    setIsAdmin((roles ?? []).some((r: any) => r.role === "admin"));
 
     const { data: mems } = await supabase
       .from("workspace_members")
@@ -125,11 +132,21 @@ function WorkspacesHubPage() {
           </button>
         </header>
 
-        <div className="mb-8">
-          <h1 className="text-3xl font-semibold tracking-tight mb-2">Seus escritórios</h1>
-          <p className="text-sm text-muted-foreground">
-            Escolha um espaço para entrar. Cada escritório tem seu próprio mapa, equipe e reuniões.
-          </p>
+        <div className="mb-8 flex items-end justify-between gap-4 flex-wrap">
+          <div>
+            <h1 className="text-3xl font-semibold tracking-tight mb-2">Seus escritórios</h1>
+            <p className="text-sm text-muted-foreground">
+              Escolha um espaço para entrar. Cada escritório tem seu próprio mapa, equipe e reuniões.
+            </p>
+          </div>
+          {isAdmin && (
+            <Link
+              to="/workspaces/new"
+              className="px-4 py-2 rounded-lg gradient-primary text-primary-foreground text-sm font-medium inline-flex items-center gap-2 hover:opacity-90 shadow-glow"
+            >
+              <Plus size={14} /> Novo escritório
+            </Link>
+          )}
         </div>
 
         {invites.length > 0 && (
