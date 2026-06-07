@@ -18,6 +18,8 @@ import {
   Palette,
   Map as MapIcon,
   ClipboardCheck,
+  Upload,
+  X as XIcon,
 } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/workspaces/new")({
