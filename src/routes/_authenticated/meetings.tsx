@@ -531,6 +531,8 @@ function MeetingCard({
   meeting,
   participants,
   hostProfile,
+  receivedFromSenderId,
+  receivedFromProfile,
   folders,
   meetingFolderIds,
   isFavorite,
@@ -538,11 +540,14 @@ function MeetingCard({
   onRename,
   onToggleFolder,
   onCreateFolder,
+  onShare,
   onAiUpdated,
 }: {
   meeting: MeetingRow;
   participants: ParticipantRow[];
   hostProfile?: { display_name: string; avatar_color: string };
+  receivedFromSenderId: string | null;
+  receivedFromProfile?: { display_name: string; avatar_color: string };
   folders: FolderRow[];
   meetingFolderIds: Set<string>;
   isFavorite: boolean;
@@ -550,6 +555,7 @@ function MeetingCard({
   onRename: (newTitle: string) => void;
   onToggleFolder: (folderId: string, isMember: boolean) => void;
   onCreateFolder: () => void;
+  onShare: () => void;
   onAiUpdated: (transcript: string, summary: string) => void;
 }) {
   const start = new Date(meeting.started_at);
