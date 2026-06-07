@@ -1618,6 +1618,39 @@ export function MapEditor() {
                 Clique no mapa para colocar · Esc para cancelar
               </div>
             )}
+            {/* Brush cursor overlay */}
+            {mouseCell && (effectiveTool.kind === "blocked" || effectiveTool.kind === "erase" || effectiveTool.kind === "zone" || effectiveTool.kind === "erase-zone") && (() => {
+              const half = Math.floor(brush / 2);
+              const c0 = Math.max(0, mouseCell.c - half);
+              const r0 = Math.max(0, mouseCell.r - half);
+              const wCells = Math.min(brush, GRID_COLS - c0);
+              const hCells = Math.min(brush, GRID_ROWS - r0);
+              let bg = "rgba(255,255,255,0.12)";
+              let border = "rgba(255,255,255,0.7)";
+              if (effectiveTool.kind === "blocked") {
+                bg = "rgba(239,68,68,0.22)";
+                border = "rgba(239,68,68,0.85)";
+              } else if (effectiveTool.kind === "zone") {
+                const zc = zoneColorOf(effectiveTool.zone);
+                bg = zc + "33";
+                border = zc + "cc";
+              }
+              return (
+                <div
+                  className="absolute pointer-events-none"
+                  style={{
+                    left: `${c0 * 100 / GRID_COLS}%`,
+                    top: `${r0 * 100 / GRID_ROWS}%`,
+                    width: `${wCells * 100 / GRID_COLS}%`,
+                    height: `${hCells * 100 / GRID_ROWS}%`,
+                    background: bg,
+                    border: `2px solid ${border}`,
+                    zIndex: 90000,
+                    boxSizing: "border-box",
+                  }}
+                />
+              );
+            })()}
           </div>
           {/* Zoom HUD */}
           <div className="sticky bottom-2 ml-auto mr-2 w-fit flex items-center gap-1 bg-card/90 border border-border rounded-full px-2 py-1 text-xs shadow-soft backdrop-blur" style={{ float: "right" }}>
