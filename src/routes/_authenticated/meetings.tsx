@@ -273,6 +273,7 @@ function MeetingsPage() {
   const currentTitle =
     selected === "all" ? "Minhas reuniões"
     : selected === "favorites" ? "Favoritas"
+    : selected === "received" ? "Gravações recebidas"
     : selected === "unfiled" ? "Sem pasta"
     : folders.find((f) => f.id === selected)?.name ?? "Pasta";
 
