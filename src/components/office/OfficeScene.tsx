@@ -1409,6 +1409,10 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
   const teleportTimers = useRef<number[]>([]);
 
   const teleportToZone = useCallback((zoneId: ZoneId, label?: string, useSpawnPoint = false) => {
+    if (!tierCapsRef.current.canTeleport) {
+      toast.info("Teleporte está disponível a partir do Nível 2.");
+      return;
+    }
     const z = findZoneById(zoneId);
     if (!z) return;
     // If already inside the target zone, do nothing.
