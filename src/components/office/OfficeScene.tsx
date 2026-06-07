@@ -2780,7 +2780,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
 
             {/* Botão de gravação — aparece em qualquer sala de reunião (mesmo sozinho).
                 Se não houver reunião ativa ainda, criamos sob demanda via meeting_join. */}
-            {!!currentZone.supportsVideo && (
+            {!!currentZone.supportsVideo && tierCaps.canRecordMeetings && (
               <button
                 onClick={async () => {
                   if (recorder.isUploading) return;
