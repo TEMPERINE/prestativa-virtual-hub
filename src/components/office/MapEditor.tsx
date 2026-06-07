@@ -1341,6 +1341,9 @@ export function MapEditor() {
               const rect = stageRef.current.getBoundingClientRect();
               const nx = (e.clientX - rect.left) / rect.width;
               const ny = (e.clientY - rect.top) / rect.height;
+              const col = Math.max(0, Math.min(GRID_COLS - 1, Math.floor(nx * GRID_COLS)));
+              const row = Math.max(0, Math.min(GRID_ROWS - 1, Math.floor(ny * GRID_ROWS)));
+              setMouseCell({ c: col, r: row });
               if (tool.kind === "place-prop") {
                 setGhostPos({ x: nx, y: ny });
               }
@@ -1352,10 +1355,6 @@ export function MapEditor() {
                     y: Math.max(0, Math.min(1, ny + drag.offY)),
                   });
                 } else {
-                  // Resize ancorado no canto oposto (estilo PowerPoint).
-                  // anchorLeft/anchorTop ficam fixos; calculamos nova largura
-                  // a partir da distância horizontal do cursor até a âncora,
-                  // mantendo a proporção.
                   const newW = Math.max(0.01, Math.min(0.8, nx - drag.anchorLeft));
                   const newH = newW / drag.aspect;
                   updateProp(drag.id, {
@@ -1368,7 +1367,10 @@ export function MapEditor() {
               }
               if (painting.current) handlePointer(e);
             }}
-            onPointerLeave={() => { if (tool.kind === "place-prop") setGhostPos(null); }}
+            onPointerLeave={() => {
+              setMouseCell(null);
+              if (tool.kind === "place-prop") setGhostPos(null);
+            }}
             onPointerUp={() => { painting.current = false; draggingPin.current = null; draggingPropRef.current = null; }}
             onPointerCancel={() => { painting.current = false; draggingPin.current = null; draggingPropRef.current = null; }}
           >
