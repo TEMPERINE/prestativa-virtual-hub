@@ -686,9 +686,9 @@ export function MapEditor() {
 
       <div className="flex flex-1 overflow-hidden">
         {/* Sidebar com abas */}
-        <aside className="w-64 border-r border-border bg-card overflow-y-auto flex flex-col">
+        <aside className="w-72 border-r border-border bg-card overflow-y-auto flex flex-col">
           {/* Tabs */}
-          <div className="flex gap-1 p-2 border-b border-border sticky top-0 bg-gradient-to-r from-card via-card to-card z-10">
+          <div className="flex gap-0.5 p-2 border-b border-border sticky top-0 bg-gradient-to-r from-card via-card to-card z-10">
             {[
               {
                 id: "map" as const,
@@ -733,7 +733,7 @@ export function MapEditor() {
                       // mantém ferramenta atual; usuário escolhe uma zona ou borracha
                     }
                   }}
-                  className={`flex-1 inline-flex items-center justify-center gap-1.5 text-xs px-2 py-2 rounded-md transition-all ${
+                  className={`flex-1 inline-flex items-center justify-center gap-1 text-xs px-1.5 py-2 rounded-md transition-all ${
                     active
                       ? `${t.activeBg} text-white font-semibold shadow-md shadow-black/20 scale-[1.02]`
                       : `text-muted-foreground ${t.hoverBg}`
