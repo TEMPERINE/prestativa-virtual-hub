@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Building2, LogOut, ArrowRight, Sparkles, Mail } from "lucide-react";
+import { Building2, LogOut, ArrowRight, Sparkles, Mail, Plus } from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/workspaces/")({
