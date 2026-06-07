@@ -84,6 +84,38 @@ const ZONE_COLORS: Record<string, string> = {
   "atendente-10": "#8b5cf6",
 };
 
+function mergeImport(
+  prev: MapOverrides,
+  src: MapOverrides,
+  mode: "walls" | "walls-zones" | "all"
+): MapOverrides {
+  if (!src?.cols || !src?.rows || !Array.isArray(src.blocked)) return prev;
+  // Resample src grid onto prev grid if needed.
+  const cols = prev.cols, rows = prev.rows;
+  const blocked = prev.blocked.slice();
+  const zones = prev.zones.slice();
+  for (let r = 0; r < rows; r++) {
+    const sr = Math.min(src.rows - 1, Math.floor((r / rows) * src.rows));
+    for (let c = 0; c < cols; c++) {
+      const sc = Math.min(src.cols - 1, Math.floor((c / cols) * src.cols));
+      const sIdx = sr * src.cols + sc;
+      const dIdx = r * cols + c;
+      blocked[dIdx] = src.blocked[sIdx] ?? 0;
+      if (mode === "walls-zones" || mode === "all") {
+        zones[dIdx] = (src.zones?.[sIdx] ?? null) as any;
+      }
+    }
+  }
+  const next: MapOverrides = { ...prev, blocked, zones };
+  if (mode === "all") {
+    next.customZones = src.customZones ?? [];
+    next.zoneKinds = src.zoneKinds ?? {};
+    next.spawnPoints = src.spawnPoints ?? {};
+    next.props = src.props ?? [];
+  }
+  return next;
+}
+
 export function MapEditor() {
   const stageRef = useRef<HTMLDivElement | null>(null);
   const mainRef = useRef<HTMLElement | null>(null);
