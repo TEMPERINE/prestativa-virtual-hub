@@ -359,7 +359,7 @@ function MeetingsPage() {
 }
 
 function FolderExplorer({
-  folders, selected, onSelect, allCount, favoritesCount, unfiledCount, countsByFolder,
+  folders, selected, onSelect, allCount, favoritesCount, receivedCount, unfiledCount, countsByFolder,
   onCreate, onRename, onDelete,
 }: {
   folders: FolderRow[];
@@ -367,6 +367,7 @@ function FolderExplorer({
   onSelect: (s: FolderSel) => void;
   allCount: number;
   favoritesCount: number;
+  receivedCount: number;
   unfiledCount: number;
   countsByFolder: Record<string, number>;
   onCreate: () => void;
@@ -401,6 +402,14 @@ function FolderExplorer({
             active={selected === "favorites"}
             onClick={() => onSelect("favorites")}
           />
+          <FolderItem
+            icon={<Mail className="w-4 h-4" />}
+            label="Gravações recebidas"
+            count={receivedCount}
+            active={selected === "received"}
+            onClick={() => onSelect("received")}
+          />
+
           {folders.map((f) => (
             <FolderItem
               key={f.id}
