@@ -691,6 +691,7 @@ export type Database = {
           name: string
           owner_id: string
           slug: string
+          tier: number
           updated_at: string
         }
         Insert: {
@@ -701,6 +702,7 @@ export type Database = {
           name: string
           owner_id: string
           slug: string
+          tier?: number
           updated_at?: string
         }
         Update: {
@@ -711,6 +713,7 @@ export type Database = {
           name?: string
           owner_id?: string
           slug?: string
+          tier?: number
           updated_at?: string
         }
         Relationships: []
