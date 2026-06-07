@@ -20,9 +20,10 @@ import {
 import { ZONES, COLLIDERS, FLOOR_POLY, type ZoneId } from "@/lib/office-map";
 import { PROP_CATALOG, getPropDef, subscribePropCatalog } from "@/lib/prop-catalog";
 import { loadCustomPropsFromCloud, deleteCustomProp, uploadCustomProp } from "@/lib/custom-props";
-import officeMap from "@/assets/office-map.webp";
+import { OFFICE_THEMES, getCurrentThemeId, setCurrentThemeId } from "@/lib/office-themes";
+import { useOfficeTheme } from "@/hooks/useOfficeTheme";
 import { toast } from "sonner";
-import { ArrowLeft, Eraser, Square, Download, Trash2, Eye, EyeOff, Undo, Plus, X, Briefcase, Users, MapPin, Hand, Zap, ZapOff, Lock, Map as MapIcon, Boxes, LayoutGrid, Upload, Loader2 } from "lucide-react";
+import { ArrowLeft, Eraser, Square, Download, Trash2, Eye, EyeOff, Undo, Plus, X, Briefcase, Users, MapPin, Hand, Zap, ZapOff, Lock, Map as MapIcon, Boxes, LayoutGrid, Upload, Loader2, Palette, Check } from "lucide-react";
 
 type Tool =
   | { kind: "blocked" }
@@ -91,7 +92,8 @@ export function MapEditor() {
     return loadOverrides() ?? seedFromDefaults();
   });
   const [tool, setTool] = useState<Tool>({ kind: "blocked" });
-  const [editorTab, setEditorTab] = useState<"map" | "zones" | "elements">("map");
+  const [editorTab, setEditorTab] = useState<"map" | "zones" | "elements" | "theme">("map");
+  const officeTheme = useOfficeTheme();
   const [brush, setBrush] = useState(1);
   const [showGrid, setShowGrid] = useState(true);
   const [showImage, setShowImage] = useState(true);
@@ -1183,7 +1185,7 @@ export function MapEditor() {
           >
             {showImage && (
               <img
-                src={officeMap}
+                src={officeTheme.url}
                 alt=""
                 className="absolute inset-0 w-full h-full object-cover pointer-events-none"
                 draggable={false}
