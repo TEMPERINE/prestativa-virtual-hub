@@ -50,7 +50,10 @@ function seedFromDefaults(): MapOverrides {
       }
     }
   }
-  // Zones from ZONES rectangles (skip lobby).
+  // Zones from ZONES rectangles (skip lobby). Materialize each as a
+  // customZone so the user can rename/recolor/delete them like any other.
+  const seededCustom: CustomZone[] = [];
+  const seededKinds: Record<string, ZoneKind> = {};
   for (const z of ZONES) {
     if (z.id === "lobby") continue;
     const c0 = Math.max(0, Math.floor(z.rect.x1 * o.cols));
@@ -62,7 +65,20 @@ function seedFromDefaults(): MapOverrides {
         o.zones[cellIndex(cc, r, o.cols)] = z.id;
       }
     }
+    const kind: ZoneKind =
+      z.id === "reuniao" || z.id === "feedback" || z.id === "descompressao"
+        ? "common"
+        : "workspace";
+    seededCustom.push({
+      id: z.id,
+      label: z.label,
+      color: ZONE_COLORS[z.id] ?? "#888",
+      kind,
+    });
+    seededKinds[z.id] = kind;
   }
+  o.customZones = seededCustom;
+  o.zoneKinds = seededKinds;
   return o;
 }
 
@@ -222,10 +238,24 @@ export function MapEditor() {
 
   const customZones = overrides.customZones ?? [];
 
-  const paintableZones = useMemo(
-    () => ZONES.filter((z) => z.id !== "lobby"),
-    []
-  );
+  // Unified zone list: customZones + any legacy built-in zone still painted
+  // on the grid that hasn't been migrated to customZones yet. Everything in
+  // this list is treated the same (editable, removable).
+  const displayZones = useMemo(() => {
+    const ids = new Set(customZones.map((c) => c.id));
+    const legacy: CustomZone[] = ZONES
+      .filter((z) => z.id !== "lobby" && !ids.has(z.id))
+      .filter((z) => overrides.zones.includes(z.id as ZoneId))
+      .map((z) => ({
+        id: z.id,
+        label: z.label,
+        color: ZONE_COLORS[z.id] ?? "#888",
+        kind: (z.id === "reuniao" || z.id === "feedback" || z.id === "descompressao"
+          ? "common"
+          : "workspace") as ZoneKind,
+      }));
+    return [...customZones, ...legacy];
+  }, [customZones, overrides.zones]);
 
   const zoneColorOf = useCallback(
     (id: string) => {
@@ -946,22 +976,21 @@ export function MapEditor() {
                   </button>
                 </div>
                 <div className="flex flex-col gap-1">
-                  {paintableZones.map((z) => {
-                    const color = ZONE_COLORS[z.id] ?? "#888";
-                    const active = tool.kind === "zone" && tool.zone === z.id;
+                  {displayZones.map((z) => {
+                    const active = tool.kind === "zone" && tool.zone === (z.id as ZoneId);
                     const k = kindOf(z.id);
                     return (
                       <div
                         key={z.id}
-                        className={`group flex items-center gap-2 px-2 py-1.5 rounded text-sm ${
+                        className={`group flex items-center gap-2 px-2 py-1.5 rounded text-left text-sm ${
                           active ? "ring-2 ring-primary bg-muted" : "hover:bg-muted"
                         }`}
                       >
                         <button
-                          onClick={() => setTool({ kind: "zone", zone: z.id })}
-                          className="flex items-center gap-2 flex-1 min-w-0 text-left"
+                          onClick={() => setTool({ kind: "zone", zone: z.id as ZoneId })}
+                          className="flex items-center gap-2 flex-1 min-w-0"
                         >
-                          <span className="w-4 h-4 rounded shrink-0" style={{ backgroundColor: color, opacity: 0.7 }} />
+                          <span className="w-4 h-4 rounded shrink-0" style={{ backgroundColor: z.color, opacity: 0.7 }} />
                           <span className="truncate">{z.label}</span>
                         </button>
                         <button
@@ -982,59 +1011,16 @@ export function MapEditor() {
                         >
                           {k === "workspace" ? <Briefcase size={12} /> : <Users size={12} />}
                         </button>
+                        <button
+                          onClick={() => removeCustomZone(z.id)}
+                          title="Remover zona"
+                          className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive"
+                        >
+                          <X size={12} />
+                        </button>
                       </div>
                     );
                   })}
-                  {customZones.length > 0 && (
-                    <div className="mt-2 pt-2 border-t border-border/50 flex flex-col gap-1">
-                      <span className="text-[10px] uppercase text-muted-foreground px-1">Personalizadas</span>
-                      {customZones.map((z) => {
-                        const active = tool.kind === "zone" && tool.zone === (z.id as ZoneId);
-                        const k = kindOf(z.id);
-                        return (
-                          <div
-                            key={z.id}
-                            className={`group flex items-center gap-2 px-2 py-1.5 rounded text-left text-sm ${
-                              active ? "ring-2 ring-primary bg-muted" : "hover:bg-muted"
-                            }`}
-                          >
-                            <button
-                              onClick={() => setTool({ kind: "zone", zone: z.id as ZoneId })}
-                              className="flex items-center gap-2 flex-1 min-w-0"
-                            >
-                              <span className="w-4 h-4 rounded shrink-0" style={{ backgroundColor: z.color, opacity: 0.7 }} />
-                              <span className="truncate">{z.label}</span>
-                            </button>
-                            <button
-                              onClick={(e) => { e.stopPropagation(); setTool({ kind: "spawn", zone: z.id }); }}
-                              title={spawnPoints[z.id] ? "Ponto de teleporte definido" : "Definir ponto de teleporte"}
-                              className={`shrink-0 p-1 rounded ${
-                                tool.kind === "spawn" && tool.zone === z.id
-                                  ? "ring-2 ring-primary text-primary"
-                                  : spawnPoints[z.id] ? "text-primary" : "text-muted-foreground"
-                              } hover:bg-muted`}
-                            >
-                              <MapPin size={12} />
-                            </button>
-                            <button
-                              onClick={(e) => { e.stopPropagation(); toggleKind(z.id); }}
-                              title={k === "workspace" ? "Local de trabalho (reivindicável)" : "Espaço comum"}
-                              className={`shrink-0 p-1 rounded ${k === "workspace" ? "text-primary" : "text-muted-foreground"} hover:bg-muted`}
-                            >
-                              {k === "workspace" ? <Briefcase size={12} /> : <Users size={12} />}
-                            </button>
-                            <button
-                              onClick={() => removeCustomZone(z.id)}
-                              title="Remover zona"
-                              className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive"
-                            >
-                              <X size={12} />
-                            </button>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
                   <button
                     onClick={addCustomZone}
                     className="mt-2 inline-flex items-center justify-center gap-1 text-xs px-2 py-1.5 rounded border border-dashed border-border hover:bg-muted text-muted-foreground"
@@ -1188,10 +1174,7 @@ export function MapEditor() {
                   const def = getPropDef(sel.defId);
                   if (!def) return null;
                   if (!def.interactive || def.frames.length < 2) return null;
-                  const allZones = [
-                    ...paintableZones.map((z) => ({ id: z.id as string, label: z.label })),
-                    ...customZones.map((z) => ({ id: z.id, label: z.label })),
-                  ];
+                  const allZones = displayZones.map((z) => ({ id: z.id, label: z.label }));
                   const gateActions = (sel.actions ?? []).filter(
                     (a): a is Extract<PropAction, { type: "gate-zone" }> => a.type === "gate-zone"
                   );
