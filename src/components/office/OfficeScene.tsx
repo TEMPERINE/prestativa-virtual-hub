@@ -11,7 +11,7 @@ import {
   type ZoneId,
 } from "@/lib/office-map";
 import { zoneRectFromOverrides, getZoneKind, customZonesFromOverrides, pullOverridesFromCloud, subscribeOverridesFromCloud, spawnPointForZone } from "@/lib/map-overrides";
-import officeMap from "@/assets/office-map.webp";
+import { useOfficeTheme } from "@/hooks/useOfficeTheme";
 import parkLeft from "@/assets/scene-park-left.webp";
 import roadRight from "@/assets/scene-road-right.webp";
 import { SPRITES, getSprite, SPRITE_FRAMES as FRAMES, type Facing } from "@/lib/sprite-catalog";
