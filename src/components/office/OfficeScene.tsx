@@ -60,6 +60,7 @@ import { OnboardingWizard } from "@/components/onboarding/OnboardingWizard";
 import { useMeetingTracker } from "@/lib/meetings/useMeetingTracker";
 import { useMeetingRecorder } from "@/lib/meetings/useMeetingRecorder";
 import { getCurrentWorkspaceId } from "@/lib/workspace/current";
+import { useWorkspaceTier } from "@/lib/workspace/useWorkspaceTier";
 
 type Profile = {
   id: string;
