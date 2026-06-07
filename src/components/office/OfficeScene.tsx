@@ -210,6 +210,11 @@ function randomPointInRect(
 
 export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
   const officeTheme = useOfficeTheme();
+  // Capacidades por nível do escritório atual — controlam botões de gravar,
+  // teleporte e troca de personagem.
+  const { caps: tierCaps } = useWorkspaceTier(getCurrentWorkspaceId());
+  const tierCapsRef = useRef(tierCaps);
+  tierCapsRef.current = tierCaps;
   const sceneRef = useRef<HTMLDivElement | null>(null);
   const stageRef = useRef<HTMLDivElement | null>(null);
   const [me, setMe] = useState<Profile | null>(null);
