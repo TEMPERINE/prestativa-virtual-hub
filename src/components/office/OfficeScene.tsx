@@ -887,7 +887,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
     // existing avatar, because an old/hidden tab can keep heartbeating SPAWN
     // and pull a stopped colleague back to the origin.
     type PresenceState = { user_id: string; x: number; y: number; zone: string; facing?: Facing; ts: number };
-    const presenceCh = supabase.channel(POSITION_PRESENCE_CHANNEL, {
+    const presenceCh = supabase.channel(`${POSITION_PRESENCE_CHANNEL}:${wsSuffix}`, {
       config: { presence: { key: meIdRef.current ?? `anon:${realtimeChannelSuffix}` } },
     });
     const presenceLastTs = new Map<string, number>();
