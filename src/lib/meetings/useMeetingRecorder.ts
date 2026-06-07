@@ -233,10 +233,15 @@ export function useMeetingRecorder({ getLocalAudioTrack, remoteStreams }: Args) 
       meetingIdRef.current = meetingId;
       startedAtRef.current = Date.now();
       setIsRecording(true);
+      // Marca a reunião como gravada para aparecer no histórico
+      rpc("meeting_mark_recording_started", { _meeting_id: meetingId }).catch((e) => {
+        console.warn("[recorder] mark_recording_started failed", e);
+      });
       tickRef.current = window.setInterval(() => {
         setElapsedSeconds(Math.floor((Date.now() - startedAtRef.current) / 1000));
       }, 1000);
       toast.success("🔴 Gravando tela + áudio…");
+
     } catch (err) {
       console.error("[recorder] start error:", err);
       toast.error("Não foi possível iniciar a gravação.");
