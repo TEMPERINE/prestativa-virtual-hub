@@ -22,6 +22,8 @@ import { PROP_CATALOG, getPropDef, subscribePropCatalog } from "@/lib/prop-catal
 import { loadCustomPropsFromCloud, deleteCustomProp, uploadCustomProp } from "@/lib/custom-props";
 import { OFFICE_THEMES, getCurrentThemeId, setCurrentThemeId } from "@/lib/office-themes";
 import { useOfficeTheme } from "@/hooks/useOfficeTheme";
+import { getCurrentWorkspaceId, subscribeCurrentWorkspaceId } from "@/lib/workspace/current";
+import { useWorkspaceTier } from "@/lib/workspace/useWorkspaceTier";
 import { toast } from "sonner";
 import { ArrowLeft, Eraser, Square, Download, Trash2, Eye, EyeOff, Undo, Plus, X, Briefcase, Users, MapPin, Hand, Zap, ZapOff, Lock, Map as MapIcon, Boxes, LayoutGrid, Upload, Loader2, Palette, Check } from "lucide-react";
 
@@ -155,6 +157,14 @@ export function MapEditor() {
   // bump para re-renderizar quando o catálogo de props muda (uploads, deletes).
   const [, setCatalogVersion] = useState(0);
   const [uploading, setUploading] = useState(false);
+  const [currentWorkspaceId, setCurrentWorkspaceIdState] = useState<string | null>(() => getCurrentWorkspaceId());
+  const { tier: workspaceTier } = useWorkspaceTier(currentWorkspaceId);
+  const levelThemes = useMemo(
+    () => OFFICE_THEMES.filter((theme) => (theme.minTier ?? 1) === workspaceTier),
+    [workspaceTier]
+  );
+
+  useEffect(() => subscribeCurrentWorkspaceId(setCurrentWorkspaceIdState), []);
 
   // Carrega elementos personalizados da nuvem e re-renderiza quando mudam.
   useEffect(() => {
