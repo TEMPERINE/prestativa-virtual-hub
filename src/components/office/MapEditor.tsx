@@ -318,6 +318,9 @@ export function MapEditor() {
           zones: prev.zones.map((z) => (z === (id as ZoneId) ? null : z)),
           customZones: (prev.customZones ?? []).filter((c) => c.id !== id),
         };
+        const sp = { ...(prev.spawnPoints ?? {}) };
+        delete sp[id];
+        next.spawnPoints = sp;
         return next;
       });
       setTool((t) => (t.kind === "zone" && t.zone === (id as ZoneId) ? { kind: "blocked" } : t));
