@@ -164,7 +164,11 @@ export function MapEditor() {
     [workspaceTier]
   );
 
-  useEffect(() => subscribeCurrentWorkspaceId(setCurrentWorkspaceIdState), []);
+  useEffect(() => {
+    return () => {
+      subscribeCurrentWorkspaceId(setCurrentWorkspaceIdState)();
+    };
+  }, []);
 
   // Carrega elementos personalizados da nuvem e re-renderiza quando mudam.
   useEffect(() => {
@@ -1264,7 +1268,7 @@ export function MapEditor() {
                   Troca apenas a imagem de fundo do mapa. Áreas, paredes e elementos continuam exatamente no mesmo lugar.
                 </p>
                 <div className="flex flex-col gap-2">
-                  {OFFICE_THEMES.map((t) => {
+                  {levelThemes.map((t) => {
                     const active = (overrides.theme ?? "default") === t.id;
                     return (
                       <button
