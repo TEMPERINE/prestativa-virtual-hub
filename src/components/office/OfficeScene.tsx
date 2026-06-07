@@ -780,11 +780,15 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
     // outros usuários parecem "congelados", mesmo com as posições sendo
     // gravadas no banco corretamente.
     const realtimeChannelSuffix = `${Date.now()}:${Math.random().toString(36).slice(2)}`;
+    const _wsChan = getCurrentWorkspaceId();
+    const wsSuffix = _wsChan ?? "none";
     const ch = supabase
-      .channel(`positions-room:${realtimeChannelSuffix}`)
+      .channel(`positions-room:${wsSuffix}:${realtimeChannelSuffix}`)
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "positions" },
+        _wsChan
+          ? { event: "*", schema: "public", table: "positions", filter: `workspace_id=eq.${_wsChan}` }
+          : { event: "*", schema: "public", table: "positions" },
         (payload) => {
           const row = (payload.new ?? payload.old) as RemotePos & { updated_at?: string };
           if (!row) return;
