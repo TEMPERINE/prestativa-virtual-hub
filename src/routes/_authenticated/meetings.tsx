@@ -1109,3 +1109,144 @@ function PersonalNotes({ meetingId, active }: { meetingId: string; active: boole
     </section>
   );
 }
+
+type MemberPick = { user_id: string; display_name: string; avatar_color: string };
+
+function SendRecordingDialog({
+  meeting,
+  currentUserId,
+  onClose,
+}: {
+  meeting: MeetingRow | null;
+  currentUserId: string | null;
+  onClose: () => void;
+}) {
+  const [members, setMembers] = useState<MemberPick[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [q, setQ] = useState("");
+  const [sendingId, setSendingId] = useState<string | null>(null);
+  const [sentIds, setSentIds] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    if (!meeting) return;
+    setQ("");
+    setSentIds(new Set());
+    setLoading(true);
+    (async () => {
+      const { data: mems } = await sb
+        .from("workspace_members")
+        .select("user_id")
+        .eq("workspace_id", meeting.workspace_id);
+      const ids = ((mems ?? []) as { user_id: string }[])
+        .map((m) => m.user_id)
+        .filter((id) => id !== currentUserId);
+      if (ids.length === 0) {
+        setMembers([]);
+        setLoading(false);
+        return;
+      }
+      const { data: profs } = await supabase
+        .from("profiles")
+        .select("id, display_name, avatar_color")
+        .in("id", ids);
+      const list: MemberPick[] = ((profs ?? []) as Array<{ id: string; display_name: string; avatar_color: string }>)
+        .map((p) => ({ user_id: p.id, display_name: p.display_name, avatar_color: p.avatar_color }))
+        .sort((a, b) => a.display_name.localeCompare(b.display_name));
+      setMembers(list);
+      setLoading(false);
+    })();
+  }, [meeting, currentUserId]);
+
+  const filtered = useMemo(() => {
+    const t = q.trim().toLowerCase();
+    if (!t) return members;
+    return members.filter((m) => m.display_name.toLowerCase().includes(t));
+  }, [members, q]);
+
+  const send = async (recipientId: string) => {
+    if (!meeting) return;
+    setSendingId(recipientId);
+    const { error } = await sb.rpc("meeting_share_recording", {
+      _meeting_id: meeting.id,
+      _recipient_id: recipientId,
+    });
+    setSendingId(null);
+    if (error) {
+      toast.error(error.message ?? "Não foi possível enviar.");
+      return;
+    }
+    setSentIds((prev) => new Set(prev).add(recipientId));
+    toast.success("Gravação enviada.");
+  };
+
+  return (
+    <Dialog open={!!meeting} onOpenChange={(o) => { if (!o) onClose(); }}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle className="inline-flex items-center gap-2">
+            <Send className="w-4 h-4" /> Enviar gravação
+          </DialogTitle>
+          <DialogDescription>
+            Selecione alguém do espaço para receber esta gravação em
+            <span className="font-medium"> Gravações recebidas</span>.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="relative">
+          <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+          <input
+            autoFocus
+            type="search"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Buscar membro…"
+            className="pl-8 pr-3 py-1.5 text-sm rounded-md border bg-background w-full focus:outline-none focus:ring-2 focus:ring-primary/40"
+          />
+        </div>
+        <div className="max-h-72 overflow-auto -mx-1 px-1">
+          {loading ? (
+            <div className="py-6 text-center text-sm text-muted-foreground inline-flex items-center gap-2 justify-center w-full">
+              <Loader2 className="w-3 h-3 animate-spin" /> Carregando membros…
+            </div>
+          ) : filtered.length === 0 ? (
+            <div className="py-6 text-center text-sm text-muted-foreground">
+              Nenhum membro encontrado.
+            </div>
+          ) : (
+            <ul className="space-y-1">
+              {filtered.map((m) => {
+                const sent = sentIds.has(m.user_id);
+                const sending = sendingId === m.user_id;
+                return (
+                  <li key={m.user_id}>
+                    <button
+                      onClick={() => !sent && !sending && send(m.user_id)}
+                      disabled={sent || sending}
+                      className="w-full flex items-center gap-3 px-2 py-2 rounded-md hover:bg-muted text-left disabled:opacity-60"
+                    >
+                      <div
+                        className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-semibold shrink-0"
+                        style={{ background: m.avatar_color }}
+                      >
+                        {m.display_name.slice(0, 1).toUpperCase()}
+                      </div>
+                      <span className="flex-1 text-sm truncate">{m.display_name}</span>
+                      {sent ? (
+                        <span className="inline-flex items-center gap-1 text-xs text-emerald-600">
+                          <Check className="w-3 h-3" /> Enviado
+                        </span>
+                      ) : sending ? (
+                        <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+                      ) : (
+                        <Send className="w-3.5 h-3.5 text-muted-foreground" />
+                      )}
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
