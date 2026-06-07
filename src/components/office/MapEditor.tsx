@@ -688,7 +688,7 @@ export function MapEditor() {
         {/* Sidebar com abas */}
         <aside className="w-72 border-r border-border bg-card overflow-y-auto flex flex-col">
           {/* Tabs */}
-          <div className="flex gap-1 p-2 border-b border-border sticky top-0 bg-gradient-to-r from-card via-card to-card z-10">
+          <div className="flex gap-0.5 p-2 border-b border-border sticky top-0 bg-gradient-to-r from-card via-card to-card z-10">
             {[
               {
                 id: "map" as const,
