@@ -356,7 +356,6 @@ export function MapEditor() {
               next.blocked[idx] = 1;
             } else if (effectiveTool.kind === "erase") {
               next.blocked[idx] = 0;
-              next.zones[idx] = null;
             } else if (effectiveTool.kind === "erase-zone") {
               next.zones[idx] = null;
             } else if (effectiveTool.kind === "zone") {
