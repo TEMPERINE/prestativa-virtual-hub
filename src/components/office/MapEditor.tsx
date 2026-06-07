@@ -1107,6 +1107,56 @@ export function MapEditor() {
                 })()}
               </div>
             )}
+
+            {/* ===== Aba: Tema ===== */}
+            {editorTab === "theme" && (
+              <div className="flex flex-col gap-3">
+                <h3 className="text-xs font-semibold uppercase text-muted-foreground">Tema do escritório</h3>
+                <p className="text-[11px] text-muted-foreground">
+                  Troca apenas a imagem de fundo do mapa. Áreas, paredes e elementos continuam exatamente no mesmo lugar.
+                </p>
+                <div className="flex flex-col gap-2">
+                  {OFFICE_THEMES.map((t) => {
+                    const active = getCurrentThemeId() === t.id;
+                    return (
+                      <button
+                        key={t.id}
+                        onClick={() => {
+                          setCurrentThemeId(t.id);
+                          toast.success(`Tema "${t.label}" aplicado`);
+                        }}
+                        className={`relative w-full text-left rounded-lg overflow-hidden border transition-all ${
+                          active ? "border-primary ring-2 ring-primary/40" : "border-border hover:border-primary/50"
+                        }`}
+                      >
+                        <div className="aspect-[16/10] bg-muted overflow-hidden">
+                          <img
+                            src={t.url}
+                            alt={t.label}
+                            className="w-full h-full object-cover"
+                            draggable={false}
+                          />
+                        </div>
+                        <div className="px-2.5 py-2 flex items-center gap-2">
+                          <div className="flex-1 min-w-0">
+                            <div className="text-xs font-semibold truncate">{t.label}</div>
+                            {t.description && (
+                              <div className="text-[10px] text-muted-foreground truncate">{t.description}</div>
+                            )}
+                          </div>
+                          {active && (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-medium text-primary">
+                              <Check size={12} /> Ativo
+                            </span>
+                          )}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
           </div>
         </aside>
 
