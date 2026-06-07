@@ -18,6 +18,7 @@ export type CreateWorkspaceInput = {
   customThemeLabel?: string | null;
   seedFrom: SeedSource;
   sourceWorkspaceId?: string | null; // usado quando seedFrom = "current"
+  tier?: 1 | 2 | 3; // default 1
 };
 
 export type CreateWorkspaceResult =
@@ -63,7 +64,7 @@ export async function createWorkspace(
   }
   const uid = userData.user.id;
 
-  // 1) Cria o workspace.
+  // 1) Cria o workspace (com nível).
   const { data: wsRow, error: wsErr } = await supabase
     .from("workspaces")
     .insert({
@@ -72,7 +73,8 @@ export async function createWorkspace(
       description: input.description?.trim() || null,
       cover_url: input.cover_url || null,
       owner_id: uid,
-    })
+      tier: input.tier ?? 1,
+    } as any)
     .select("id")
     .single();
 
