@@ -309,8 +309,9 @@ function MeetingsPage() {
           folders={folders}
           selected={selected}
           onSelect={setSelected}
-          allCount={meetings.length}
+          allCount={meetings.filter((m) => !receivedShares.has(m.id)).length}
           favoritesCount={favorites.size}
+          receivedCount={receivedShares.size}
           unfiledCount={unfiledCount}
           countsByFolder={countsByFolder}
           onCreate={createFolder}
