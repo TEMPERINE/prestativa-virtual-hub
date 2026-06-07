@@ -22,6 +22,8 @@ import { PROP_CATALOG, getPropDef, subscribePropCatalog } from "@/lib/prop-catal
 import { loadCustomPropsFromCloud, deleteCustomProp, uploadCustomProp } from "@/lib/custom-props";
 import { OFFICE_THEMES, getCurrentThemeId, setCurrentThemeId } from "@/lib/office-themes";
 import { useOfficeTheme } from "@/hooks/useOfficeTheme";
+import { getCurrentWorkspaceId, subscribeCurrentWorkspaceId } from "@/lib/workspace/current";
+import { useWorkspaceTier } from "@/lib/workspace/useWorkspaceTier";
 import { toast } from "sonner";
 import { ArrowLeft, Eraser, Square, Download, Trash2, Eye, EyeOff, Undo, Plus, X, Briefcase, Users, MapPin, Hand, Zap, ZapOff, Lock, Map as MapIcon, Boxes, LayoutGrid, Upload, Loader2, Palette, Check } from "lucide-react";
 
@@ -155,6 +157,19 @@ export function MapEditor() {
   // bump para re-renderizar quando o catálogo de props muda (uploads, deletes).
   const [, setCatalogVersion] = useState(0);
   const [uploading, setUploading] = useState(false);
+  const [currentWorkspaceId, setCurrentWorkspaceIdState] = useState<string | null>(() => getCurrentWorkspaceId());
+  const { tier: workspaceTier } = useWorkspaceTier(currentWorkspaceId);
+  const levelThemes = useMemo(
+    () => OFFICE_THEMES.filter((theme) => (theme.minTier ?? 1) === workspaceTier),
+    [workspaceTier]
+  );
+
+  useEffect(() => {
+    const unsubscribe = subscribeCurrentWorkspaceId(setCurrentWorkspaceIdState);
+    return () => {
+      unsubscribe();
+    };
+  }, []);
 
   // Carrega elementos personalizados da nuvem e re-renderiza quando mudam.
   useEffect(() => {
@@ -1254,7 +1269,7 @@ export function MapEditor() {
                   Troca apenas a imagem de fundo do mapa. Áreas, paredes e elementos continuam exatamente no mesmo lugar.
                 </p>
                 <div className="flex flex-col gap-2">
-                  {OFFICE_THEMES.map((t) => {
+                  {levelThemes.map((t) => {
                     const active = (overrides.theme ?? "default") === t.id;
                     return (
                       <button
