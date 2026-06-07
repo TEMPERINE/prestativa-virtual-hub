@@ -1627,6 +1627,72 @@ export function MapEditor() {
           </div>
         </main>
       </div>
+
+      {importOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+          onClick={() => setImportOpen(false)}
+        >
+          <div
+            className="bg-card text-card-foreground rounded-lg shadow-lg w-full max-w-md p-4 space-y-3"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between">
+              <h3 className="font-semibold text-sm">Importar mapa de outro escritório</h3>
+              <button onClick={() => setImportOpen(false)} className="text-muted-foreground hover:text-foreground">
+                <X size={16} />
+              </button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Copia o que você escolher do escritório de origem para o atual. As alterações só são gravadas quando você clicar em <strong>Salvar</strong>.
+            </p>
+            <div className="flex flex-col gap-1 text-xs">
+              <label className="inline-flex items-center gap-2">
+                <input type="radio" checked={importMode === "walls"} onChange={() => setImportMode("walls")} />
+                Só paredes (bloqueios)
+              </label>
+              <label className="inline-flex items-center gap-2">
+                <input type="radio" checked={importMode === "walls-zones"} onChange={() => setImportMode("walls-zones")} />
+                Paredes + áreas pintadas
+              </label>
+              <label className="inline-flex items-center gap-2">
+                <input type="radio" checked={importMode === "all"} onChange={() => setImportMode("all")} />
+                Tudo (paredes, áreas, spawns, elementos)
+              </label>
+            </div>
+            <div className="border-t border-border pt-2">
+              <div className="text-xs font-medium mb-1">Escolha o escritório de origem:</div>
+              {importLoading ? (
+                <div className="text-xs text-muted-foreground inline-flex items-center gap-2">
+                  <Loader2 size={12} className="animate-spin" /> Carregando…
+                </div>
+              ) : importList.length === 0 ? (
+                <div className="text-xs text-muted-foreground">
+                  Você não tem outros escritórios. Você ainda pode importar o layout padrão da Prestativa abaixo.
+                </div>
+              ) : (
+                <div className="max-h-48 overflow-auto flex flex-col gap-1">
+                  {importList.map((w) => (
+                    <button
+                      key={w.id}
+                      onClick={() => importFromWorkspace(w.id)}
+                      className="text-left text-xs px-2 py-1.5 rounded hover:bg-muted border border-border"
+                    >
+                      {w.name}
+                    </button>
+                  ))}
+                </div>
+              )}
+              <button
+                onClick={() => importFromWorkspace("__defaults__")}
+                className="mt-2 w-full text-xs px-2 py-1.5 rounded bg-muted hover:bg-muted/80"
+              >
+                Usar layout padrão da Prestativa (hardcoded)
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
