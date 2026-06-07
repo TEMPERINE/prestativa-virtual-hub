@@ -232,9 +232,13 @@ export function findZoneById(id: string | null | undefined): Zone | null {
 }
 
 // Wrap zoneAt to honor painted zone overrides when present.
+// IMPORTANT: if an overrides record exists at all (even with no painted
+// zones yet), we do NOT fall back to the hardcoded Prestativa zones —
+// otherwise a freshly-created workspace would inherit Atendente/Diretoria
+// /Reunião zones from the default office. Empty overrides = lobby only.
 const _zoneAtBuiltin = zoneAt;
 export function zoneAtWithOverrides(p: Point): Zone {
-  if (hasZoneOverrides()) {
+  if (loadOverrides()) {
     const id = zoneFromOverrides(p);
     if (id) {
       const z = ZONES.find((zz) => zz.id === id);
