@@ -449,33 +449,51 @@ export type Database = {
       profiles: {
         Row: {
           avatar_color: string
+          birth_date: string | null
+          city: string | null
+          country_code: string | null
           created_at: string
           display_name: string
+          first_name: string | null
           id: string
+          last_name: string | null
           onboarded_at: string | null
           sprite_id: string
+          state: string | null
           status: string
           tagline: string | null
           updated_at: string
         }
         Insert: {
           avatar_color?: string
+          birth_date?: string | null
+          city?: string | null
+          country_code?: string | null
           created_at?: string
           display_name: string
+          first_name?: string | null
           id: string
+          last_name?: string | null
           onboarded_at?: string | null
           sprite_id?: string
+          state?: string | null
           status?: string
           tagline?: string | null
           updated_at?: string
         }
         Update: {
           avatar_color?: string
+          birth_date?: string | null
+          city?: string | null
+          country_code?: string | null
           created_at?: string
           display_name?: string
+          first_name?: string | null
           id?: string
+          last_name?: string | null
           onboarded_at?: string | null
           sprite_id?: string
+          state?: string | null
           status?: string
           tagline?: string | null
           updated_at?: string
