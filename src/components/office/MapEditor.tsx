@@ -757,6 +757,13 @@ export function MapEditor() {
           <button onClick={reseed} className="text-xs px-2 py-1 rounded bg-muted">
             Recarregar padrão
           </button>
+          <button
+            onClick={openImport}
+            className="text-xs px-2 py-1 rounded bg-muted inline-flex items-center gap-1"
+            title="Copiar paredes/zonas de outro escritório"
+          >
+            <Upload size={12} /> Importar de outro
+          </button>
           <button onClick={reset} className="text-xs px-2 py-1 rounded bg-muted inline-flex items-center gap-1">
             <Trash2 size={12} /> Limpar
           </button>
