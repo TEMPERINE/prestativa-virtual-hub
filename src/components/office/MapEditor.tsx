@@ -750,6 +750,15 @@ export function MapEditor() {
           {GRID_COLS}×{GRID_ROWS} células
         </span>
 
+        {/* Brush size indicator */}
+        <div className="flex items-center gap-1 text-xs">
+          <span className="text-muted-foreground">Pincel:</span>
+          <span className="font-mono font-bold px-1.5 py-0.5 rounded bg-primary/10 text-primary min-w-[2.5rem] text-center">
+            {brush}×{brush}
+          </span>
+          <span className="text-[10px] text-muted-foreground hidden sm:inline">(Shift+scroll)</span>
+        </div>
+
         <div className="ml-auto flex items-center gap-2">
 
           <button
