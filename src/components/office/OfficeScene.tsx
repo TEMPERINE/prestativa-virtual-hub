@@ -1154,17 +1154,21 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
 
     // Load + subscribe to desk notes (post-it gifts left on workstations)
     void (async () => {
-      const { data } = await supabase
+      let nq = supabase
         .from("desk_notes")
         .select("id, zone_id, sender_id, recipient_id, body, x, y, created_at, read_at")
         .is("read_at", null);
+      if (_wsChan) nq = nq.eq("workspace_id", _wsChan);
+      const { data } = await nq;
       if (data) setNotes(data as DeskNote[]);
     })();
     const notesCh = supabase
-      .channel(`desk-notes-room:${realtimeChannelSuffix}`)
+      .channel(`desk-notes-room:${wsSuffix}:${realtimeChannelSuffix}`)
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "desk_notes" },
+        _wsChan
+          ? { event: "*", schema: "public", table: "desk_notes", filter: `workspace_id=eq.${_wsChan}` }
+          : { event: "*", schema: "public", table: "desk_notes" },
         (payload) => {
           setNotes((prev) => {
             if (payload.eventType === "DELETE") {
