@@ -693,6 +693,7 @@ export function MapEditor() {
               { id: "map" as const, label: "Mapa", icon: <MapIcon size={14} /> },
               { id: "zones" as const, label: "Áreas", icon: <LayoutGrid size={14} /> },
               { id: "elements" as const, label: "Elementos", icon: <Boxes size={14} /> },
+              { id: "theme" as const, label: "Tema", icon: <Palette size={14} /> },
             ].map((t) => {
               const active = editorTab === t.id;
               return (
