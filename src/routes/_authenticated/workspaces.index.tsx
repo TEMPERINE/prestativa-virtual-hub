@@ -51,6 +51,12 @@ function WorkspacesHubPage() {
     }
     setProfile({ display_name: prof.display_name });
 
+    const { data: roles } = await supabase
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", u.user.id);
+    setIsAdmin((roles ?? []).some((r: any) => r.role === "admin"));
+
     const { data: mems } = await supabase
       .from("workspace_members")
       .select("role, workspace_id, workspaces:workspace_id ( id, name, description, cover_url )")
