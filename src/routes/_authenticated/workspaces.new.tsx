@@ -90,6 +90,12 @@ function NewWorkspacePage() {
     if (!slugTouched) setSlug(name ? suggestSlug(name) : "");
   }, [name, slugTouched]);
 
+  // Temas disponíveis no tier escolhido
+  const availableThemes = useMemo(
+    () => OFFICE_THEMES.filter((t) => (t.minTier ?? 1) === tier),
+    [tier]
+  );
+
   const selectedTheme = useMemo(() => {
     if (themeId === "custom" && customThemeUrl) {
       return {
@@ -98,14 +104,15 @@ function NewWorkspacePage() {
         url: customThemeUrl,
       };
     }
-    return OFFICE_THEMES.find((t) => t.id === themeId) ?? OFFICE_THEMES[0];
-  }, [themeId, customThemeUrl, customThemeLabel]);
+    return availableThemes.find((t) => t.id === themeId) ?? availableThemes[0] ?? OFFICE_THEMES[0];
+  }, [themeId, customThemeUrl, customThemeLabel, availableThemes]);
 
-  // Temas disponíveis no tier escolhido
-  const availableThemes = useMemo(
-    () => OFFICE_THEMES.filter((t) => (t.minTier ?? 1) <= tier),
-    [tier]
-  );
+  useEffect(() => {
+    if (themeId === "custom") return;
+    if (!availableThemes.some((t) => t.id === themeId)) {
+      setThemeId(availableThemes[0]?.id ?? "nivel-1");
+    }
+  }, [availableThemes, themeId]);
 
   const canNext = useMemo(() => {
     if (step === 1) return true; // tier sempre selecionado
