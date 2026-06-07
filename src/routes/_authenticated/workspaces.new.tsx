@@ -40,6 +40,8 @@ function NewWorkspacePage() {
   const [slugTouched, setSlugTouched] = useState(false);
   const [description, setDescription] = useState("");
   const [themeId, setThemeId] = useState(OFFICE_THEMES[0].id);
+  const [customThemeUrl, setCustomThemeUrl] = useState<string | null>(null);
+  const [customThemeLabel, setCustomThemeLabel] = useState<string>("");
   const [seedFrom, setSeedFrom] = useState<SeedSource>("blank");
   const [sourceWorkspaceId, setSourceWorkspaceId] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -69,16 +71,23 @@ function NewWorkspacePage() {
     if (!slugTouched) setSlug(name ? suggestSlug(name) : "");
   }, [name, slugTouched]);
 
-  const selectedTheme = useMemo(
-    () => OFFICE_THEMES.find((t) => t.id === themeId) ?? OFFICE_THEMES[0],
-    [themeId]
-  );
+  const selectedTheme = useMemo(() => {
+    if (themeId === "custom" && customThemeUrl) {
+      return {
+        id: "custom",
+        label: customThemeLabel || "Tema personalizado",
+        url: customThemeUrl,
+      };
+    }
+    return OFFICE_THEMES.find((t) => t.id === themeId) ?? OFFICE_THEMES[0];
+  }, [themeId, customThemeUrl, customThemeLabel]);
 
   const canNext = useMemo(() => {
     if (step === 1) return name.trim().length >= 2 && slug.trim().length >= 2;
+    if (step === 2 && themeId === "custom" && !customThemeUrl) return false;
     if (step === 3 && seedFrom === "current" && !sourceWorkspaceId) return false;
     return true;
-  }, [step, name, slug, seedFrom, sourceWorkspaceId]);
+  }, [step, name, slug, themeId, customThemeUrl, seedFrom, sourceWorkspaceId]);
 
   const submit = async () => {
     setSubmitting(true);
@@ -87,6 +96,8 @@ function NewWorkspacePage() {
       slug,
       description: description || null,
       themeId,
+      customThemeUrl: themeId === "custom" ? customThemeUrl : null,
+      customThemeLabel: themeId === "custom" ? customThemeLabel || "Tema personalizado" : null,
       seedFrom,
       sourceWorkspaceId,
     });
