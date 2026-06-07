@@ -1,14 +1,15 @@
 import { useEffect, useState } from "react";
-import officeMap from "@/assets/office-map.webp";
 import parkLeft from "@/assets/scene-park-left.webp";
 import roadRight from "@/assets/scene-road-right.webp";
 import daniWalk from "@/assets/sprites/blonde-right.png";
 import doorClosed from "@/assets/props/door-closed.png.asset.json";
 import doorOpen from "@/assets/props/door-open.png.asset.json";
+import { getCurrentTheme } from "@/lib/office-themes";
 
-// Assets críticos para a primeira render do escritório
+// Assets críticos para a primeira render do escritório.
+// O BG do escritório usa o tema ativo (selecionado no editor).
 const CRITICAL_ASSETS: string[] = [
-  officeMap,
+  getCurrentTheme().url,
   parkLeft,
   roadRight,
   daniWalk,

@@ -201,6 +201,7 @@ function randomPointInRect(
 }
 
 export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
+  const officeTheme = useOfficeTheme();
   const sceneRef = useRef<HTMLDivElement | null>(null);
   const stageRef = useRef<HTMLDivElement | null>(null);
   const [me, setMe] = useState<Profile | null>(null);
@@ -1979,7 +1980,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
           >
 
         <img
-          src={officeMap}
+          src={officeTheme.url}
           alt="Escritório Prestativa Virtual"
           className="absolute inset-0 w-full h-full object-cover select-none pointer-events-none"
           draggable={false}
