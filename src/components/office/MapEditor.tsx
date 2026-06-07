@@ -20,9 +20,10 @@ import {
 import { ZONES, COLLIDERS, FLOOR_POLY, type ZoneId } from "@/lib/office-map";
 import { PROP_CATALOG, getPropDef, subscribePropCatalog } from "@/lib/prop-catalog";
 import { loadCustomPropsFromCloud, deleteCustomProp, uploadCustomProp } from "@/lib/custom-props";
-import officeMap from "@/assets/office-map.webp";
+import { OFFICE_THEMES, getCurrentThemeId, setCurrentThemeId } from "@/lib/office-themes";
+import { useOfficeTheme } from "@/hooks/useOfficeTheme";
 import { toast } from "sonner";
-import { ArrowLeft, Eraser, Square, Download, Trash2, Eye, EyeOff, Undo, Plus, X, Briefcase, Users, MapPin, Hand, Zap, ZapOff, Lock, Map as MapIcon, Boxes, LayoutGrid, Upload, Loader2 } from "lucide-react";
+import { ArrowLeft, Eraser, Square, Download, Trash2, Eye, EyeOff, Undo, Plus, X, Briefcase, Users, MapPin, Hand, Zap, ZapOff, Lock, Map as MapIcon, Boxes, LayoutGrid, Upload, Loader2, Palette, Check } from "lucide-react";
 
 type Tool =
   | { kind: "blocked" }
@@ -91,7 +92,8 @@ export function MapEditor() {
     return loadOverrides() ?? seedFromDefaults();
   });
   const [tool, setTool] = useState<Tool>({ kind: "blocked" });
-  const [editorTab, setEditorTab] = useState<"map" | "zones" | "elements">("map");
+  const [editorTab, setEditorTab] = useState<"map" | "zones" | "elements" | "theme">("map");
+  const officeTheme = useOfficeTheme();
   const [brush, setBrush] = useState(1);
   const [showGrid, setShowGrid] = useState(true);
   const [showImage, setShowImage] = useState(true);
@@ -691,6 +693,7 @@ export function MapEditor() {
               { id: "map" as const, label: "Mapa", icon: <MapIcon size={14} /> },
               { id: "zones" as const, label: "Áreas", icon: <LayoutGrid size={14} /> },
               { id: "elements" as const, label: "Elementos", icon: <Boxes size={14} /> },
+              { id: "theme" as const, label: "Tema", icon: <Palette size={14} /> },
             ].map((t) => {
               const active = editorTab === t.id;
               return (
@@ -1104,6 +1107,56 @@ export function MapEditor() {
                 })()}
               </div>
             )}
+
+            {/* ===== Aba: Tema ===== */}
+            {editorTab === "theme" && (
+              <div className="flex flex-col gap-3">
+                <h3 className="text-xs font-semibold uppercase text-muted-foreground">Tema do escritório</h3>
+                <p className="text-[11px] text-muted-foreground">
+                  Troca apenas a imagem de fundo do mapa. Áreas, paredes e elementos continuam exatamente no mesmo lugar.
+                </p>
+                <div className="flex flex-col gap-2">
+                  {OFFICE_THEMES.map((t) => {
+                    const active = getCurrentThemeId() === t.id;
+                    return (
+                      <button
+                        key={t.id}
+                        onClick={() => {
+                          setCurrentThemeId(t.id);
+                          toast.success(`Tema "${t.label}" aplicado`);
+                        }}
+                        className={`relative w-full text-left rounded-lg overflow-hidden border transition-all ${
+                          active ? "border-primary ring-2 ring-primary/40" : "border-border hover:border-primary/50"
+                        }`}
+                      >
+                        <div className="aspect-[16/10] bg-muted overflow-hidden">
+                          <img
+                            src={t.url}
+                            alt={t.label}
+                            className="w-full h-full object-cover"
+                            draggable={false}
+                          />
+                        </div>
+                        <div className="px-2.5 py-2 flex items-center gap-2">
+                          <div className="flex-1 min-w-0">
+                            <div className="text-xs font-semibold truncate">{t.label}</div>
+                            {t.description && (
+                              <div className="text-[10px] text-muted-foreground truncate">{t.description}</div>
+                            )}
+                          </div>
+                          {active && (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-medium text-primary">
+                              <Check size={12} /> Ativo
+                            </span>
+                          )}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
           </div>
         </aside>
 
@@ -1183,7 +1236,7 @@ export function MapEditor() {
           >
             {showImage && (
               <img
-                src={officeMap}
+                src={officeTheme.url}
                 alt=""
                 className="absolute inset-0 w-full h-full object-cover pointer-events-none"
                 draggable={false}

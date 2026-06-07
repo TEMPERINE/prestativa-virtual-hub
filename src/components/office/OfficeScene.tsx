@@ -11,7 +11,7 @@ import {
   type ZoneId,
 } from "@/lib/office-map";
 import { zoneRectFromOverrides, getZoneKind, customZonesFromOverrides, pullOverridesFromCloud, subscribeOverridesFromCloud, spawnPointForZone } from "@/lib/map-overrides";
-import officeMap from "@/assets/office-map.webp";
+import { useOfficeTheme } from "@/hooks/useOfficeTheme";
 import parkLeft from "@/assets/scene-park-left.webp";
 import roadRight from "@/assets/scene-road-right.webp";
 import { SPRITES, getSprite, SPRITE_FRAMES as FRAMES, type Facing } from "@/lib/sprite-catalog";
@@ -201,6 +201,7 @@ function randomPointInRect(
 }
 
 export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
+  const officeTheme = useOfficeTheme();
   const sceneRef = useRef<HTMLDivElement | null>(null);
   const stageRef = useRef<HTMLDivElement | null>(null);
   const [me, setMe] = useState<Profile | null>(null);
@@ -1979,7 +1980,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
           >
 
         <img
-          src={officeMap}
+          src={officeTheme.url}
           alt="Escritório Prestativa Virtual"
           className="absolute inset-0 w-full h-full object-cover select-none pointer-events-none"
           draggable={false}
