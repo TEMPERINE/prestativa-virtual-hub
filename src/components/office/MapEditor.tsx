@@ -1307,7 +1307,7 @@ export function MapEditor() {
         >
           <div
             ref={stageRef}
-            className="relative mx-auto select-none cursor-crosshair"
+            className={`relative mx-auto select-none ${["blocked","erase","zone","erase-zone"].includes(tool.kind) || (altDown && ["blocked","zone"].includes(tool.kind)) ? "cursor-none" : "cursor-crosshair"}`}
             style={{
               aspectRatio: "1536 / 1024",
               width: `calc(${zoom} * min(100%, calc((100vh - 110px) * 1.5)))`,
