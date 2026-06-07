@@ -178,10 +178,24 @@ export function MapEditor() {
   }, []);
 
   // Mouse-wheel zoom (anchored to cursor) for precise painting.
+  // Hold Shift + scroll to change brush size instead of zoom.
   useEffect(() => {
     const main = mainRef.current;
     if (!main) return;
+    const BRUSH_SIZES = [1, 2, 5];
     const onWheel = (e: WheelEvent) => {
+      if (e.shiftKey) {
+        e.preventDefault();
+        setBrush((b) => {
+          const idx = BRUSH_SIZES.indexOf(b);
+          if (e.deltaY < 0) {
+            return BRUSH_SIZES[Math.min(BRUSH_SIZES.length - 1, idx + 1)] ?? BRUSH_SIZES[BRUSH_SIZES.length - 1];
+          } else {
+            return BRUSH_SIZES[Math.max(0, idx - 1)] ?? BRUSH_SIZES[0];
+          }
+        });
+        return;
+      }
       e.preventDefault();
       const stage = stageRef.current;
       if (!stage) return;
