@@ -14,6 +14,8 @@ export type CreateWorkspaceInput = {
   description?: string | null;
   cover_url?: string | null;
   themeId: string;
+  customThemeUrl?: string | null;
+  customThemeLabel?: string | null;
   seedFrom: SeedSource;
   sourceWorkspaceId?: string | null; // usado quando seedFrom = "current"
 };
@@ -97,7 +99,13 @@ export async function createWorkspace(
   } else {
     baseOverrides = newOverrides();
   }
-  const overrides: MapOverrides = { ...baseOverrides, theme: input.themeId };
+  const overrides: MapOverrides = {
+    ...baseOverrides,
+    theme: input.themeId,
+    ...(input.themeId === "custom" && input.customThemeUrl
+      ? { customTheme: { url: input.customThemeUrl, label: input.customThemeLabel || "Tema personalizado" } }
+      : {}),
+  };
 
   const { error: mapErr } = await supabase.from("map_overrides").upsert(
     {
