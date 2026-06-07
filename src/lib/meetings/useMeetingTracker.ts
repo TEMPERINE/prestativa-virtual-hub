@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { getCurrentWorkspaceId } from "@/lib/workspace/current";
 
 // Os tipos auto-gerados ainda não conhecem as RPCs `meeting_join` /
 // `meeting_leave`. Usamos um wrapper sem types para evitar ruído de TS — as
@@ -68,7 +69,10 @@ export function useMeetingTracker({
             setActive(null);
             await rpc("meeting_leave", { _meeting_id: prev });
           }
+          const ws = getCurrentWorkspaceId();
+          if (!ws) return;
           const { data, error } = await rpc("meeting_join", {
+            _workspace_id: ws,
             _zone_id: zoneId,
             _zone_label: zoneLabel,
           });

@@ -136,20 +136,24 @@ export function clearOverrides() {
 }
 
 // ---- Cloud sync (Lovable Cloud) ----------------------------------------
-// The map editor used to live only in localStorage, so clearing the browser
-// cache or switching device wiped the layout. We mirror the doc into the
-// `map_overrides` table (id = 'global') so it's shared and persistent.
+// One row per workspace, keyed by workspace_id (PK after multi-workspace
+// migration). All reads/writes are scoped to the currently active workspace.
 
-const CLOUD_ID = "global";
+async function getWs(): Promise<string | null> {
+  const { getCurrentWorkspaceId } = await import("@/lib/workspace/current");
+  return getCurrentWorkspaceId();
+}
 
 export async function pullOverridesFromCloud(): Promise<MapOverrides | null> {
   if (typeof window === "undefined") return null;
   try {
+    const ws = await getWs();
+    if (!ws) return loadOverrides();
     const { supabase } = await import("@/integrations/supabase/client");
     const { data, error } = await supabase
       .from("map_overrides")
       .select("data")
-      .eq("id", CLOUD_ID)
+      .eq("workspace_id", ws)
       .maybeSingle();
     if (error || !data) return loadOverrides();
     const parsed = (data.data as unknown) as MapOverrides;
@@ -172,16 +176,18 @@ export async function pushOverridesToCloud(
   o: MapOverrides
 ): Promise<{ ok: boolean; error?: string }> {
   try {
+    const ws = await getWs();
+    if (!ws) return { ok: false, error: "Nenhum workspace ativo." };
     const { supabase } = await import("@/integrations/supabase/client");
     const { data: userData } = await supabase.auth.getUser();
     const { error } = await supabase.from("map_overrides").upsert(
       {
-        id: CLOUD_ID,
+        workspace_id: ws,
         data: JSON.parse(JSON.stringify(o)),
         updated_by: userData.user?.id ?? null,
         updated_at: new Date().toISOString(),
       },
-      { onConflict: "id" }
+      { onConflict: "workspace_id" }
     );
     if (error) return { ok: false, error: error.message };
     return { ok: true };
@@ -192,8 +198,10 @@ export async function pushOverridesToCloud(
 
 export async function clearOverridesInCloud(): Promise<void> {
   try {
+    const ws = await getWs();
+    if (!ws) return;
     const { supabase } = await import("@/integrations/supabase/client");
-    await supabase.from("map_overrides").delete().eq("id", CLOUD_ID);
+    await supabase.from("map_overrides").delete().eq("workspace_id", ws);
   } catch {}
 }
 
@@ -203,17 +211,19 @@ export function subscribeOverridesFromCloud(
   let cancelled = false;
   let cleanup = () => {};
   (async () => {
+    const ws = await getWs();
+    if (!ws) return;
     const { supabase } = await import("@/integrations/supabase/client");
     if (cancelled) return;
     const channel = supabase
-      .channel(`map_overrides:global:${Date.now()}:${Math.random().toString(36).slice(2)}`)
+      .channel(`map_overrides:${ws}:${Date.now()}:${Math.random().toString(36).slice(2)}`)
       .on(
         "postgres_changes",
         {
           event: "*",
           schema: "public",
           table: "map_overrides",
-          filter: `id=eq.${CLOUD_ID}`,
+          filter: `workspace_id=eq.${ws}`,
         },
         (payload) => {
           const next =
