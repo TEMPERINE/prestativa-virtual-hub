@@ -1085,7 +1085,9 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
 
 
     const syncPositions = async () => {
-      const { data } = await supabase.from("positions").select("user_id, x, y, zone, facing, is_online, updated_at");
+      let q = supabase.from("positions").select("user_id, x, y, zone, facing, is_online, updated_at");
+      if (_wsChan) q = q.eq("workspace_id", _wsChan);
+      const { data } = await q;
       if (!data) return;
       const uid = meIdRef.current;
       setPositions((prev) => {
