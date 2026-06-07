@@ -36,6 +36,8 @@ export type MapOverrides = {
   spawnPoints?: Record<string, SpawnPoint>;
   // Elementos visuais sobrepostos ao mapa (mobília, portas etc.)
   props?: PropInstance[];
+  // Tema visual do escritório (id em office-themes.ts). Default = "default".
+  theme?: string;
 };
 
 function emptyOverrides(): MapOverrides {
