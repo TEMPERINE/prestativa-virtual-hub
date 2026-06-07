@@ -31,6 +31,7 @@ export const Route = createFileRoute("/_authenticated/meetings")({
 
 type MeetingRow = {
   id: string;
+  workspace_id: string;
   zone_id: string;
   zone_label: string;
   title: string | null;
@@ -55,11 +56,13 @@ type ParticipantRow = {
   profiles?: { display_name: string; avatar_color: string } | null;
 };
 
+type ShareRow = { meeting_id: string; sender_id: string };
+
 type FolderRow = { id: string; name: string };
 type FolderItemRow = { folder_id: string; meeting_id: string };
 
-/** "all" | "unfiled" | "favorites" | uuid de pasta */
-type FolderSel = "all" | "unfiled" | "favorites" | string;
+/** "all" | "unfiled" | "favorites" | "received" | uuid de pasta */
+type FolderSel = "all" | "unfiled" | "favorites" | "received" | string;
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const sb = supabase as any;
