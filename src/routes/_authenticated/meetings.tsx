@@ -332,6 +332,11 @@ function MeetingsPage() {
                   meeting={m}
                   participants={participantsByMeeting[m.id] ?? []}
                   hostProfile={m.host_id ? profiles[m.host_id] : undefined}
+                  receivedFromSenderId={receivedShares.get(m.id) ?? null}
+                  receivedFromProfile={(() => {
+                    const sid = receivedShares.get(m.id);
+                    return sid ? profiles[sid] : undefined;
+                  })()}
                   folders={folders}
                   meetingFolderIds={foldersByMeeting[m.id] ?? new Set()}
                   isFavorite={favorites.has(m.id)}
@@ -339,6 +344,7 @@ function MeetingsPage() {
                   onRename={(t) => renameMeeting(m.id, t)}
                   onToggleFolder={(folderId, isMember) => toggleMembership(m.id, folderId, isMember)}
                   onCreateFolder={createFolder}
+                  onShare={() => setShareTarget(m)}
                   onAiUpdated={(transcript, summary) => {
                     setMeetings((prev) =>
                       prev.map((row) =>
@@ -354,6 +360,12 @@ function MeetingsPage() {
           )}
         </main>
       </div>
+
+      <SendRecordingDialog
+        meeting={shareTarget}
+        currentUserId={userId}
+        onClose={() => setShareTarget(null)}
+      />
     </div>
   );
 }
