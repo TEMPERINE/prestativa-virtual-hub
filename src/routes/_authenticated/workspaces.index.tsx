@@ -132,11 +132,21 @@ function WorkspacesHubPage() {
           </button>
         </header>
 
-        <div className="mb-8">
-          <h1 className="text-3xl font-semibold tracking-tight mb-2">Seus escritórios</h1>
-          <p className="text-sm text-muted-foreground">
-            Escolha um espaço para entrar. Cada escritório tem seu próprio mapa, equipe e reuniões.
-          </p>
+        <div className="mb-8 flex items-end justify-between gap-4 flex-wrap">
+          <div>
+            <h1 className="text-3xl font-semibold tracking-tight mb-2">Seus escritórios</h1>
+            <p className="text-sm text-muted-foreground">
+              Escolha um espaço para entrar. Cada escritório tem seu próprio mapa, equipe e reuniões.
+            </p>
+          </div>
+          {isAdmin && (
+            <Link
+              to="/workspaces/new"
+              className="px-4 py-2 rounded-lg gradient-primary text-primary-foreground text-sm font-medium inline-flex items-center gap-2 hover:opacity-90 shadow-glow"
+            >
+              <Plus size={14} /> Novo escritório
+            </Link>
+          )}
         </div>
 
         {invites.length > 0 && (
