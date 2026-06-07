@@ -248,6 +248,7 @@ export type Database = {
           recorded_by: string | null
           recording_duration_seconds: number | null
           recording_path: string | null
+          recording_started_at: string | null
           recording_uploaded_at: string | null
           started_at: string
           summary: string | null
@@ -266,6 +267,7 @@ export type Database = {
           recorded_by?: string | null
           recording_duration_seconds?: number | null
           recording_path?: string | null
+          recording_started_at?: string | null
           recording_uploaded_at?: string | null
           started_at?: string
           summary?: string | null
@@ -284,6 +286,7 @@ export type Database = {
           recorded_by?: string | null
           recording_duration_seconds?: number | null
           recording_path?: string | null
+          recording_started_at?: string | null
           recording_uploaded_at?: string | null
           started_at?: string
           summary?: string | null
@@ -496,6 +499,10 @@ export type Database = {
       }
       meeting_leave: { Args: { _meeting_id: string }; Returns: undefined }
       meeting_mark_ai_processing: {
+        Args: { _meeting_id: string }
+        Returns: undefined
+      }
+      meeting_mark_recording_started: {
         Args: { _meeting_id: string }
         Returns: undefined
       }
