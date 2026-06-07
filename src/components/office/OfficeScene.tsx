@@ -69,7 +69,14 @@ type Profile = {
   tagline?: string | null;
   status?: "available" | "busy" | "away" | null;
   onboarded_at?: string | null;
+  first_name?: string | null;
+  last_name?: string | null;
+  birth_date?: string | null;
+  city?: string | null;
+  state?: string | null;
+  country_code?: string | null;
 };
+
 type RemotePos = {
   user_id: string;
   x: number;
@@ -296,7 +303,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
   const refreshMe = useCallback(async () => {
     const uid = meIdRef.current;
     if (!uid) return;
-    const { data } = await supabase.from("profiles").select("id, display_name, avatar_color, sprite_id, tagline, status, onboarded_at").eq("id", uid).maybeSingle();
+    const { data } = await supabase.from("profiles").select("id, display_name, avatar_color, sprite_id, tagline, status, onboarded_at, first_name, last_name, birth_date, city, state, country_code").eq("id", uid).maybeSingle();
     if (data) {
       setMe(data as Profile);
       setProfiles((prev) => ({ ...prev, [uid]: data as Profile }));
@@ -638,7 +645,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
       if (!userData.user) { try { onHydrated?.(); } catch { /* noop */ } return; }
       meIdRef.current = userData.user.id;
       setMyEmail(userData.user.email ?? "");
-      const { data: profs } = await supabase.from("profiles").select("id, display_name, avatar_color, sprite_id, tagline, status, onboarded_at");
+      const { data: profs } = await supabase.from("profiles").select("id, display_name, avatar_color, sprite_id, tagline, status, onboarded_at, first_name, last_name, birth_date, city, state, country_code");
       const map: Record<string, Profile> = {};
       (profs ?? []).forEach((p) => (map[p.id] = p as Profile));
       setProfiles(map);
@@ -2947,7 +2954,18 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
             open={editProfOpen}
             onOpenChange={setEditProfOpen}
             userId={me.id}
-            initial={{ display_name: me.display_name, avatar_color: me.avatar_color, tagline: me.tagline ?? null }}
+            initial={{
+              display_name: me.display_name,
+              avatar_color: me.avatar_color,
+              tagline: me.tagline ?? null,
+              first_name: me.first_name ?? null,
+              last_name: me.last_name ?? null,
+              birth_date: me.birth_date ?? null,
+              city: me.city ?? null,
+              state: me.state ?? null,
+              country_code: me.country_code ?? null,
+            }}
+
             onSaved={refreshMe}
           />
         </>
