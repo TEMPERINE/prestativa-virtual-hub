@@ -77,9 +77,11 @@ function MeetingsPage() {
   const [folders, setFolders] = useState<FolderRow[]>([]);
   const [folderItems, setFolderItems] = useState<FolderItemRow[]>([]);
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
+  const [receivedShares, setReceivedShares] = useState<Map<string, string>>(new Map()); // meeting_id -> sender_id
   const [selected, setSelected] = useState<FolderSel>("all");
   const [userId, setUserId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
+  const [shareTarget, setShareTarget] = useState<MeetingRow | null>(null);
 
   useEffect(() => {
     let cancelled = false;
