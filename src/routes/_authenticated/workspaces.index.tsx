@@ -15,6 +15,7 @@ type WorkspaceCard = {
   description: string | null;
   cover_url: string | null;
   role: string;
+  tier: number;
 };
 
 type InviteRow = {
@@ -59,7 +60,7 @@ function WorkspacesHubPage() {
 
     const { data: mems } = await supabase
       .from("workspace_members")
-      .select("role, workspace_id, workspaces:workspace_id ( id, name, description, cover_url )")
+      .select("role, workspace_id, workspaces:workspace_id ( id, name, description, cover_url, tier )")
       .eq("user_id", u.user.id);
 
     const cards: WorkspaceCard[] = (mems ?? [])
@@ -69,6 +70,7 @@ function WorkspacesHubPage() {
         description: m.workspaces.description,
         cover_url: m.workspaces.cover_url,
         role: m.role,
+        tier: m.workspaces.tier ?? 1,
       } : null)
       .filter(Boolean) as WorkspaceCard[];
     setWorkspaces(cards);
@@ -203,9 +205,14 @@ function WorkspacesHubPage() {
                       <Building2 className="text-primary" />
                     )}
                   </div>
-                  <span className="text-[10px] uppercase tracking-wider text-muted-foreground bg-muted px-2 py-1 rounded-full">
-                    {ws.role}
-                  </span>
+                  <div className="flex flex-col items-end gap-1">
+                    <span className="text-[10px] uppercase tracking-wider text-muted-foreground bg-muted px-2 py-1 rounded-full">
+                      {ws.role}
+                    </span>
+                    <span className="text-[10px] uppercase tracking-wider bg-primary/15 text-primary px-2 py-1 rounded-full font-medium">
+                      Nível {ws.tier}
+                    </span>
+                  </div>
                 </div>
                 <div className="font-semibold text-lg mb-1">{ws.name}</div>
                 {ws.description && (

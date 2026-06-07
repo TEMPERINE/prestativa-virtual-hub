@@ -2,6 +2,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { OFFICE_THEMES } from "@/lib/office-themes";
+import { TIERS, type WorkspaceTier, getTierCaps, isUnlimited } from "@/lib/workspace/tiers";
 import {
   createWorkspace,
   suggestSlug,
@@ -20,6 +21,11 @@ import {
   ClipboardCheck,
   Upload,
   X as XIcon,
+  Layers,
+  Users,
+  Video,
+  Sparkle,
+  ShieldCheck,
 } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/workspaces/new")({
@@ -27,7 +33,7 @@ export const Route = createFileRoute("/_authenticated/workspaces/new")({
   component: NewWorkspacePage,
 });
 
-type Step = 1 | 2 | 3 | 4;
+type Step = 1 | 2 | 3 | 4 | 5;
 
 function NewWorkspacePage() {
   const navigate = useNavigate();
@@ -35,16 +41,29 @@ function NewWorkspacePage() {
   const [allowed, setAllowed] = useState(false);
 
   const [step, setStep] = useState<Step>(1);
+  const [tier, setTier] = useState<WorkspaceTier>(1);
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
   const [slugTouched, setSlugTouched] = useState(false);
   const [description, setDescription] = useState("");
-  const [themeId, setThemeId] = useState(OFFICE_THEMES[0].id);
+  const [themeId, setThemeId] = useState<string>("nivel-1");
   const [customThemeUrl, setCustomThemeUrl] = useState<string | null>(null);
   const [customThemeLabel, setCustomThemeLabel] = useState<string>("");
   const [seedFrom, setSeedFrom] = useState<SeedSource>("blank");
   const [sourceWorkspaceId, setSourceWorkspaceId] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  // Caps do tier escolhido
+  const caps = useMemo(() => getTierCaps(tier), [tier]);
+
+  // Quando o tier muda, propõe o tema-padrão dele.
+  useEffect(() => {
+    if (caps.defaultThemeId) {
+      setThemeId(caps.defaultThemeId);
+      setCustomThemeUrl(null);
+      setCustomThemeLabel("");
+    }
+  }, [tier]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     (async () => {
@@ -82,10 +101,17 @@ function NewWorkspacePage() {
     return OFFICE_THEMES.find((t) => t.id === themeId) ?? OFFICE_THEMES[0];
   }, [themeId, customThemeUrl, customThemeLabel]);
 
+  // Temas disponíveis no tier escolhido
+  const availableThemes = useMemo(
+    () => OFFICE_THEMES.filter((t) => (t.minTier ?? 1) <= tier),
+    [tier]
+  );
+
   const canNext = useMemo(() => {
-    if (step === 1) return name.trim().length >= 2 && slug.trim().length >= 2;
-    if (step === 2 && themeId === "custom" && !customThemeUrl) return false;
-    if (step === 3 && seedFrom === "current" && !sourceWorkspaceId) return false;
+    if (step === 1) return true; // tier sempre selecionado
+    if (step === 2) return name.trim().length >= 2 && slug.trim().length >= 2;
+    if (step === 3 && themeId === "custom" && !customThemeUrl) return false;
+    if (step === 4 && seedFrom === "current" && !sourceWorkspaceId) return false;
     return true;
   }, [step, name, slug, themeId, customThemeUrl, seedFrom, sourceWorkspaceId]);
 
@@ -100,6 +126,7 @@ function NewWorkspacePage() {
       customThemeLabel: themeId === "custom" ? customThemeLabel || "Tema personalizado" : null,
       seedFrom,
       sourceWorkspaceId,
+      tier,
     });
     setSubmitting(false);
     if (!result.ok) {
@@ -159,13 +186,14 @@ function NewWorkspacePage() {
         </h1>
         <p className="text-sm text-muted-foreground mb-8">
           Configure um novo espaço sem afetar o escritório atual. Cada
-          escritório tem seu próprio mapa, tema, áreas e equipe.
+          escritório tem seu próprio nível, mapa, tema, áreas e equipe.
         </p>
 
         <Stepper step={step} />
 
         <div className="glass-panel rounded-2xl p-6 mt-6">
-          {step === 1 && (
+          {step === 1 && <StepTier tier={tier} setTier={setTier} />}
+          {step === 2 && (
             <StepIdentity
               name={name}
               setName={setName}
@@ -178,7 +206,7 @@ function NewWorkspacePage() {
               setDescription={setDescription}
             />
           )}
-          {step === 2 && (
+          {step === 3 && (
             <StepTheme
               themeId={themeId}
               setThemeId={setThemeId}
@@ -186,22 +214,25 @@ function NewWorkspacePage() {
               setCustomThemeUrl={setCustomThemeUrl}
               customThemeLabel={customThemeLabel}
               setCustomThemeLabel={setCustomThemeLabel}
+              availableThemes={availableThemes}
+              canUploadCustom={caps.canUploadCustomTheme}
             />
           )}
-          {step === 3 && (
+          {step === 4 && (
             <StepSeed
               seedFrom={seedFrom}
               setSeedFrom={setSeedFrom}
               hasSource={!!sourceWorkspaceId}
             />
           )}
-          {step === 4 && (
+          {step === 5 && (
             <StepReview
               name={name}
               slug={slug}
               description={description}
               theme={selectedTheme}
               seedFrom={seedFrom}
+              tier={tier}
             />
           )}
         </div>
@@ -214,9 +245,9 @@ function NewWorkspacePage() {
           >
             Voltar
           </button>
-          {step < 4 ? (
+          {step < 5 ? (
             <button
-              onClick={() => setStep((s) => (Math.min(4, s + 1) as Step))}
+              onClick={() => setStep((s) => (Math.min(5, s + 1) as Step))}
               disabled={!canNext}
               className="px-5 py-2.5 rounded-lg gradient-primary text-primary-foreground text-sm font-medium inline-flex items-center gap-2 disabled:opacity-50"
             >
@@ -247,21 +278,22 @@ function NewWorkspacePage() {
 
 function Stepper({ step }: { step: Step }) {
   const steps = [
-    { n: 1, label: "Identidade", icon: Building2 },
-    { n: 2, label: "Tema", icon: Palette },
-    { n: 3, label: "Mapa inicial", icon: MapIcon },
-    { n: 4, label: "Revisão", icon: ClipboardCheck },
+    { n: 1, label: "Nível", icon: Layers },
+    { n: 2, label: "Identidade", icon: Building2 },
+    { n: 3, label: "Tema", icon: Palette },
+    { n: 4, label: "Mapa inicial", icon: MapIcon },
+    { n: 5, label: "Revisão", icon: ClipboardCheck },
   ];
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex items-center gap-2 overflow-x-auto">
       {steps.map((s, i) => {
         const active = step === s.n;
         const done = step > s.n;
         const Icon = s.icon;
         return (
-          <div key={s.n} className="flex items-center gap-2 flex-1">
+          <div key={s.n} className="flex items-center gap-2 flex-1 min-w-fit">
             <div
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition ${
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition whitespace-nowrap ${
                 active
                   ? "bg-primary text-primary-foreground"
                   : done
@@ -277,6 +309,103 @@ function Stepper({ step }: { step: Step }) {
           </div>
         );
       })}
+    </div>
+  );
+}
+
+function StepTier({
+  tier,
+  setTier,
+}: {
+  tier: WorkspaceTier;
+  setTier: (t: WorkspaceTier) => void;
+}) {
+  const tiers: WorkspaceTier[] = [1, 2, 3];
+  return (
+    <div>
+      <div className="text-xs font-medium uppercase tracking-wider text-muted-foreground mb-3">
+        Escolha o nível do escritório
+      </div>
+      <div className="grid gap-3">
+        {tiers.map((t) => {
+          const caps = TIERS[t];
+          const active = t === tier;
+          return (
+            <button
+              key={t}
+              onClick={() => setTier(t)}
+              className={`text-left rounded-xl p-4 border-2 transition ${
+                active
+                  ? "border-primary bg-primary/5 shadow-glow"
+                  : "border-border hover:border-primary/40"
+              }`}
+            >
+              <div className="flex items-start justify-between gap-3 mb-2">
+                <div>
+                  <div className="font-semibold text-base">{caps.label}</div>
+                  <div className="text-xs text-muted-foreground mt-1">
+                    {caps.description}
+                  </div>
+                </div>
+                {active && (
+                  <div className="rounded-full bg-primary text-primary-foreground p-1">
+                    <Check size={12} />
+                  </div>
+                )}
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-3">
+                <Cap
+                  icon={<Users size={12} />}
+                  label="Membros"
+                  value={isUnlimited(caps.maxMembers) ? "Ilimitado" : `Até ${caps.maxMembers}`}
+                />
+                <Cap
+                  icon={<Video size={12} />}
+                  label="Reuniões A/V"
+                  value={caps.canMeetingAV ? "Sim" : "Não"}
+                  dim={!caps.canMeetingAV}
+                />
+                <Cap
+                  icon={<Sparkle size={12} />}
+                  label="Gravação + IA"
+                  value={caps.canRecordMeetings ? "Sim" : "Não"}
+                  dim={!caps.canRecordMeetings}
+                />
+                <Cap
+                  icon={<ShieldCheck size={12} />}
+                  label="Teleporte"
+                  value={caps.canTeleport ? "Sim" : "Não"}
+                  dim={!caps.canTeleport}
+                />
+              </div>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function Cap({
+  icon,
+  label,
+  value,
+  dim,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: string;
+  dim?: boolean;
+}) {
+  return (
+    <div
+      className={`flex items-center gap-1.5 text-[11px] px-2 py-1 rounded-md bg-background/50 ${
+        dim ? "text-muted-foreground/60" : "text-foreground"
+      }`}
+    >
+      <span className="text-muted-foreground">{icon}</span>
+      <span className="text-muted-foreground">{label}:</span>
+      <span className="font-medium">{value}</span>
     </div>
   );
 }
@@ -345,6 +474,8 @@ function StepTheme({
   setCustomThemeUrl,
   customThemeLabel,
   setCustomThemeLabel,
+  availableThemes,
+  canUploadCustom,
 }: {
   themeId: string;
   setThemeId: (id: string) => void;
@@ -352,6 +483,8 @@ function StepTheme({
   setCustomThemeUrl: (u: string | null) => void;
   customThemeLabel: string;
   setCustomThemeLabel: (s: string) => void;
+  availableThemes: typeof OFFICE_THEMES;
+  canUploadCustom: boolean;
 }) {
   const [uploading, setUploading] = useState(false);
 
@@ -393,7 +526,7 @@ function StepTheme({
         Escolha o tema visual
       </div>
       <div className="grid sm:grid-cols-2 gap-3">
-        {OFFICE_THEMES.map((t) => {
+        {availableThemes.map((t) => {
           const active = t.id === themeId;
           return (
             <button
@@ -406,11 +539,7 @@ function StepTheme({
               }`}
             >
               <div className="aspect-video bg-muted">
-                <img
-                  src={t.url}
-                  alt={t.label}
-                  className="w-full h-full object-cover"
-                />
+                <img src={t.url} alt={t.label} className="w-full h-full object-cover" />
               </div>
               <div className="p-3">
                 <div className="flex items-center justify-between mb-1">
@@ -427,84 +556,81 @@ function StepTheme({
           );
         })}
 
-        {/* Card Custom */}
-        <label
-          className={`text-left rounded-xl overflow-hidden border-2 transition cursor-pointer block ${
-            themeId === "custom"
-              ? "border-primary shadow-glow"
-              : "border-dashed border-border hover:border-primary/40"
-          }`}
-        >
-          <input
-            type="file"
-            accept="image/*"
-            className="hidden"
-            disabled={uploading}
-            onChange={(e) => {
-              const f = e.target.files?.[0];
-              if (f) onUpload(f);
-              e.target.value = "";
-            }}
-          />
-          <div className="aspect-video bg-muted flex items-center justify-center relative">
-            {customThemeUrl ? (
-              <img
-                src={customThemeUrl}
-                alt="Tema personalizado"
-                className="w-full h-full object-cover"
-              />
-            ) : (
-              <div className="flex flex-col items-center text-muted-foreground text-xs gap-1">
-                {uploading ? (
-                  <Loader2 size={20} className="animate-spin" />
-                ) : (
-                  <Upload size={20} />
-                )}
-                <span>{uploading ? "Enviando…" : "Enviar nova imagem"}</span>
-              </div>
-            )}
-            {customThemeUrl && (
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  setCustomThemeUrl(null);
-                  setCustomThemeLabel("");
-                  if (themeId === "custom") setThemeId(OFFICE_THEMES[0].id);
-                }}
-                className="absolute top-2 right-2 p-1 rounded-full bg-background/80 hover:bg-background"
-                aria-label="Remover imagem"
-              >
-                <XIcon size={12} />
-              </button>
-            )}
-          </div>
-          <div className="p-3">
-            <div className="flex items-center justify-between mb-1">
-              <div className="font-medium text-sm">
-                {customThemeUrl ? (
-                  <input
-                    type="text"
-                    value={customThemeLabel}
-                    onClick={(e) => e.stopPropagation()}
-                    onChange={(e) => setCustomThemeLabel(e.target.value)}
-                    placeholder="Nome do tema"
-                    className="bg-transparent border-b border-border focus:outline-none focus:border-primary text-sm w-full"
-                  />
-                ) : (
-                  "Tema personalizado"
-                )}
-              </div>
-              {themeId === "custom" && <Check size={14} className="text-primary" />}
+        {canUploadCustom && (
+          <label
+            className={`text-left rounded-xl overflow-hidden border-2 transition cursor-pointer block ${
+              themeId === "custom"
+                ? "border-primary shadow-glow"
+                : "border-dashed border-border hover:border-primary/40"
+            }`}
+          >
+            <input
+              type="file"
+              accept="image/*"
+              className="hidden"
+              disabled={uploading}
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) onUpload(f);
+                e.target.value = "";
+              }}
+            />
+            <div className="aspect-video bg-muted flex items-center justify-center relative">
+              {customThemeUrl ? (
+                <img src={customThemeUrl} alt="Tema personalizado" className="w-full h-full object-cover" />
+              ) : (
+                <div className="flex flex-col items-center text-muted-foreground text-xs gap-1">
+                  {uploading ? <Loader2 size={20} className="animate-spin" /> : <Upload size={20} />}
+                  <span>{uploading ? "Enviando…" : "Enviar nova imagem"}</span>
+                </div>
+              )}
+              {customThemeUrl && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setCustomThemeUrl(null);
+                    setCustomThemeLabel("");
+                    if (themeId === "custom") setThemeId(availableThemes[0]?.id ?? "nivel-1");
+                  }}
+                  className="absolute top-2 right-2 p-1 rounded-full bg-background/80 hover:bg-background"
+                  aria-label="Remover imagem"
+                >
+                  <XIcon size={12} />
+                </button>
+              )}
             </div>
-            <div className="text-xs text-muted-foreground line-clamp-2">
-              {customThemeUrl
-                ? "Clique no card para usar este tema."
-                : "Faça upload de uma imagem (PNG/JPG/WEBP, até 8MB) para criar um tema novo."}
+            <div className="p-3">
+              <div className="flex items-center justify-between mb-1">
+                <div className="font-medium text-sm">
+                  {customThemeUrl ? (
+                    <input
+                      type="text"
+                      value={customThemeLabel}
+                      onClick={(e) => e.stopPropagation()}
+                      onChange={(e) => setCustomThemeLabel(e.target.value)}
+                      placeholder="Nome do tema"
+                      className="bg-transparent border-b border-border focus:outline-none focus:border-primary text-sm w-full"
+                    />
+                  ) : (
+                    "Tema personalizado"
+                  )}
+                </div>
+                {themeId === "custom" && <Check size={14} className="text-primary" />}
+              </div>
+              <div className="text-xs text-muted-foreground">
+                Envie uma imagem (PNG/JPG) e use como fundo do mapa.
+              </div>
             </div>
+          </label>
+        )}
+
+        {!canUploadCustom && (
+          <div className="rounded-xl border border-dashed border-border p-4 text-xs text-muted-foreground flex items-center justify-center text-center">
+            Upload de tema customizado disponível apenas no Nível 3.
           </div>
-        </label>
+        )}
       </div>
     </div>
   );
@@ -520,66 +646,40 @@ function StepSeed({
   hasSource: boolean;
 }) {
   return (
-    <div>
-      <div className="text-xs font-medium uppercase tracking-wider text-muted-foreground mb-3">
+    <div className="space-y-3">
+      <div className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
         Ponto de partida do mapa
       </div>
-      <p className="text-xs text-muted-foreground mb-4">
-        Áreas, paredes e props podem ser ajustados depois pelo Editor de
-        Escritório dentro do novo espaço.
-      </p>
-      <div className="space-y-2">
-        <SeedOption
-          active={seedFrom === "blank"}
-          onClick={() => setSeedFrom("blank")}
-          title="Começar em branco"
-          desc="Mapa vazio. Você desenha as áreas e posiciona os móveis do zero."
-        />
-        <SeedOption
-          active={seedFrom === "current"}
-          onClick={() => setSeedFrom("current")}
-          disabled={!hasSource}
-          title="Copiar do escritório atual"
-          desc={
-            hasSource
-              ? "Clona o mapa, áreas e props do seu escritório atual. Bom para variações."
-              : "Indisponível: nenhum escritório atual identificado."
-          }
-        />
-      </div>
+      <button
+        onClick={() => setSeedFrom("blank")}
+        className={`w-full text-left rounded-xl p-4 border-2 transition ${
+          seedFrom === "blank"
+            ? "border-primary bg-primary/5"
+            : "border-border hover:border-primary/40"
+        }`}
+      >
+        <div className="font-medium text-sm mb-1">Começar em branco</div>
+        <div className="text-xs text-muted-foreground">
+          Mapa vazio. O admin pode pintar áreas, paredes e props depois no Editor de Escritório.
+        </div>
+      </button>
+      <button
+        onClick={() => setSeedFrom("current")}
+        disabled={!hasSource}
+        className={`w-full text-left rounded-xl p-4 border-2 transition disabled:opacity-50 disabled:cursor-not-allowed ${
+          seedFrom === "current"
+            ? "border-primary bg-primary/5"
+            : "border-border hover:border-primary/40"
+        }`}
+      >
+        <div className="font-medium text-sm mb-1">Copiar do escritório atual</div>
+        <div className="text-xs text-muted-foreground">
+          {hasSource
+            ? "Clona zonas, paredes, props e custom props do último escritório acessado."
+            : "Nenhum escritório de origem detectado."}
+        </div>
+      </button>
     </div>
-  );
-}
-
-function SeedOption({
-  active,
-  onClick,
-  title,
-  desc,
-  disabled,
-}: {
-  active: boolean;
-  onClick: () => void;
-  title: string;
-  desc: string;
-  disabled?: boolean;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      disabled={disabled}
-      className={`w-full text-left p-4 rounded-xl border-2 transition disabled:opacity-50 disabled:cursor-not-allowed ${
-        active
-          ? "border-primary bg-primary/5"
-          : "border-border hover:border-primary/40"
-      }`}
-    >
-      <div className="flex items-center justify-between mb-1">
-        <div className="font-medium text-sm">{title}</div>
-        {active && <Check size={14} className="text-primary" />}
-      </div>
-      <div className="text-xs text-muted-foreground">{desc}</div>
-    </button>
   );
 }
 
@@ -589,61 +689,43 @@ function StepReview({
   description,
   theme,
   seedFrom,
+  tier,
 }: {
   name: string;
   slug: string;
   description: string;
   theme: { label: string; url: string };
   seedFrom: SeedSource;
+  tier: WorkspaceTier;
 }) {
+  const caps = getTierCaps(tier);
   return (
     <div className="space-y-4">
       <div className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-        Revise e confirme
+        Revisão
       </div>
       <div className="rounded-xl overflow-hidden border border-border">
-        <div className="aspect-video bg-muted">
-          <img src={theme.url} alt="" className="w-full h-full object-cover" />
+        <img src={theme.url} alt={theme.label} className="w-full aspect-video object-cover" />
+        <div className="p-4 bg-background/50">
+          <div className="flex items-center justify-between mb-2">
+            <div className="font-semibold">{name || "(sem nome)"}</div>
+            <div className="text-[10px] uppercase tracking-wider bg-primary/15 text-primary px-2 py-1 rounded-full">
+              {caps.shortLabel}
+            </div>
+          </div>
+          <div className="text-xs text-muted-foreground font-mono mb-1">/{slug}</div>
+          {description && (
+            <div className="text-sm text-muted-foreground mb-2">{description}</div>
+          )}
+          <div className="text-xs text-muted-foreground">
+            Tema: <b>{theme.label}</b> · Mapa: <b>{seedFrom === "blank" ? "em branco" : "copiado do atual"}</b>
+          </div>
+          <div className="text-xs text-muted-foreground mt-1">
+            Limites: {isUnlimited(caps.maxMembers) ? "membros ilimitados" : `até ${caps.maxMembers} membros`}
+            {caps.canMeetingAV ? " · A/V liberado" : " · sem A/V"}
+            {caps.canRecordMeetings ? " · gravação + IA" : ""}
+          </div>
         </div>
-        <div className="p-4 space-y-2">
-          <Row label="Nome" value={name} />
-          <Row label="Slug" value={slug} mono />
-          {description && <Row label="Descrição" value={description} />}
-          <Row label="Tema" value={theme.label} />
-          <Row
-            label="Mapa inicial"
-            value={
-              seedFrom === "blank"
-                ? "Em branco"
-                : "Copiado do escritório atual"
-            }
-          />
-        </div>
-      </div>
-      <p className="text-xs text-muted-foreground">
-        Depois de criar, você será levado direto para o novo escritório e
-        poderá ajustar áreas e móveis no Editor de Escritório.
-      </p>
-    </div>
-  );
-}
-
-function Row({
-  label,
-  value,
-  mono,
-}: {
-  label: string;
-  value: string;
-  mono?: boolean;
-}) {
-  return (
-    <div className="flex items-baseline justify-between gap-4">
-      <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
-        {label}
-      </div>
-      <div className={`text-sm text-right ${mono ? "font-mono" : ""}`}>
-        {value}
       </div>
     </div>
   );
