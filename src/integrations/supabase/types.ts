@@ -267,6 +267,35 @@ export type Database = {
           },
         ]
       }
+      meeting_recording_shares: {
+        Row: {
+          created_at: string
+          meeting_id: string
+          recipient_id: string
+          sender_id: string
+        }
+        Insert: {
+          created_at?: string
+          meeting_id: string
+          recipient_id: string
+          sender_id: string
+        }
+        Update: {
+          created_at?: string
+          meeting_id?: string
+          recipient_id?: string
+          sender_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "meeting_recording_shares_meeting_id_fkey"
+            columns: ["meeting_id"]
+            isOneToOne: false
+            referencedRelation: "meetings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       meetings: {
         Row: {
           ai_error: string | null
@@ -720,6 +749,10 @@ export type Database = {
       }
       meeting_set_title: {
         Args: { _meeting_id: string; _title: string }
+        Returns: undefined
+      }
+      meeting_share_recording: {
+        Args: { _meeting_id: string; _recipient_id: string }
         Returns: undefined
       }
       workspace_accept_invite: { Args: { _token: string }; Returns: string }

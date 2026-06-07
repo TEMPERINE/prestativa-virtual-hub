@@ -7,13 +7,17 @@ import { supabase } from "@/integrations/supabase/client";
 import {
   ArrowLeft, Users, Clock, Video, Sparkles, Loader2, FileText, ChevronDown,
   Folder, FolderPlus, FolderOpen, Inbox, Pencil, Trash2, FolderInput,
-  Search, Star, Download, Check, X, AlertCircle, CheckCircle2,
+  Search, Star, Download, Check, X, AlertCircle, CheckCircle2, Send, Mail,
 } from "lucide-react";
 import { generateMeetingAi } from "@/lib/meetings/ai.functions";
 import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent,
   DropdownMenuItem, DropdownMenuCheckboxItem, DropdownMenuSeparator, DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
+} from "@/components/ui/dialog";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/meetings")({
   head: () => ({
@@ -27,6 +31,7 @@ export const Route = createFileRoute("/_authenticated/meetings")({
 
 type MeetingRow = {
   id: string;
+  workspace_id: string;
   zone_id: string;
   zone_label: string;
   title: string | null;
@@ -51,11 +56,13 @@ type ParticipantRow = {
   profiles?: { display_name: string; avatar_color: string } | null;
 };
 
+type ShareRow = { meeting_id: string; sender_id: string };
+
 type FolderRow = { id: string; name: string };
 type FolderItemRow = { folder_id: string; meeting_id: string };
 
-/** "all" | "unfiled" | "favorites" | uuid de pasta */
-type FolderSel = "all" | "unfiled" | "favorites" | string;
+/** "all" | "unfiled" | "favorites" | "received" | uuid de pasta */
+type FolderSel = "all" | "unfiled" | "favorites" | "received" | string;
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const sb = supabase as any;
@@ -70,9 +77,11 @@ function MeetingsPage() {
   const [folders, setFolders] = useState<FolderRow[]>([]);
   const [folderItems, setFolderItems] = useState<FolderItemRow[]>([]);
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
+  const [receivedShares, setReceivedShares] = useState<Map<string, string>>(new Map()); // meeting_id -> sender_id
   const [selected, setSelected] = useState<FolderSel>("all");
   const [userId, setUserId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
+  const [shareTarget, setShareTarget] = useState<MeetingRow | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -82,10 +91,10 @@ function MeetingsPage() {
       const uid = auth.user?.id ?? null;
       setUserId(uid);
 
-      const [{ data: ms }, { data: fs }, { data: fis }, { data: favs }] = await Promise.all([
+      const [{ data: ms }, { data: fs }, { data: fis }, { data: favs }, { data: shares }] = await Promise.all([
         supabase
           .from("meetings" as never)
-          .select("id, zone_id, zone_label, title, started_at, ended_at, host_id, recording_path, recording_started_at, recording_duration_seconds, transcript, summary, ai_status, ai_error")
+          .select("id, workspace_id, zone_id, zone_label, title, started_at, ended_at, host_id, recording_path, recording_started_at, recording_duration_seconds, transcript, summary, ai_status, ai_error")
           .or("recording_path.not.is.null,recording_started_at.not.is.null")
           .order("started_at", { ascending: false })
           .limit(200),
@@ -93,6 +102,9 @@ function MeetingsPage() {
         sb.from("meeting_folders").select("id, name").order("name"),
         sb.from("meeting_folder_items").select("folder_id, meeting_id"),
         sb.from("meeting_favorites").select("meeting_id"),
+        uid
+          ? sb.from("meeting_recording_shares").select("meeting_id, sender_id").eq("recipient_id", uid)
+          : Promise.resolve({ data: [] }),
       ]);
       if (cancelled) return;
       const meetingList = (ms ?? []) as MeetingRow[];
@@ -100,6 +112,9 @@ function MeetingsPage() {
       setFolders((fs ?? []) as FolderRow[]);
       setFolderItems((fis ?? []) as FolderItemRow[]);
       setFavorites(new Set(((favs ?? []) as { meeting_id: string }[]).map((f) => f.meeting_id)));
+      const shareMap = new Map<string, string>();
+      for (const s of ((shares ?? []) as ShareRow[])) shareMap.set(s.meeting_id, s.sender_id);
+      setReceivedShares(shareMap);
 
       if (meetingList.length > 0) {
         const ids = meetingList.map((m) => m.id);
@@ -114,7 +129,10 @@ function MeetingsPage() {
         setParticipantsByMeeting(byMeeting);
 
         const userIds = Array.from(
-          new Set(meetingList.map((m) => m.host_id).filter(Boolean) as string[]),
+          new Set([
+            ...meetingList.map((m) => m.host_id).filter(Boolean) as string[],
+            ...Array.from(shareMap.values()),
+          ]),
         );
         if (userIds.length > 0) {
           const { data: profs } = await supabase
@@ -154,9 +172,10 @@ function MeetingsPage() {
 
   const visibleMeetings = useMemo(() => {
     let base: MeetingRow[];
-    if (selected === "all") base = meetings;
+    if (selected === "all") base = meetings.filter((m) => !receivedShares.has(m.id));
+    else if (selected === "received") base = meetings.filter((m) => receivedShares.has(m.id));
     else if (selected === "favorites") base = meetings.filter((m) => favorites.has(m.id));
-    else if (selected === "unfiled") base = meetings.filter((m) => !foldersByMeeting[m.id] || foldersByMeeting[m.id].size === 0);
+    else if (selected === "unfiled") base = meetings.filter((m) => !receivedShares.has(m.id) && (!foldersByMeeting[m.id] || foldersByMeeting[m.id].size === 0));
     else base = meetings.filter((m) => foldersByMeeting[m.id]?.has(selected));
 
     const q = query.trim().toLowerCase();
@@ -254,6 +273,7 @@ function MeetingsPage() {
   const currentTitle =
     selected === "all" ? "Minhas reuniões"
     : selected === "favorites" ? "Favoritas"
+    : selected === "received" ? "Gravações recebidas"
     : selected === "unfiled" ? "Sem pasta"
     : folders.find((f) => f.id === selected)?.name ?? "Pasta";
 
@@ -289,8 +309,9 @@ function MeetingsPage() {
           folders={folders}
           selected={selected}
           onSelect={setSelected}
-          allCount={meetings.length}
+          allCount={meetings.filter((m) => !receivedShares.has(m.id)).length}
           favoritesCount={favorites.size}
+          receivedCount={receivedShares.size}
           unfiledCount={unfiledCount}
           countsByFolder={countsByFolder}
           onCreate={createFolder}
@@ -311,6 +332,11 @@ function MeetingsPage() {
                   meeting={m}
                   participants={participantsByMeeting[m.id] ?? []}
                   hostProfile={m.host_id ? profiles[m.host_id] : undefined}
+                  receivedFromSenderId={receivedShares.get(m.id) ?? null}
+                  receivedFromProfile={(() => {
+                    const sid = receivedShares.get(m.id);
+                    return sid ? profiles[sid] : undefined;
+                  })()}
                   folders={folders}
                   meetingFolderIds={foldersByMeeting[m.id] ?? new Set()}
                   isFavorite={favorites.has(m.id)}
@@ -318,6 +344,7 @@ function MeetingsPage() {
                   onRename={(t) => renameMeeting(m.id, t)}
                   onToggleFolder={(folderId, isMember) => toggleMembership(m.id, folderId, isMember)}
                   onCreateFolder={createFolder}
+                  onShare={() => setShareTarget(m)}
                   onAiUpdated={(transcript, summary) => {
                     setMeetings((prev) =>
                       prev.map((row) =>
@@ -333,12 +360,18 @@ function MeetingsPage() {
           )}
         </main>
       </div>
+
+      <SendRecordingDialog
+        meeting={shareTarget}
+        currentUserId={userId}
+        onClose={() => setShareTarget(null)}
+      />
     </div>
   );
 }
 
 function FolderExplorer({
-  folders, selected, onSelect, allCount, favoritesCount, unfiledCount, countsByFolder,
+  folders, selected, onSelect, allCount, favoritesCount, receivedCount, unfiledCount, countsByFolder,
   onCreate, onRename, onDelete,
 }: {
   folders: FolderRow[];
@@ -346,6 +379,7 @@ function FolderExplorer({
   onSelect: (s: FolderSel) => void;
   allCount: number;
   favoritesCount: number;
+  receivedCount: number;
   unfiledCount: number;
   countsByFolder: Record<string, number>;
   onCreate: () => void;
@@ -380,6 +414,14 @@ function FolderExplorer({
             active={selected === "favorites"}
             onClick={() => onSelect("favorites")}
           />
+          <FolderItem
+            icon={<Mail className="w-4 h-4" />}
+            label="Gravações recebidas"
+            count={receivedCount}
+            active={selected === "received"}
+            onClick={() => onSelect("received")}
+          />
+
           {folders.map((f) => (
             <FolderItem
               key={f.id}
@@ -489,6 +531,8 @@ function MeetingCard({
   meeting,
   participants,
   hostProfile,
+  receivedFromSenderId,
+  receivedFromProfile,
   folders,
   meetingFolderIds,
   isFavorite,
@@ -496,11 +540,14 @@ function MeetingCard({
   onRename,
   onToggleFolder,
   onCreateFolder,
+  onShare,
   onAiUpdated,
 }: {
   meeting: MeetingRow;
   participants: ParticipantRow[];
   hostProfile?: { display_name: string; avatar_color: string };
+  receivedFromSenderId: string | null;
+  receivedFromProfile?: { display_name: string; avatar_color: string };
   folders: FolderRow[];
   meetingFolderIds: Set<string>;
   isFavorite: boolean;
@@ -508,6 +555,7 @@ function MeetingCard({
   onRename: (newTitle: string) => void;
   onToggleFolder: (folderId: string, isMember: boolean) => void;
   onCreateFolder: () => void;
+  onShare: () => void;
   onAiUpdated: (transcript: string, summary: string) => void;
 }) {
   const start = new Date(meeting.started_at);
@@ -609,6 +657,15 @@ function MeetingCard({
               >
                 <Star className={`w-4 h-4 ${isFavorite ? "fill-current" : ""}`} />
               </button>
+              {meeting.recording_path && (
+                <button
+                  onClick={onShare}
+                  title="Enviar gravação para alguém do espaço"
+                  className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground"
+                >
+                  <Send className="w-4 h-4" />
+                </button>
+              )}
               <DropdownMenu>
                 <DropdownMenuTrigger className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground border rounded px-2 py-1">
                   <FolderInput className="w-3 h-3" />
@@ -661,6 +718,12 @@ function MeetingCard({
               {participants.length || "—"} participação{participants.length === 1 ? "" : "s"} sua{participants.length === 1 ? "" : "s"}
             </span>
             <span className="text-muted-foreground/80">· {meeting.zone_label}</span>
+            {receivedFromSenderId && (
+              <span className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-primary bg-primary/10 px-1.5 py-0.5 rounded">
+                <Mail className="w-3 h-3" />
+                Recebido{receivedFromProfile ? ` de ${receivedFromProfile.display_name}` : ""}
+              </span>
+            )}
             <AiStatusBadge meeting={meeting} />
           </div>
 
@@ -1044,5 +1107,146 @@ function PersonalNotes({ meetingId, active }: { meetingId: string; active: boole
         className="w-full resize-y rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-50"
       />
     </section>
+  );
+}
+
+type MemberPick = { user_id: string; display_name: string; avatar_color: string };
+
+function SendRecordingDialog({
+  meeting,
+  currentUserId,
+  onClose,
+}: {
+  meeting: MeetingRow | null;
+  currentUserId: string | null;
+  onClose: () => void;
+}) {
+  const [members, setMembers] = useState<MemberPick[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [q, setQ] = useState("");
+  const [sendingId, setSendingId] = useState<string | null>(null);
+  const [sentIds, setSentIds] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    if (!meeting) return;
+    setQ("");
+    setSentIds(new Set());
+    setLoading(true);
+    (async () => {
+      const { data: mems } = await sb
+        .from("workspace_members")
+        .select("user_id")
+        .eq("workspace_id", meeting.workspace_id);
+      const ids = ((mems ?? []) as { user_id: string }[])
+        .map((m) => m.user_id)
+        .filter((id) => id !== currentUserId);
+      if (ids.length === 0) {
+        setMembers([]);
+        setLoading(false);
+        return;
+      }
+      const { data: profs } = await supabase
+        .from("profiles")
+        .select("id, display_name, avatar_color")
+        .in("id", ids);
+      const list: MemberPick[] = ((profs ?? []) as Array<{ id: string; display_name: string; avatar_color: string }>)
+        .map((p) => ({ user_id: p.id, display_name: p.display_name, avatar_color: p.avatar_color }))
+        .sort((a, b) => a.display_name.localeCompare(b.display_name));
+      setMembers(list);
+      setLoading(false);
+    })();
+  }, [meeting, currentUserId]);
+
+  const filtered = useMemo(() => {
+    const t = q.trim().toLowerCase();
+    if (!t) return members;
+    return members.filter((m) => m.display_name.toLowerCase().includes(t));
+  }, [members, q]);
+
+  const send = async (recipientId: string) => {
+    if (!meeting) return;
+    setSendingId(recipientId);
+    const { error } = await sb.rpc("meeting_share_recording", {
+      _meeting_id: meeting.id,
+      _recipient_id: recipientId,
+    });
+    setSendingId(null);
+    if (error) {
+      toast.error(error.message ?? "Não foi possível enviar.");
+      return;
+    }
+    setSentIds((prev) => new Set(prev).add(recipientId));
+    toast.success("Gravação enviada.");
+  };
+
+  return (
+    <Dialog open={!!meeting} onOpenChange={(o) => { if (!o) onClose(); }}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle className="inline-flex items-center gap-2">
+            <Send className="w-4 h-4" /> Enviar gravação
+          </DialogTitle>
+          <DialogDescription>
+            Selecione alguém do espaço para receber esta gravação em
+            <span className="font-medium"> Gravações recebidas</span>.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="relative">
+          <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+          <input
+            autoFocus
+            type="search"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Buscar membro…"
+            className="pl-8 pr-3 py-1.5 text-sm rounded-md border bg-background w-full focus:outline-none focus:ring-2 focus:ring-primary/40"
+          />
+        </div>
+        <div className="max-h-72 overflow-auto -mx-1 px-1">
+          {loading ? (
+            <div className="py-6 text-center text-sm text-muted-foreground inline-flex items-center gap-2 justify-center w-full">
+              <Loader2 className="w-3 h-3 animate-spin" /> Carregando membros…
+            </div>
+          ) : filtered.length === 0 ? (
+            <div className="py-6 text-center text-sm text-muted-foreground">
+              Nenhum membro encontrado.
+            </div>
+          ) : (
+            <ul className="space-y-1">
+              {filtered.map((m) => {
+                const sent = sentIds.has(m.user_id);
+                const sending = sendingId === m.user_id;
+                return (
+                  <li key={m.user_id}>
+                    <button
+                      onClick={() => !sent && !sending && send(m.user_id)}
+                      disabled={sent || sending}
+                      className="w-full flex items-center gap-3 px-2 py-2 rounded-md hover:bg-muted text-left disabled:opacity-60"
+                    >
+                      <div
+                        className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-semibold shrink-0"
+                        style={{ background: m.avatar_color }}
+                      >
+                        {m.display_name.slice(0, 1).toUpperCase()}
+                      </div>
+                      <span className="flex-1 text-sm truncate">{m.display_name}</span>
+                      {sent ? (
+                        <span className="inline-flex items-center gap-1 text-xs text-emerald-600">
+                          <Check className="w-3 h-3" /> Enviado
+                        </span>
+                      ) : sending ? (
+                        <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+                      ) : (
+                        <Send className="w-3.5 h-3.5 text-muted-foreground" />
+                      )}
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
