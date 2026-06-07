@@ -837,7 +837,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
     reactionChannelRef.current = reactionCh;
 
     const positionBroadcastCh = supabase
-      .channel(POSITION_BROADCAST_CHANNEL, { config: { broadcast: { self: false } } })
+      .channel(`${POSITION_BROADCAST_CHANNEL}:${wsSuffix}`, { config: { broadcast: { self: false } } })
       .on("broadcast", { event: "position" }, (payload) => {
         const row = payload.payload as RemotePos;
         if (!row?.user_id) return;
