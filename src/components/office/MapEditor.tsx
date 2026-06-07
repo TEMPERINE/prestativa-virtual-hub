@@ -733,7 +733,7 @@ export function MapEditor() {
                       // mantém ferramenta atual; usuário escolhe uma zona ou borracha
                     }
                   }}
-                  className={`flex-1 inline-flex items-center justify-center gap-1.5 text-xs px-2 py-2 rounded-md transition-all ${
+                  className={`flex-1 inline-flex items-center justify-center gap-1 text-xs px-1.5 py-2 rounded-md transition-all ${
                     active
                       ? `${t.activeBg} text-white font-semibold shadow-md shadow-black/20 scale-[1.02]`
                       : `text-muted-foreground ${t.hoverBg}`
