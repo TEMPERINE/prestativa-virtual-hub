@@ -60,6 +60,7 @@ import { OnboardingWizard } from "@/components/onboarding/OnboardingWizard";
 import { useMeetingTracker } from "@/lib/meetings/useMeetingTracker";
 import { useMeetingRecorder } from "@/lib/meetings/useMeetingRecorder";
 import { getCurrentWorkspaceId } from "@/lib/workspace/current";
+import { useWorkspaceTier } from "@/lib/workspace/useWorkspaceTier";
 
 type Profile = {
   id: string;
@@ -209,6 +210,11 @@ function randomPointInRect(
 
 export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
   const officeTheme = useOfficeTheme();
+  // Capacidades por nível do escritório atual — controlam botões de gravar,
+  // teleporte e troca de personagem.
+  const { caps: tierCaps } = useWorkspaceTier(getCurrentWorkspaceId());
+  const tierCapsRef = useRef(tierCaps);
+  tierCapsRef.current = tierCaps;
   const sceneRef = useRef<HTMLDivElement | null>(null);
   const stageRef = useRef<HTMLDivElement | null>(null);
   const [me, setMe] = useState<Profile | null>(null);
@@ -1403,6 +1409,10 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
   const teleportTimers = useRef<number[]>([]);
 
   const teleportToZone = useCallback((zoneId: ZoneId, label?: string, useSpawnPoint = false) => {
+    if (!tierCapsRef.current.canTeleport) {
+      toast.info("Teleporte está disponível a partir do Nível 2.");
+      return;
+    }
     const z = findZoneById(zoneId);
     if (!z) return;
     // If already inside the target zone, do nothing.
@@ -1838,6 +1848,8 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
     getLocalAudioTrack: rtc.getLocalAudioTrack,
     remoteStreams: rtc.remoteStreams,
   });
+
+
 
 
 
@@ -2768,7 +2780,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
 
             {/* Botão de gravação — aparece em qualquer sala de reunião (mesmo sozinho).
                 Se não houver reunião ativa ainda, criamos sob demanda via meeting_join. */}
-            {!!currentZone.supportsVideo && (
+            {!!currentZone.supportsVideo && tierCaps.canRecordMeetings && (
               <button
                 onClick={async () => {
                   if (recorder.isUploading) return;
@@ -2847,6 +2859,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
                 email={myEmail}
                 hasClaim={Object.values(claims).includes(me.id)}
                 onEditCharacter={() => setEditCharOpen(true)}
+                canEditCharacter={tierCaps.canChangeSprite}
                 onEditProfile={() => setEditProfOpen(true)}
                 onGoToMyDesk={teleportToMyClaim}
                 onGoToLobby={() => {
