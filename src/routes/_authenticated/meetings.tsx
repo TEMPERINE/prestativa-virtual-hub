@@ -34,6 +34,8 @@ type MeetingRow = {
   ended_at: string | null;
   host_id: string | null;
   recording_path: string | null;
+  recording_started_at?: string | null;
+
   recording_duration_seconds: number | null;
   transcript: string | null;
   summary: string | null;
