@@ -50,7 +50,10 @@ function seedFromDefaults(): MapOverrides {
       }
     }
   }
-  // Zones from ZONES rectangles (skip lobby).
+  // Zones from ZONES rectangles (skip lobby). Materialize each as a
+  // customZone so the user can rename/recolor/delete them like any other.
+  const seededCustom: CustomZone[] = [];
+  const seededKinds: Record<string, ZoneKind> = {};
   for (const z of ZONES) {
     if (z.id === "lobby") continue;
     const c0 = Math.max(0, Math.floor(z.rect.x1 * o.cols));
@@ -62,7 +65,20 @@ function seedFromDefaults(): MapOverrides {
         o.zones[cellIndex(cc, r, o.cols)] = z.id;
       }
     }
+    const kind: ZoneKind =
+      z.id === "reuniao" || z.id === "feedback" || z.id === "descompressao"
+        ? "common"
+        : "workspace";
+    seededCustom.push({
+      id: z.id,
+      label: z.label,
+      color: ZONE_COLORS[z.id] ?? "#888",
+      kind,
+    });
+    seededKinds[z.id] = kind;
   }
+  o.customZones = seededCustom;
+  o.zoneKinds = seededKinds;
   return o;
 }
 
