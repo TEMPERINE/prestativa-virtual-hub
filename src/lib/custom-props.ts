@@ -6,10 +6,15 @@ import { supabase } from "@/integrations/supabase/client";
 import { setCustomProps, type PropDef } from "./prop-catalog";
 
 
+import { getCurrentWorkspaceId } from "@/lib/workspace/current";
+
 export async function loadCustomPropsFromCloud(): Promise<void> {
+  const ws = getCurrentWorkspaceId();
+  if (!ws) { setCustomProps([]); return; }
   const { data, error } = await supabase
     .from("custom_props")
     .select("id,label,frames,default_w,aspect_ratio")
+    .eq("workspace_id", ws)
     .order("created_at", { ascending: true });
   if (error) {
     console.warn("[custom-props] load falhou", error);
@@ -98,7 +103,10 @@ export async function uploadCustomProp(opts: UploadOptions): Promise<void> {
   const { data: userData } = await supabase.auth.getUser();
   const userId = userData.user?.id ?? null;
 
+  const ws = getCurrentWorkspaceId();
+  if (!ws) throw new Error("Workspace inválido.");
   const { error } = await supabase.from("custom_props").insert({
+    workspace_id: ws,
     id,
     label: label.trim(),
     frames,

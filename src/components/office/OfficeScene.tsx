@@ -59,6 +59,7 @@ import { EditProfileModal } from "@/components/profile/EditProfileModal";
 import { OnboardingWizard } from "@/components/onboarding/OnboardingWizard";
 import { useMeetingTracker } from "@/lib/meetings/useMeetingTracker";
 import { useMeetingRecorder } from "@/lib/meetings/useMeetingRecorder";
+import { getCurrentWorkspaceId } from "@/lib/workspace/current";
 
 type Profile = {
   id: string;
@@ -489,7 +490,9 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
       const now = performance.now();
       if (persistNow || now - lastPersisted.current > 300) {
         lastPersisted.current = now;
-        void supabase.from("positions").upsert({
+        const _ws = getCurrentWorkspaceId();
+        if (_ws) void supabase.from("positions").upsert({
+          workspace_id: _ws,
           user_id: userId,
           x,
           y,
@@ -724,7 +727,9 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
       };
       setPositions(pmap);
 
-      await supabase.from("positions").upsert({
+      const _wsInit = getCurrentWorkspaceId();
+      if (_wsInit) await supabase.from("positions").upsert({
+        workspace_id: _wsInit,
         user_id: userData.user.id,
         x: safeStart.x,
         y: safeStart.y,
@@ -1019,7 +1024,9 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
         });
       } catch { /* noop */ }
       // Also fire a normal async upsert as a backup (works if the page isn't fully torn down yet)
-      void supabase.from("positions").upsert({
+      const _wsOff = getCurrentWorkspaceId();
+      if (_wsOff) void supabase.from("positions").upsert({
+        workspace_id: _wsOff,
         user_id: uid,
         x: cur.x,
         y: cur.y,
@@ -1090,7 +1097,9 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
       // SPAWN here would clobber the real DB row and snap us back for peers.
       if (cur.x === SPAWN.x && cur.y === SPAWN.y) return;
       writeLocalSavedPosition(uid, cur, zoneAt(cur).id, facingRef.current);
-      void supabase.from("positions").upsert({
+      const _wsHb = getCurrentWorkspaceId();
+      if (_wsHb) void supabase.from("positions").upsert({
+        workspace_id: _wsHb,
         user_id: uid,
         x: cur.x,
         y: cur.y,
@@ -1336,9 +1345,11 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
     if (!uid) return;
     // Release any previous claim by this user (one workstation per user).
     await supabase.from("workspace_claims").delete().eq("user_id", uid);
+    const _wsClaim = getCurrentWorkspaceId();
+    if (!_wsClaim) { toast.error("Workspace inválido."); return; }
     const { error } = await supabase
       .from("workspace_claims")
-      .insert({ zone_id: zoneId, user_id: uid });
+      .insert({ workspace_id: _wsClaim, zone_id: zoneId, user_id: uid });
     if (error) {
       toast.error("Não foi possível reivindicar esse espaço.");
       return;
@@ -2298,7 +2309,10 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
             onConfirm={async (p) => {
               const uid = meIdRef.current;
               if (!uid) return;
+              const _wsNote = getCurrentWorkspaceId();
+              if (!_wsNote) { toast.error("Workspace inválido."); return; }
               const { error } = await supabase.from("desk_notes").insert({
+                workspace_id: _wsNote,
                 zone_id: placing.zoneId,
                 sender_id: uid,
                 recipient_id: placing.recipientId,
