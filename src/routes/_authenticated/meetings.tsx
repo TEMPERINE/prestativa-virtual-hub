@@ -657,6 +657,15 @@ function MeetingCard({
               >
                 <Star className={`w-4 h-4 ${isFavorite ? "fill-current" : ""}`} />
               </button>
+              {meeting.recording_path && (
+                <button
+                  onClick={onShare}
+                  title="Enviar gravação para alguém do espaço"
+                  className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground"
+                >
+                  <Send className="w-4 h-4" />
+                </button>
+              )}
               <DropdownMenu>
                 <DropdownMenuTrigger className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground border rounded px-2 py-1">
                   <FolderInput className="w-3 h-3" />
