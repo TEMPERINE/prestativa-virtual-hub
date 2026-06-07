@@ -940,10 +940,12 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
     });
 
     const claimsCh = supabase
-      .channel(`claims-room:${realtimeChannelSuffix}`)
+      .channel(`claims-room:${wsSuffix}:${realtimeChannelSuffix}`)
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "workspace_claims" },
+        _wsChan
+          ? { event: "*", schema: "public", table: "workspace_claims", filter: `workspace_id=eq.${_wsChan}` }
+          : { event: "*", schema: "public", table: "workspace_claims" },
         (payload) => {
           const row = (payload.new ?? payload.old) as { zone_id: string; user_id: string };
           if (!row) return;
