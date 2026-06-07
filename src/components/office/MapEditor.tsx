@@ -143,6 +143,7 @@ export function MapEditor() {
   const [editorTab, setEditorTab] = useState<"map" | "zones" | "elements" | "theme">("map");
   const officeTheme = useOfficeTheme();
   const [brush, setBrush] = useState(1);
+  const [mouseCell, setMouseCell] = useState<{ c: number; r: number } | null>(null);
   const [showGrid, setShowGrid] = useState(true);
   const [showImage, setShowImage] = useState(true);
   const [showEffective, setShowEffective] = useState(false);
@@ -1306,7 +1307,7 @@ export function MapEditor() {
         >
           <div
             ref={stageRef}
-            className="relative mx-auto select-none cursor-crosshair"
+            className={`relative mx-auto select-none ${["blocked","erase","zone","erase-zone"].includes(tool.kind) || (altDown && ["blocked","zone"].includes(tool.kind)) ? "cursor-none" : "cursor-crosshair"}`}
             style={{
               aspectRatio: "1536 / 1024",
               width: `calc(${zoom} * min(100%, calc((100vh - 110px) * 1.5)))`,
@@ -1340,6 +1341,9 @@ export function MapEditor() {
               const rect = stageRef.current.getBoundingClientRect();
               const nx = (e.clientX - rect.left) / rect.width;
               const ny = (e.clientY - rect.top) / rect.height;
+              const col = Math.max(0, Math.min(GRID_COLS - 1, Math.floor(nx * GRID_COLS)));
+              const row = Math.max(0, Math.min(GRID_ROWS - 1, Math.floor(ny * GRID_ROWS)));
+              setMouseCell({ c: col, r: row });
               if (tool.kind === "place-prop") {
                 setGhostPos({ x: nx, y: ny });
               }
@@ -1351,10 +1355,6 @@ export function MapEditor() {
                     y: Math.max(0, Math.min(1, ny + drag.offY)),
                   });
                 } else {
-                  // Resize ancorado no canto oposto (estilo PowerPoint).
-                  // anchorLeft/anchorTop ficam fixos; calculamos nova largura
-                  // a partir da distância horizontal do cursor até a âncora,
-                  // mantendo a proporção.
                   const newW = Math.max(0.01, Math.min(0.8, nx - drag.anchorLeft));
                   const newH = newW / drag.aspect;
                   updateProp(drag.id, {
@@ -1367,7 +1367,10 @@ export function MapEditor() {
               }
               if (painting.current) handlePointer(e);
             }}
-            onPointerLeave={() => { if (tool.kind === "place-prop") setGhostPos(null); }}
+            onPointerLeave={() => {
+              setMouseCell(null);
+              if (tool.kind === "place-prop") setGhostPos(null);
+            }}
             onPointerUp={() => { painting.current = false; draggingPin.current = null; draggingPropRef.current = null; }}
             onPointerCancel={() => { painting.current = false; draggingPin.current = null; draggingPropRef.current = null; }}
           >
@@ -1615,6 +1618,39 @@ export function MapEditor() {
                 Clique no mapa para colocar · Esc para cancelar
               </div>
             )}
+            {/* Brush cursor overlay */}
+            {mouseCell && (effectiveTool.kind === "blocked" || effectiveTool.kind === "erase" || effectiveTool.kind === "zone" || effectiveTool.kind === "erase-zone") && (() => {
+              const half = Math.floor(brush / 2);
+              const c0 = Math.max(0, mouseCell.c - half);
+              const r0 = Math.max(0, mouseCell.r - half);
+              const wCells = Math.min(brush, GRID_COLS - c0);
+              const hCells = Math.min(brush, GRID_ROWS - r0);
+              let bg = "rgba(255,255,255,0.12)";
+              let border = "rgba(255,255,255,0.7)";
+              if (effectiveTool.kind === "blocked") {
+                bg = "rgba(239,68,68,0.22)";
+                border = "rgba(239,68,68,0.85)";
+              } else if (effectiveTool.kind === "zone") {
+                const zc = zoneColorOf(effectiveTool.zone);
+                bg = zc + "33";
+                border = zc + "cc";
+              }
+              return (
+                <div
+                  className="absolute pointer-events-none"
+                  style={{
+                    left: `${c0 * 100 / GRID_COLS}%`,
+                    top: `${r0 * 100 / GRID_ROWS}%`,
+                    width: `${wCells * 100 / GRID_COLS}%`,
+                    height: `${hCells * 100 / GRID_ROWS}%`,
+                    background: bg,
+                    border: `2px solid ${border}`,
+                    zIndex: 90000,
+                    boxSizing: "border-box",
+                  }}
+                />
+              );
+            })()}
           </div>
           {/* Zoom HUD */}
           <div className="sticky bottom-2 ml-auto mr-2 w-fit flex items-center gap-1 bg-card/90 border border-border rounded-full px-2 py-1 text-xs shadow-soft backdrop-blur" style={{ float: "right" }}>
