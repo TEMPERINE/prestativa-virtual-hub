@@ -651,23 +651,43 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
       if (!userData.user) { try { onHydrated?.(); } catch { /* noop */ } return; }
       meIdRef.current = userData.user.id;
       setMyEmail(userData.user.email ?? "");
+
+      // Workspace ativo deste OfficeScene. Tudo (positions, claims, notes,
+      // realtime, broadcast) é escopado por ele — escritórios são espaços
+      // independentes e o usuário só pode estar online em um por vez.
+      const wsId = getCurrentWorkspaceId();
+
+      // Garante presença única: marca offline qualquer posição minha em
+      // OUTROS workspaces antes de entrar neste.
+      if (wsId) {
+        void supabase
+          .from("positions")
+          .update({ is_online: false })
+          .eq("user_id", userData.user.id)
+          .neq("workspace_id", wsId);
+      }
+
       const { data: profs } = await supabase.from("profiles").select("id, display_name, avatar_color, sprite_id, tagline, status, onboarded_at, first_name, last_name, birth_date, city, state, country_code");
       const map: Record<string, Profile> = {};
       (profs ?? []).forEach((p) => (map[p.id] = p as Profile));
       setProfiles(map);
       setMe(map[userData.user.id] ?? null);
 
-      const { data: posData } = await supabase.from("positions").select("user_id, x, y, zone, facing, is_online, updated_at");
+      let posQuery = supabase.from("positions").select("user_id, x, y, zone, facing, is_online, updated_at");
+      if (wsId) posQuery = posQuery.eq("workspace_id", wsId);
+      const { data: posData } = await posQuery;
       const pmap: Record<string, RemotePos> = {};
       (posData ?? []).forEach((p) => {
         pmap[p.user_id] = p as RemotePos;
         if (p.updated_at) positionFreshTs.current.set(p.user_id, Date.parse(p.updated_at));
       });
 
-      // Load workspace claims
-      const { data: claimData } = await supabase
+      // Load workspace claims (escopado pelo workspace atual)
+      let claimQuery = supabase
         .from("workspace_claims")
         .select("zone_id, user_id");
+      if (wsId) claimQuery = claimQuery.eq("workspace_id", wsId);
+      const { data: claimData } = await claimQuery;
       const cmap: Record<string, string> = {};
       (claimData ?? []).forEach((c: { zone_id: string; user_id: string }) => {
         cmap[c.zone_id] = c.user_id;
@@ -760,11 +780,15 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
     // outros usuários parecem "congelados", mesmo com as posições sendo
     // gravadas no banco corretamente.
     const realtimeChannelSuffix = `${Date.now()}:${Math.random().toString(36).slice(2)}`;
+    const _wsChan = getCurrentWorkspaceId();
+    const wsSuffix = _wsChan ?? "none";
     const ch = supabase
-      .channel(`positions-room:${realtimeChannelSuffix}`)
+      .channel(`positions-room:${wsSuffix}:${realtimeChannelSuffix}`)
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "positions" },
+        _wsChan
+          ? { event: "*", schema: "public", table: "positions", filter: `workspace_id=eq.${_wsChan}` }
+          : { event: "*", schema: "public", table: "positions" },
         (payload) => {
           const row = (payload.new ?? payload.old) as RemotePos & { updated_at?: string };
           if (!row) return;
@@ -794,7 +818,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
 
 
     const reactionCh = supabase
-      .channel("reactions-room")
+      .channel(`reactions-room:${wsSuffix}`)
       .on("broadcast", { event: "reaction" }, (payload) => {
         const { user_id, emoji } = (payload.payload ?? {}) as { user_id?: string; emoji?: string };
         if (!user_id || !emoji) return;
@@ -813,7 +837,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
     reactionChannelRef.current = reactionCh;
 
     const positionBroadcastCh = supabase
-      .channel(POSITION_BROADCAST_CHANNEL, { config: { broadcast: { self: false } } })
+      .channel(`${POSITION_BROADCAST_CHANNEL}:${wsSuffix}`, { config: { broadcast: { self: false } } })
       .on("broadcast", { event: "position" }, (payload) => {
         const row = payload.payload as RemotePos;
         if (!row?.user_id) return;
@@ -863,7 +887,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
     // existing avatar, because an old/hidden tab can keep heartbeating SPAWN
     // and pull a stopped colleague back to the origin.
     type PresenceState = { user_id: string; x: number; y: number; zone: string; facing?: Facing; ts: number };
-    const presenceCh = supabase.channel(POSITION_PRESENCE_CHANNEL, {
+    const presenceCh = supabase.channel(`${POSITION_PRESENCE_CHANNEL}:${wsSuffix}`, {
       config: { presence: { key: meIdRef.current ?? `anon:${realtimeChannelSuffix}` } },
     });
     const presenceLastTs = new Map<string, number>();
@@ -916,10 +940,12 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
     });
 
     const claimsCh = supabase
-      .channel(`claims-room:${realtimeChannelSuffix}`)
+      .channel(`claims-room:${wsSuffix}:${realtimeChannelSuffix}`)
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "workspace_claims" },
+        _wsChan
+          ? { event: "*", schema: "public", table: "workspace_claims", filter: `workspace_id=eq.${_wsChan}` }
+          : { event: "*", schema: "public", table: "workspace_claims" },
         (payload) => {
           const row = (payload.new ?? payload.old) as { zone_id: string; user_id: string };
           if (!row) return;
@@ -1059,7 +1085,9 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
 
 
     const syncPositions = async () => {
-      const { data } = await supabase.from("positions").select("user_id, x, y, zone, facing, is_online, updated_at");
+      let q = supabase.from("positions").select("user_id, x, y, zone, facing, is_online, updated_at");
+      if (_wsChan) q = q.eq("workspace_id", _wsChan);
+      const { data } = await q;
       if (!data) return;
       const uid = meIdRef.current;
       setPositions((prev) => {
@@ -1126,17 +1154,21 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
 
     // Load + subscribe to desk notes (post-it gifts left on workstations)
     void (async () => {
-      const { data } = await supabase
+      let nq = supabase
         .from("desk_notes")
         .select("id, zone_id, sender_id, recipient_id, body, x, y, created_at, read_at")
         .is("read_at", null);
+      if (_wsChan) nq = nq.eq("workspace_id", _wsChan);
+      const { data } = await nq;
       if (data) setNotes(data as DeskNote[]);
     })();
     const notesCh = supabase
-      .channel(`desk-notes-room:${realtimeChannelSuffix}`)
+      .channel(`desk-notes-room:${wsSuffix}:${realtimeChannelSuffix}`)
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "desk_notes" },
+        _wsChan
+          ? { event: "*", schema: "public", table: "desk_notes", filter: `workspace_id=eq.${_wsChan}` }
+          : { event: "*", schema: "public", table: "desk_notes" },
         (payload) => {
           setNotes((prev) => {
             if (payload.eventType === "DELETE") {

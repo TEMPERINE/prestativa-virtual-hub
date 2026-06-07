@@ -34,14 +34,14 @@ function AuthPage() {
       setLoading(false);
       if (error) { toast.error(error.message); return; }
       toast.success("Bem-vindo(a) ao escritório!");
-      window.location.href = "/office";
+      window.location.href = "/workspaces";
     } else {
       const displayName = (name.trim() || email.split("@")[0] || "Novo membro").slice(0, 24);
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
-          emailRedirectTo: `${window.location.origin}/office`,
+          emailRedirectTo: `${window.location.origin}/workspaces`,
           data: { display_name: displayName },
         },
       });
@@ -52,7 +52,7 @@ function AuthPage() {
         return;
       }
       toast.success("Conta criada! Vamos personalizar seu avatar.");
-      window.location.href = "/office";
+      window.location.href = "/workspaces";
     }
   };
 
