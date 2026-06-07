@@ -1218,10 +1218,7 @@ export function MapEditor() {
                   const def = getPropDef(sel.defId);
                   if (!def) return null;
                   if (!def.interactive || def.frames.length < 2) return null;
-                  const allZones = [
-                    ...paintableZones.map((z) => ({ id: z.id as string, label: z.label })),
-                    ...customZones.map((z) => ({ id: z.id, label: z.label })),
-                  ];
+                  const allZones = displayZones.map((z) => ({ id: z.id, label: z.label }));
                   const gateActions = (sel.actions ?? []).filter(
                     (a): a is Extract<PropAction, { type: "gate-zone" }> => a.type === "gate-zone"
                   );
