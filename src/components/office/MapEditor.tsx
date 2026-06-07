@@ -238,10 +238,24 @@ export function MapEditor() {
 
   const customZones = overrides.customZones ?? [];
 
-  const paintableZones = useMemo(
-    () => ZONES.filter((z) => z.id !== "lobby"),
-    []
-  );
+  // Unified zone list: customZones + any legacy built-in zone still painted
+  // on the grid that hasn't been migrated to customZones yet. Everything in
+  // this list is treated the same (editable, removable).
+  const displayZones = useMemo(() => {
+    const ids = new Set(customZones.map((c) => c.id));
+    const legacy: CustomZone[] = ZONES
+      .filter((z) => z.id !== "lobby" && !ids.has(z.id))
+      .filter((z) => overrides.zones.includes(z.id as ZoneId))
+      .map((z) => ({
+        id: z.id,
+        label: z.label,
+        color: ZONE_COLORS[z.id] ?? "#888",
+        kind: (z.id === "reuniao" || z.id === "feedback" || z.id === "descompressao"
+          ? "common"
+          : "workspace") as ZoneKind,
+      }));
+    return [...customZones, ...legacy];
+  }, [customZones, overrides.zones]);
 
   const zoneColorOf = useCallback(
     (id: string) => {
