@@ -2859,6 +2859,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
                 email={myEmail}
                 hasClaim={Object.values(claims).includes(me.id)}
                 onEditCharacter={() => setEditCharOpen(true)}
+                canEditCharacter={tierCaps.canChangeSprite}
                 onEditProfile={() => setEditProfOpen(true)}
                 onGoToMyDesk={teleportToMyClaim}
                 onGoToLobby={() => {
