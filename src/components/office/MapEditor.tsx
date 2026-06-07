@@ -143,6 +143,7 @@ export function MapEditor() {
   const [editorTab, setEditorTab] = useState<"map" | "zones" | "elements" | "theme">("map");
   const officeTheme = useOfficeTheme();
   const [brush, setBrush] = useState(1);
+  const [mouseCell, setMouseCell] = useState<{ c: number; r: number } | null>(null);
   const [showGrid, setShowGrid] = useState(true);
   const [showImage, setShowImage] = useState(true);
   const [showEffective, setShowEffective] = useState(false);
