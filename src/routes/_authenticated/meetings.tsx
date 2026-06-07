@@ -7,13 +7,17 @@ import { supabase } from "@/integrations/supabase/client";
 import {
   ArrowLeft, Users, Clock, Video, Sparkles, Loader2, FileText, ChevronDown,
   Folder, FolderPlus, FolderOpen, Inbox, Pencil, Trash2, FolderInput,
-  Search, Star, Download, Check, X, AlertCircle, CheckCircle2,
+  Search, Star, Download, Check, X, AlertCircle, CheckCircle2, Send, Mail,
 } from "lucide-react";
 import { generateMeetingAi } from "@/lib/meetings/ai.functions";
 import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent,
   DropdownMenuItem, DropdownMenuCheckboxItem, DropdownMenuSeparator, DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
+} from "@/components/ui/dialog";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/meetings")({
   head: () => ({
