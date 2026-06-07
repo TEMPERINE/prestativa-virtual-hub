@@ -480,6 +480,64 @@ export function MapEditor() {
     toast.success("Overrides removidos.");
   }, []);
 
+  // --- Importar paredes/zonas de outro escritório ---------------------------
+  const [importOpen, setImportOpen] = useState(false);
+  const [importList, setImportList] = useState<Array<{ id: string; name: string }>>([]);
+  const [importLoading, setImportLoading] = useState(false);
+  const [importMode, setImportMode] = useState<"walls" | "walls-zones" | "all">("walls");
+
+  const openImport = useCallback(async () => {
+    setImportOpen(true);
+    setImportLoading(true);
+    try {
+      const { supabase } = await import("@/integrations/supabase/client");
+      const { getCurrentWorkspaceId } = await import("@/lib/workspace/current");
+      const currentWs = getCurrentWorkspaceId();
+      const { data: u } = await supabase.auth.getUser();
+      if (!u.user) { setImportList([]); return; }
+      const { data: mems } = await supabase
+        .from("workspace_members")
+        .select("workspace_id, workspaces(id, name)")
+        .eq("user_id", u.user.id);
+      const list = (mems ?? [])
+        .map((m: any) => ({ id: m.workspaces?.id, name: m.workspaces?.name }))
+        .filter((w: any) => w.id && w.id !== currentWs);
+      setImportList(list);
+    } catch (e) {
+      toast.error("Falha ao listar escritórios.");
+    } finally {
+      setImportLoading(false);
+    }
+  }, []);
+
+  const importFromWorkspace = useCallback(async (sourceId: string) => {
+    try {
+      const { supabase } = await import("@/integrations/supabase/client");
+      const { data, error } = await supabase
+        .from("map_overrides")
+        .select("data")
+        .eq("workspace_id", sourceId)
+        .maybeSingle();
+      if (error || !data) {
+        // Fallback: seed from defaults (Prestativa hardcoded layout).
+        const seed = seedFromDefaults();
+        setOverrides((prev) => mergeImport(prev, seed, importMode));
+        setDirty(true);
+        setImportOpen(false);
+        toast.success("Mapa importado a partir do layout padrão.");
+        return;
+      }
+      const src = data.data as unknown as MapOverrides;
+      setOverrides((prev) => mergeImport(prev, src, importMode));
+      setDirty(true);
+      setImportOpen(false);
+      toast.success("Mapa importado. Lembre de Salvar.");
+    } catch {
+      toast.error("Falha ao importar.");
+    }
+  }, [importMode]);
+
+
   const exportJson = useCallback(() => {
     const blob = new Blob([JSON.stringify(overrides)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
