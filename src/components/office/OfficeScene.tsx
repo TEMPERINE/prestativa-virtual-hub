@@ -645,7 +645,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
       if (!userData.user) { try { onHydrated?.(); } catch { /* noop */ } return; }
       meIdRef.current = userData.user.id;
       setMyEmail(userData.user.email ?? "");
-      const { data: profs } = await supabase.from("profiles").select("id, display_name, avatar_color, sprite_id, tagline, status, onboarded_at");
+      const { data: profs } = await supabase.from("profiles").select("id, display_name, avatar_color, sprite_id, tagline, status, onboarded_at, first_name, last_name, birth_date, city, state, country_code");
       const map: Record<string, Profile> = {};
       (profs ?? []).forEach((p) => (map[p.id] = p as Profile));
       setProfiles(map);
