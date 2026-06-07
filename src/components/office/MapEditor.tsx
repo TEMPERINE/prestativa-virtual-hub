@@ -686,7 +686,7 @@ export function MapEditor() {
 
       <div className="flex flex-1 overflow-hidden">
         {/* Sidebar com abas */}
-        <aside className="w-64 border-r border-border bg-card overflow-y-auto flex flex-col">
+        <aside className="w-72 border-r border-border bg-card overflow-y-auto flex flex-col">
           {/* Tabs */}
           <div className="flex gap-1 p-2 border-b border-border sticky top-0 bg-gradient-to-r from-card via-card to-card z-10">
             {[
