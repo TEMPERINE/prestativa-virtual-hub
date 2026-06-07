@@ -84,6 +84,38 @@ const ZONE_COLORS: Record<string, string> = {
   "atendente-10": "#8b5cf6",
 };
 
+function mergeImport(
+  prev: MapOverrides,
+  src: MapOverrides,
+  mode: "walls" | "walls-zones" | "all"
+): MapOverrides {
+  if (!src?.cols || !src?.rows || !Array.isArray(src.blocked)) return prev;
+  // Resample src grid onto prev grid if needed.
+  const cols = prev.cols, rows = prev.rows;
+  const blocked = prev.blocked.slice();
+  const zones = prev.zones.slice();
+  for (let r = 0; r < rows; r++) {
+    const sr = Math.min(src.rows - 1, Math.floor((r / rows) * src.rows));
+    for (let c = 0; c < cols; c++) {
+      const sc = Math.min(src.cols - 1, Math.floor((c / cols) * src.cols));
+      const sIdx = sr * src.cols + sc;
+      const dIdx = r * cols + c;
+      blocked[dIdx] = src.blocked[sIdx] ?? 0;
+      if (mode === "walls-zones" || mode === "all") {
+        zones[dIdx] = (src.zones?.[sIdx] ?? null) as any;
+      }
+    }
+  }
+  const next: MapOverrides = { ...prev, blocked, zones };
+  if (mode === "all") {
+    next.customZones = src.customZones ?? [];
+    next.zoneKinds = src.zoneKinds ?? {};
+    next.spawnPoints = src.spawnPoints ?? {};
+    next.props = src.props ?? [];
+  }
+  return next;
+}
+
 export function MapEditor() {
   const stageRef = useRef<HTMLDivElement | null>(null);
   const mainRef = useRef<HTMLElement | null>(null);
@@ -97,7 +129,7 @@ export function MapEditor() {
   const [brush, setBrush] = useState(1);
   const [showGrid, setShowGrid] = useState(true);
   const [showImage, setShowImage] = useState(true);
-  const [showEffective, setShowEffective] = useState(true);
+  const [showEffective, setShowEffective] = useState(false);
   const [dirty, setDirty] = useState(!loadOverrides());
   const painting = useRef(false);
   const [altDown, setAltDown] = useState(false);
@@ -480,6 +512,72 @@ export function MapEditor() {
     toast.success("Overrides removidos.");
   }, []);
 
+  // --- Importar paredes/zonas de outro escritório ---------------------------
+  const [importOpen, setImportOpen] = useState(false);
+  const [importList, setImportList] = useState<Array<{ id: string; name: string }>>([]);
+  const [importLoading, setImportLoading] = useState(false);
+  const [importMode, setImportMode] = useState<"walls" | "walls-zones" | "all">("walls");
+
+  const openImport = useCallback(async () => {
+    setImportOpen(true);
+    setImportLoading(true);
+    try {
+      const { supabase } = await import("@/integrations/supabase/client");
+      const { getCurrentWorkspaceId } = await import("@/lib/workspace/current");
+      const currentWs = getCurrentWorkspaceId();
+      const { data: u } = await supabase.auth.getUser();
+      if (!u.user) { setImportList([]); return; }
+      const { data: mems } = await supabase
+        .from("workspace_members")
+        .select("workspace_id, workspaces(id, name)")
+        .eq("user_id", u.user.id);
+      const list = (mems ?? [])
+        .map((m: any) => ({ id: m.workspaces?.id, name: m.workspaces?.name }))
+        .filter((w: any) => w.id && w.id !== currentWs);
+      setImportList(list);
+    } catch (e) {
+      toast.error("Falha ao listar escritórios.");
+    } finally {
+      setImportLoading(false);
+    }
+  }, []);
+
+  const importFromWorkspace = useCallback(async (sourceId: string) => {
+    try {
+      if (sourceId === "__defaults__") {
+        const seed = seedFromDefaults();
+        setOverrides((prev) => mergeImport(prev, seed, importMode));
+        setDirty(true);
+        setImportOpen(false);
+        toast.success("Layout padrão importado. Lembre de Salvar.");
+        return;
+      }
+      const { supabase } = await import("@/integrations/supabase/client");
+      const { data, error } = await supabase
+        .from("map_overrides")
+        .select("data")
+        .eq("workspace_id", sourceId)
+        .maybeSingle();
+      if (error || !data) {
+        // Fallback: seed from defaults (Prestativa hardcoded layout).
+        const seed = seedFromDefaults();
+        setOverrides((prev) => mergeImport(prev, seed, importMode));
+        setDirty(true);
+        setImportOpen(false);
+        toast.success("Mapa importado a partir do layout padrão.");
+        return;
+      }
+      const src = data.data as unknown as MapOverrides;
+      setOverrides((prev) => mergeImport(prev, src, importMode));
+      setDirty(true);
+      setImportOpen(false);
+      toast.success("Mapa importado. Lembre de Salvar.");
+    } catch {
+      toast.error("Falha ao importar.");
+    }
+  }, [importMode]);
+
+
   const exportJson = useCallback(() => {
     const blob = new Blob([JSON.stringify(overrides)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
@@ -666,6 +764,13 @@ export function MapEditor() {
           </button>
           <button onClick={reseed} className="text-xs px-2 py-1 rounded bg-muted">
             Recarregar padrão
+          </button>
+          <button
+            onClick={openImport}
+            className="text-xs px-2 py-1 rounded bg-muted inline-flex items-center gap-1"
+            title="Copiar paredes/zonas de outro escritório"
+          >
+            <Upload size={12} /> Importar de outro
           </button>
           <button onClick={reset} className="text-xs px-2 py-1 rounded bg-muted inline-flex items-center gap-1">
             <Trash2 size={12} /> Limpar
@@ -1530,6 +1635,72 @@ export function MapEditor() {
           </div>
         </main>
       </div>
+
+      {importOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+          onClick={() => setImportOpen(false)}
+        >
+          <div
+            className="bg-card text-card-foreground rounded-lg shadow-lg w-full max-w-md p-4 space-y-3"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between">
+              <h3 className="font-semibold text-sm">Importar mapa de outro escritório</h3>
+              <button onClick={() => setImportOpen(false)} className="text-muted-foreground hover:text-foreground">
+                <X size={16} />
+              </button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Copia o que você escolher do escritório de origem para o atual. As alterações só são gravadas quando você clicar em <strong>Salvar</strong>.
+            </p>
+            <div className="flex flex-col gap-1 text-xs">
+              <label className="inline-flex items-center gap-2">
+                <input type="radio" checked={importMode === "walls"} onChange={() => setImportMode("walls")} />
+                Só paredes (bloqueios)
+              </label>
+              <label className="inline-flex items-center gap-2">
+                <input type="radio" checked={importMode === "walls-zones"} onChange={() => setImportMode("walls-zones")} />
+                Paredes + áreas pintadas
+              </label>
+              <label className="inline-flex items-center gap-2">
+                <input type="radio" checked={importMode === "all"} onChange={() => setImportMode("all")} />
+                Tudo (paredes, áreas, spawns, elementos)
+              </label>
+            </div>
+            <div className="border-t border-border pt-2">
+              <div className="text-xs font-medium mb-1">Escolha o escritório de origem:</div>
+              {importLoading ? (
+                <div className="text-xs text-muted-foreground inline-flex items-center gap-2">
+                  <Loader2 size={12} className="animate-spin" /> Carregando…
+                </div>
+              ) : importList.length === 0 ? (
+                <div className="text-xs text-muted-foreground">
+                  Você não tem outros escritórios. Você ainda pode importar o layout padrão da Prestativa abaixo.
+                </div>
+              ) : (
+                <div className="max-h-48 overflow-auto flex flex-col gap-1">
+                  {importList.map((w) => (
+                    <button
+                      key={w.id}
+                      onClick={() => importFromWorkspace(w.id)}
+                      className="text-left text-xs px-2 py-1.5 rounded hover:bg-muted border border-border"
+                    >
+                      {w.name}
+                    </button>
+                  ))}
+                </div>
+              )}
+              <button
+                onClick={() => importFromWorkspace("__defaults__")}
+                className="mt-2 w-full text-xs px-2 py-1.5 rounded bg-muted hover:bg-muted/80"
+              >
+                Usar layout padrão da Prestativa (hardcoded)
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
