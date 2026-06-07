@@ -165,8 +165,9 @@ export function MapEditor() {
   );
 
   useEffect(() => {
+    const unsubscribe = subscribeCurrentWorkspaceId(setCurrentWorkspaceIdState);
     return () => {
-      subscribeCurrentWorkspaceId(setCurrentWorkspaceIdState)();
+      unsubscribe();
     };
   }, []);
 
