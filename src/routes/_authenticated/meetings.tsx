@@ -718,6 +718,12 @@ function MeetingCard({
               {participants.length || "—"} participação{participants.length === 1 ? "" : "s"} sua{participants.length === 1 ? "" : "s"}
             </span>
             <span className="text-muted-foreground/80">· {meeting.zone_label}</span>
+            {receivedFromSenderId && (
+              <span className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-primary bg-primary/10 px-1.5 py-0.5 rounded">
+                <Mail className="w-3 h-3" />
+                Recebido{receivedFromProfile ? ` de ${receivedFromProfile.display_name}` : ""}
+              </span>
+            )}
             <AiStatusBadge meeting={meeting} />
           </div>
 
