@@ -91,10 +91,10 @@ function MeetingsPage() {
       const uid = auth.user?.id ?? null;
       setUserId(uid);
 
-      const [{ data: ms }, { data: fs }, { data: fis }, { data: favs }] = await Promise.all([
+      const [{ data: ms }, { data: fs }, { data: fis }, { data: favs }, { data: shares }] = await Promise.all([
         supabase
           .from("meetings" as never)
-          .select("id, zone_id, zone_label, title, started_at, ended_at, host_id, recording_path, recording_started_at, recording_duration_seconds, transcript, summary, ai_status, ai_error")
+          .select("id, workspace_id, zone_id, zone_label, title, started_at, ended_at, host_id, recording_path, recording_started_at, recording_duration_seconds, transcript, summary, ai_status, ai_error")
           .or("recording_path.not.is.null,recording_started_at.not.is.null")
           .order("started_at", { ascending: false })
           .limit(200),
@@ -102,6 +102,9 @@ function MeetingsPage() {
         sb.from("meeting_folders").select("id, name").order("name"),
         sb.from("meeting_folder_items").select("folder_id, meeting_id"),
         sb.from("meeting_favorites").select("meeting_id"),
+        uid
+          ? sb.from("meeting_recording_shares").select("meeting_id, sender_id").eq("recipient_id", uid)
+          : Promise.resolve({ data: [] }),
       ]);
       if (cancelled) return;
       const meetingList = (ms ?? []) as MeetingRow[];
@@ -109,6 +112,9 @@ function MeetingsPage() {
       setFolders((fs ?? []) as FolderRow[]);
       setFolderItems((fis ?? []) as FolderItemRow[]);
       setFavorites(new Set(((favs ?? []) as { meeting_id: string }[]).map((f) => f.meeting_id)));
+      const shareMap = new Map<string, string>();
+      for (const s of ((shares ?? []) as ShareRow[])) shareMap.set(s.meeting_id, s.sender_id);
+      setReceivedShares(shareMap);
 
       if (meetingList.length > 0) {
         const ids = meetingList.map((m) => m.id);
