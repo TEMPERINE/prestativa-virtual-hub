@@ -129,7 +129,10 @@ function MeetingsPage() {
         setParticipantsByMeeting(byMeeting);
 
         const userIds = Array.from(
-          new Set(meetingList.map((m) => m.host_id).filter(Boolean) as string[]),
+          new Set([
+            ...meetingList.map((m) => m.host_id).filter(Boolean) as string[],
+            ...Array.from(shareMap.values()),
+          ]),
         );
         if (userIds.length > 0) {
           const { data: profs } = await supabase
