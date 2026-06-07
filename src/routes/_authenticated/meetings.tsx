@@ -172,9 +172,10 @@ function MeetingsPage() {
 
   const visibleMeetings = useMemo(() => {
     let base: MeetingRow[];
-    if (selected === "all") base = meetings;
+    if (selected === "all") base = meetings.filter((m) => !receivedShares.has(m.id));
+    else if (selected === "received") base = meetings.filter((m) => receivedShares.has(m.id));
     else if (selected === "favorites") base = meetings.filter((m) => favorites.has(m.id));
-    else if (selected === "unfiled") base = meetings.filter((m) => !foldersByMeeting[m.id] || foldersByMeeting[m.id].size === 0);
+    else if (selected === "unfiled") base = meetings.filter((m) => !receivedShares.has(m.id) && (!foldersByMeeting[m.id] || foldersByMeeting[m.id].size === 0));
     else base = meetings.filter((m) => foldersByMeeting[m.id]?.has(selected));
 
     const q = query.trim().toLowerCase();
