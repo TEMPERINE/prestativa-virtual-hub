@@ -83,9 +83,11 @@ function MeetingsPage() {
       const [{ data: ms }, { data: fs }, { data: fis }, { data: favs }] = await Promise.all([
         supabase
           .from("meetings" as never)
-          .select("id, zone_id, zone_label, title, started_at, ended_at, host_id, recording_path, recording_duration_seconds, transcript, summary, ai_status, ai_error")
+          .select("id, zone_id, zone_label, title, started_at, ended_at, host_id, recording_path, recording_started_at, recording_duration_seconds, transcript, summary, ai_status, ai_error")
+          .or("recording_path.not.is.null,recording_started_at.not.is.null")
           .order("started_at", { ascending: false })
           .limit(200),
+
         sb.from("meeting_folders").select("id, name").order("name"),
         sb.from("meeting_folder_items").select("folder_id, meeting_id"),
         sb.from("meeting_favorites").select("meeting_id"),
