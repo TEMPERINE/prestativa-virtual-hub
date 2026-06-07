@@ -651,23 +651,43 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
       if (!userData.user) { try { onHydrated?.(); } catch { /* noop */ } return; }
       meIdRef.current = userData.user.id;
       setMyEmail(userData.user.email ?? "");
+
+      // Workspace ativo deste OfficeScene. Tudo (positions, claims, notes,
+      // realtime, broadcast) é escopado por ele — escritórios são espaços
+      // independentes e o usuário só pode estar online em um por vez.
+      const wsId = getCurrentWorkspaceId();
+
+      // Garante presença única: marca offline qualquer posição minha em
+      // OUTROS workspaces antes de entrar neste.
+      if (wsId) {
+        void supabase
+          .from("positions")
+          .update({ is_online: false })
+          .eq("user_id", userData.user.id)
+          .neq("workspace_id", wsId);
+      }
+
       const { data: profs } = await supabase.from("profiles").select("id, display_name, avatar_color, sprite_id, tagline, status, onboarded_at, first_name, last_name, birth_date, city, state, country_code");
       const map: Record<string, Profile> = {};
       (profs ?? []).forEach((p) => (map[p.id] = p as Profile));
       setProfiles(map);
       setMe(map[userData.user.id] ?? null);
 
-      const { data: posData } = await supabase.from("positions").select("user_id, x, y, zone, facing, is_online, updated_at");
+      let posQuery = supabase.from("positions").select("user_id, x, y, zone, facing, is_online, updated_at");
+      if (wsId) posQuery = posQuery.eq("workspace_id", wsId);
+      const { data: posData } = await posQuery;
       const pmap: Record<string, RemotePos> = {};
       (posData ?? []).forEach((p) => {
         pmap[p.user_id] = p as RemotePos;
         if (p.updated_at) positionFreshTs.current.set(p.user_id, Date.parse(p.updated_at));
       });
 
-      // Load workspace claims
-      const { data: claimData } = await supabase
+      // Load workspace claims (escopado pelo workspace atual)
+      let claimQuery = supabase
         .from("workspace_claims")
         .select("zone_id, user_id");
+      if (wsId) claimQuery = claimQuery.eq("workspace_id", wsId);
+      const { data: claimData } = await claimQuery;
       const cmap: Record<string, string> = {};
       (claimData ?? []).forEach((c: { zone_id: string; user_id: string }) => {
         cmap[c.zone_id] = c.user_id;
