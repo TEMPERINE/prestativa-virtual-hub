@@ -1,11 +1,17 @@
 // Temas visuais do escritório. Inicialmente alteram somente a imagem de
 // fundo (BG) do mapa — sem mexer em proporções, colliders, zonas etc.
-// A seleção é persistida em localStorage e escopada por workspace,
-// para que cada espaço possa ter seu próprio tema.
+// A seleção é persistida dentro de map_overrides (escopado por workspace
+// e sincronizado em nuvem), de forma que todos os usuários do mesmo
+// espaço vejam o mesmo tema.
 
 import officeMapDefault from "@/assets/office-map.webp";
 import officeMapCopa from "@/assets/office-map-copa.jpg.asset.json";
-import { getCurrentWorkspaceId, subscribeCurrentWorkspaceId } from "@/lib/workspace/current";
+import {
+  loadOverrides,
+  newOverrides,
+  saveOverrides,
+  pushOverridesToCloud,
+} from "@/lib/map-overrides";
 
 export type OfficeTheme = {
   id: string;
@@ -30,23 +36,10 @@ export const OFFICE_THEMES: OfficeTheme[] = [
 ];
 
 export const DEFAULT_THEME_ID = "default";
-
-function storageKey(ws: string | null): string {
-  return ws ? `office-theme:${ws}` : "office-theme:_global";
-}
-
 const EVENT = "office-theme-changed";
 
 export function getCurrentThemeId(): string {
-  if (typeof window === "undefined") return DEFAULT_THEME_ID;
-  try {
-    return (
-      window.localStorage.getItem(storageKey(getCurrentWorkspaceId())) ??
-      DEFAULT_THEME_ID
-    );
-  } catch {
-    return DEFAULT_THEME_ID;
-  }
+  return loadOverrides()?.theme ?? DEFAULT_THEME_ID;
 }
 
 export function getTheme(id: string): OfficeTheme {
@@ -57,21 +50,24 @@ export function getCurrentTheme(): OfficeTheme {
   return getTheme(getCurrentThemeId());
 }
 
-export function setCurrentThemeId(id: string) {
-  if (typeof window === "undefined") return;
-  try {
-    window.localStorage.setItem(storageKey(getCurrentWorkspaceId()), id);
-  } catch {}
-  window.dispatchEvent(new CustomEvent(EVENT));
+export async function setCurrentThemeId(id: string): Promise<{ ok: boolean; error?: string }> {
+  const base = loadOverrides() ?? newOverrides();
+  const next = { ...base, theme: id };
+  saveOverrides(next);
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent(EVENT));
+  }
+  return pushOverridesToCloud(next);
 }
 
 export function subscribeTheme(cb: () => void): () => void {
   if (typeof window === "undefined") return () => {};
   const handler = () => cb();
   window.addEventListener(EVENT, handler);
-  const unsubWs = subscribeCurrentWorkspaceId(() => cb());
+  // map-overrides-changed cobre cargas iniciais da nuvem e edições remotas
+  window.addEventListener("map-overrides-changed", handler);
   return () => {
     window.removeEventListener(EVENT, handler);
-    unsubWs();
+    window.removeEventListener("map-overrides-changed", handler);
   };
 }

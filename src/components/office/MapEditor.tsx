@@ -1117,13 +1117,15 @@ export function MapEditor() {
                 </p>
                 <div className="flex flex-col gap-2">
                   {OFFICE_THEMES.map((t) => {
-                    const active = getCurrentThemeId() === t.id;
+                    const active = (overrides.theme ?? "default") === t.id;
                     return (
                       <button
                         key={t.id}
-                        onClick={() => {
-                          setCurrentThemeId(t.id);
-                          toast.success(`Tema "${t.label}" aplicado`);
+                        onClick={async () => {
+                          setOverrides((prev) => ({ ...prev, theme: t.id }));
+                          const res = await setCurrentThemeId(t.id);
+                          if (res.ok) toast.success(`Tema "${t.label}" aplicado`);
+                          else toast.error(`Falha ao salvar tema: ${res.error ?? "erro"}`);
                         }}
                         className={`relative w-full text-left rounded-lg overflow-hidden border transition-all ${
                           active ? "border-primary ring-2 ring-primary/40" : "border-border hover:border-primary/50"
