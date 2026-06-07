@@ -62,7 +62,7 @@ export function ProfileMenu(p: Props) {
           />
         </button>
       </PopoverTrigger>
-      <PopoverContent align="end" className="w-72 p-0">
+      <PopoverContent align="end" className="w-72 p-0 z-[200]">
         <div className="p-3 flex items-center gap-3 border-b">
           <div className="w-12 h-12 rounded-full overflow-hidden flex items-end justify-center" style={{ background: `${p.me.avatar_color}22` }}>
             <SpritePreview spriteId={p.me.sprite_id ?? "marcio"} size={48} />
