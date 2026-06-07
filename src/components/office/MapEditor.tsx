@@ -544,6 +544,14 @@ export function MapEditor() {
 
   const importFromWorkspace = useCallback(async (sourceId: string) => {
     try {
+      if (sourceId === "__defaults__") {
+        const seed = seedFromDefaults();
+        setOverrides((prev) => mergeImport(prev, seed, importMode));
+        setDirty(true);
+        setImportOpen(false);
+        toast.success("Layout padrão importado. Lembre de Salvar.");
+        return;
+      }
       const { supabase } = await import("@/integrations/supabase/client");
       const { data, error } = await supabase
         .from("map_overrides")
