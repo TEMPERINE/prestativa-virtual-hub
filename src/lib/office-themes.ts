@@ -43,6 +43,7 @@ export const OFFICE_THEMES: OfficeTheme[] = [
 ];
 
 export const DEFAULT_THEME_ID = "default";
+export const CUSTOM_THEME_ID = "custom";
 const EVENT = "office-theme-changed";
 
 export function getCurrentThemeId(): string {
@@ -54,7 +55,17 @@ export function getTheme(id: string): OfficeTheme {
 }
 
 export function getCurrentTheme(): OfficeTheme {
-  return getTheme(getCurrentThemeId());
+  const o = loadOverrides();
+  const id = o?.theme ?? DEFAULT_THEME_ID;
+  if (id === CUSTOM_THEME_ID && o?.customTheme?.url) {
+    return {
+      id: CUSTOM_THEME_ID,
+      label: o.customTheme.label || "Tema personalizado",
+      description: "Tema enviado pelo administrador.",
+      url: o.customTheme.url,
+    };
+  }
+  return getTheme(id);
 }
 
 export async function setCurrentThemeId(id: string): Promise<{ ok: boolean; error?: string }> {
