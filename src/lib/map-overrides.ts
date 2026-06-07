@@ -38,6 +38,8 @@ export type MapOverrides = {
   props?: PropInstance[];
   // Tema visual do escritório (id em office-themes.ts). Default = "default".
   theme?: string;
+  // Quando theme === "custom", url da imagem de fundo enviada pelo admin.
+  customTheme?: { url: string; label?: string };
 };
 
 function emptyOverrides(): MapOverrides {
