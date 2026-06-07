@@ -28,6 +28,7 @@ type Props = {
   };
   email: string;
   hasClaim: boolean;
+  canEditCharacter?: boolean;
   onEditCharacter: () => void;
   onEditProfile: () => void;
   onGoToMyDesk: () => void;
