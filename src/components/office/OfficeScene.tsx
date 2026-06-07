@@ -1840,6 +1840,10 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
     remoteStreams: rtc.remoteStreams,
   });
 
+  // Capacidades por nível do escritório (controla botões de gravar, teleporte,
+  // troca de personagem, etc.). Lê o workspaceId atual do módulo.
+  const { caps: tierCaps } = useWorkspaceTier(getCurrentWorkspaceId());
+
 
 
   // All workspace zones (built-in + custom) with their effective rect for hover overlays.
