@@ -3,6 +3,8 @@ import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { OFFICE_THEMES } from "@/lib/office-themes";
 import { TIERS, type WorkspaceTier, getTierCaps, isUnlimited } from "@/lib/workspace/tiers";
+import { useMyPlan } from "@/lib/account/useMyPlan";
+import { allowedTiersForPlan, getPlanInfo } from "@/lib/account/plans";
 import {
   createWorkspace,
   suggestSlug,
