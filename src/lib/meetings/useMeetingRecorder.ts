@@ -234,9 +234,14 @@ export function useMeetingRecorder({ getLocalAudioTrack, remoteStreams }: Args) 
       startedAtRef.current = Date.now();
       setIsRecording(true);
       // Marca a reunião como gravada para aparecer no histórico
-      rpc("meeting_mark_recording_started", { _meeting_id: meetingId }).catch((e) => {
-        console.warn("[recorder] mark_recording_started failed", e);
-      });
+      void (async () => {
+        try {
+          const { error } = await rpc("meeting_mark_recording_started", { _meeting_id: meetingId });
+          if (error) console.warn("[recorder] mark_recording_started failed", error);
+        } catch (e) {
+          console.warn("[recorder] mark_recording_started threw", e);
+        }
+      })();
       tickRef.current = window.setInterval(() => {
         setElapsedSeconds(Math.floor((Date.now() - startedAtRef.current) / 1000));
       }, 1000);
