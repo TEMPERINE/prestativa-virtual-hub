@@ -41,6 +41,8 @@ function NewWorkspacePage() {
   const navigate = useNavigate();
   const [checking, setChecking] = useState(true);
   const [allowed, setAllowed] = useState(false);
+  const { plan, info: planInfo, loading: planLoading } = useMyPlan();
+  const allowedTiers = useMemo(() => allowedTiersForPlan(plan), [plan]);
 
   const [step, setStep] = useState<Step>(1);
   const [tier, setTier] = useState<WorkspaceTier>(1);
@@ -57,6 +59,14 @@ function NewWorkspacePage() {
 
   // Caps do tier escolhido
   const caps = useMemo(() => getTierCaps(tier), [tier]);
+
+  // Se o tier atual não cabe no plano da conta, força o maior tier permitido.
+  useEffect(() => {
+    if (planLoading) return;
+    if (!allowedTiers.includes(tier)) {
+      setTier(planInfo.maxTier);
+    }
+  }, [planLoading, allowedTiers, tier, planInfo.maxTier]);
 
   // Quando o tier muda, propõe o tema-padrão dele.
   useEffect(() => {
