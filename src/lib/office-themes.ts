@@ -1,4 +1,4 @@
-// Temas visuais do escritório. Inicialmente alteram somente a imagem de
+// Temas visuais do espaço. Inicialmente alteram somente a imagem de
 // fundo (BG) do mapa — sem mexer em proporções, colliders, zonas etc.
 // A seleção é persistida dentro de map_overrides (escopado por workspace
 // e sincronizado em nuvem), de forma que todos os usuários do mesmo
@@ -56,7 +56,7 @@ export const OFFICE_THEMES: OfficeTheme[] = [
   {
     id: "festa-junina",
     label: "Festa Junina",
-    description: "Bandeirinhas, girassóis e xadrez vermelho — arraiá no escritório.",
+    description: "Bandeirinhas, girassóis e xadrez vermelho — arraiá no espaço.",
     url: officeMapJunino.url,
     minTier: 3,
   },

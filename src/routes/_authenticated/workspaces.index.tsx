@@ -8,7 +8,7 @@ import { getTierCaps } from "@/lib/workspace/tiers";
 import { getPlanInfo, type AccountPlan, DEFAULT_PLAN } from "@/lib/account/plans";
 
 export const Route = createFileRoute("/_authenticated/workspaces/")({
-  head: () => ({ meta: [{ title: "Seus escritórios — Prestativa Office" }] }),
+  head: () => ({ meta: [{ title: "Seus espaços — Prestativa Office" }] }),
   component: WorkspacesHubPage,
 });
 
@@ -175,9 +175,9 @@ function WorkspacesHubPage() {
 
         <div className="mb-8 flex items-end justify-between gap-4 flex-wrap">
           <div>
-            <h1 className="text-3xl font-semibold tracking-tight mb-2">Seus escritórios</h1>
+            <h1 className="text-3xl font-semibold tracking-tight mb-2">Seus espaços</h1>
             <p className="text-sm text-muted-foreground">
-              Escolha um espaço para entrar. Cada escritório tem seu próprio mapa, equipe e reuniões.
+              Escolha um espaço para entrar. Cada espaço tem seu próprio mapa, equipe e reuniões.
             </p>
           </div>
           {isAdmin && (
@@ -185,7 +185,7 @@ function WorkspacesHubPage() {
               to="/workspaces/new"
               className="px-4 py-2 rounded-lg gradient-primary text-primary-foreground text-sm font-medium inline-flex items-center gap-2 hover:opacity-90 shadow-glow"
             >
-              <Plus size={14} /> Novo escritório
+              <Plus size={14} /> Novo espaço
             </Link>
           )}
         </div>
@@ -199,7 +199,7 @@ function WorkspacesHubPage() {
               {invites.map((inv) => (
                 <div key={inv.id} className="glass-panel rounded-xl p-4 flex items-center justify-between">
                   <div>
-                    <div className="font-medium">{inv.workspaces?.name ?? "Escritório"}</div>
+                    <div className="font-medium">{inv.workspaces?.name ?? "Espaço"}</div>
                     <div className="text-xs text-muted-foreground">
                       Você foi convidado como {inv.role}.
                     </div>
@@ -222,9 +222,9 @@ function WorkspacesHubPage() {
         ) : workspaces.length === 0 ? (
           <div className="glass-panel rounded-2xl p-10 text-center">
             <Sparkles className="mx-auto mb-3 text-muted-foreground" />
-            <h2 className="text-lg font-medium mb-1">Nenhum escritório por enquanto</h2>
+            <h2 className="text-lg font-medium mb-1">Nenhum espaço por enquanto</h2>
             <p className="text-sm text-muted-foreground max-w-md mx-auto">
-              Você ainda não foi adicionado a nenhum escritório. Peça um convite ao administrador
+              Você ainda não foi adicionado a nenhum espaço. Peça um convite ao administrador
               para entrar em um espaço de trabalho.
             </p>
           </div>

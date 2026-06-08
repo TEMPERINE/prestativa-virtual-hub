@@ -210,7 +210,7 @@ function randomPointInRect(
 
 export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
   const officeTheme = useOfficeTheme();
-  // Capacidades por nível do escritório atual — controlam botões de gravar,
+  // Capacidades por nível do espaço atual — controlam botões de gravar,
   // teleporte e troca de personagem.
   const { caps: tierCaps } = useWorkspaceTier(getCurrentWorkspaceId());
   const tierCapsRef = useRef(tierCaps);
@@ -653,7 +653,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
       setMyEmail(userData.user.email ?? "");
 
       // Workspace ativo deste OfficeScene. Tudo (positions, claims, notes,
-      // realtime, broadcast) é escopado por ele — escritórios são espaços
+      // realtime, broadcast) é escopado por ele — espaços são independentes
       // independentes e o usuário só pode estar online em um por vez.
       const wsId = getCurrentWorkspaceId();
 
@@ -2032,7 +2032,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
 
         <img
           src={officeTheme.url}
-          alt="Escritório Prestativa Virtual"
+          alt="Espaço Prestativa Virtual"
           className="absolute inset-0 w-full h-full object-cover select-none pointer-events-none"
           draggable={false}
           style={{ imageRendering: "pixelated" }}

@@ -9,7 +9,7 @@ import { toast } from "sonner";
 export const Route = createFileRoute("/_authenticated/workspaces/$workspaceId")({
   head: () => ({
     meta: [
-      { title: "Escritório — Prestativa Office" },
+      { title: "Espaço — Prestativa Office" },
       { name: "description", content: "Trabalhe junto com a equipe da Prestativa em tempo real." },
     ],
   }),
@@ -54,7 +54,7 @@ function WorkspaceScenePage() {
 
       if (cancel) return;
       if (!mem) {
-        toast.error("Você não tem acesso a este escritório.");
+        toast.error("Você não tem acesso a este espaço.");
         navigate({ to: "/workspaces" });
         return;
       }
@@ -82,7 +82,7 @@ function WorkspaceScenePage() {
   if (authorized !== true) {
     return (
       <div className="min-h-screen flex items-center justify-center text-sm text-muted-foreground">
-        Carregando escritório…
+        Carregando espaço…
       </div>
     );
   }

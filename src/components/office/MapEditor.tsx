@@ -574,7 +574,7 @@ export function MapEditor() {
     toast.success("Overrides removidos.");
   }, []);
 
-  // --- Importar paredes/zonas de outro escritório ---------------------------
+  // --- Importar paredes/zonas de outro espaço ----------------------------
   const [importOpen, setImportOpen] = useState(false);
   const [importList, setImportList] = useState<Array<{ id: string; name: string }>>([]);
   const [importLoading, setImportLoading] = useState(false);
@@ -598,7 +598,7 @@ export function MapEditor() {
         .filter((w: any) => w.id && w.id !== currentWs);
       setImportList(list);
     } catch (e) {
-      toast.error("Falha ao listar escritórios.");
+      toast.error("Falha ao listar espaços.");
     } finally {
       setImportLoading(false);
     }
@@ -793,7 +793,7 @@ export function MapEditor() {
         >
           <ArrowLeft size={16} /> Voltar
         </Link>
-        <span className="text-sm font-semibold">Editor de Escritório</span>
+        <span className="text-sm font-semibold">Editor de Espaço</span>
         <span className="text-xs text-muted-foreground">
           {GRID_COLS}×{GRID_ROWS} células
         </span>
@@ -839,7 +839,7 @@ export function MapEditor() {
           <button
             onClick={openImport}
             className="text-xs px-2 py-1 rounded bg-muted inline-flex items-center gap-1"
-            title="Copiar paredes/zonas de outro escritório"
+            title="Copiar paredes/zonas de outro espaço"
           >
             <Upload size={12} /> Importar de outro
           </button>
@@ -1264,7 +1264,7 @@ export function MapEditor() {
             {/* ===== Aba: Tema ===== */}
             {editorTab === "theme" && (
               <div className="flex flex-col gap-3">
-                <h3 className="text-xs font-semibold uppercase text-muted-foreground">Tema do escritório</h3>
+                <h3 className="text-xs font-semibold uppercase text-muted-foreground">Tema do espaço</h3>
                 <p className="text-[11px] text-muted-foreground">
                   Troca apenas a imagem de fundo do mapa. Áreas, paredes e elementos continuam exatamente no mesmo lugar.
                 </p>
@@ -1705,13 +1705,13 @@ export function MapEditor() {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between">
-              <h3 className="font-semibold text-sm">Importar mapa de outro escritório</h3>
+              <h3 className="font-semibold text-sm">Importar mapa de outro espaço</h3>
               <button onClick={() => setImportOpen(false)} className="text-muted-foreground hover:text-foreground">
                 <X size={16} />
               </button>
             </div>
             <p className="text-xs text-muted-foreground">
-              Copia o que você escolher do escritório de origem para o atual. As alterações só são gravadas quando você clicar em <strong>Salvar</strong>.
+              Copia o que você escolher do espaço de origem para o atual. As alterações só são gravadas quando você clicar em <strong>Salvar</strong>.
             </p>
             <div className="flex flex-col gap-1 text-xs">
               <label className="inline-flex items-center gap-2">
@@ -1728,14 +1728,14 @@ export function MapEditor() {
               </label>
             </div>
             <div className="border-t border-border pt-2">
-              <div className="text-xs font-medium mb-1">Escolha o escritório de origem:</div>
+              <div className="text-xs font-medium mb-1">Escolha o espaço de origem:</div>
               {importLoading ? (
                 <div className="text-xs text-muted-foreground inline-flex items-center gap-2">
                   <Loader2 size={12} className="animate-spin" /> Carregando…
                 </div>
               ) : importList.length === 0 ? (
                 <div className="text-xs text-muted-foreground">
-                  Você não tem outros escritórios. Você ainda pode importar o layout padrão da Prestativa abaixo.
+                  Você não tem outros espaços. Você ainda pode importar o layout padrão da Prestativa abaixo.
                 </div>
               ) : (
                 <div className="max-h-48 overflow-auto flex flex-col gap-1">

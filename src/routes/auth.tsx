@@ -7,7 +7,7 @@ export const Route = createFileRoute("/auth")({
   head: () => ({
     meta: [
       { title: "Entrar — Prestativa Office" },
-      { name: "description", content: "Acesse o escritório virtual da Prestativa." },
+      { name: "description", content: "Acesse o espaço virtual da Prestativa." },
     ],
   }),
   beforeLoad: async () => {
@@ -67,7 +67,7 @@ function AuthPage() {
           </div>
           <h1 className="text-3xl font-semibold tracking-tight">Prestativa Office</h1>
           <p className="text-sm text-muted-foreground mt-2">
-            Seu escritório virtual. Presença, proximidade, colaboração.
+            Seu espaço virtual. Presença, proximidade, colaboração.
           </p>
         </div>
 
