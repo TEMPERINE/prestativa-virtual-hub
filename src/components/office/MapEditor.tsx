@@ -574,7 +574,7 @@ export function MapEditor() {
     toast.success("Overrides removidos.");
   }, []);
 
-  // --- Importar paredes/zonas de outro escritório ---------------------------
+  // --- Importar paredes/zonas de outro espaço ----------------------------
   const [importOpen, setImportOpen] = useState(false);
   const [importList, setImportList] = useState<Array<{ id: string; name: string }>>([]);
   const [importLoading, setImportLoading] = useState(false);
