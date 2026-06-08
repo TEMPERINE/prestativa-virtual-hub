@@ -151,9 +151,17 @@ function WorkspacesHubPage() {
               <span className="text-primary-foreground font-bold">P</span>
             </div>
             <div>
-              <div className="text-xs uppercase tracking-wider text-muted-foreground">Prestativa</div>
-              <div className="text-sm font-medium">
-                Olá, {profile?.display_name ?? "—"} 👋
+              <div className="text-xs uppercase tracking-wider text-muted-foreground">Prestativa Virtual Office</div>
+              <div className="text-sm font-medium flex items-center gap-2 flex-wrap">
+                <span>Olá, {profile?.display_name ?? "—"} 👋</span>
+                {profile && (
+                  <span
+                    title={getPlanInfo(profile.plan).description}
+                    className={`text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full font-medium ${getPlanInfo(profile.plan).badgeClass}`}
+                  >
+                    {getPlanInfo(profile.plan).shortLabel}
+                  </span>
+                )}
               </div>
             </div>
           </div>
@@ -161,7 +169,7 @@ function WorkspacesHubPage() {
             onClick={signOut}
             className="text-xs text-muted-foreground hover:text-foreground transition inline-flex items-center gap-1.5"
           >
-            <LogOut size={14} /> Sair
+            <LogOut size={14} /> Sair da conta
           </button>
         </header>
 
