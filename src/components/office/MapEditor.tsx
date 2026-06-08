@@ -1264,7 +1264,7 @@ export function MapEditor() {
             {/* ===== Aba: Tema ===== */}
             {editorTab === "theme" && (
               <div className="flex flex-col gap-3">
-                <h3 className="text-xs font-semibold uppercase text-muted-foreground">Tema do escritório</h3>
+                <h3 className="text-xs font-semibold uppercase text-muted-foreground">Tema do espaço</h3>
                 <p className="text-[11px] text-muted-foreground">
                   Troca apenas a imagem de fundo do mapa. Áreas, paredes e elementos continuam exatamente no mesmo lugar.
                 </p>
