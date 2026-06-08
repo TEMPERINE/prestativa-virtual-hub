@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import ReactMarkdown from "react-markdown";
@@ -68,6 +68,7 @@ type FolderSel = "all" | "unfiled" | "favorites" | "received" | string;
 const sb = supabase as any;
 
 function MeetingsPage() {
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [meetings, setMeetings] = useState<MeetingRow[]>([]);
   const [participantsByMeeting, setParticipantsByMeeting] = useState<
@@ -281,13 +282,21 @@ function MeetingsPage() {
     <div className="min-h-screen bg-background">
       <header className="border-b sticky top-0 bg-background/90 backdrop-blur z-10">
         <div className="max-w-6xl mx-auto px-4 h-14 flex items-center gap-3">
-          <Link
-            to="/office"
+          <button
+            type="button"
+            onClick={() => {
+              const last = typeof window !== "undefined" ? window.localStorage.getItem("lastWorkspaceId") : null;
+              if (last) {
+                navigate({ to: "/workspaces/$workspaceId", params: { workspaceId: last } });
+              } else {
+                navigate({ to: "/workspaces" });
+              }
+            }}
             className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
           >
             <ArrowLeft className="w-4 h-4" />
             Voltar ao espaço
-          </Link>
+          </button>
           <div className="ml-auto flex items-center gap-3">
             <div className="relative">
               <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
