@@ -5,6 +5,7 @@ import { Building2, LogOut, ArrowRight, Sparkles, Mail, Plus } from "lucide-reac
 import { toast } from "sonner";
 import { OFFICE_THEMES, DEFAULT_THEME_ID, CUSTOM_THEME_ID } from "@/lib/office-themes";
 import { getTierCaps } from "@/lib/workspace/tiers";
+import { getPlanInfo, type AccountPlan, DEFAULT_PLAN } from "@/lib/account/plans";
 
 export const Route = createFileRoute("/_authenticated/workspaces/")({
   head: () => ({ meta: [{ title: "Seus escritórios — Prestativa Office" }] }),
