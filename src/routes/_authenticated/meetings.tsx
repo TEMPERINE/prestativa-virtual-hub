@@ -68,6 +68,7 @@ type FolderSel = "all" | "unfiled" | "favorites" | "received" | string;
 const sb = supabase as any;
 
 function MeetingsPage() {
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [meetings, setMeetings] = useState<MeetingRow[]>([]);
   const [participantsByMeeting, setParticipantsByMeeting] = useState<
