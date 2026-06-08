@@ -3,6 +3,8 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Building2, LogOut, ArrowRight, Sparkles, Mail, Plus } from "lucide-react";
 import { toast } from "sonner";
+import { OFFICE_THEMES, DEFAULT_THEME_ID, CUSTOM_THEME_ID } from "@/lib/office-themes";
+import { getTierCaps } from "@/lib/workspace/tiers";
 
 export const Route = createFileRoute("/_authenticated/workspaces/")({
   head: () => ({ meta: [{ title: "Seus escritórios — Prestativa Office" }] }),
@@ -16,6 +18,7 @@ type WorkspaceCard = {
   cover_url: string | null;
   role: string;
   tier: number;
+  previewUrl: string | null;
 };
 
 type InviteRow = {
