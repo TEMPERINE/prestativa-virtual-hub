@@ -2032,7 +2032,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
 
         <img
           src={officeTheme.url}
-          alt="Escritório Prestativa Virtual"
+          alt="Espaço Prestativa Virtual"
           className="absolute inset-0 w-full h-full object-cover select-none pointer-events-none"
           draggable={false}
           style={{ imageRendering: "pixelated" }}
