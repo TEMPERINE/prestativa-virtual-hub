@@ -2843,7 +2843,10 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
                   if (!meetingId) {
                     try {
                       // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                      const _wsJoin = getCurrentWorkspaceId();
+                      if (!_wsJoin) throw new Error("workspace não encontrado");
                       const { data, error } = await (supabase as any).rpc("meeting_join", {
+                        _workspace_id: _wsJoin,
                         _zone_id: currentZone.id,
                         _zone_label: currentZone.label,
                       });
