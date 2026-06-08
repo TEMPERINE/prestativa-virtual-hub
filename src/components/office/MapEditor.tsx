@@ -1728,7 +1728,7 @@ export function MapEditor() {
               </label>
             </div>
             <div className="border-t border-border pt-2">
-              <div className="text-xs font-medium mb-1">Escolha o escritório de origem:</div>
+              <div className="text-xs font-medium mb-1">Escolha o espaço de origem:</div>
               {importLoading ? (
                 <div className="text-xs text-muted-foreground inline-flex items-center gap-2">
                   <Loader2 size={12} className="animate-spin" /> Carregando…
