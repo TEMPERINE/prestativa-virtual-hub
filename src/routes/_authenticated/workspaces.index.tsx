@@ -33,7 +33,7 @@ type InviteRow = {
 function WorkspacesHubPage() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
-  const [profile, setProfile] = useState<{ display_name: string } | null>(null);
+  const [profile, setProfile] = useState<{ display_name: string; plan: AccountPlan } | null>(null);
   const [workspaces, setWorkspaces] = useState<WorkspaceCard[]>([]);
   const [invites, setInvites] = useState<InviteRow[]>([]);
   const [isAdmin, setIsAdmin] = useState(false);
@@ -46,7 +46,7 @@ function WorkspacesHubPage() {
 
     const { data: prof } = await supabase
       .from("profiles")
-      .select("display_name, onboarded_at")
+      .select("display_name, onboarded_at, plan")
       .eq("id", u.user.id)
       .maybeSingle();
 
@@ -54,7 +54,10 @@ function WorkspacesHubPage() {
       navigate({ to: "/onboarding" });
       return;
     }
-    setProfile({ display_name: prof.display_name });
+    setProfile({
+      display_name: prof.display_name,
+      plan: ((prof as any).plan ?? DEFAULT_PLAN) as AccountPlan,
+    });
 
     const { data: roles } = await supabase
       .from("user_roles")
