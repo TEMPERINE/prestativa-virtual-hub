@@ -66,7 +66,7 @@ function WorkspacesHubPage() {
       .select("role, workspace_id, workspaces:workspace_id ( id, name, description, cover_url, tier )")
       .eq("user_id", u.user.id);
 
-    const cards: WorkspaceCard[] = (mems ?? [])
+    const baseCards = (mems ?? [])
       .map((m: any) => m.workspaces ? {
         id: m.workspaces.id,
         name: m.workspaces.name,
@@ -75,7 +75,31 @@ function WorkspacesHubPage() {
         role: m.role,
         tier: m.workspaces.tier ?? 1,
       } : null)
-      .filter(Boolean) as WorkspaceCard[];
+      .filter(Boolean) as Omit<WorkspaceCard, "previewUrl">[];
+
+    // Busca temas escolhidos por workspace pra montar a prévia visual do mapa.
+    const ids = baseCards.map((c) => c.id);
+    const overridesById = new Map<string, any>();
+    if (ids.length) {
+      const { data: ov } = await supabase
+        .from("map_overrides")
+        .select("workspace_id, data")
+        .in("workspace_id", ids);
+      (ov ?? []).forEach((row: any) => overridesById.set(row.workspace_id, row.data));
+    }
+
+    const resolvePreview = (id: string, tier: number): string | null => {
+      const data = overridesById.get(id);
+      const themeId: string = data?.theme ?? getTierCaps(tier).defaultThemeId ?? DEFAULT_THEME_ID;
+      if (themeId === CUSTOM_THEME_ID && data?.customTheme?.url) return data.customTheme.url;
+      const theme = OFFICE_THEMES.find((t) => t.id === themeId);
+      return theme?.url ?? null;
+    };
+
+    const cards: WorkspaceCard[] = baseCards.map((c) => ({
+      ...c,
+      previewUrl: resolvePreview(c.id, c.tier),
+    }));
     setWorkspaces(cards);
 
     const { data: inv } = await supabase
