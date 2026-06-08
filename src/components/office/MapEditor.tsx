@@ -598,7 +598,7 @@ export function MapEditor() {
         .filter((w: any) => w.id && w.id !== currentWs);
       setImportList(list);
     } catch (e) {
-      toast.error("Falha ao listar escritórios.");
+      toast.error("Falha ao listar espaços.");
     } finally {
       setImportLoading(false);
     }
