@@ -1735,7 +1735,7 @@ export function MapEditor() {
                 </div>
               ) : importList.length === 0 ? (
                 <div className="text-xs text-muted-foreground">
-                  Você não tem outros escritórios. Você ainda pode importar o layout padrão da Prestativa abaixo.
+                  Você não tem outros espaços. Você ainda pode importar o layout padrão da Prestativa abaixo.
                 </div>
               ) : (
                 <div className="max-h-48 overflow-auto flex flex-col gap-1">
