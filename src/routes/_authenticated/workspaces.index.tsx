@@ -44,7 +44,7 @@ function WorkspacesHubPage() {
     const { data: u } = await supabase.auth.getUser();
     if (!u.user) { navigate({ to: "/auth" }); return; }
 
-    const { data: prof } = await supabase
+    const { data: prof } = await (supabase as any)
       .from("profiles")
       .select("display_name, onboarded_at, plan")
       .eq("id", u.user.id)

@@ -38,7 +38,7 @@ export function useMyPlan(): {
       setLoading(false);
       return;
     }
-    const { data } = await supabase
+    const { data } = await (supabase as any)
       .from("profiles")
       .select("plan")
       .eq("id", u.user.id)
