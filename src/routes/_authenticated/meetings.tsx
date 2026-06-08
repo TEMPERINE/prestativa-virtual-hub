@@ -23,7 +23,7 @@ export const Route = createFileRoute("/_authenticated/meetings")({
   head: () => ({
     meta: [
       { title: "Minhas Reuniões — Prestativa Office" },
-      { name: "description", content: "Histórico das suas reuniões no escritório virtual." },
+      { name: "description", content: "Histórico das suas reuniões no espaço virtual." },
     ],
   }),
   component: MeetingsPage,
@@ -286,7 +286,7 @@ function MeetingsPage() {
             className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
           >
             <ArrowLeft className="w-4 h-4" />
-            Voltar ao escritório
+            Voltar ao espaço
           </Link>
           <div className="ml-auto flex items-center gap-3">
             <div className="relative">
