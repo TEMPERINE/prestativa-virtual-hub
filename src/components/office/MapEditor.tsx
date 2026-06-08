@@ -793,7 +793,7 @@ export function MapEditor() {
         >
           <ArrowLeft size={16} /> Voltar
         </Link>
-        <span className="text-sm font-semibold">Editor de Escritório</span>
+        <span className="text-sm font-semibold">Editor de Espaço</span>
         <span className="text-xs text-muted-foreground">
           {GRID_COLS}×{GRID_ROWS} células
         </span>

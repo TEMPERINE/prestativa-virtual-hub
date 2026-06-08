@@ -653,7 +653,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
       setMyEmail(userData.user.email ?? "");
 
       // Workspace ativo deste OfficeScene. Tudo (positions, claims, notes,
-      // realtime, broadcast) é escopado por ele — escritórios são espaços
+      // realtime, broadcast) é escopado por ele — espaços são independentes
       // independentes e o usuário só pode estar online em um por vez.
       const wsId = getCurrentWorkspaceId();
 
