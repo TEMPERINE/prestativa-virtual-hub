@@ -1907,12 +1907,31 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
 
 
 
+  // Re-evaluate "is fresh" periodically — a peer that died without cleanup
+  // keeps is_online=true in DB but stops heartbeating; we treat anyone whose
+  // freshest sample is older than STALE_MS as offline for rendering purposes.
+  const STALE_MS = 30_000;
+  const [staleTick, setStaleTick] = useState(0);
+  useEffect(() => {
+    const id = window.setInterval(() => setStaleTick((t) => t + 1), 5_000);
+    return () => window.clearInterval(id);
+  }, []);
+
   const onlineList = useMemo(() => {
+    const now = Date.now();
+    const myId = meIdRef.current;
     return Object.values(positions)
-      .filter((p) => p.is_online)
+      .filter((p) => {
+        if (!p.is_online) return false;
+        if (p.user_id === myId) return true; // self is always fresh
+        const tsBroadcast = p.ts ?? 0;
+        const tsDb = p.updated_at ? new Date(p.updated_at).getTime() : 0;
+        const fresh = Math.max(tsBroadcast, tsDb, positionFreshTs.current.get(p.user_id) ?? 0);
+        return fresh > 0 && now - fresh < STALE_MS;
+      })
       .map((p) => ({ pos: p, profile: profiles[p.user_id] }))
       .filter((x) => x.profile);
-  }, [positions, profiles]);
+  }, [positions, profiles, staleTick]);
 
   const offlineList = useMemo(() => {
     const onlineIds = new Set(onlineList.map((x) => x.profile.id));
