@@ -1705,7 +1705,7 @@ export function MapEditor() {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between">
-              <h3 className="font-semibold text-sm">Importar mapa de outro escritório</h3>
+              <h3 className="font-semibold text-sm">Importar mapa de outro espaço</h3>
               <button onClick={() => setImportOpen(false)} className="text-muted-foreground hover:text-foreground">
                 <X size={16} />
               </button>
