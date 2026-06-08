@@ -1,4 +1,4 @@
-// Cria um novo workspace (escritório) de forma isolada, sem afetar o
+// Cria um novo workspace (espaço) de forma isolada, sem afetar o
 // workspace atualmente em uso. Toda a configuração inicial vai direto
 // para a nuvem escopada por workspace_id — não toca em localStorage
 // nem dispara eventos que o OfficeScene atual escuta.
@@ -32,7 +32,7 @@ function slugify(s: string): string {
     .replace(/[\u0300-\u036f]/g, "")
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/(^-|-$)+/g, "")
-    .slice(0, 48) || "escritorio";
+    .slice(0, 48) || "espaco";
 }
 
 export function suggestSlug(name: string): string {
@@ -79,7 +79,7 @@ export async function createWorkspace(
     .single();
 
   if (wsErr || !wsRow) {
-    return { ok: false, error: wsErr?.message ?? "Falha ao criar escritório." };
+    return { ok: false, error: wsErr?.message ?? "Falha ao criar espaço." };
   }
   const workspaceId = wsRow.id as string;
 
