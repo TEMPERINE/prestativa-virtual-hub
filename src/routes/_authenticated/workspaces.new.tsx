@@ -3,6 +3,8 @@ import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { OFFICE_THEMES } from "@/lib/office-themes";
 import { TIERS, type WorkspaceTier, getTierCaps, isUnlimited } from "@/lib/workspace/tiers";
+import { useMyPlan } from "@/lib/account/useMyPlan";
+import { allowedTiersForPlan, getPlanInfo } from "@/lib/account/plans";
 import {
   createWorkspace,
   suggestSlug,
@@ -39,6 +41,8 @@ function NewWorkspacePage() {
   const navigate = useNavigate();
   const [checking, setChecking] = useState(true);
   const [allowed, setAllowed] = useState(false);
+  const { plan, info: planInfo, loading: planLoading } = useMyPlan();
+  const allowedTiers = useMemo(() => allowedTiersForPlan(plan), [plan]);
 
   const [step, setStep] = useState<Step>(1);
   const [tier, setTier] = useState<WorkspaceTier>(1);
@@ -55,6 +59,14 @@ function NewWorkspacePage() {
 
   // Caps do tier escolhido
   const caps = useMemo(() => getTierCaps(tier), [tier]);
+
+  // Se o tier atual não cabe no plano da conta, força o maior tier permitido.
+  useEffect(() => {
+    if (planLoading) return;
+    if (!allowedTiers.includes(tier)) {
+      setTier(planInfo.maxTier);
+    }
+  }, [planLoading, allowedTiers, tier, planInfo.maxTier]);
 
   // Quando o tier muda, propõe o tema-padrão dele.
   useEffect(() => {
@@ -199,7 +211,15 @@ function NewWorkspacePage() {
         <Stepper step={step} />
 
         <div className="glass-panel rounded-2xl p-6 mt-6">
-          {step === 1 && <StepTier tier={tier} setTier={setTier} />}
+          {step === 1 && (
+            <StepTier
+              tier={tier}
+              setTier={setTier}
+              allowedTiers={allowedTiers}
+              planLabel={planInfo.label}
+              planDescription={planInfo.description}
+            />
+          )}
           {step === 2 && (
             <StepIdentity
               name={name}
@@ -323,13 +343,25 @@ function Stepper({ step }: { step: Step }) {
 function StepTier({
   tier,
   setTier,
+  allowedTiers,
+  planLabel,
+  planDescription,
 }: {
   tier: WorkspaceTier;
   setTier: (t: WorkspaceTier) => void;
+  allowedTiers: WorkspaceTier[];
+  planLabel: string;
+  planDescription: string;
 }) {
   const tiers: WorkspaceTier[] = [1, 2, 3];
   return (
     <div>
+      <div className="mb-4 rounded-xl bg-primary/5 border border-primary/20 p-3">
+        <div className="text-[10px] uppercase tracking-wider text-primary font-semibold mb-1">
+          Sua conta · {planLabel}
+        </div>
+        <div className="text-xs text-muted-foreground">{planDescription}</div>
+      </div>
       <div className="text-xs font-medium uppercase tracking-wider text-muted-foreground mb-3">
         Escolha o nível do escritório
       </div>
@@ -337,19 +369,31 @@ function StepTier({
         {tiers.map((t) => {
           const caps = TIERS[t];
           const active = t === tier;
+          const isAllowed = allowedTiers.includes(t);
           return (
             <button
               key={t}
-              onClick={() => setTier(t)}
+              onClick={() => isAllowed && setTier(t)}
+              disabled={!isAllowed}
+              title={isAllowed ? undefined : `Disponível em planos superiores ao ${planLabel}.`}
               className={`text-left rounded-xl p-4 border-2 transition ${
                 active
                   ? "border-primary bg-primary/5 shadow-glow"
-                  : "border-border hover:border-primary/40"
+                  : isAllowed
+                  ? "border-border hover:border-primary/40"
+                  : "border-border opacity-50 cursor-not-allowed"
               }`}
             >
               <div className="flex items-start justify-between gap-3 mb-2">
                 <div>
-                  <div className="font-semibold text-base">{caps.label}</div>
+                  <div className="font-semibold text-base flex items-center gap-2">
+                    {caps.label}
+                    {!isAllowed && (
+                      <span className="text-[10px] uppercase tracking-wider bg-muted text-muted-foreground px-2 py-0.5 rounded-full">
+                        Upgrade necessário
+                      </span>
+                    )}
+                  </div>
                   <div className="text-xs text-muted-foreground mt-1">
                     {caps.description}
                   </div>

@@ -33,7 +33,7 @@ function AuthPage() {
       const { error } = await supabase.auth.signInWithPassword({ email, password });
       setLoading(false);
       if (error) { toast.error(error.message); return; }
-      toast.success("Bem-vindo(a) ao escritório!");
+      toast.success("Bem-vindo(a) ao Virtual Office!");
       window.location.href = "/workspaces";
     } else {
       const displayName = (name.trim() || email.split("@")[0] || "Novo membro").slice(0, 24);
@@ -51,7 +51,7 @@ function AuthPage() {
         toast.success("Confira seu e-mail para confirmar o cadastro.");
         return;
       }
-      toast.success("Conta criada! Vamos personalizar seu avatar.");
+      toast.success("Conta criada no Virtual Office! Vamos personalizar seu avatar.");
       window.location.href = "/workspaces";
     }
   };

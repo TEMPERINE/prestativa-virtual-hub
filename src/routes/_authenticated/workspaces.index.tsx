@@ -5,6 +5,7 @@ import { Building2, LogOut, ArrowRight, Sparkles, Mail, Plus } from "lucide-reac
 import { toast } from "sonner";
 import { OFFICE_THEMES, DEFAULT_THEME_ID, CUSTOM_THEME_ID } from "@/lib/office-themes";
 import { getTierCaps } from "@/lib/workspace/tiers";
+import { getPlanInfo, type AccountPlan, DEFAULT_PLAN } from "@/lib/account/plans";
 
 export const Route = createFileRoute("/_authenticated/workspaces/")({
   head: () => ({ meta: [{ title: "Seus escritórios — Prestativa Office" }] }),
@@ -32,7 +33,7 @@ type InviteRow = {
 function WorkspacesHubPage() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
-  const [profile, setProfile] = useState<{ display_name: string } | null>(null);
+  const [profile, setProfile] = useState<{ display_name: string; plan: AccountPlan } | null>(null);
   const [workspaces, setWorkspaces] = useState<WorkspaceCard[]>([]);
   const [invites, setInvites] = useState<InviteRow[]>([]);
   const [isAdmin, setIsAdmin] = useState(false);
@@ -43,9 +44,9 @@ function WorkspacesHubPage() {
     const { data: u } = await supabase.auth.getUser();
     if (!u.user) { navigate({ to: "/auth" }); return; }
 
-    const { data: prof } = await supabase
+    const { data: prof } = await (supabase as any)
       .from("profiles")
-      .select("display_name, onboarded_at")
+      .select("display_name, onboarded_at, plan")
       .eq("id", u.user.id)
       .maybeSingle();
 
@@ -53,7 +54,10 @@ function WorkspacesHubPage() {
       navigate({ to: "/onboarding" });
       return;
     }
-    setProfile({ display_name: prof.display_name });
+    setProfile({
+      display_name: prof.display_name,
+      plan: ((prof as any).plan ?? DEFAULT_PLAN) as AccountPlan,
+    });
 
     const { data: roles } = await supabase
       .from("user_roles")
@@ -147,9 +151,17 @@ function WorkspacesHubPage() {
               <span className="text-primary-foreground font-bold">P</span>
             </div>
             <div>
-              <div className="text-xs uppercase tracking-wider text-muted-foreground">Prestativa</div>
-              <div className="text-sm font-medium">
-                Olá, {profile?.display_name ?? "—"} 👋
+              <div className="text-xs uppercase tracking-wider text-muted-foreground">Prestativa Virtual Office</div>
+              <div className="text-sm font-medium flex items-center gap-2 flex-wrap">
+                <span>Olá, {profile?.display_name ?? "—"} 👋</span>
+                {profile && (
+                  <span
+                    title={getPlanInfo(profile.plan).description}
+                    className={`text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full font-medium ${getPlanInfo(profile.plan).badgeClass}`}
+                  >
+                    {getPlanInfo(profile.plan).shortLabel}
+                  </span>
+                )}
               </div>
             </div>
           </div>
@@ -157,7 +169,7 @@ function WorkspacesHubPage() {
             onClick={signOut}
             className="text-xs text-muted-foreground hover:text-foreground transition inline-flex items-center gap-1.5"
           >
-            <LogOut size={14} /> Sair
+            <LogOut size={14} /> Sair da conta
           </button>
         </header>
 

@@ -458,6 +458,7 @@ export type Database = {
           id: string
           last_name: string | null
           onboarded_at: string | null
+          plan: Database["public"]["Enums"]["account_plan"]
           sprite_id: string
           state: string | null
           status: string
@@ -475,6 +476,7 @@ export type Database = {
           id: string
           last_name?: string | null
           onboarded_at?: string | null
+          plan?: Database["public"]["Enums"]["account_plan"]
           sprite_id?: string
           state?: string | null
           status?: string
@@ -492,6 +494,7 @@ export type Database = {
           id?: string
           last_name?: string | null
           onboarded_at?: string | null
+          plan?: Database["public"]["Enums"]["account_plan"]
           sprite_id?: string
           state?: string | null
           status?: string
@@ -723,6 +726,17 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      account_plan_allows_tier: {
+        Args: {
+          _plan: Database["public"]["Enums"]["account_plan"]
+          _tier: number
+        }
+        Returns: boolean
+      }
+      account_plan_max_tier: {
+        Args: { _plan: Database["public"]["Enums"]["account_plan"] }
+        Returns: number
+      }
       current_user_email: { Args: never; Returns: string }
       has_role: {
         Args: {
@@ -779,6 +793,7 @@ export type Database = {
       workspace_accept_invite: { Args: { _token: string }; Returns: string }
     }
     Enums: {
+      account_plan: "essencial" | "pro" | "premium"
       app_role: "admin" | "supervisor" | "member"
       workspace_role: "owner" | "admin" | "member"
     }
@@ -908,6 +923,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      account_plan: ["essencial", "pro", "premium"],
       app_role: ["admin", "supervisor", "member"],
       workspace_role: ["owner", "admin", "member"],
     },
