@@ -135,6 +135,12 @@ function mergeImport(
 }
 
 export function MapEditor() {
+  const navigate = useNavigate();
+  const goBack = () => {
+    const last = typeof window !== "undefined" ? window.localStorage.getItem("lastWorkspaceId") : null;
+    if (last) navigate({ to: "/workspaces/$workspaceId", params: { workspaceId: last } });
+    else navigate({ to: "/workspaces" });
+  };
   const stageRef = useRef<HTMLDivElement | null>(null);
   const mainRef = useRef<HTMLElement | null>(null);
   const [zoom, setZoom] = useState(1);
