@@ -31,7 +31,7 @@ import {
 } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/workspaces/new")({
-  head: () => ({ meta: [{ title: "Novo escritório — Prestativa Office" }] }),
+  head: () => ({ meta: [{ title: "Novo espaço — Prestativa Office" }] }),
   component: NewWorkspacePage,
 });
 
@@ -152,7 +152,7 @@ function NewWorkspacePage() {
       toast.error(result.error);
       return;
     }
-    toast.success("Escritório criado!");
+    toast.success("Espaço criado!");
     try {
       localStorage.setItem("lastWorkspaceId", result.workspaceId);
     } catch {}
@@ -177,7 +177,7 @@ function NewWorkspacePage() {
           <Sparkles className="mx-auto mb-3 text-muted-foreground" />
           <h1 className="text-lg font-semibold mb-1">Sem permissão</h1>
           <p className="text-sm text-muted-foreground mb-5">
-            Só administradores podem criar novos escritórios.
+            Só administradores podem criar novos espaços.
           </p>
           <button
             onClick={() => navigate({ to: "/workspaces" })}
@@ -197,15 +197,15 @@ function NewWorkspacePage() {
           onClick={() => navigate({ to: "/workspaces" })}
           className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5 mb-6"
         >
-          <ArrowLeft size={14} /> Voltar para Seus escritórios
+          <ArrowLeft size={14} /> Voltar para Seus espaços
         </button>
 
         <h1 className="text-3xl font-semibold tracking-tight mb-2">
-          Novo escritório
+          Novo espaço
         </h1>
         <p className="text-sm text-muted-foreground mb-8">
-          Configure um novo espaço sem afetar o escritório atual. Cada
-          escritório tem seu próprio nível, mapa, tema, áreas e equipe.
+          Configure um novo espaço sem afetar o espaço atual. Cada
+          espaço tem seu próprio nível, mapa, tema, áreas e equipe.
         </p>
 
         <Stepper step={step} />
@@ -292,7 +292,7 @@ function NewWorkspacePage() {
                 </>
               ) : (
                 <>
-                  <Check size={14} /> Criar escritório
+                  <Check size={14} /> Criar espaço
                 </>
               )}
             </button>
@@ -363,7 +363,7 @@ function StepTier({
         <div className="text-xs text-muted-foreground">{planDescription}</div>
       </div>
       <div className="text-xs font-medium uppercase tracking-wider text-muted-foreground mb-3">
-        Escolha o nível do escritório
+        Escolha o nível do espaço
       </div>
       <div className="grid gap-3">
         {tiers.map((t) => {
@@ -480,7 +480,7 @@ function StepIdentity({
     <div className="space-y-4">
       <div>
         <label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-          Nome do escritório
+          Nome do espaço
         </label>
         <input
           type="text"
@@ -510,7 +510,7 @@ function StepIdentity({
           value={description}
           onChange={(e) => setDescription(e.target.value)}
           rows={3}
-          placeholder="Para que serve este escritório?"
+          placeholder="Para que serve este espaço?"
           className="mt-1 w-full px-3 py-2 rounded-lg bg-background border border-border focus:outline-none focus:ring-2 focus:ring-primary/40 resize-none"
         />
       </div>
@@ -711,7 +711,7 @@ function StepSeed({
       >
         <div className="font-medium text-sm mb-1">Começar em branco</div>
         <div className="text-xs text-muted-foreground">
-          Mapa vazio. O admin pode pintar áreas, paredes e props depois no Editor de Escritório.
+          Mapa vazio. O admin pode pintar áreas, paredes e props depois no Editor de Espaço.
         </div>
       </button>
       <button
@@ -723,11 +723,11 @@ function StepSeed({
             : "border-border hover:border-primary/40"
         }`}
       >
-        <div className="font-medium text-sm mb-1">Copiar do escritório atual</div>
+        <div className="font-medium text-sm mb-1">Copiar do espaço atual</div>
         <div className="text-xs text-muted-foreground">
           {hasSource
-            ? "Clona zonas, paredes, props e custom props do último escritório acessado."
-            : "Nenhum escritório de origem detectado."}
+            ? "Clona zonas, paredes, props e custom props do último espaço acessado."
+            : "Nenhum espaço de origem detectado."}
         </div>
       </button>
     </div>
