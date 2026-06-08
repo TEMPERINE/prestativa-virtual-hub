@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Link } from "@tanstack/react-router";
+import { useNavigate } from "@tanstack/react-router";
 import {
   GRID_COLS,
   GRID_ROWS,
@@ -135,6 +135,12 @@ function mergeImport(
 }
 
 export function MapEditor() {
+  const navigate = useNavigate();
+  const goBack = () => {
+    const last = typeof window !== "undefined" ? window.localStorage.getItem("lastWorkspaceId") : null;
+    if (last) navigate({ to: "/workspaces/$workspaceId", params: { workspaceId: last } });
+    else navigate({ to: "/workspaces" });
+  };
   const stageRef = useRef<HTMLDivElement | null>(null);
   const mainRef = useRef<HTMLElement | null>(null);
   const [zoom, setZoom] = useState(1);
@@ -787,12 +793,13 @@ export function MapEditor() {
     <div className="h-screen w-screen flex flex-col bg-background text-foreground">
       {/* Toolbar */}
       <header className="flex items-center gap-3 px-4 py-2 border-b border-border bg-card flex-wrap">
-        <Link
-          to="/office"
+        <button
+          type="button"
+          onClick={goBack}
           className="inline-flex items-center gap-1 text-sm px-2 py-1 rounded hover:bg-muted"
         >
           <ArrowLeft size={16} /> Voltar
-        </Link>
+        </button>
         <span className="text-sm font-semibold">Editor de Espaço</span>
         <span className="text-xs text-muted-foreground">
           {GRID_COLS}×{GRID_ROWS} células
