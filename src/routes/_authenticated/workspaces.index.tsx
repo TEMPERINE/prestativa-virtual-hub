@@ -222,31 +222,44 @@ function WorkspacesHubPage() {
               <button
                 key={ws.id}
                 onClick={() => enter(ws.id)}
-                className="group text-left glass-panel rounded-2xl p-6 hover:shadow-soft transition-all border border-transparent hover:border-primary/30"
+                className="group text-left glass-panel rounded-2xl overflow-hidden hover:shadow-soft transition-all border border-transparent hover:border-primary/30"
               >
-                <div className="flex items-start justify-between">
-                  <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center mb-4">
-                    {ws.cover_url ? (
-                      <img src={ws.cover_url} alt="" className="w-full h-full object-cover rounded-xl" />
-                    ) : (
-                      <Building2 className="text-primary" />
-                    )}
-                  </div>
-                  <div className="flex flex-col items-end gap-1">
-                    <span className="text-[10px] uppercase tracking-wider text-muted-foreground bg-muted px-2 py-1 rounded-full">
+                <div className="relative aspect-[16/9] w-full bg-muted overflow-hidden">
+                  {ws.previewUrl ? (
+                    <img
+                      src={ws.previewUrl}
+                      alt={`Prévia do mapa de ${ws.name}`}
+                      loading="lazy"
+                      className="w-full h-full object-cover group-hover:scale-[1.02] transition-transform duration-500"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center bg-primary/5">
+                      <Building2 className="text-primary/40" size={40} />
+                    </div>
+                  )}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent pointer-events-none" />
+                  <div className="absolute top-3 right-3 flex flex-col items-end gap-1">
+                    <span className="text-[10px] uppercase tracking-wider text-white/90 bg-black/40 backdrop-blur px-2 py-1 rounded-full">
                       {ws.role}
                     </span>
-                    <span className="text-[10px] uppercase tracking-wider bg-primary/15 text-primary px-2 py-1 rounded-full font-medium">
+                    <span className="text-[10px] uppercase tracking-wider bg-primary/90 text-primary-foreground px-2 py-1 rounded-full font-medium">
                       Nível {ws.tier}
                     </span>
                   </div>
+                  {ws.cover_url && (
+                    <div className="absolute bottom-3 left-3 w-10 h-10 rounded-lg overflow-hidden ring-2 ring-white/80 shadow">
+                      <img src={ws.cover_url} alt="" className="w-full h-full object-cover" />
+                    </div>
+                  )}
                 </div>
-                <div className="font-semibold text-lg mb-1">{ws.name}</div>
-                {ws.description && (
-                  <div className="text-sm text-muted-foreground mb-4 line-clamp-2">{ws.description}</div>
-                )}
-                <div className="text-xs text-primary inline-flex items-center gap-1 group-hover:gap-2 transition-all">
-                  Entrar no espaço <ArrowRight size={12} />
+                <div className="p-5">
+                  <div className="font-semibold text-lg mb-1">{ws.name}</div>
+                  {ws.description && (
+                    <div className="text-sm text-muted-foreground mb-3 line-clamp-2">{ws.description}</div>
+                  )}
+                  <div className="text-xs text-primary inline-flex items-center gap-1 group-hover:gap-2 transition-all">
+                    Entrar no espaço <ArrowRight size={12} />
+                  </div>
                 </div>
               </button>
             ))}
