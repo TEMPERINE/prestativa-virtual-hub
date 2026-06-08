@@ -65,7 +65,7 @@ export function OnboardingWizard({ userId, initialName, onDone }: Props) {
         {step === 1 && (
           <div className="space-y-4">
             <h2 className="text-2xl font-semibold">Escolha seu personagem</h2>
-            <p className="text-sm text-muted-foreground">Esse será você no escritório.</p>
+            <p className="text-sm text-muted-foreground">Esse será você no espaço.</p>
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
               {SPRITES.map((s) => {
                 const sel = s.id === spriteId;
@@ -161,7 +161,7 @@ export function OnboardingWizard({ userId, initialName, onDone }: Props) {
           {step < 3 ? (
             <Button onClick={next} style={{ background: color }}>Próximo</Button>
           ) : (
-            <Button onClick={finish} disabled={saving} style={{ background: color }}>{saving ? "Salvando…" : "Entrar no escritório 🚀"}</Button>
+            <Button onClick={finish} disabled={saving} style={{ background: color }}>{saving ? "Salvando…" : "Entrar no espaço 🚀"}</Button>
           )}
         </div>
       </div>
