@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { OFFICE_THEMES, DEFAULT_THEME_ID, CUSTOM_THEME_ID } from "@/lib/office-themes";
 import { getTierCaps } from "@/lib/workspace/tiers";
 import { getPlanInfo, type AccountPlan, DEFAULT_PLAN } from "@/lib/account/plans";
+import { VersionBadge } from "@/components/VersionBadge";
 
 export const Route = createFileRoute("/_authenticated/workspaces/")({
   head: () => ({ meta: [{ title: "Seus espaços — Prestativa Office" }] }),
@@ -144,6 +145,7 @@ function WorkspacesHubPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-accent/20 to-background">
+      <VersionBadge />
       <div className="max-w-5xl mx-auto px-6 py-12">
         <header className="flex items-center justify-between mb-10">
           <div className="flex items-center gap-3">
