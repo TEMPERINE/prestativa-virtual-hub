@@ -839,7 +839,7 @@ export function MapEditor() {
           <button
             onClick={openImport}
             className="text-xs px-2 py-1 rounded bg-muted inline-flex items-center gap-1"
-            title="Copiar paredes/zonas de outro escritório"
+            title="Copiar paredes/zonas de outro espaço"
           >
             <Upload size={12} /> Importar de outro
           </button>
