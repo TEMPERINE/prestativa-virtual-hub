@@ -6,8 +6,8 @@ import doorClosed from "@/assets/props/door-closed.png.asset.json";
 import doorOpen from "@/assets/props/door-open.png.asset.json";
 import { getCurrentTheme } from "@/lib/office-themes";
 
-// Assets críticos para a primeira render do escritório.
-// O BG do escritório usa o tema ativo (selecionado no editor).
+// Assets críticos para a primeira render do espaço.
+// O BG do espaço usa o tema ativo (selecionado no editor).
 const CRITICAL_ASSETS: string[] = [
   getCurrentTheme().url,
   parkLeft,
@@ -91,7 +91,7 @@ export function PreloadScreen({ onReady, canFinish = true }: Props) {
         opacity: done ? 0 : 1,
         pointerEvents: done ? "none" : "auto",
       }}
-      aria-label="Carregando escritório"
+      aria-label="Carregando espaço"
       role="progressbar"
       aria-valuenow={pct}
       aria-valuemin={0}
@@ -119,7 +119,7 @@ export function PreloadScreen({ onReady, canFinish = true }: Props) {
             Prestativa Office
           </div>
           <div className="text-xs uppercase tracking-[0.3em] mt-1 text-pink-200/60">
-            Preparando seu escritório
+            Preparando seu espaço
           </div>
         </div>
 
