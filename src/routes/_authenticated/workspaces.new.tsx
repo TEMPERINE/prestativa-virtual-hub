@@ -211,7 +211,15 @@ function NewWorkspacePage() {
         <Stepper step={step} />
 
         <div className="glass-panel rounded-2xl p-6 mt-6">
-          {step === 1 && <StepTier tier={tier} setTier={setTier} />}
+          {step === 1 && (
+            <StepTier
+              tier={tier}
+              setTier={setTier}
+              allowedTiers={allowedTiers}
+              planLabel={planInfo.label}
+              planDescription={planInfo.description}
+            />
+          )}
           {step === 2 && (
             <StepIdentity
               name={name}
