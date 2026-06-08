@@ -1711,7 +1711,7 @@ export function MapEditor() {
               </button>
             </div>
             <p className="text-xs text-muted-foreground">
-              Copia o que você escolher do escritório de origem para o atual. As alterações só são gravadas quando você clicar em <strong>Salvar</strong>.
+              Copia o que você escolher do espaço de origem para o atual. As alterações só são gravadas quando você clicar em <strong>Salvar</strong>.
             </p>
             <div className="flex flex-col gap-1 text-xs">
               <label className="inline-flex items-center gap-2">
