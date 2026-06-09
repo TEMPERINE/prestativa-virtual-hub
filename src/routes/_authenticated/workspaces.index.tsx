@@ -182,14 +182,16 @@ function WorkspacesHubPage() {
               Escolha um espaço para entrar. Cada espaço tem seu próprio mapa, equipe e reuniões.
             </p>
           </div>
-          {isAdmin && (
+          {isMaster && (
             <Link
               to="/admin"
               className="px-4 py-2 rounded-lg gradient-primary text-primary-foreground text-sm font-medium inline-flex items-center gap-2 hover:opacity-90 shadow-glow"
+              title="Acesso restrito ao Master"
             >
-              <Plus size={14} /> Painel Admin
+              <Plus size={14} /> Construtor
             </Link>
           )}
+
         </div>
 
         {invites.length > 0 && (
