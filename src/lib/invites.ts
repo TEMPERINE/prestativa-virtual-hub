@@ -43,7 +43,7 @@ export async function redeemPendingInvite(): Promise<string | null> {
     return null;
   }
   if (peek.kind === "signup") {
-    const { data, error } = await supabase.rpc("signup_invite_redeem", { _token: token, _workspace_name: null });
+    const { data, error } = await supabase.rpc("signup_invite_redeem", { _token: token });
     setPendingInviteToken(null);
     if (error) throw error;
     return data as string;
