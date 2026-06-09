@@ -164,10 +164,11 @@ export function AppDialogsHost() {
               {o.confirmLabel ?? "OK"}
             </button>
           </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    );
-  }
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 
   const o = current.opts;
   return (
