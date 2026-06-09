@@ -19,6 +19,9 @@ type Props = {
   file: File;
   includeRight: boolean;
   onReady: (outputs: FacingOutput[]) => void;
+  /** Se true (default), gera os PNGs automaticamente após detectar os frames
+   *  e mostra um botão "Ajustar manualmente" pra abrir o editor frame-a-frame. */
+  autoApply?: boolean;
 };
 
 /**
