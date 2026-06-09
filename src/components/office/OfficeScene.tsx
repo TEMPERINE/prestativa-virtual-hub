@@ -302,6 +302,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
   const meIdRef = useRef<string | null>(null);
   const accessTokenRef = useRef<string | null>(null);
   const [myEmail, setMyEmail] = useState<string>("");
+  const [isMaster, setIsMaster] = useState(false);
   const [editCharOpen, setEditCharOpen] = useState(false);
   const [editProfOpen, setEditProfOpen] = useState(false);
   const [forceOnboarding, setForceOnboarding] = useState(false);
