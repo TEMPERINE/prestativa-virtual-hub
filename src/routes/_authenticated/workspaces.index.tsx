@@ -37,7 +37,7 @@ function WorkspacesHubPage() {
   const [profile, setProfile] = useState<{ display_name: string; plan: AccountPlan } | null>(null);
   const [workspaces, setWorkspaces] = useState<WorkspaceCard[]>([]);
   const [invites, setInvites] = useState<InviteRow[]>([]);
-  const [isAdmin, setIsAdmin] = useState(false);
+  const [isMaster, setIsMaster] = useState(false);
   const [busyToken, setBusyToken] = useState<string | null>(null);
 
   const load = async () => {
