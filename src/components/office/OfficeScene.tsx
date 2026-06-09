@@ -928,6 +928,11 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
     // reconcile: any peer in our positions map that is NOT in the presence
     // state is treated as offline locally.
     let presenceReconcileReady = false;
+    // Peers ausentes do roster precisam ficar fora por N ms consecutivos
+    // antes de virarem offline — presence tem "blips" entre untrack/track
+    // do heartbeat e sem essa carência o avatar piscava (sumia e voltava).
+    const PRESENCE_OFFLINE_GRACE_MS = 4000;
+    const presenceMissingSince = new Map<string, number>();
     const reconcilePresence = () => {
       if (!presenceReconcileReady) return;
       const state = presenceCh.presenceState() as Record<string, PresenceState[]>;
@@ -936,15 +941,19 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
         for (const s of list) if (s?.user_id) onlineIds.add(s.user_id);
       }
       const myId = meIdRef.current;
+      const now = Date.now();
       setPositions((p) => {
         let changed = false;
         const next = { ...p };
         for (const [uid, cur] of Object.entries(p)) {
           if (uid === myId) continue;
-          if (cur.is_online && !onlineIds.has(uid)) {
-            next[uid] = { ...cur, is_online: false };
-            changed = true;
-          }
+          if (onlineIds.has(uid)) { presenceMissingSince.delete(uid); continue; }
+          if (!cur.is_online) continue;
+          const since = presenceMissingSince.get(uid);
+          if (since === undefined) { presenceMissingSince.set(uid, now); continue; }
+          if (now - since < PRESENCE_OFFLINE_GRACE_MS) continue;
+          next[uid] = { ...cur, is_online: false };
+          changed = true;
         }
         return changed ? next : p;
       });
@@ -952,12 +961,13 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
     presenceCh.on("presence", { event: "sync" }, () => {
       const state = presenceCh.presenceState() as Record<string, PresenceState[]>;
       for (const list of Object.values(state)) mergePresence(list);
-      // A primeira sync já carrega o roster real do canal — a partir daí a
-      // presence vira a fonte da verdade pra "quem está no espaço". Sem
-      // ativar imediatamente, ficávamos 3s confiando no DB e peers fantasmas
-      // (apps fechados sem aviso) continuavam visíveis nesse intervalo.
-      presenceReconcileReady = true;
-      reconcilePresence();
+      // Espera 3s após a primeira sync pra dar tempo dos peers chamarem
+      // track() após o subscribe. Reconciliações seguintes rodam na hora.
+      if (!presenceReconcileReady) {
+        window.setTimeout(() => { presenceReconcileReady = true; reconcilePresence(); }, 3000);
+      } else {
+        reconcilePresence();
+      }
     });
 
     presenceCh.on("presence", { event: "join" }, ({ newPresences }) => mergePresence(newPresences));
