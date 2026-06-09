@@ -98,8 +98,6 @@ function InvitePage() {
   const isSignup = peek.kind === "signup";
   const tierLabel = peek.tier ? `Nível ${peek.tier}` : null;
 
-  const emailMismatch = session && peek.email_lock && session.email.toLowerCase() !== peek.email_lock.toLowerCase();
-
   return (
     <div className="min-h-screen flex items-center justify-center p-6 bg-gradient-to-br from-background via-accent/30 to-background">
       <div className="w-full max-w-md">
@@ -119,25 +117,14 @@ function InvitePage() {
 
         <div className="glass-panel rounded-2xl p-8 shadow-soft">
           {session ? (
-            emailMismatch ? (
-              <div className="text-sm text-center space-y-3">
-                <p>Esse convite é para <b>{peek.email_lock}</b>.</p>
-                <p>Você está logado como <b>{session.email}</b>.</p>
-                <button
-                  onClick={async () => { await supabase.auth.signOut(); setSession(null); }}
-                  className="text-xs text-primary hover:underline"
-                >Sair e usar outra conta</button>
-              </div>
-            ) : (
-              <div className="space-y-4 text-center">
-                <p className="text-sm text-muted-foreground">Logado como <b>{session.email}</b>.</p>
-                <button
-                  onClick={handleAcceptLogged}
-                  disabled={busy}
-                  className="w-full rounded-lg gradient-primary text-primary-foreground font-medium py-2.5 hover:opacity-90 disabled:opacity-50"
-                >Aceitar convite e continuar</button>
-              </div>
-            )
+            <div className="space-y-4 text-center">
+              <p className="text-sm text-muted-foreground">Logado como <b>{session.email}</b>.</p>
+              <button
+                onClick={handleAcceptLogged}
+                disabled={busy}
+                className="w-full rounded-lg gradient-primary text-primary-foreground font-medium py-2.5 hover:opacity-90 disabled:opacity-50"
+              >Aceitar convite e continuar</button>
+            </div>
           ) : (
             <>
               <div className="flex gap-1 p-1 bg-muted rounded-lg mb-5">
