@@ -66,6 +66,7 @@ function AdminPersonagensPage() {
   const [sourceFile, setSourceFile] = useState<File | null>(null);
   const [outputs, setOutputs] = useState<FacingOutput[] | null>(null);
   const [busy, setBusy] = useState(false);
+  const [mode, setMode] = useState<"sheet" | "ai">("sheet");
 
   const check = async () => {
     const { data: u } = await supabase.auth.getUser();
