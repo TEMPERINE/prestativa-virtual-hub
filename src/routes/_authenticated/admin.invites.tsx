@@ -79,7 +79,7 @@ function AdminInvitesPage() {
   };
 
   const copyLink = (token: string) => {
-    const url = `${window.location.origin}/convite/${token}`;
+    const url = buildInviteUrl(token);
     navigator.clipboard.writeText(url);
     toast.success("Link copiado!");
   };
