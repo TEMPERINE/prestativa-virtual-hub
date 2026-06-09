@@ -1144,12 +1144,14 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
     };
 
     const onPageHide = () => persistFinalPosition();
-    const onVisibilityHidden = () => {
-      if (document.visibilityState === "hidden") persistFinalPosition();
-    };
+    // IMPORTANTE: NÃO ouvir `visibilitychange` para marcar offline. Alt-tab,
+    // foco em devtools, minimizar janela, etc. disparam `hidden` sem que o
+    // usuário tenha saído do espaço — escrevíamos is_online=false no DB e os
+    // outros peers viam o avatar piscar/sumir. "Sair do espaço" só vale
+    // para fechar app/aba (pagehide/beforeunload) ou desmontar a cena.
     window.addEventListener("beforeunload", persistFinalPosition);
     window.addEventListener("pagehide", onPageHide);
-    document.addEventListener("visibilitychange", onVisibilityHidden);
+
 
 
     const syncPositions = async () => {
@@ -1292,7 +1294,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
       window.clearInterval(persistHeartbeat);
       window.removeEventListener("beforeunload", persistFinalPosition);
       window.removeEventListener("pagehide", onPageHide);
-      document.removeEventListener("visibilitychange", onVisibilityHidden);
+      
       document.removeEventListener("visibilitychange", onVisible);
       window.removeEventListener("focus", onVisible);
       persistFinalPosition();
