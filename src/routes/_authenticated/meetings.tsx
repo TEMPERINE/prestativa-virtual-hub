@@ -18,6 +18,8 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
+import { appPrompt, appConfirm } from "@/components/ui/app-dialogs";
+
 
 export const Route = createFileRoute("/_authenticated/meetings")({
   head: () => ({
