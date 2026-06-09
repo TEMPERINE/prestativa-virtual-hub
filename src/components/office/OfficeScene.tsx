@@ -2215,6 +2215,9 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
               }}
             >
               <div className="flex flex-col items-center">
+                {(isMe ? (rtc.micOn && rtc.selfSpeaking) : !!rtc.speakingPeers[profile.id]) && (
+                  <SpeechBubble />
+                )}
                 <div
                   className="px-2 py-0.5 rounded-full text-[10px] font-medium whitespace-nowrap mb-0.5 shadow-soft backdrop-blur-sm text-white"
                   style={{
@@ -3457,6 +3460,36 @@ function ReactionBubble({ emoji }: { emoji: string | null }) {
     </div>
   );
 }
+
+function SpeechBubble() {
+  return (
+    <div
+      className="relative mb-1 select-none pointer-events-none animate-in fade-in zoom-in-95 duration-200"
+      style={{ filter: "drop-shadow(0 1px 2px rgba(0,0,0,0.25))" }}
+      aria-label="Conversando"
+    >
+      <div
+        className="flex flex-col justify-center gap-[3px] bg-[#efeae0] rounded-[10px] px-2"
+        style={{ width: 32, height: 22 }}
+      >
+        <span className="block h-[2px] rounded-full bg-[#7a7165]" style={{ width: "85%", animation: "speech-line 1.1s ease-in-out infinite" }} />
+        <span className="block h-[2px] rounded-full bg-[#7a7165]" style={{ width: "60%", animation: "speech-line 1.1s ease-in-out infinite 0.25s" }} />
+      </div>
+      <div
+        className="absolute left-1/2 -bottom-[3px] w-0 h-0"
+        style={{
+          transform: "translateX(-60%)",
+          borderLeft: "4px solid transparent",
+          borderRight: "4px solid transparent",
+          borderTop: "5px solid #efeae0",
+        }}
+      />
+      <style>{`@keyframes speech-line { 0%,100% { opacity: 0.45; } 50% { opacity: 1; } }`}</style>
+    </div>
+  );
+}
+
+
 
 
 
