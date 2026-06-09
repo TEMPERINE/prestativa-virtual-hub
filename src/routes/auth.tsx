@@ -1,7 +1,8 @@
 import { createFileRoute, Link, redirect } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { getPendingInviteToken } from "@/lib/invites";
 
 export const Route = createFileRoute("/auth")({
   head: () => ({
@@ -25,6 +26,9 @@ function AuthPage() {
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
   const [loading, setLoading] = useState(false);
+  // Signup só é permitido quando há um convite pendente (link recebido por convite).
+  const [signupAllowed, setSignupAllowed] = useState(false);
+  useEffect(() => { setSignupAllowed(!!getPendingInviteToken()); }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -56,7 +60,7 @@ function AuthPage() {
     }
   };
 
-  const isSignup = mode === "signup";
+  const isSignup = mode === "signup" && signupAllowed;
 
   return (
     <div className="min-h-screen flex items-center justify-center p-6 bg-gradient-to-br from-background via-accent/30 to-background">
@@ -72,22 +76,18 @@ function AuthPage() {
         </div>
 
         <div className="glass-panel rounded-2xl p-8 shadow-soft">
-          <div className="flex gap-1 p-1 bg-muted rounded-lg mb-5">
-            <button
-              type="button"
-              onClick={() => setMode("signin")}
-              className={`flex-1 py-2 rounded-md text-sm font-medium transition ${!isSignup ? "bg-background shadow-sm" : "text-muted-foreground"}`}
-            >
-              Entrar
-            </button>
-            <button
-              type="button"
-              onClick={() => setMode("signup")}
-              className={`flex-1 py-2 rounded-md text-sm font-medium transition ${isSignup ? "bg-background shadow-sm" : "text-muted-foreground"}`}
-            >
-              Criar conta
-            </button>
-          </div>
+          {signupAllowed && (
+            <div className="flex gap-1 p-1 bg-muted rounded-lg mb-5">
+              <button type="button" onClick={() => setMode("signin")}
+                className={`flex-1 py-2 rounded-md text-sm font-medium transition ${!isSignup ? "bg-background shadow-sm" : "text-muted-foreground"}`}>
+                Entrar
+              </button>
+              <button type="button" onClick={() => setMode("signup")}
+                className={`flex-1 py-2 rounded-md text-sm font-medium transition ${isSignup ? "bg-background shadow-sm" : "text-muted-foreground"}`}>
+                Criar conta
+              </button>
+            </div>
+          )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
             {isSignup && (

@@ -1,136 +1,95 @@
-# Plano: Beta versionado + App Desktop Windows
 
-## Objetivo
+# Jornada de entrada por convite
 
-1. Congelar este projeto como **beta estável** para sua operação usar.
-2. Criar um **projeto separado de testes** (lab) onde você continua experimentando sem afetar usuários.
-3. Empacotar o app como **executável Windows (.exe)** estilo Gather, com **auto-update** ao publicar nova versão.
+Modelo escolhido: **dois tipos de convite num mesmo fluxo de URL**, signup público bloqueado, wizard de avatar primeiro, workspace depois. Desenhado pra escalar pra venda self-service no futuro sem refazer schema.
 
----
+## 1. Tipos de convite
 
-## Parte 1 — Estratégia de versionamento
+| Tipo | Quem gera | O que faz ao ser redimido |
+|---|---|---|
+| **Convite de signup** (provision) | Você (super-admin global) | Cria conta + workspace NOVO (a pessoa vira owner), define o plano (`essencial`/`pro`/`premium`) e tier do workspace |
+| **Convite de membro** (existente, `workspace_invites`) | Owner/admin de qualquer workspace | Adiciona a pessoa como membro de um workspace JÁ EXISTENTE |
 
-### Ambientes
+Ambos passam pela mesma URL pública `/convite/$token` — o backend identifica o tipo e roteia o fluxo. O usuário não precisa saber a diferença.
+
+## 2. Schema (nova migration)
+
+**Nova tabela `signup_invites`** (não toca em `workspace_invites`, que já cobre o caso de membro):
+
+- `token` (gerado), `email` (opcional — quando null, qualquer email pode usar), `plan` (`account_plan`), `tier` (1/2/3), `workspace_name_suggestion` (opcional), `max_uses` (default 1), `uses` (default 0), `expires_at` (default 30 dias), `created_by`, `notes`, timestamps.
+- RLS: só `has_role(auth.uid(), 'admin')` faz SELECT/INSERT/UPDATE/DELETE. Anônimos NÃO leem direto — leitura pública vai por RPC.
+
+**Relaxar `workspace_invites`**: tornar `email` nullable + adicionar `max_uses`/`uses` pra suportar "link compartilhável" também no convite de membro (sem retrabalho quando workspaces forem vendidos e admins quiserem gerar links abertos pro time).
+
+**Novas RPCs (SECURITY DEFINER, schema public)**:
+
+- `invite_peek(_token text)` → retorna `{ kind, valid, expires_at, workspace_name, plan, tier, email_lock }` sem exigir auth. Permite a tela de convite mostrar "Você foi convidado pro workspace X com plano Pro" antes do cadastro.
+- `signup_invite_redeem(_token text)` → autenticado. Valida token, cria workspace tier definido, faz `profiles.plan = invite.plan`, insere `workspace_members` com role `owner`, incrementa `uses`. Retorna `workspace_id`.
+- `workspace_accept_invite(_token text)` → já existe; só ajustar pra aceitar tokens sem email travado quando `max_uses > 1`.
+
+## 3. Fluxo de entrada (UX)
+
 ```text
-[Lab Project]  ─── experimentos, quebra à vontade
-     │ (você porta o que amadurece)
-     ▼
-[Beta Project] ─── este projeto, sua operação usa
-     │ Publish = nova versão
-     ▼
-[Desktop App] ─── instalado nos PCs, auto-update
+Sem convite:
+  /auth → só mostra tab "Entrar" (signup escondido)
+  CTA pequeno: "Acesso por convite. Fale com a administração."
+
+Com convite (link recebido):
+  /convite/<token>
+    ├─ peek → mostra "Você foi convidado pra criar seu espaço (plano Pro)"
+    │         OU "Você foi convidado pra entrar no espaço 'Prestativa'"
+    ├─ se NÃO logado → form signup (email pré-preenchido se invite trava email)
+    │   após signup → guarda token em sessionStorage → /onboarding
+    ├─ se logado e email casa → botão "Aceitar convite"
+    │   ao clicar → redeem → redireciona
+
+/onboarding (wizard de avatar, fluxo atual)
+  onDone → se tiver token pendente em sessionStorage:
+            chama redeem apropriado → /workspaces/<id>
+          senão → /workspaces (lista vazia se não tem invite,
+                  com mensagem "Aguardando convite")
 ```
 
-### Numeração de versão (SemVer + canal)
-- `v0.1.0-beta` → primeira versão pra operação
-- `v0.1.1-beta` → bugfix
-- `v0.2.0-beta` → nova feature
-- `v1.0.0` → quando sair de beta (futuro)
+Wizard de avatar fica **antes** de entrar no workspace (decisão sua). Não muda o `OnboardingWizard.tsx` atual.
 
-### O que vou fazer neste projeto (beta)
-1. Criar `src/lib/version.ts` com versão atual + canal (`beta`).
-2. Mostrar **badge de versão** discreto no rodapé (ex: canto do `workspaces.index`) — operação sabe qual versão tá rodando, você sabe pra qual reportar bug.
-3. Criar `CHANGELOG.md` na raiz — toda Publish você anota o que mudou.
-4. Criar tela `/sobre` (rota) com versão, changelog resumido, link de suporte.
+## 4. UI de geração de convites
 
-### Sobre o projeto "lab"
-Você cria via **Remix** deste projeto (botão na UI do Lovable, não algo que eu faço por código). Ambos compartilham o mesmo banco Supabase **só se você quiser** — recomendo banco separado pra não contaminar dados reais com testes.
+**Super-admin (você) — nova rota `/admin/invites`:**
+- Gate: `has_role(auth.uid(), 'admin')`.
+- Formulário: email opcional, plano, tier, validade, máx. usos, observações.
+- Lista de convites gerados com botão "copiar link" + status (não usado / aceito / expirado).
+- Link copiado: `https://<host>/convite/<token>`.
 
----
+**Owner/admin de workspace — ampliar UI atual de convidar membro:**
+- Manter o convite por email (já existe).
+- Adicionar botão "Gerar link compartilhável" → cria `workspace_invites` com email null e `max_uses` configurável.
+- Útil agora pra você convidar gente fácil, e amanhã pra clientes pagantes convidarem o time deles.
 
-## Parte 2 — App Desktop Windows (Electron)
+## 5. Bloqueio de signup público
 
-### Stack
-- **Electron** (mesma base do Gather, VS Code, Slack, Discord)
-- **@electron/packager** pra gerar o `.exe` (já validado no template, ver card `electron-desktop-app`)
-- **electron-updater** pra auto-update via GitHub Releases (grátis)
+Não tocar em `disable_signup` do Supabase (precisa permitir signup pra quem tem token). O bloqueio é **só de UX**:
 
-### Arquitetura do app desktop
-```text
-PrestativaVirtual.exe
-  └── Electron shell (Chromium + Node)
-       ├── carrega https://prestativa-virtual-hub.lovable.app
-       ├── preload.cjs → expõe window.prestativaDesktop
-       │     ├── getScreenStream()    (gravação sem diálogo)
-       │     └── getAppVersion()
-       └── auto-updater → checa GitHub Releases ao abrir
-```
+- `/auth` sem `?invite=<token>` na URL e sem token em sessionStorage → tab "Criar conta" oculta.
+- Backend continua aceitando signup (pra não quebrar fluxo de convite). Defesa em profundidade: ao primeiro login, se a pessoa não tiver workspace E não tiver token pendente, mandar pra `/aguardando-convite`.
 
-### Boas práticas de segurança (alinhadas ao que o Gather faz)
-- `contextIsolation: true` — renderer não tem acesso direto a Node
-- `nodeIntegration: false` — sem `require` no front
-- `sandbox: true` no renderer
-- `contextBridge.exposeInMainWorld` é a **única** ponte preload→renderer
-- CSP no HTML carregado
-- Carrega só HTTPS da URL publicada (sem `file://` arbitrário)
-- Auto-updates **assinados** (verificação criptográfica antes de instalar)
-- Sem `eval`, sem `webview` aberto, sem `allowRunningInsecureContent`
+## 6. Memória de pricing/produto
 
-### Code signing (assinatura digital do .exe)
-**Sem assinar:** Windows mostra alerta "Editor desconhecido" no SmartScreen — usuário precisa clicar "Mais informações → Executar mesmo assim". Funciona, mas assusta.
-**Com assinar:** sem alerta. Custa ~US$ 100/ano (certificado OV) ou ~US$ 300/ano (EV, sem warm-up).
+Os 3 planos (`essencial`/`pro`/`premium`) já existem em `profiles.plan` e o trigger `workspaces_enforce_owner_plan` já valida tier vs plano. O convite de signup amarra "plano da conta" + "tier do workspace inicial" num único token — então quando virar venda, só trocar a UI de "admin gera convite" por "checkout gera convite automaticamente" (Stripe webhook chama mesma RPC `signup_invite_redeem`).
 
-**Recomendação:** começar **sem assinatura** (operação pequena, todos sabem que é seu app). Adicionar certificado quando sair de beta.
+## 7. Entregas (ordem de implementação)
 
-### Auto-update via GitHub Releases
-1. Você cria repo GitHub privado do desktop wrapper (não precisa colocar o app web lá — só a casca Electron).
-2. Toda nova versão: build local → upload do `.exe` + `latest.yml` no GitHub Releases.
-3. App instalado checa esse feed no boot, baixa em background, instala no próximo restart.
-
-**Importante:** o **app web** atualiza sozinho (é só recarregar a página) sempre que você clicar Publish neste projeto. O **shell Electron** só precisa de update quando mudar algo na casca (preload, versão do Electron, ícone, etc) — o que é raro.
-
-Ou seja:
-- Publish no Lovable → operação recebe nova versão **na próxima vez que abrir o app desktop** (recarrega a URL).
-- Nova versão do Electron shell → distribuída via GitHub Releases (raro).
-
----
+1. **Migration**: tabela `signup_invites` + RPCs `invite_peek` / `signup_invite_redeem` + relax do `workspace_invites`.
+2. **Rota `/convite/$token`** (pública, SSR off) com peek + signup-form-com-token / aceite-direto-se-logado.
+3. **Ajustar `/auth`**: esconder tab signup quando não houver token em URL/sessionStorage; ler token de `?invite=` e propagar.
+4. **Ajustar `/onboarding`**: após `onDone`, ler token pendente e chamar redeem correto antes do redirect.
+5. **Rota `/admin/invites`** pra você gerar links de signup.
+6. **Ampliar UI de convites do workspace** com "gerar link compartilhável".
+7. **Rota `/aguardando-convite`** como safety net.
 
 ## Detalhes técnicos
 
-### Arquivos que vou criar/editar neste projeto (beta)
-- `src/lib/version.ts` — constante `APP_VERSION = "0.1.0-beta"`
-- `src/components/VersionBadge.tsx` — badge canto inferior
-- `src/routes/_authenticated/workspaces.index.tsx` — inserir badge
-- `src/routes/sobre.tsx` (público) — página de versão/changelog
-- `CHANGELOG.md` — histórico de releases
-
-### Repositório Electron (separado, fora do Lovable)
-Vou te entregar os arquivos prontos pra você criar um repo GitHub e rodar localmente:
-- `electron/main.cjs` — janela + auto-updater + display media handler
-- `electron/preload.cjs` — expõe `window.prestativaDesktop`
-- `package.json` — deps (`electron`, `@electron/packager`, `electron-updater`)
-- `build-icon.ico` — ícone do app (gero a partir do `prestativa-icon.png` existente)
-- `README.md` — passo a passo de build/release
-
-### Comando de build (Windows .exe)
-```bash
-npm install
-npx @electron/packager . "PrestativaVirtual" \
-  --platform=win32 --arch=x64 \
-  --icon=build-icon.ico \
-  --out=release --overwrite
-```
-Saída: `release/PrestativaVirtual-win32-x64/PrestativaVirtual.exe`.
-
-Pra distribuir um **instalador único** (.exe estilo Gather/NSIS), uso `electron-builder` numa máquina Windows ou via GitHub Actions (Linux/sandbox não consegue gerar NSIS confiável — limitação documentada no card `electron-desktop-app`).
-
-### Sobre o Gather.exe que você enviou
-Confirmo que recebi (`/mnt/user-uploads/Gather-1.18.0-Setup_1.exe`, ~95 MB). É um instalador NSIS Electron padrão, code-signed. **Não vou copiar nem extrair nada** — só uso como confirmação de que a arquitetura escolhida (Electron + NSIS + auto-update + signing) é exatamente a do Gather. Boas práticas que vou replicar já listadas acima.
-
----
-
-## Ordem de execução (quando aprovar)
-
-1. **Versionamento** (rápido, dentro do Lovable) — versão, badge, página /sobre, CHANGELOG.
-2. **Publish v0.1.0-beta** — sua operação já pode usar pela web.
-3. **Electron shell** — gero os arquivos do app desktop num diretório `desktop/` aqui no projeto pra você baixar e colocar no GitHub.
-4. **Primeiro build .exe** — você roda local no Windows (ou eu te entrego instruções pra GitHub Actions buildar).
-5. **Auto-update** — configurado apontando pro seu GitHub Releases.
-
----
-
-## Fora de escopo (decisões futuras)
-- macOS / Linux — só Windows agora, conforme você definiu.
-- Code signing — quando sair de beta.
-- App Store / Microsoft Store — distribuição direta por enquanto.
-- Mobile (Capacitor) — caminho diferente, não confundir com desktop.
+- Todas RPCs `SECURITY DEFINER` com `search_path = public`.
+- `signup_invites` com `GRANT SELECT, INSERT, UPDATE, DELETE TO authenticated` + RLS gateando por `has_role`. `invite_peek` exposta como RPC com `GRANT EXECUTE TO anon, authenticated` (lê via função, não tabela).
+- Token em `sessionStorage` (não localStorage) pra não vazar entre sessões diferentes.
+- `/convite/$token` é rota top-level (pública, SSR on) com `head()` próprio.
+- Toda criação de workspace via redeem usa o mesmo `createWorkspace` helper já existente (ou inlineia no RPC pra atomicidade) — escolho **inline no RPC** pra ser transacional.

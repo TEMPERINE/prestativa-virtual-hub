@@ -14,13 +14,16 @@ import { Route as DownloadRouteImport } from './routes/download'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ConviteTokenRouteImport } from './routes/convite.$token'
 import { Route as AuthenticatedOnboardingRouteImport } from './routes/_authenticated/onboarding'
 import { Route as AuthenticatedOfficeRouteImport } from './routes/_authenticated/office'
 import { Route as AuthenticatedMeetingsRouteImport } from './routes/_authenticated/meetings'
+import { Route as AuthenticatedAguardandoConviteRouteImport } from './routes/_authenticated/aguardando-convite'
 import { Route as AuthenticatedWorkspacesIndexRouteImport } from './routes/_authenticated/workspaces.index'
 import { Route as AuthenticatedWorkspacesNewRouteImport } from './routes/_authenticated/workspaces.new'
 import { Route as AuthenticatedWorkspacesWorkspaceIdRouteImport } from './routes/_authenticated/workspaces.$workspaceId'
 import { Route as AuthenticatedOfficeEditorRouteImport } from './routes/_authenticated/office_.editor'
+import { Route as AuthenticatedAdminInvitesRouteImport } from './routes/_authenticated/admin.invites'
 
 const SobreRoute = SobreRouteImport.update({
   id: '/sobre',
@@ -46,6 +49,11 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ConviteTokenRoute = ConviteTokenRouteImport.update({
+  id: '/convite/$token',
+  path: '/convite/$token',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthenticatedOnboardingRoute = AuthenticatedOnboardingRouteImport.update({
   id: '/onboarding',
   path: '/onboarding',
@@ -61,6 +69,12 @@ const AuthenticatedMeetingsRoute = AuthenticatedMeetingsRouteImport.update({
   path: '/meetings',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedAguardandoConviteRoute =
+  AuthenticatedAguardandoConviteRouteImport.update({
+    id: '/aguardando-convite',
+    path: '/aguardando-convite',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedWorkspacesIndexRoute =
   AuthenticatedWorkspacesIndexRouteImport.update({
     id: '/workspaces/',
@@ -85,15 +99,24 @@ const AuthenticatedOfficeEditorRoute =
     path: '/office/editor',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedAdminInvitesRoute =
+  AuthenticatedAdminInvitesRouteImport.update({
+    id: '/admin/invites',
+    path: '/admin/invites',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/download': typeof DownloadRoute
   '/sobre': typeof SobreRoute
+  '/aguardando-convite': typeof AuthenticatedAguardandoConviteRoute
   '/meetings': typeof AuthenticatedMeetingsRoute
   '/office': typeof AuthenticatedOfficeRoute
   '/onboarding': typeof AuthenticatedOnboardingRoute
+  '/convite/$token': typeof ConviteTokenRoute
+  '/admin/invites': typeof AuthenticatedAdminInvitesRoute
   '/office/editor': typeof AuthenticatedOfficeEditorRoute
   '/workspaces/$workspaceId': typeof AuthenticatedWorkspacesWorkspaceIdRoute
   '/workspaces/new': typeof AuthenticatedWorkspacesNewRoute
@@ -104,9 +127,12 @@ export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/download': typeof DownloadRoute
   '/sobre': typeof SobreRoute
+  '/aguardando-convite': typeof AuthenticatedAguardandoConviteRoute
   '/meetings': typeof AuthenticatedMeetingsRoute
   '/office': typeof AuthenticatedOfficeRoute
   '/onboarding': typeof AuthenticatedOnboardingRoute
+  '/convite/$token': typeof ConviteTokenRoute
+  '/admin/invites': typeof AuthenticatedAdminInvitesRoute
   '/office/editor': typeof AuthenticatedOfficeEditorRoute
   '/workspaces/$workspaceId': typeof AuthenticatedWorkspacesWorkspaceIdRoute
   '/workspaces/new': typeof AuthenticatedWorkspacesNewRoute
@@ -119,9 +145,12 @@ export interface FileRoutesById {
   '/auth': typeof AuthRoute
   '/download': typeof DownloadRoute
   '/sobre': typeof SobreRoute
+  '/_authenticated/aguardando-convite': typeof AuthenticatedAguardandoConviteRoute
   '/_authenticated/meetings': typeof AuthenticatedMeetingsRoute
   '/_authenticated/office': typeof AuthenticatedOfficeRoute
   '/_authenticated/onboarding': typeof AuthenticatedOnboardingRoute
+  '/convite/$token': typeof ConviteTokenRoute
+  '/_authenticated/admin/invites': typeof AuthenticatedAdminInvitesRoute
   '/_authenticated/office_/editor': typeof AuthenticatedOfficeEditorRoute
   '/_authenticated/workspaces/$workspaceId': typeof AuthenticatedWorkspacesWorkspaceIdRoute
   '/_authenticated/workspaces/new': typeof AuthenticatedWorkspacesNewRoute
@@ -134,9 +163,12 @@ export interface FileRouteTypes {
     | '/auth'
     | '/download'
     | '/sobre'
+    | '/aguardando-convite'
     | '/meetings'
     | '/office'
     | '/onboarding'
+    | '/convite/$token'
+    | '/admin/invites'
     | '/office/editor'
     | '/workspaces/$workspaceId'
     | '/workspaces/new'
@@ -147,9 +179,12 @@ export interface FileRouteTypes {
     | '/auth'
     | '/download'
     | '/sobre'
+    | '/aguardando-convite'
     | '/meetings'
     | '/office'
     | '/onboarding'
+    | '/convite/$token'
+    | '/admin/invites'
     | '/office/editor'
     | '/workspaces/$workspaceId'
     | '/workspaces/new'
@@ -161,9 +196,12 @@ export interface FileRouteTypes {
     | '/auth'
     | '/download'
     | '/sobre'
+    | '/_authenticated/aguardando-convite'
     | '/_authenticated/meetings'
     | '/_authenticated/office'
     | '/_authenticated/onboarding'
+    | '/convite/$token'
+    | '/_authenticated/admin/invites'
     | '/_authenticated/office_/editor'
     | '/_authenticated/workspaces/$workspaceId'
     | '/_authenticated/workspaces/new'
@@ -176,6 +214,7 @@ export interface RootRouteChildren {
   AuthRoute: typeof AuthRoute
   DownloadRoute: typeof DownloadRoute
   SobreRoute: typeof SobreRoute
+  ConviteTokenRoute: typeof ConviteTokenRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -215,6 +254,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/convite/$token': {
+      id: '/convite/$token'
+      path: '/convite/$token'
+      fullPath: '/convite/$token'
+      preLoaderRoute: typeof ConviteTokenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_authenticated/onboarding': {
       id: '/_authenticated/onboarding'
       path: '/onboarding'
@@ -234,6 +280,13 @@ declare module '@tanstack/react-router' {
       path: '/meetings'
       fullPath: '/meetings'
       preLoaderRoute: typeof AuthenticatedMeetingsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/aguardando-convite': {
+      id: '/_authenticated/aguardando-convite'
+      path: '/aguardando-convite'
+      fullPath: '/aguardando-convite'
+      preLoaderRoute: typeof AuthenticatedAguardandoConviteRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/workspaces/': {
@@ -264,13 +317,22 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedOfficeEditorRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/admin/invites': {
+      id: '/_authenticated/admin/invites'
+      path: '/admin/invites'
+      fullPath: '/admin/invites'
+      preLoaderRoute: typeof AuthenticatedAdminInvitesRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
   }
 }
 
 interface AuthenticatedRouteRouteChildren {
+  AuthenticatedAguardandoConviteRoute: typeof AuthenticatedAguardandoConviteRoute
   AuthenticatedMeetingsRoute: typeof AuthenticatedMeetingsRoute
   AuthenticatedOfficeRoute: typeof AuthenticatedOfficeRoute
   AuthenticatedOnboardingRoute: typeof AuthenticatedOnboardingRoute
+  AuthenticatedAdminInvitesRoute: typeof AuthenticatedAdminInvitesRoute
   AuthenticatedOfficeEditorRoute: typeof AuthenticatedOfficeEditorRoute
   AuthenticatedWorkspacesWorkspaceIdRoute: typeof AuthenticatedWorkspacesWorkspaceIdRoute
   AuthenticatedWorkspacesNewRoute: typeof AuthenticatedWorkspacesNewRoute
@@ -278,9 +340,11 @@ interface AuthenticatedRouteRouteChildren {
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
+  AuthenticatedAguardandoConviteRoute: AuthenticatedAguardandoConviteRoute,
   AuthenticatedMeetingsRoute: AuthenticatedMeetingsRoute,
   AuthenticatedOfficeRoute: AuthenticatedOfficeRoute,
   AuthenticatedOnboardingRoute: AuthenticatedOnboardingRoute,
+  AuthenticatedAdminInvitesRoute: AuthenticatedAdminInvitesRoute,
   AuthenticatedOfficeEditorRoute: AuthenticatedOfficeEditorRoute,
   AuthenticatedWorkspacesWorkspaceIdRoute:
     AuthenticatedWorkspacesWorkspaceIdRoute,
@@ -297,6 +361,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthRoute: AuthRoute,
   DownloadRoute: DownloadRoute,
   SobreRoute: SobreRoute,
+  ConviteTokenRoute: ConviteTokenRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
