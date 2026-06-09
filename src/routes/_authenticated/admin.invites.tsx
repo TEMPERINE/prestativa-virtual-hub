@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Copy, Trash2, Plus, ArrowLeft } from "lucide-react";
+import { buildInviteUrl } from "@/lib/invites";
 
 export const Route = createFileRoute("/_authenticated/admin/invites")({
   ssr: false,
