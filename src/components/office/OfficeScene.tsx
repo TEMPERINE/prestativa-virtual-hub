@@ -952,8 +952,14 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
     presenceCh.on("presence", { event: "sync" }, () => {
       const state = presenceCh.presenceState() as Record<string, PresenceState[]>;
       for (const list of Object.values(state)) mergePresence(list);
+      // A primeira sync já carrega o roster real do canal — a partir daí a
+      // presence vira a fonte da verdade pra "quem está no espaço". Sem
+      // ativar imediatamente, ficávamos 3s confiando no DB e peers fantasmas
+      // (apps fechados sem aviso) continuavam visíveis nesse intervalo.
+      presenceReconcileReady = true;
       reconcilePresence();
     });
+
     presenceCh.on("presence", { event: "join" }, ({ newPresences }) => mergePresence(newPresences));
     presenceCh.on("presence", { event: "leave" }, ({ leftPresences }) => {
       const arr = leftPresences as unknown as PresenceState[];
@@ -1000,13 +1006,6 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
       claimsCh.subscribe();
       presenceCh.subscribe(async (status) => {
         if (status !== "SUBSCRIBED") return;
-        // Ativa a reconciliação independentemente do nosso estado de
-        // hidratação — peers fantasmas (que fecharam o app sem aviso) precisam
-        // ser detectados mesmo enquanto ainda estamos entrando.
-        window.setTimeout(() => {
-          presenceReconcileReady = true;
-          reconcilePresence();
-        }, 3000);
         const uid = meIdRef.current;
         if (!uid || !positionHydratedRef.current) return;
         const cur = posRef.current;
@@ -1019,6 +1018,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
       });
 
     })();
+
 
     // Heartbeat presence every second so peers detect each other within 1s of
     // joining and the "frozen avatar" symptom can't happen even if both
@@ -1084,8 +1084,11 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
       if (!uid || !positionHydratedRef.current) return;
       const cur = posRef.current;
       const z = zoneAt(cur).id;
+      const ws = getCurrentWorkspaceId();
+      if (!ws) return;
       writeLocalSavedPosition(uid, cur, z, facingRef.current);
       const body = JSON.stringify({
+        workspace_id: ws,
         user_id: uid,
         x: cur.x,
         y: cur.y,
@@ -1094,7 +1097,10 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
         is_online: false,
       });
       try {
-        const url = `${import.meta.env.VITE_SUPABASE_URL}/rest/v1/positions?on_conflict=user_id`;
+        // PK é (workspace_id, user_id), então o on_conflict precisa carregar
+        // ambas as colunas; sem isto o upsert keepalive era rejeitado e o
+        // is_online ficava `true` no DB depois do app fechar.
+        const url = `${import.meta.env.VITE_SUPABASE_URL}/rest/v1/positions?on_conflict=workspace_id,user_id`;
         const token = accessTokenRef.current;
         const headers = {
           "Content-Type": "application/json",
@@ -1108,17 +1114,17 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
         });
       } catch { /* noop */ }
       // Also fire a normal async upsert as a backup (works if the page isn't fully torn down yet)
-      const _wsOff = getCurrentWorkspaceId();
-      if (_wsOff) void supabase.from("positions").upsert({
-        workspace_id: _wsOff,
+      void supabase.from("positions").upsert({
+        workspace_id: ws,
         user_id: uid,
         x: cur.x,
         y: cur.y,
         zone: z,
         facing: facingRef.current,
         is_online: false,
-      });
+      }, { onConflict: "workspace_id,user_id" });
     };
+
     const onPageHide = () => persistFinalPosition();
     const onVisibilityHidden = () => {
       if (document.visibilityState === "hidden") persistFinalPosition();
