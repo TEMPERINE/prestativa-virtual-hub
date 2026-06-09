@@ -980,15 +980,16 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
 
     presenceCh.on("presence", { event: "join" }, ({ newPresences }) => mergePresence(newPresences));
     presenceCh.on("presence", { event: "leave" }, ({ leftPresences }) => {
+      // Não esconda imediatamente no leave: o realtime pode emitir leave/join
+      // durante re-track, reconexão ou troca de foco. O reconcilePresence aplica
+      // a carência antes de marcar offline, evitando piscar ao andar.
+      const now = Date.now();
       const arr = leftPresences as unknown as PresenceState[];
       for (const s of arr ?? []) {
         if (!s?.user_id || s.user_id === meIdRef.current) continue;
-        setPositions((p) => {
-          const cur = p[s.user_id];
-          if (!cur) return p;
-          return { ...p, [s.user_id]: { ...cur, is_online: false } };
-        });
+        if (!presenceMissingSince.has(s.user_id)) presenceMissingSince.set(s.user_id, now);
       }
+      reconcilePresence();
     });
 
     const claimsCh = supabase
@@ -1169,22 +1170,34 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
       for (const list of Object.values(presenceState)) {
         for (const s of list) if (s?.user_id) presenceOnlineIds.add(s.user_id);
       }
+      const now = Date.now();
       setPositions((prev) => {
         const next: Record<string, RemotePos> = { ...prev };
         (data as Array<RemotePos & { updated_at?: string }>).forEach((p) => {
           if (uid && p.user_id === uid) return; // handled below
           const dbTs = p.updated_at ? Date.parse(p.updated_at) : 0;
           const freshTs = positionFreshTs.current.get(p.user_id) ?? 0;
-          // Online efetivo = DB diz online E peer está em presence (após o
-          // grace period inicial). Antes do grace, confiamos no DB.
-          const effectiveOnline = presenceReconcileReady
-            ? (p.is_online && presenceOnlineIds.has(p.user_id))
-            : p.is_online;
+          const cur = prev[p.user_id];
+          // Online efetivo: DB false derruba; DB true + absence temporária de
+          // presence mantém o avatar por alguns segundos. Sem isso o poll de DB
+          // escondia o colega em qualquer blip de websocket/presence.
+          let effectiveOnline = p.is_online;
+          if (p.is_online && presenceReconcileReady) {
+            if (presenceOnlineIds.has(p.user_id)) {
+              presenceMissingSince.delete(p.user_id);
+              effectiveOnline = true;
+            } else if (cur?.is_online) {
+              const since = presenceMissingSince.get(p.user_id) ?? now;
+              presenceMissingSince.set(p.user_id, since);
+              effectiveOnline = now - since < PRESENCE_OFFLINE_GRACE_MS;
+            } else {
+              effectiveOnline = false;
+            }
+          }
           if (effectiveOnline) maybeStartRemoteTeleportFromCurrent(p.user_id, { x: p.x, y: p.y }, dbTs || Date.now());
           // Strict LWW: DB rows older than the freshest known live sample are
           // never allowed to move a stopped avatar back to a spawn/old spot.
           if (dbTs && dbTs < freshTs) {
-            const cur = prev[p.user_id];
             if (cur) next[p.user_id] = { ...cur, is_online: effectiveOnline };
             else next[p.user_id] = { ...p, is_online: effectiveOnline };
           } else {
