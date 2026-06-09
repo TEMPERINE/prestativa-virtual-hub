@@ -81,7 +81,7 @@ function AdminEspacosPage() {
   };
 
   const rename = async (ws: Ws) => {
-    const newName = prompt("Novo nome:", ws.name);
+    const newName = await appPrompt({ title: "Renomear espaço", defaultValue: ws.name, placeholder: "Novo nome" });
     if (!newName || newName === ws.name) return;
     try {
       await updateFn({ data: { id: ws.id, name: newName } });
