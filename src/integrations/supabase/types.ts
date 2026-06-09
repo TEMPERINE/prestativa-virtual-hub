@@ -565,6 +565,56 @@ export type Database = {
         }
         Relationships: []
       }
+      sprite_skins: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          dims: Json
+          gender: string
+          id: string
+          label: string
+          mirror_left_from_right: boolean
+          mirror_right_from_left: boolean
+          sheets: Json
+          updated_at: string
+          workspace_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          dims: Json
+          gender?: string
+          id: string
+          label: string
+          mirror_left_from_right?: boolean
+          mirror_right_from_left?: boolean
+          sheets: Json
+          updated_at?: string
+          workspace_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          dims?: Json
+          gender?: string
+          id?: string
+          label?: string
+          mirror_left_from_right?: boolean
+          mirror_right_from_left?: boolean
+          sheets?: Json
+          updated_at?: string
+          workspace_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sprite_skins_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           id: string
