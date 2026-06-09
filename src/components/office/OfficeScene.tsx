@@ -2994,13 +2994,15 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
             <IconButton active={showTeam} onClick={() => setShowTeam(!showTeam)} title="Equipe">
               <Users className="w-4 h-4" />
             </IconButton>
-            <Link
-              to="/office/editor"
-              title="Editor de mapa"
-              className="inline-flex items-center justify-center w-8 h-8 rounded-md text-foreground/70 hover:text-foreground hover:bg-foreground/10 transition"
-            >
-              <Pencil className="w-4 h-4" />
-            </Link>
+            {isMaster && (
+              <Link
+                to="/office/editor"
+                title="Editor de mapa"
+                className="inline-flex items-center justify-center w-8 h-8 rounded-md text-foreground/70 hover:text-foreground hover:bg-foreground/10 transition"
+              >
+                <Pencil className="w-4 h-4" />
+              </Link>
+            )}
             {me && (
               <ProfileMenu
                 me={me}
