@@ -118,7 +118,6 @@ const POSITION_PRESENCE_CHANNEL = "positions-presence-v1";
 const timestampForPosition = (p: Partial<Pick<RemotePos, "updated_at" | "ts">>) =>
   p.ts ?? (p.updated_at ? Date.parse(p.updated_at) : 0);
 
-const distanceBetween = (a: Point, b: Point) => Math.hypot(a.x - b.x, a.y - b.y);
 const validPoint = (p: Point | undefined): p is Point =>
   !!p && Number.isFinite(p.x) && Number.isFinite(p.y);
 const LAST_POSITION_KEY_PREFIX = "office:last-position:v1:";
@@ -787,7 +786,6 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
         (payload) => {
           const row = (payload.new ?? payload.old) as RemotePos & { updated_at?: string };
           if (!row) return;
-          const rowTs = timestampForPosition(row) || Date.now();
           setPositions((prev) => {
             const next = { ...prev };
             if (payload.eventType === "DELETE") {
