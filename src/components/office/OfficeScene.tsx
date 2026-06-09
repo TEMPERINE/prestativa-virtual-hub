@@ -652,6 +652,13 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
       if (!userData.user) { try { onHydrated?.(); } catch { /* noop */ } return; }
       meIdRef.current = userData.user.id;
       setMyEmail(userData.user.email ?? "");
+      void supabase
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", userData.user.id)
+        .then(({ data }) => {
+          setIsMaster((data ?? []).some((r: any) => r.role === "master"));
+        });
 
       // Workspace ativo deste OfficeScene. Tudo (positions, claims, notes,
       // realtime, broadcast) é escopado por ele — espaços são independentes
