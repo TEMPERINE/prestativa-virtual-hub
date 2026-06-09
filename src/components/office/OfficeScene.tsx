@@ -812,7 +812,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
             if (dbTs && dbTs < freshTs) {
               const cur = prev[row.user_id];
               if (cur) {
-                next[row.user_id] = { ...cur, is_online: row.is_online };
+                next[row.user_id] = { ...cur, is_online: row.is_online || cur.is_online };
                 return next;
               }
             }
