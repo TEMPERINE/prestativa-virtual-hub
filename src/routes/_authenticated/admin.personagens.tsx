@@ -226,17 +226,42 @@ function AdminPersonagensPage() {
           </div>
 
           <div>
-            <label className="block text-xs font-medium mb-1.5">Folha-fonte (PNG, 4×6)</label>
-            <input
-              type="file"
-              accept="image/png"
-              onChange={(e) => {
-                const f = e.target.files?.[0] ?? null;
-                setSourceFile(f);
-                setOutputs(null);
-              }}
-              className="w-full text-xs"
-            />
+            <div className="flex gap-2 mb-2">
+              <button
+                type="button"
+                onClick={() => { setMode("sheet"); setSourceFile(null); setOutputs(null); }}
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium ${mode === "sheet" ? "bg-foreground text-background" : "bg-muted text-foreground"}`}
+              >
+                Subir folha pronta (4×6)
+              </button>
+              <button
+                type="button"
+                onClick={() => { setMode("ai"); setSourceFile(null); setOutputs(null); }}
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium ${mode === "ai" ? "bg-foreground text-background" : "bg-muted text-foreground"}`}
+              >
+                Gerar com IA (4 fotos)
+              </button>
+            </div>
+
+            {mode === "sheet" && (
+              <>
+                <label className="block text-xs font-medium mb-1.5">Folha-fonte (PNG, 4×6)</label>
+                <input
+                  type="file"
+                  accept="image/png"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0] ?? null;
+                    setSourceFile(f);
+                    setOutputs(null);
+                  }}
+                  className="w-full text-xs"
+                />
+              </>
+            )}
+
+            {mode === "ai" && !sourceFile && (
+              <AiWalkComposer onSheetReady={(f) => { setSourceFile(f); setOutputs(null); }} />
+            )}
           </div>
 
           {sourceFile && (
