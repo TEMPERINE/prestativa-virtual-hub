@@ -335,8 +335,8 @@ export function MapEditor() {
   }, []);
 
   const removeCustomZone = useCallback(
-    (id: string) => {
-      if (!confirm("Remover esta zona e apagar suas células pintadas?")) return;
+    async (id: string) => {
+      if (!(await appConfirm({ title: "Remover esta zona?", description: "As células pintadas dela serão apagadas.", confirmLabel: "Remover", destructive: true }))) return;
       setOverrides((prev) => {
         const next: MapOverrides = {
           ...prev,
