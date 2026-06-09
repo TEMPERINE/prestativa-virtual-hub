@@ -788,7 +788,6 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
           const row = (payload.new ?? payload.old) as RemotePos & { updated_at?: string };
           if (!row) return;
           const rowTs = timestampForPosition(row) || Date.now();
-          if (row.is_online) maybeStartRemoteTeleportFromCurrent(row.user_id, { x: row.x, y: row.y }, rowTs);
           setPositions((prev) => {
             const next = { ...prev };
             if (payload.eventType === "DELETE") {
@@ -837,7 +836,6 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
         const row = payload.payload as RemotePos;
         if (!row?.user_id) return;
         const incomingTs = timestampForPosition(row) || Date.now();
-        maybeStartRemoteTeleportFromCurrent(row.user_id, { x: row.x, y: row.y }, incomingTs);
         setPositions((prev) => {
           const curTs = timestampForPosition(prev[row.user_id] ?? {}) || (positionFreshTs.current.get(row.user_id) ?? 0);
           if (incomingTs < curTs) return prev;
@@ -894,7 +892,6 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
         const prev = presenceLastTs.get(s.user_id) ?? 0;
         if (s.ts <= prev) continue;
         presenceLastTs.set(s.user_id, s.ts);
-        maybeStartRemoteTeleportFromCurrent(s.user_id, { x: s.x, y: s.y }, s.ts);
         setPositions((p) => {
           const cur = p[s.user_id];
           // Presence heartbeat is hydration-guarded (never advertises SPAWN),
@@ -1182,7 +1179,6 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
               effectiveOnline = false;
             }
           }
-          if (effectiveOnline) maybeStartRemoteTeleportFromCurrent(p.user_id, { x: p.x, y: p.y }, dbTs || Date.now());
           // Strict LWW: DB rows older than the freshest known live sample are
           // never allowed to move a stopped avatar back to a spawn/old spot.
           if (dbTs && dbTs < freshTs) {
