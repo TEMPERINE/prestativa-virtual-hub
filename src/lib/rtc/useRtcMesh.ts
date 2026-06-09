@@ -542,14 +542,39 @@ export function useRtcMesh(myId: string | null, desiredPeers: string[]): RtcMesh
     });
 
     if (!analysers.length) return;
+    // Limiar acima do ruído de sala + hangover: o balão só aparece quando o
+    // nível de áudio cruza ON_THRESHOLD por pelo menos ATTACK_MS, e só some
+    // depois de cair abaixo de OFF_THRESHOLD por RELEASE_MS. Sem isso o balão
+    // piscava por causa de ruído ambiente assim que o mic abria.
+    const ON_THRESHOLD = 28;
+    const OFF_THRESHOLD = 18;
+    const ATTACK_MS = 120;
+    const RELEASE_MS = 450;
+    const state = new Map<string, { speaking: boolean; aboveSince: number; belowSince: number }>();
     let raf = 0;
     const tick = () => {
+      const now = performance.now();
       const next: Record<string, boolean> = {};
       for (const a of analysers) {
         a.analyser.getByteFrequencyData(a.data);
         let sum = 0;
         for (let i = 0; i < a.data.length; i++) sum += a.data[i];
-        next[a.peerId] = sum / a.data.length > 12;
+        const level = sum / a.data.length;
+        let s = state.get(a.peerId);
+        if (!s) { s = { speaking: false, aboveSince: 0, belowSince: now }; state.set(a.peerId, s); }
+        if (level >= ON_THRESHOLD) {
+          if (!s.aboveSince) s.aboveSince = now;
+          s.belowSince = 0;
+          if (!s.speaking && now - s.aboveSince >= ATTACK_MS) s.speaking = true;
+        } else if (level <= OFF_THRESHOLD) {
+          if (!s.belowSince) s.belowSince = now;
+          s.aboveSince = 0;
+          if (s.speaking && now - s.belowSince >= RELEASE_MS) s.speaking = false;
+        } else {
+          // banda morta — mantém o estado, mas reseta cronômetros opostos
+          if (s.speaking) s.aboveSince = 0; else s.belowSince = 0;
+        }
+        next[a.peerId] = s.speaking;
       }
       setSpeakingPeers((prev) => {
         const keys = new Set([...Object.keys(prev), ...Object.keys(next)]);
@@ -564,6 +589,7 @@ export function useRtcMesh(myId: string | null, desiredPeers: string[]): RtcMesh
       try { void ctxRef.ctx?.close(); } catch { /* noop */ }
     };
   }, [remoteStreams]);
+
 
   // Self speaking detection (analyse local mic level only when mic is on).
   useEffect(() => {
