@@ -694,6 +694,12 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
       });
       setClaims(cmap);
 
+      // Garante que os overrides do mapa (rects e spawn points custom) estejam
+      // carregados do cloud ANTES de calcular o ponto de spawn. Sem isto,
+      // zonas customizadas caem em SPAWN porque zoneRectFromOverrides/
+      // spawnPointForZone leem do localStorage ainda vazio.
+      try { await pullOverridesFromCloud(); } catch { /* noop */ }
+
       // Ao entrar no workspace, o personagem sempre nasce no spawn point da
       // sua cadeira reivindicada (posição frontal). Quem não tem cadeira cai
       // num ponto aleatório do corredor. Não preservamos posição anterior:
@@ -702,13 +708,16 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
       let startPoint: Point;
       if (myClaimZone) {
         const z = findZoneById(myClaimZone);
-        const sp = spawnPointForZone(myClaimZone);
         const rect = zoneRectFromOverrides(myClaimZone as ZoneId) ?? z?.rect ?? null;
+        const sp = spawnPointForZone(myClaimZone);
+        // Preferimos o spawn point frontal explícito; se não houver, usamos
+        // o ponto frontal calculado do rect da cadeira.
         startPoint = sp ?? (rect ? seatPointForRect(rect) : SPAWN);
       } else {
         startPoint = randomCorridorPoint();
       }
       const safeStart = collides(startPoint) ? SPAWN : startPoint;
+
       posRef.current = safeStart;
       setPos(safeStart);
       const startZone = zoneAt(safeStart).id;
