@@ -694,53 +694,54 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
       });
       setClaims(cmap);
 
-      // Garante que os overrides do mapa (rects e spawn points custom) estejam
-      // carregados do cloud ANTES de calcular o ponto de spawn. Sem isto,
-      // zonas customizadas caem em SPAWN porque zoneRectFromOverrides/
-      // spawnPointForZone leem do localStorage ainda vazio.
-      try { await pullOverridesFromCloud(); } catch { /* noop */ }
-
-      // Ao entrar no workspace, o personagem sempre nasce no spawn point da
-      // sua cadeira reivindicada (posição frontal). Quem não tem cadeira cai
-      // num ponto aleatório do corredor. Não preservamos posição anterior:
-      // entrar no escritório é como spawnar num mundo de jogo.
+      // Preserve the last known position on refresh — never snap an existing
+      // user back to a spawn point. Only first-time entry uses spawn logic.
       const myClaimZone = Object.entries(cmap).find(([, uid]) => uid === userData.user!.id)?.[0];
+      const localSaved = readLocalSavedPosition(userData.user.id);
       let startPoint: Point;
-      if (myClaimZone) {
+      const existing = pmap[userData.user.id];
+      const hasSavedPos = existing && typeof existing.x === "number" && typeof existing.y === "number";
+      const dbTs = timestampForPosition(existing ?? {});
+      const dbLooksLikeSpawn = hasSavedPos && existing.x === SPAWN.x && existing.y === SPAWN.y;
+      const localLooksLikeSpawn = !!localSaved && localSaved.x === SPAWN.x && localSaved.y === SPAWN.y;
+      // ESTRITAMENTE o mais novo vence — não dá pra dar grace window pro
+      // localStorage, porque se a última escrita local falhou silenciosamente
+      // (cota cheia, modo anônimo, aba congelada), o valor antigo "ganharia"
+      // do DB recente e o avatar voltaria pro penúltimo ponto. Em empate
+      // perfeito o localStorage decide só pra estabilizar o tie-break.
+      const localTs = localSaved?.ts ?? 0;
+      const localWins =
+        !!localSaved && (
+          !hasSavedPos ||
+          (dbLooksLikeSpawn && !localLooksLikeSpawn) ||
+          localTs > dbTs
+        );
+      if (localWins) {
+        // The browser copy is written on every movement/unload before the DB
+        // roundtrip finishes, so on hard refresh it is the safest resume point.
+        startPoint = { x: localSaved.x, y: localSaved.y };
+      } else if (hasSavedPos) {
+        // Current DB/presence position is authoritative for returning users.
+        // Do not collision-correct it here: map overrides can still be loading,
+        // and "fixing" it would clobber the live position with a spawn point.
+        startPoint = { x: existing.x, y: existing.y };
+      } else if (myClaimZone) {
+        // First entry with a claim → spawn at the workstation seat.
         const z = findZoneById(myClaimZone);
-        const rect = zoneRectFromOverrides(myClaimZone as ZoneId) ?? z?.rect ?? null;
         const sp = spawnPointForZone(myClaimZone);
-        // Preferimos o spawn point frontal explícito; se houver mas colidir
-        // (móvel adicionado por cima depois), caímos pro seat point do rect.
-        if (sp && !collides(sp)) {
-          startPoint = sp;
-        } else if (rect) {
-          startPoint = seatPointForRect(rect);
-        } else {
-          startPoint = randomCorridorPoint();
-        }
+        const rect = zoneRectFromOverrides(myClaimZone as ZoneId) ?? z?.rect ?? null;
+        startPoint = sp ?? (rect ? seatPointForRect(rect) : SPAWN);
       } else {
+        // First time in: drop somewhere random in the corridors so people
+        // don't all pile on top of each other at the default spawn.
         startPoint = randomCorridorPoint();
       }
-      // Last-resort: se ainda colide, anda até achar livre em vez de teleportar pro SPAWN longe da cadeira.
-      let safeStart = startPoint;
-      if (collides(safeStart)) {
-        let found = false;
-        for (let r = 0.01; r <= 0.2 && !found; r += 0.01) {
-          for (const [dx, dy] of [[0, r], [0, -r], [r, 0], [-r, 0], [r, r], [-r, r], [r, -r], [-r, -r]] as const) {
-            const p = { x: startPoint.x + dx, y: startPoint.y + dy };
-            if (!collides(p)) { safeStart = p; found = true; break; }
-          }
-        }
-        if (!found) safeStart = SPAWN;
-      }
-
-
+      const safeStart = hasSavedPos ? startPoint : (collides(startPoint) ? SPAWN : startPoint);
       posRef.current = safeStart;
       setPos(safeStart);
       const startZone = zoneAt(safeStart).id;
       setZone(startZone);
-      const startFacing: Facing = "down";
+      const startFacing = (localWins ? localSaved?.facing : undefined) ?? (existing?.facing as Facing | undefined) ?? facingRef.current;
       facingRef.current = startFacing;
       setFacing(startFacing);
       positionHydratedRef.current = true;
@@ -952,14 +953,8 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
     presenceCh.on("presence", { event: "sync" }, () => {
       const state = presenceCh.presenceState() as Record<string, PresenceState[]>;
       for (const list of Object.values(state)) mergePresence(list);
-      // A primeira sync já carrega o roster real do canal — a partir daí a
-      // presence vira a fonte da verdade pra "quem está no espaço". Sem
-      // ativar imediatamente, ficávamos 3s confiando no DB e peers fantasmas
-      // (apps fechados sem aviso) continuavam visíveis nesse intervalo.
-      presenceReconcileReady = true;
       reconcilePresence();
     });
-
     presenceCh.on("presence", { event: "join" }, ({ newPresences }) => mergePresence(newPresences));
     presenceCh.on("presence", { event: "leave" }, ({ leftPresences }) => {
       const arr = leftPresences as unknown as PresenceState[];
@@ -1015,10 +1010,13 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
             zone: zoneAt(cur).id, facing: facingRef.current, ts: Date.now(),
           });
         } catch { /* noop */ }
+        // Give peers ~8s to track themselves before we start reconciling.
+        window.setTimeout(() => {
+          presenceReconcileReady = true;
+          reconcilePresence();
+        }, 8000);
       });
-
     })();
-
 
     // Heartbeat presence every second so peers detect each other within 1s of
     // joining and the "frozen avatar" symptom can't happen even if both
@@ -1032,14 +1030,6 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
         zone: zoneAt(cur).id, facing: facingRef.current, ts: Date.now(),
       }).catch(() => { /* noop */ });
     }, 1000);
-
-    // Reconcile periódico: peers que fecharam o app sem disparar
-    // beforeunload/pagehide ficam com is_online=true no DB. A reconciliação
-    // baseada em presence é a fonte da verdade.
-    const reconcileInterval = window.setInterval(() => {
-      reconcilePresence();
-    }, 5000);
-
 
     // Reconnection + resync watchdog: when the tab regains focus (or the
     // browser wakes from sleep), force a position sync, re-track presence
@@ -1084,11 +1074,8 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
       if (!uid || !positionHydratedRef.current) return;
       const cur = posRef.current;
       const z = zoneAt(cur).id;
-      const ws = getCurrentWorkspaceId();
-      if (!ws) return;
       writeLocalSavedPosition(uid, cur, z, facingRef.current);
       const body = JSON.stringify({
-        workspace_id: ws,
         user_id: uid,
         x: cur.x,
         y: cur.y,
@@ -1097,10 +1084,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
         is_online: false,
       });
       try {
-        // PK é (workspace_id, user_id), então o on_conflict precisa carregar
-        // ambas as colunas; sem isto o upsert keepalive era rejeitado e o
-        // is_online ficava `true` no DB depois do app fechar.
-        const url = `${import.meta.env.VITE_SUPABASE_URL}/rest/v1/positions?on_conflict=workspace_id,user_id`;
+        const url = `${import.meta.env.VITE_SUPABASE_URL}/rest/v1/positions?on_conflict=user_id`;
         const token = accessTokenRef.current;
         const headers = {
           "Content-Type": "application/json",
@@ -1114,17 +1098,17 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
         });
       } catch { /* noop */ }
       // Also fire a normal async upsert as a backup (works if the page isn't fully torn down yet)
-      void supabase.from("positions").upsert({
-        workspace_id: ws,
+      const _wsOff = getCurrentWorkspaceId();
+      if (_wsOff) void supabase.from("positions").upsert({
+        workspace_id: _wsOff,
         user_id: uid,
         x: cur.x,
         y: cur.y,
         zone: z,
         facing: facingRef.current,
         is_online: false,
-      }, { onConflict: "workspace_id,user_id" });
+      });
     };
-
     const onPageHide = () => persistFinalPosition();
     const onVisibilityHidden = () => {
       if (document.visibilityState === "hidden") persistFinalPosition();
@@ -1140,39 +1124,24 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
       const { data } = await q;
       if (!data) return;
       const uid = meIdRef.current;
-      // Presence é a fonte da verdade para "quem está no mundo agora". O
-      // is_online do DB pode mentir (app fechado bruscamente sem disparar
-      // pagehide/beforeunload), então só consideramos um peer online se ele
-      // também aparece em presence.
-      const presenceState = presenceCh.presenceState() as Record<string, PresenceState[]>;
-      const presenceOnlineIds = new Set<string>();
-      for (const list of Object.values(presenceState)) {
-        for (const s of list) if (s?.user_id) presenceOnlineIds.add(s.user_id);
-      }
       setPositions((prev) => {
         const next: Record<string, RemotePos> = { ...prev };
         (data as Array<RemotePos & { updated_at?: string }>).forEach((p) => {
           if (uid && p.user_id === uid) return; // handled below
           const dbTs = p.updated_at ? Date.parse(p.updated_at) : 0;
           const freshTs = positionFreshTs.current.get(p.user_id) ?? 0;
-          // Online efetivo = DB diz online E peer está em presence (após o
-          // grace period inicial). Antes do grace, confiamos no DB.
-          const effectiveOnline = presenceReconcileReady
-            ? (p.is_online && presenceOnlineIds.has(p.user_id))
-            : p.is_online;
-          if (effectiveOnline) maybeStartRemoteTeleportFromCurrent(p.user_id, { x: p.x, y: p.y }, dbTs || Date.now());
+          if (p.is_online) maybeStartRemoteTeleportFromCurrent(p.user_id, { x: p.x, y: p.y }, dbTs || Date.now());
           // Strict LWW: DB rows older than the freshest known live sample are
           // never allowed to move a stopped avatar back to a spawn/old spot.
           if (dbTs && dbTs < freshTs) {
             const cur = prev[p.user_id];
-            if (cur) next[p.user_id] = { ...cur, is_online: effectiveOnline };
-            else next[p.user_id] = { ...p, is_online: effectiveOnline };
+            if (cur) next[p.user_id] = { ...cur, is_online: p.is_online };
+            else next[p.user_id] = p;
           } else {
             if (dbTs) positionFreshTs.current.set(p.user_id, dbTs);
-            next[p.user_id] = { ...p, is_online: effectiveOnline };
+            next[p.user_id] = p;
           }
         });
-
         if (uid) {
           const cur = posRef.current;
           const curZone = zoneAt(cur).id;
@@ -1269,8 +1238,6 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
       positionBroadcastReadyRef.current = false;
       window.clearInterval(positionsPoll);
       window.clearInterval(presenceHeartbeat);
-      window.clearInterval(reconcileInterval);
-
       window.clearInterval(persistHeartbeat);
       window.removeEventListener("beforeunload", persistFinalPosition);
       window.removeEventListener("pagehide", onPageHide);
