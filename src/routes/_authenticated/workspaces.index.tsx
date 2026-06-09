@@ -37,7 +37,7 @@ function WorkspacesHubPage() {
   const [profile, setProfile] = useState<{ display_name: string; plan: AccountPlan } | null>(null);
   const [workspaces, setWorkspaces] = useState<WorkspaceCard[]>([]);
   const [invites, setInvites] = useState<InviteRow[]>([]);
-  const [isMaster, setIsMaster] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [busyToken, setBusyToken] = useState<string | null>(null);
 
   const load = async () => {
@@ -64,7 +64,7 @@ function WorkspacesHubPage() {
       .from("user_roles")
       .select("role")
       .eq("user_id", u.user.id);
-    setIsMaster((roles ?? []).some((r: any) => r.role === "master"));
+    setIsAdmin((roles ?? []).some((r: any) => r.role === "admin"));
 
     const { data: mems } = await supabase
       .from("workspace_members")
@@ -182,16 +182,14 @@ function WorkspacesHubPage() {
               Escolha um espaço para entrar. Cada espaço tem seu próprio mapa, equipe e reuniões.
             </p>
           </div>
-          {isMaster && (
+          {isAdmin && (
             <Link
               to="/admin"
               className="px-4 py-2 rounded-lg gradient-primary text-primary-foreground text-sm font-medium inline-flex items-center gap-2 hover:opacity-90 shadow-glow"
-              title="Acesso restrito ao Master"
             >
-              <Plus size={14} /> Construtor
+              <Plus size={14} /> Painel Admin
             </Link>
           )}
-
         </div>
 
         {invites.length > 0 && (

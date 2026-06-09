@@ -114,10 +114,12 @@ const MAX_STEP_FACTOR = 3;       // evita pulos enormes quando a aba volta do ba
 const SEND_INTERVAL_MS = 120;
 const POSITION_BROADCAST_CHANNEL = "positions-broadcast-v1";
 const POSITION_PRESENCE_CHANNEL = "positions-presence-v1";
+const REMOTE_TELEPORT_MIN_DISTANCE = 0.075;
 
 const timestampForPosition = (p: Partial<Pick<RemotePos, "updated_at" | "ts">>) =>
   p.ts ?? (p.updated_at ? Date.parse(p.updated_at) : 0);
 
+const distanceBetween = (a: Point, b: Point) => Math.hypot(a.x - b.x, a.y - b.y);
 const validPoint = (p: Point | undefined): p is Point =>
   !!p && Number.isFinite(p.x) && Number.isFinite(p.y);
 const LAST_POSITION_KEY_PREFIX = "office:last-position:v1:";
@@ -265,6 +267,17 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
     );
     remoteTeleportTimers.current.set(userId, timers);
   }, []);
+  const maybeStartRemoteTeleportFromCurrent = useCallback((userId: string, to: Point, incomingTs: number) => {
+    if (!userId || userId === meIdRef.current || !validPoint(to)) return;
+    if (remoteTeleportTimers.current.has(userId)) return;
+    const cur = positionsRef.current[userId];
+    if (!cur || !validPoint(cur)) return;
+    const curTs = timestampForPosition(cur) || (positionFreshTs.current.get(userId) ?? 0);
+    if (incomingTs && curTs && incomingTs < curTs) return;
+    const from = { x: cur.x, y: cur.y };
+    if (distanceBetween(from, to) < REMOTE_TELEPORT_MIN_DISTANCE) return;
+    startRemoteTeleport(userId, from, to);
+  }, [startRemoteTeleport]);
   // Per-remote-user walking animation state. Advances frame while position is changing.
   const remoteAnimRef = useRef<Map<string, { frame: number; lastMove: number; lastX: number; lastY: number; lastTick: number }>>(new Map());
   const [remoteFrames, setRemoteFrames] = useState<Record<string, number>>({});
@@ -289,7 +302,6 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
   const meIdRef = useRef<string | null>(null);
   const accessTokenRef = useRef<string | null>(null);
   const [myEmail, setMyEmail] = useState<string>("");
-  const [isMaster, setIsMaster] = useState(false);
   const [editCharOpen, setEditCharOpen] = useState(false);
   const [editProfOpen, setEditProfOpen] = useState(false);
   const [forceOnboarding, setForceOnboarding] = useState(false);
@@ -639,13 +651,6 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
       if (!userData.user) { try { onHydrated?.(); } catch { /* noop */ } return; }
       meIdRef.current = userData.user.id;
       setMyEmail(userData.user.email ?? "");
-      void supabase
-        .from("user_roles")
-        .select("role")
-        .eq("user_id", userData.user.id)
-        .then(({ data }) => {
-          setIsMaster((data ?? []).some((r: any) => r.role === "master"));
-        });
 
       // Workspace ativo deste OfficeScene. Tudo (positions, claims, notes,
       // realtime, broadcast) é escopado por ele — espaços são independentes
@@ -786,6 +791,8 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
         (payload) => {
           const row = (payload.new ?? payload.old) as RemotePos & { updated_at?: string };
           if (!row) return;
+          const rowTs = timestampForPosition(row) || Date.now();
+          if (row.is_online) maybeStartRemoteTeleportFromCurrent(row.user_id, { x: row.x, y: row.y }, rowTs);
           setPositions((prev) => {
             const next = { ...prev };
             if (payload.eventType === "DELETE") {
@@ -797,7 +804,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
             if (dbTs && dbTs < freshTs) {
               const cur = prev[row.user_id];
               if (cur) {
-                next[row.user_id] = { ...cur, is_online: row.is_online || cur.is_online };
+                next[row.user_id] = { ...cur, is_online: row.is_online };
                 return next;
               }
             }
@@ -834,6 +841,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
         const row = payload.payload as RemotePos;
         if (!row?.user_id) return;
         const incomingTs = timestampForPosition(row) || Date.now();
+        maybeStartRemoteTeleportFromCurrent(row.user_id, { x: row.x, y: row.y }, incomingTs);
         setPositions((prev) => {
           const curTs = timestampForPosition(prev[row.user_id] ?? {}) || (positionFreshTs.current.get(row.user_id) ?? 0);
           if (incomingTs < curTs) return prev;
@@ -890,6 +898,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
         const prev = presenceLastTs.get(s.user_id) ?? 0;
         if (s.ts <= prev) continue;
         presenceLastTs.set(s.user_id, s.ts);
+        maybeStartRemoteTeleportFromCurrent(s.user_id, { x: s.x, y: s.y }, s.ts);
         setPositions((p) => {
           const cur = p[s.user_id];
           // Presence heartbeat is hydration-guarded (never advertises SPAWN),
@@ -919,11 +928,6 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
     // reconcile: any peer in our positions map that is NOT in the presence
     // state is treated as offline locally.
     let presenceReconcileReady = false;
-    // Peers ausentes do roster precisam ficar fora por N ms consecutivos
-    // antes de virarem offline — presence tem "blips" entre untrack/track
-    // do heartbeat e sem essa carência o avatar piscava (sumia e voltava).
-    const PRESENCE_OFFLINE_GRACE_MS = 4000;
-    const presenceMissingSince = new Map<string, number>();
     const reconcilePresence = () => {
       if (!presenceReconcileReady) return;
       const state = presenceCh.presenceState() as Record<string, PresenceState[]>;
@@ -932,19 +936,15 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
         for (const s of list) if (s?.user_id) onlineIds.add(s.user_id);
       }
       const myId = meIdRef.current;
-      const now = Date.now();
       setPositions((p) => {
         let changed = false;
         const next = { ...p };
         for (const [uid, cur] of Object.entries(p)) {
           if (uid === myId) continue;
-          if (onlineIds.has(uid)) { presenceMissingSince.delete(uid); continue; }
-          if (!cur.is_online) continue;
-          const since = presenceMissingSince.get(uid);
-          if (since === undefined) { presenceMissingSince.set(uid, now); continue; }
-          if (now - since < PRESENCE_OFFLINE_GRACE_MS) continue;
-          next[uid] = { ...cur, is_online: false };
-          changed = true;
+          if (cur.is_online && !onlineIds.has(uid)) {
+            next[uid] = { ...cur, is_online: false };
+            changed = true;
+          }
         }
         return changed ? next : p;
       });
@@ -952,27 +952,25 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
     presenceCh.on("presence", { event: "sync" }, () => {
       const state = presenceCh.presenceState() as Record<string, PresenceState[]>;
       for (const list of Object.values(state)) mergePresence(list);
-      // Espera 3s após a primeira sync pra dar tempo dos peers chamarem
-      // track() após o subscribe. Reconciliações seguintes rodam na hora.
-      if (!presenceReconcileReady) {
-        window.setTimeout(() => { presenceReconcileReady = true; reconcilePresence(); }, 3000);
-      } else {
-        reconcilePresence();
-      }
+      // A primeira sync já carrega o roster real do canal — a partir daí a
+      // presence vira a fonte da verdade pra "quem está no espaço". Sem
+      // ativar imediatamente, ficávamos 3s confiando no DB e peers fantasmas
+      // (apps fechados sem aviso) continuavam visíveis nesse intervalo.
+      presenceReconcileReady = true;
+      reconcilePresence();
     });
 
     presenceCh.on("presence", { event: "join" }, ({ newPresences }) => mergePresence(newPresences));
     presenceCh.on("presence", { event: "leave" }, ({ leftPresences }) => {
-      // Não esconda imediatamente no leave: o realtime pode emitir leave/join
-      // durante re-track, reconexão ou troca de foco. O reconcilePresence aplica
-      // a carência antes de marcar offline, evitando piscar ao andar.
-      const now = Date.now();
       const arr = leftPresences as unknown as PresenceState[];
       for (const s of arr ?? []) {
         if (!s?.user_id || s.user_id === meIdRef.current) continue;
-        if (!presenceMissingSince.has(s.user_id)) presenceMissingSince.set(s.user_id, now);
+        setPositions((p) => {
+          const cur = p[s.user_id];
+          if (!cur) return p;
+          return { ...p, [s.user_id]: { ...cur, is_online: false } };
+        });
       }
-      reconcilePresence();
     });
 
     const claimsCh = supabase
@@ -1128,14 +1126,12 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
     };
 
     const onPageHide = () => persistFinalPosition();
-    // IMPORTANTE: NÃO ouvir `visibilitychange` para marcar offline. Alt-tab,
-    // foco em devtools, minimizar janela, etc. disparam `hidden` sem que o
-    // usuário tenha saído do espaço — escrevíamos is_online=false no DB e os
-    // outros peers viam o avatar piscar/sumir. "Sair do espaço" só vale
-    // para fechar app/aba (pagehide/beforeunload) ou desmontar a cena.
+    const onVisibilityHidden = () => {
+      if (document.visibilityState === "hidden") persistFinalPosition();
+    };
     window.addEventListener("beforeunload", persistFinalPosition);
     window.addEventListener("pagehide", onPageHide);
-
+    document.addEventListener("visibilitychange", onVisibilityHidden);
 
 
     const syncPositions = async () => {
@@ -1153,33 +1149,22 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
       for (const list of Object.values(presenceState)) {
         for (const s of list) if (s?.user_id) presenceOnlineIds.add(s.user_id);
       }
-      const now = Date.now();
       setPositions((prev) => {
         const next: Record<string, RemotePos> = { ...prev };
         (data as Array<RemotePos & { updated_at?: string }>).forEach((p) => {
           if (uid && p.user_id === uid) return; // handled below
           const dbTs = p.updated_at ? Date.parse(p.updated_at) : 0;
           const freshTs = positionFreshTs.current.get(p.user_id) ?? 0;
-          const cur = prev[p.user_id];
-          // Online efetivo: DB false derruba; DB true + absence temporária de
-          // presence mantém o avatar por alguns segundos. Sem isso o poll de DB
-          // escondia o colega em qualquer blip de websocket/presence.
-          let effectiveOnline = p.is_online;
-          if (p.is_online && presenceReconcileReady) {
-            if (presenceOnlineIds.has(p.user_id)) {
-              presenceMissingSince.delete(p.user_id);
-              effectiveOnline = true;
-            } else if (cur?.is_online) {
-              const since = presenceMissingSince.get(p.user_id) ?? now;
-              presenceMissingSince.set(p.user_id, since);
-              effectiveOnline = now - since < PRESENCE_OFFLINE_GRACE_MS;
-            } else {
-              effectiveOnline = false;
-            }
-          }
+          // Online efetivo = DB diz online E peer está em presence (após o
+          // grace period inicial). Antes do grace, confiamos no DB.
+          const effectiveOnline = presenceReconcileReady
+            ? (p.is_online && presenceOnlineIds.has(p.user_id))
+            : p.is_online;
+          if (effectiveOnline) maybeStartRemoteTeleportFromCurrent(p.user_id, { x: p.x, y: p.y }, dbTs || Date.now());
           // Strict LWW: DB rows older than the freshest known live sample are
           // never allowed to move a stopped avatar back to a spawn/old spot.
           if (dbTs && dbTs < freshTs) {
+            const cur = prev[p.user_id];
             if (cur) next[p.user_id] = { ...cur, is_online: effectiveOnline };
             else next[p.user_id] = { ...p, is_online: effectiveOnline };
           } else {
@@ -1289,7 +1274,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
       window.clearInterval(persistHeartbeat);
       window.removeEventListener("beforeunload", persistFinalPosition);
       window.removeEventListener("pagehide", onPageHide);
-      
+      document.removeEventListener("visibilitychange", onVisibilityHidden);
       document.removeEventListener("visibilitychange", onVisible);
       window.removeEventListener("focus", onVisible);
       persistFinalPosition();
@@ -2991,15 +2976,13 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
             <IconButton active={showTeam} onClick={() => setShowTeam(!showTeam)} title="Equipe">
               <Users className="w-4 h-4" />
             </IconButton>
-            {isMaster && (
-              <Link
-                to="/office/editor"
-                title="Editor de mapa"
-                className="inline-flex items-center justify-center w-8 h-8 rounded-md text-foreground/70 hover:text-foreground hover:bg-foreground/10 transition"
-              >
-                <Pencil className="w-4 h-4" />
-              </Link>
-            )}
+            <Link
+              to="/office/editor"
+              title="Editor de mapa"
+              className="inline-flex items-center justify-center w-8 h-8 rounded-md text-foreground/70 hover:text-foreground hover:bg-foreground/10 transition"
+            >
+              <Pencil className="w-4 h-4" />
+            </Link>
             {me && (
               <ProfileMenu
                 me={me}
