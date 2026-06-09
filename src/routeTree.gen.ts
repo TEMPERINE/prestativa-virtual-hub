@@ -19,9 +19,12 @@ import { Route as AuthenticatedOfficeRouteImport } from './routes/_authenticated
 import { Route as AuthenticatedMeetingsRouteImport } from './routes/_authenticated/meetings'
 import { Route as AuthenticatedAguardandoConviteRouteImport } from './routes/_authenticated/aguardando-convite'
 import { Route as AuthenticatedWorkspacesIndexRouteImport } from './routes/_authenticated/workspaces.index'
+import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authenticated/admin.index'
 import { Route as AuthenticatedWorkspacesNewRouteImport } from './routes/_authenticated/workspaces.new'
 import { Route as AuthenticatedWorkspacesWorkspaceIdRouteImport } from './routes/_authenticated/workspaces.$workspaceId'
 import { Route as AuthenticatedOfficeEditorRouteImport } from './routes/_authenticated/office_.editor'
+import { Route as AuthenticatedAdminPersonagensRouteImport } from './routes/_authenticated/admin.personagens'
+import { Route as AuthenticatedAdminEspacosRouteImport } from './routes/_authenticated/admin.espacos'
 import { Route as AuthenticatedAdminContasRouteImport } from './routes/_authenticated/admin.contas'
 
 const SobreRoute = SobreRouteImport.update({
@@ -75,6 +78,11 @@ const AuthenticatedWorkspacesIndexRoute =
     path: '/workspaces/',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedAdminIndexRoute = AuthenticatedAdminIndexRouteImport.update({
+  id: '/admin/',
+  path: '/admin/',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedWorkspacesNewRoute =
   AuthenticatedWorkspacesNewRouteImport.update({
     id: '/workspaces/new',
@@ -91,6 +99,18 @@ const AuthenticatedOfficeEditorRoute =
   AuthenticatedOfficeEditorRouteImport.update({
     id: '/office_/editor',
     path: '/office/editor',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedAdminPersonagensRoute =
+  AuthenticatedAdminPersonagensRouteImport.update({
+    id: '/admin/personagens',
+    path: '/admin/personagens',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedAdminEspacosRoute =
+  AuthenticatedAdminEspacosRouteImport.update({
+    id: '/admin/espacos',
+    path: '/admin/espacos',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const AuthenticatedAdminContasRoute =
@@ -110,9 +130,12 @@ export interface FileRoutesByFullPath {
   '/office': typeof AuthenticatedOfficeRoute
   '/onboarding': typeof AuthenticatedOnboardingRoute
   '/admin/contas': typeof AuthenticatedAdminContasRoute
+  '/admin/espacos': typeof AuthenticatedAdminEspacosRoute
+  '/admin/personagens': typeof AuthenticatedAdminPersonagensRoute
   '/office/editor': typeof AuthenticatedOfficeEditorRoute
   '/workspaces/$workspaceId': typeof AuthenticatedWorkspacesWorkspaceIdRoute
   '/workspaces/new': typeof AuthenticatedWorkspacesNewRoute
+  '/admin/': typeof AuthenticatedAdminIndexRoute
   '/workspaces/': typeof AuthenticatedWorkspacesIndexRoute
 }
 export interface FileRoutesByTo {
@@ -125,9 +148,12 @@ export interface FileRoutesByTo {
   '/office': typeof AuthenticatedOfficeRoute
   '/onboarding': typeof AuthenticatedOnboardingRoute
   '/admin/contas': typeof AuthenticatedAdminContasRoute
+  '/admin/espacos': typeof AuthenticatedAdminEspacosRoute
+  '/admin/personagens': typeof AuthenticatedAdminPersonagensRoute
   '/office/editor': typeof AuthenticatedOfficeEditorRoute
   '/workspaces/$workspaceId': typeof AuthenticatedWorkspacesWorkspaceIdRoute
   '/workspaces/new': typeof AuthenticatedWorkspacesNewRoute
+  '/admin': typeof AuthenticatedAdminIndexRoute
   '/workspaces': typeof AuthenticatedWorkspacesIndexRoute
 }
 export interface FileRoutesById {
@@ -142,9 +168,12 @@ export interface FileRoutesById {
   '/_authenticated/office': typeof AuthenticatedOfficeRoute
   '/_authenticated/onboarding': typeof AuthenticatedOnboardingRoute
   '/_authenticated/admin/contas': typeof AuthenticatedAdminContasRoute
+  '/_authenticated/admin/espacos': typeof AuthenticatedAdminEspacosRoute
+  '/_authenticated/admin/personagens': typeof AuthenticatedAdminPersonagensRoute
   '/_authenticated/office_/editor': typeof AuthenticatedOfficeEditorRoute
   '/_authenticated/workspaces/$workspaceId': typeof AuthenticatedWorkspacesWorkspaceIdRoute
   '/_authenticated/workspaces/new': typeof AuthenticatedWorkspacesNewRoute
+  '/_authenticated/admin/': typeof AuthenticatedAdminIndexRoute
   '/_authenticated/workspaces/': typeof AuthenticatedWorkspacesIndexRoute
 }
 export interface FileRouteTypes {
@@ -159,9 +188,12 @@ export interface FileRouteTypes {
     | '/office'
     | '/onboarding'
     | '/admin/contas'
+    | '/admin/espacos'
+    | '/admin/personagens'
     | '/office/editor'
     | '/workspaces/$workspaceId'
     | '/workspaces/new'
+    | '/admin/'
     | '/workspaces/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -174,9 +206,12 @@ export interface FileRouteTypes {
     | '/office'
     | '/onboarding'
     | '/admin/contas'
+    | '/admin/espacos'
+    | '/admin/personagens'
     | '/office/editor'
     | '/workspaces/$workspaceId'
     | '/workspaces/new'
+    | '/admin'
     | '/workspaces'
   id:
     | '__root__'
@@ -190,9 +225,12 @@ export interface FileRouteTypes {
     | '/_authenticated/office'
     | '/_authenticated/onboarding'
     | '/_authenticated/admin/contas'
+    | '/_authenticated/admin/espacos'
+    | '/_authenticated/admin/personagens'
     | '/_authenticated/office_/editor'
     | '/_authenticated/workspaces/$workspaceId'
     | '/_authenticated/workspaces/new'
+    | '/_authenticated/admin/'
     | '/_authenticated/workspaces/'
   fileRoutesById: FileRoutesById
 }
@@ -276,6 +314,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedWorkspacesIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/admin/': {
+      id: '/_authenticated/admin/'
+      path: '/admin'
+      fullPath: '/admin/'
+      preLoaderRoute: typeof AuthenticatedAdminIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/workspaces/new': {
       id: '/_authenticated/workspaces/new'
       path: '/workspaces/new'
@@ -297,6 +342,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedOfficeEditorRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/admin/personagens': {
+      id: '/_authenticated/admin/personagens'
+      path: '/admin/personagens'
+      fullPath: '/admin/personagens'
+      preLoaderRoute: typeof AuthenticatedAdminPersonagensRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/admin/espacos': {
+      id: '/_authenticated/admin/espacos'
+      path: '/admin/espacos'
+      fullPath: '/admin/espacos'
+      preLoaderRoute: typeof AuthenticatedAdminEspacosRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/admin/contas': {
       id: '/_authenticated/admin/contas'
       path: '/admin/contas'
@@ -313,9 +372,12 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedOfficeRoute: typeof AuthenticatedOfficeRoute
   AuthenticatedOnboardingRoute: typeof AuthenticatedOnboardingRoute
   AuthenticatedAdminContasRoute: typeof AuthenticatedAdminContasRoute
+  AuthenticatedAdminEspacosRoute: typeof AuthenticatedAdminEspacosRoute
+  AuthenticatedAdminPersonagensRoute: typeof AuthenticatedAdminPersonagensRoute
   AuthenticatedOfficeEditorRoute: typeof AuthenticatedOfficeEditorRoute
   AuthenticatedWorkspacesWorkspaceIdRoute: typeof AuthenticatedWorkspacesWorkspaceIdRoute
   AuthenticatedWorkspacesNewRoute: typeof AuthenticatedWorkspacesNewRoute
+  AuthenticatedAdminIndexRoute: typeof AuthenticatedAdminIndexRoute
   AuthenticatedWorkspacesIndexRoute: typeof AuthenticatedWorkspacesIndexRoute
 }
 
@@ -325,10 +387,13 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedOfficeRoute: AuthenticatedOfficeRoute,
   AuthenticatedOnboardingRoute: AuthenticatedOnboardingRoute,
   AuthenticatedAdminContasRoute: AuthenticatedAdminContasRoute,
+  AuthenticatedAdminEspacosRoute: AuthenticatedAdminEspacosRoute,
+  AuthenticatedAdminPersonagensRoute: AuthenticatedAdminPersonagensRoute,
   AuthenticatedOfficeEditorRoute: AuthenticatedOfficeEditorRoute,
   AuthenticatedWorkspacesWorkspaceIdRoute:
     AuthenticatedWorkspacesWorkspaceIdRoute,
   AuthenticatedWorkspacesNewRoute: AuthenticatedWorkspacesNewRoute,
+  AuthenticatedAdminIndexRoute: AuthenticatedAdminIndexRoute,
   AuthenticatedWorkspacesIndexRoute: AuthenticatedWorkspacesIndexRoute,
 }
 
@@ -345,3 +410,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
