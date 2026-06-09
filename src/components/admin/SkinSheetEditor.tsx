@@ -31,12 +31,14 @@ type Props = {
  * - Clica num frame → edita bbox + centro + linha do pé com handles arrastáveis.
  * - Botão "Aplicar e gerar PNGs" emite blobs prontos pra upload.
  */
-export function SkinSheetEditor({ file, includeRight, onReady }: Props) {
+export function SkinSheetEditor({ file, includeRight, onReady, autoApply = true }: Props) {
   const [slice, setSlice] = useState<SliceResult | null>(null);
   const [frames, setFrames] = useState<Frame[]>([]);
   const [selected, setSelected] = useState<number>(0);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [showEditor, setShowEditor] = useState(!autoApply);
+  const [previews, setPreviews] = useState<{ facing: Facing; url: string }[] | null>(null);
 
   useEffect(() => {
     let cancelled = false;
