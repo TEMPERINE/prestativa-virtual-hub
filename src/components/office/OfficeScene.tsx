@@ -1294,7 +1294,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
       window.clearInterval(persistHeartbeat);
       window.removeEventListener("beforeunload", persistFinalPosition);
       window.removeEventListener("pagehide", onPageHide);
-      document.removeEventListener("visibilitychange", onVisibilityHidden);
+      
       document.removeEventListener("visibilitychange", onVisible);
       window.removeEventListener("focus", onVisible);
       persistFinalPosition();
