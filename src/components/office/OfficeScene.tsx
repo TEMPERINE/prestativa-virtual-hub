@@ -694,54 +694,26 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
       });
       setClaims(cmap);
 
-      // Preserve the last known position on refresh — never snap an existing
-      // user back to a spawn point. Only first-time entry uses spawn logic.
+      // Ao entrar no workspace, o personagem sempre nasce no spawn point da
+      // sua cadeira reivindicada (posição frontal). Quem não tem cadeira cai
+      // num ponto aleatório do corredor. Não preservamos posição anterior:
+      // entrar no escritório é como spawnar num mundo de jogo.
       const myClaimZone = Object.entries(cmap).find(([, uid]) => uid === userData.user!.id)?.[0];
-      const localSaved = readLocalSavedPosition(userData.user.id);
       let startPoint: Point;
-      const existing = pmap[userData.user.id];
-      const hasSavedPos = existing && typeof existing.x === "number" && typeof existing.y === "number";
-      const dbTs = timestampForPosition(existing ?? {});
-      const dbLooksLikeSpawn = hasSavedPos && existing.x === SPAWN.x && existing.y === SPAWN.y;
-      const localLooksLikeSpawn = !!localSaved && localSaved.x === SPAWN.x && localSaved.y === SPAWN.y;
-      // ESTRITAMENTE o mais novo vence — não dá pra dar grace window pro
-      // localStorage, porque se a última escrita local falhou silenciosamente
-      // (cota cheia, modo anônimo, aba congelada), o valor antigo "ganharia"
-      // do DB recente e o avatar voltaria pro penúltimo ponto. Em empate
-      // perfeito o localStorage decide só pra estabilizar o tie-break.
-      const localTs = localSaved?.ts ?? 0;
-      const localWins =
-        !!localSaved && (
-          !hasSavedPos ||
-          (dbLooksLikeSpawn && !localLooksLikeSpawn) ||
-          localTs > dbTs
-        );
-      if (localWins) {
-        // The browser copy is written on every movement/unload before the DB
-        // roundtrip finishes, so on hard refresh it is the safest resume point.
-        startPoint = { x: localSaved.x, y: localSaved.y };
-      } else if (hasSavedPos) {
-        // Current DB/presence position is authoritative for returning users.
-        // Do not collision-correct it here: map overrides can still be loading,
-        // and "fixing" it would clobber the live position with a spawn point.
-        startPoint = { x: existing.x, y: existing.y };
-      } else if (myClaimZone) {
-        // First entry with a claim → spawn at the workstation seat.
+      if (myClaimZone) {
         const z = findZoneById(myClaimZone);
         const sp = spawnPointForZone(myClaimZone);
         const rect = zoneRectFromOverrides(myClaimZone as ZoneId) ?? z?.rect ?? null;
         startPoint = sp ?? (rect ? seatPointForRect(rect) : SPAWN);
       } else {
-        // First time in: drop somewhere random in the corridors so people
-        // don't all pile on top of each other at the default spawn.
         startPoint = randomCorridorPoint();
       }
-      const safeStart = hasSavedPos ? startPoint : (collides(startPoint) ? SPAWN : startPoint);
+      const safeStart = collides(startPoint) ? SPAWN : startPoint;
       posRef.current = safeStart;
       setPos(safeStart);
       const startZone = zoneAt(safeStart).id;
       setZone(startZone);
-      const startFacing = (localWins ? localSaved?.facing : undefined) ?? (existing?.facing as Facing | undefined) ?? facingRef.current;
+      const startFacing: Facing = "down";
       facingRef.current = startFacing;
       setFacing(startFacing);
       positionHydratedRef.current = true;
