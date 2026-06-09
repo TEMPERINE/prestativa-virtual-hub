@@ -1116,24 +1116,39 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
       const { data } = await q;
       if (!data) return;
       const uid = meIdRef.current;
+      // Presence é a fonte da verdade para "quem está no mundo agora". O
+      // is_online do DB pode mentir (app fechado bruscamente sem disparar
+      // pagehide/beforeunload), então só consideramos um peer online se ele
+      // também aparece em presence.
+      const presenceState = presenceCh.presenceState() as Record<string, PresenceState[]>;
+      const presenceOnlineIds = new Set<string>();
+      for (const list of Object.values(presenceState)) {
+        for (const s of list) if (s?.user_id) presenceOnlineIds.add(s.user_id);
+      }
       setPositions((prev) => {
         const next: Record<string, RemotePos> = { ...prev };
         (data as Array<RemotePos & { updated_at?: string }>).forEach((p) => {
           if (uid && p.user_id === uid) return; // handled below
           const dbTs = p.updated_at ? Date.parse(p.updated_at) : 0;
           const freshTs = positionFreshTs.current.get(p.user_id) ?? 0;
-          if (p.is_online) maybeStartRemoteTeleportFromCurrent(p.user_id, { x: p.x, y: p.y }, dbTs || Date.now());
+          // Online efetivo = DB diz online E peer está em presence (após o
+          // grace period inicial). Antes do grace, confiamos no DB.
+          const effectiveOnline = presenceReconcileReady
+            ? (p.is_online && presenceOnlineIds.has(p.user_id))
+            : p.is_online;
+          if (effectiveOnline) maybeStartRemoteTeleportFromCurrent(p.user_id, { x: p.x, y: p.y }, dbTs || Date.now());
           // Strict LWW: DB rows older than the freshest known live sample are
           // never allowed to move a stopped avatar back to a spawn/old spot.
           if (dbTs && dbTs < freshTs) {
             const cur = prev[p.user_id];
-            if (cur) next[p.user_id] = { ...cur, is_online: p.is_online };
-            else next[p.user_id] = p;
+            if (cur) next[p.user_id] = { ...cur, is_online: effectiveOnline };
+            else next[p.user_id] = { ...p, is_online: effectiveOnline };
           } else {
             if (dbTs) positionFreshTs.current.set(p.user_id, dbTs);
-            next[p.user_id] = p;
+            next[p.user_id] = { ...p, is_online: effectiveOnline };
           }
         });
+
         if (uid) {
           const cur = posRef.current;
           const curZone = zoneAt(cur).id;
