@@ -12,6 +12,8 @@ import {
 } from "@/lib/admin/workspaces.functions";
 import { adminListAccounts } from "@/lib/admin/accounts.functions";
 import { setCurrentWorkspaceId } from "@/lib/workspace/current";
+import { appPrompt, appConfirm } from "@/components/ui/app-dialogs";
+
 
 export const Route = createFileRoute("/_authenticated/admin/espacos")({
   ssr: false,
