@@ -3,19 +3,15 @@ import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { ArrowLeft, Upload, Trash2, Pencil, Plus, Lightbulb } from "lucide-react";
-import spriteMatrixExample from "@/assets/sprite-matrix-example.png";
+import { ArrowLeft, Trash2, Pencil } from "lucide-react";
 import {
   adminListSkins,
-  adminCreateSignedUploadUrls,
-  adminSaveSkin,
   adminUpdateSkin,
   adminDeleteSkin,
 } from "@/lib/admin/sprites.functions";
 import { adminListWorkspacesFull } from "@/lib/admin/workspaces.functions";
 import { invalidateSpriteCatalog } from "@/lib/sprites/useSpriteCatalog";
-import { SkinSheetEditor, type FacingOutput } from "@/components/admin/SkinSheetEditor";
-import { AiWalkComposer } from "@/components/admin/AiWalkComposer";
+
 
 export const Route = createFileRoute("/_authenticated/admin/personagens")({
   ssr: false,
