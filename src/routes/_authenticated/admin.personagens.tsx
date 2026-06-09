@@ -13,6 +13,7 @@ import {
 } from "@/lib/admin/sprites.functions";
 import { adminListWorkspacesFull } from "@/lib/admin/workspaces.functions";
 import { invalidateSpriteCatalog } from "@/lib/sprites/useSpriteCatalog";
+import { SkinSheetEditor, type FacingOutput } from "@/components/admin/SkinSheetEditor";
 
 export const Route = createFileRoute("/_authenticated/admin/personagens")({
   ssr: false,
@@ -61,7 +62,8 @@ function AdminPersonagensPage() {
   const [gender, setGender] = useState<"m" | "f" | "n">("n");
   const [wsId, setWsId] = useState<string>("");
   const [mirrorRight, setMirrorRight] = useState(true);
-  const [files, setFiles] = useState<Partial<Record<Facing, File>>>({});
+  const [sourceFile, setSourceFile] = useState<File | null>(null);
+  const [outputs, setOutputs] = useState<FacingOutput[] | null>(null);
   const [busy, setBusy] = useState(false);
 
   const check = async () => {
@@ -86,52 +88,32 @@ function AdminPersonagensPage() {
   };
   useEffect(() => { load(); }, []);
 
-  const readDims = (file: File) =>
-    new Promise<{ w: number; h: number }>((resolve, reject) => {
-      const img = new Image();
-      img.onload = () => resolve({ w: img.naturalWidth, h: img.naturalHeight });
-      img.onerror = reject;
-      img.src = URL.createObjectURL(file);
-    });
-
-  const onFile = (facing: Facing, f: File | null) => {
-    if (!f) {
-      const cp = { ...files }; delete cp[facing]; setFiles(cp);
-    } else {
-      setFiles({ ...files, [facing]: f });
-    }
-  };
-
   const create = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!files.down || !files.up || !files.left) {
-      toast.error("Envie pelo menos as folhas down, up e left.");
-      return;
-    }
-    if (!mirrorRight && !files.right) {
-      toast.error("Envie a folha right ou marque 'Espelhar right do left'.");
+    if (!outputs || outputs.length === 0) {
+      toast.error("Gere os PNGs no editor antes de salvar.");
       return;
     }
     setBusy(true);
     try {
-      const facings: Facing[] = ["down", "up", "left"];
-      if (!mirrorRight && files.right) facings.push("right");
-
+      const facings = outputs.map((o) => o.facing);
       const { uploads } = (await signFn({ data: { skinId, facings } })) as any;
 
       const sheets: Record<Facing, string> = {} as any;
       const dims: Record<Facing, { w: number; h: number }> = {} as any;
-      for (const f of facings) {
-        const file = files[f]!;
+
+      for (const out of outputs) {
+        const u = uploads[out.facing];
+        const file = new File([out.blob], `${out.facing}.png`, { type: "image/png" });
         const { error } = await supabase.storage
           .from("sprite-sheets")
-          .uploadToSignedUrl(uploads[f].path, uploads[f].token, file, { contentType: "image/png" });
-        if (error) throw new Error(`Falha enviando ${f}: ${error.message}`);
-        sheets[f] = uploads[f].path;
-        const d = await readDims(file);
-        dims[f] = { w: Math.round(d.w / 6), h: d.h };
+          .uploadToSignedUrl(u.path, u.token, file, { contentType: "image/png" });
+        if (error) throw new Error(`Falha enviando ${out.facing}: ${error.message}`);
+        sheets[out.facing] = u.path;
+        // cellW = width / 6 (sheet tem 6 frames)
+        dims[out.facing] = { w: Math.round(out.width / 6), h: out.height };
       }
-      if (mirrorRight) {
+      if (mirrorRight && !sheets.right) {
         sheets.right = sheets.left;
         dims.right = dims.left;
       }
@@ -150,7 +132,7 @@ function AdminPersonagensPage() {
       });
       toast.success("Personagem criado!");
       invalidateSpriteCatalog();
-      setSkinId(""); setLabel(""); setWsId(""); setFiles({});
+      setSkinId(""); setLabel(""); setWsId(""); setSourceFile(null); setOutputs(null);
       load();
     } catch (e: any) {
       toast.error(e?.message ?? "Erro ao criar");
@@ -196,16 +178,12 @@ function AdminPersonagensPage() {
           <ArrowLeft size={14} /> Voltar
         </button>
         <h1 className="text-3xl font-semibold tracking-tight mb-2">Personagens (skins)</h1>
-        <p className="text-sm text-muted-foreground mb-3">
-          Adicione novos personagens — globais ou exclusivos de um espaço.
+        <p className="text-sm text-muted-foreground mb-6">
+          Suba uma folha de sprite (PNG, 4 linhas × 6 colunas: down, up, left, right) e o sistema fatia
+          automaticamente. Ajuste qualquer frame manualmente antes de salvar.
         </p>
-        <div className="text-[11px] text-muted-foreground mb-6 p-3 rounded-lg bg-muted/50 border border-border">
-          <strong>Antes de enviar:</strong> processe cada folha pelo script&nbsp;
-          <code className="font-mono">python3 scripts/process-skin-sheet.py &lt;fonte&gt; &lt;id&gt;</code>{" "}
-          para alinhar pés e remover halo. Cada folha deve ter 6 frames horizontais.
-        </div>
 
-        <form onSubmit={create} className="glass-panel rounded-2xl p-6 mb-10 space-y-4">
+        <form onSubmit={create} className="glass-panel rounded-2xl p-6 mb-10 space-y-5">
           <h2 className="text-sm font-medium uppercase tracking-wider text-muted-foreground flex items-center gap-2">
             <Plus size={14} /> Novo personagem
           </h2>
@@ -247,24 +225,34 @@ function AdminPersonagensPage() {
             </div>
           </div>
 
-          <div className="grid sm:grid-cols-4 gap-3">
-            {(["down", "up", "left", "right"] as Facing[]).map((f) => {
-              const disabled = f === "right" && mirrorRight;
-              return (
-                <div key={f} className={disabled ? "opacity-40" : ""}>
-                  <label className="block text-xs font-medium mb-1.5 uppercase">{f}</label>
-                  <input type="file" accept="image/png" disabled={disabled}
-                    onChange={(e) => onFile(f, e.target.files?.[0] ?? null)}
-                    className="w-full text-xs" />
-                  {files[f] && <div className="text-[10px] text-muted-foreground mt-1 truncate">{files[f]!.name}</div>}
-                </div>
-              );
-            })}
+          <div>
+            <label className="block text-xs font-medium mb-1.5">Folha-fonte (PNG, 4×6)</label>
+            <input
+              type="file"
+              accept="image/png"
+              onChange={(e) => {
+                const f = e.target.files?.[0] ?? null;
+                setSourceFile(f);
+                setOutputs(null);
+              }}
+              className="w-full text-xs"
+            />
           </div>
 
-          <button type="submit" disabled={busy}
+          {sourceFile && (
+            <SkinSheetEditor
+              file={sourceFile}
+              includeRight={!mirrorRight}
+              onReady={(outs) => {
+                setOutputs(outs);
+                toast.success(`${outs.length} folhas prontas pra envio`);
+              }}
+            />
+          )}
+
+          <button type="submit" disabled={busy || !outputs}
             className="px-4 py-2 rounded-lg gradient-primary text-primary-foreground text-sm font-medium inline-flex items-center gap-2 hover:opacity-90 shadow-glow disabled:opacity-50">
-            <Upload size={14} /> {busy ? "Enviando…" : "Criar personagem"}
+            <Upload size={14} /> {busy ? "Enviando…" : "Salvar personagem"}
           </button>
         </form>
 

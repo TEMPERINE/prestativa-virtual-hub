@@ -1,90 +1,78 @@
-# Hub Admin único — Contas, Espaços e Personagens
+## Objetivo
 
-Hoje só você é admin. A ideia é centralizar tudo em `/admin/*` para que ninguém mais precise (nem possa) criar/editar espaços ou cadastrar personagens.
+Em `/admin/personagens`, substituir o fluxo atual (rodar script Python + enviar 3-4 PNGs separados) por:
 
-## 1. Espaços (workspaces) — só admin cria
+1. **Subir 1 PNG** (4×6 — down, up, left, right).
+2. **Auto-fatiar no browser** com a mesma lógica do `process-skin-sheet.py` (remoção de fundo branco + flood, maior componente conectado, normalização de altura, padding por baseline).
+3. **Editor visual frame-a-frame** com handles arrastáveis pra corrigir qualquer frame que ficou torto.
+4. **Salvar** gerando 3 sheets finais (down/up/left, right espelhado) e enviando ao bucket `sprite-sheets`.
 
-**Mudanças de regra:**
-- Remover criação de workspace pelo usuário comum. A rota `/workspaces/new` passa a redirecionar para `/workspaces` (ou some do menu). O botão "Criar novo espaço" no hub de workspaces some para não-admins.
-- Migration: política RLS de INSERT em `workspaces` passa a exigir `has_role(auth.uid(), 'admin')`. UPDATE/DELETE idem (já tem owner check, vou somar admin override).
+## Fluxo na UI
 
-**Nova aba `/admin/espacos`:**
-- Listar todos os workspaces (nome, tier, dono, nº membros).
-- Criar novo: nome, tier (1/2/3), dono (escolhe entre contas existentes — usa lista que já está em `/admin/contas`).
-- Para cada workspace, atalhos diretos pros editores **sem precisar entrar no workspace**:
-  - "Editar mapa" → abre `/office/editor?workspaceId=<id>` (a rota `office_.editor.tsx` já existe; vou ajustar pra aceitar `workspaceId` na query e, se admin, carregar o mapa daquele ws sem exigir membership).
-  - "Áreas / zonas" → mesmo editor (é tudo no MapEditor).
-  - "Props customizados" → reaproveita o editor existente, escopado ao workspace selecionado.
-- Renomear, mudar tier, excluir.
+```
+[1] Upload folha-fonte (PNG 4x6)
+       │
+       ▼
+[2] Auto-fatiamento (Canvas API + flood fill)
+       │  detecta 24 frames, calcula bbox/centro/baseline
+       ▼
+[3] Grid 4×6 de mini-previews + painel de edição
+       ┌──────────────────────────────────┐
+       │  down  [F0][F1][F2][F3][F4][F5]  │
+       │  up    [F0][F1][F2][F3][F4][F5]  │
+       │  left  [F0][F1][F2][F3][F4][F5]  │
+       │  right [F0][F1][F2][F3][F4][F5]  │
+       └──────────────────────────────────┘
+       Clica num frame → editor grande com:
+         - retângulo arrastável (move bbox)
+         - 4 handles pra redimensionar
+         - botão "auto" (refaz detecção só desse frame)
+         - sliders fine-tune (offset X/Y do centro e do pé)
+       Botões globais: "Refazer auto em todos", "Aplicar offset a toda a linha"
+       │
+       ▼
+[4] Preview animado (caminhada down/up/left) usando AlignedSprite
+       │
+       ▼
+[5] Compor 3 PNGs finais (down/up/left) com mesmo padding/baseline
+    e fazer upload para o bucket sprite-sheets via signed URL
+```
 
-## 2. Personagens (sprites) — editor admin
+## Mudanças concretas
 
-Hoje sprites são **hard-coded** em `src/lib/sprite-catalog.ts` (importados como assets do bundle). Para você poder adicionar/renomear/criar exclusivos por workspace em runtime, precisamos mover pra banco + storage:
+### Novo: `src/lib/sprites/sheet-processor.ts`
+- Port em TypeScript da lógica do `process-skin-sheet.py` usando Canvas/ImageData puro (sem PIL/numpy).
+- Funções: `removeWhiteBackground(imageData)`, `findLargestBlobBbox(alpha)`, `robustCenterX(mask)`, `sliceSheet(image, rows=4, cols=6)` → devolve `Frame[]` `{ srcX, srcY, w, h, centerX, footY, dataUrl }`.
+- Algoritmo idêntico ao Python (flood-fill 8-connected, erosão de halo 2 passes, blob principal + satélites internos/abaixo, mediana de altura por facing).
 
-**Banco (migration):**
-- Tabela `sprite_skins`:
-  - `id` (slug, ex: `marcio`), `label`, `gender` (m/f/n)
-  - `workspace_id uuid null` — `null` = global (todo mundo vê); preenchido = exclusivo daquele workspace
-  - `mirror_right_from_left bool`, `mirror_left_from_right bool`
-  - `sheets jsonb` — `{ up: path, down: path, left: path, right: path }` (paths no bucket)
-  - `dims jsonb` — `{ up:{w,h}, down:{w,h}, ... }`
-  - `created_by`, timestamps
-- Bucket storage **público** `sprite-sheets/` (sprites precisam ser lidos no `<img>`, então público é simples).
-- RLS: SELECT liberado pra `authenticated` que seja membro do workspace OU sprite global. INSERT/UPDATE/DELETE só admin.
-- Seed: inserir as 9 skins atuais (marcio, blonde, curly, redhead, afro, japa, morena, latina, indi) como global, com os mesmos `dims` e os assets já no bucket (upload do `src/assets/sprites/*` via script de seed na própria migration usando os caminhos atuais — alternativa: manter as 9 atuais hard-coded como fallback e o catálogo db é "extras". **Vou fazer essa rota** — mais simples e zero risco de quebrar o que já funciona.).
+### Novo: `src/components/admin/SkinSheetEditor.tsx`
+- Recebe `File` da folha-fonte, renderiza o grid 4×6 de previews.
+- Cada frame tem retângulo + handles em SVG (drag para mover/resize, snap opcional).
+- Painel lateral: facing selecionado, offset global por linha (botão "aplicar a toda a linha"), botão "refazer auto neste frame", botão "refazer auto em tudo".
+- Live preview animado embaixo (usa `<AlignedSprite>` com dataURL temporário).
+- Ao confirmar: gera 3 canvas finais (1 por facing usado: down/up/left) com o mesmo algoritmo de padding/baseline do script, exporta PNGs.
 
-**Catálogo runtime (`sprite-catalog.ts`):**
-- Mantém as 9 skins atuais hard-coded (fallback offline-friendly).
-- Nova função `loadSpriteCatalog(workspaceId)` que faz fetch das skins do db (globais + do ws) e devolve `SPRITES` merged. Hook `useSpriteCatalog(workspaceId)` com cache.
-- `AlignedSprite` continua igual — só passa a aceitar sprite dinâmico do catálogo merged.
+### Editado: `src/routes/_authenticated/admin.personagens.tsx`
+- Substituir os 4 inputs separados por 1 input único de PNG da folha-fonte.
+- Embedar o `SkinSheetEditor` no formulário "Novo personagem".
+- Manter ID/Rótulo/Gênero/Espaço/"Espelhar right do left" como hoje.
+- Ao submeter: usar os 3 PNGs gerados pelo editor → fluxo de signed URL + `adminSaveSkin` continua igual.
+- Remover o aviso "antes de enviar rode o script python".
 
-**Nova aba `/admin/personagens`:**
-- Lista todas as skins (badge "Global" ou nome do workspace).
-- Renomear (label), trocar gender, ajustar dims/mirror, excluir, **renomear inclui as 9 default** (vou permitir override de label das default skins gravando uma row "override" — ou mais simples: também migrar as 9 pro db e sumir com o hard-code). Decisão: **migro as 9 pro banco** com upload automático dos PNGs atuais via storage na primeira inicialização (script `seed-default-sprites.ts` rodado uma vez via server fn admin-only "Inicializar skins padrão"). Catálogo passa a vir 100% do db.
-- Criar nova skin: upload de 3 ou 4 sheets PNG (down/up/left + opcional right), dims auto-detectadas (lê dimensões da imagem no browser antes do upload e divide largura por 6 frames), opção "espelhar right do left", workspace (global ou um específico).
-- O script `scripts/process-skin-sheet.py` continua sendo o jeito recomendado pra preparar a folha; UI vai mostrar uma nota "Recomendado: rode o script de pré-processamento antes do upload".
+### Sem mudanças no servidor
+- `sprites.functions.ts`, bucket, tabela `sprite_skins`, `AlignedSprite`, `useSpriteCatalog` — tudo continua igual. Toda a etapa de processamento sai do build-time (Python) e vai pro browser do admin.
 
-## 3. Mover navegação para um hub admin
+### Memória
+- Atualizar `mem://design/sprite-alignment` removendo a obrigatoriedade do script Python (continua sendo opção pra processamento em lote, mas o admin agora processa pelo browser).
 
-`/admin` vira página índice com 3 cards:
-- Contas (`/admin/contas` — já existe)
-- Espaços (`/admin/espacos` — novo)
-- Personagens (`/admin/personagens` — novo)
+## Detalhes técnicos
 
-Botão "Admin" só aparece no hub de workspaces se `has_role admin`.
+- **Workers/SSR**: rota tem `ssr: false`; processamento usa `Canvas`/`createImageBitmap` só no browser. Sem dependências server-side.
+- **Performance**: folha-fonte típica ~1500×2000 px → ~3M pixels. Flood-fill iterativo + label connected components em JS roda em ~200-400ms; ok pra UX (mostrar spinner durante o auto-fatiamento).
+- **Sem libs externas**: tudo com APIs nativas (`HTMLCanvasElement`, `ImageData`). Evita peso e mantém Worker-safe se um dia mudar.
+- **Compatibilidade**: o PNG gerado mantém exatamente a estrutura que `AlignedSprite` espera hoje (6 frames horizontais, baseline alinhada), então skins novas e antigas convivem sem retoque.
 
-## Arquivos afetados
+## Fora do escopo
 
-**Novos:**
-- `src/routes/_authenticated/admin.index.tsx` (hub)
-- `src/routes/_authenticated/admin.espacos.tsx`
-- `src/routes/_authenticated/admin.personagens.tsx`
-- `src/lib/admin/workspaces.functions.ts`
-- `src/lib/admin/sprites.functions.ts`
-- `src/lib/sprites/useSpriteCatalog.ts`
-- Migration (tabela `sprite_skins`, bucket `sprite-sheets`, políticas, RLS de `workspaces` para admin)
-
-**Editados:**
-- `src/lib/sprite-catalog.ts` (passa a ser async + fallback)
-- `src/components/sprites/AlignedSprite.tsx` (aceitar SpriteDef direto além de spriteId)
-- `src/components/profile/SpritePreview.tsx`, `EditCharacterModal.tsx`, `OnboardingWizard.tsx` (usar hook com workspaceId)
-- `src/routes/_authenticated/workspaces.index.tsx` (link "Admin", remove "Criar novo espaço" para não-admin)
-- `src/routes/_authenticated/workspaces.new.tsx` (redirect ou bloqueio para não-admin)
-- `src/routes/_authenticated/office_.editor.tsx` (aceitar `?workspaceId=` admin override)
-- `src/routes/_authenticated/admin.contas.tsx` (vira sub-aba do hub admin, sem mudanças funcionais)
-
-## Escopo / ordem de entrega
-
-Como é grande, sugiro entregar em 2 PRs lógicos no mesmo loop:
-1. **Espaços** (mais simples — só RLS + UI nova, reaproveita editor).
-2. **Personagens** (migração das skins pro banco + uploader).
-
-## Pergunta antes de começar
-
-1. **Migrar as 9 skins atuais pro banco** (recomendo) ou **manter hard-coded e só permitir adicionar extras**? Migrar é mais limpo (você renomeia tudo, edita dims, deleta o que não quer), mas exige um seed automático que sobe os PNGs pro storage na primeira execução. Se preferir o caminho conservador (mais rápido, menos risco), faço só "extras".
-
-2. **Editor de mapa "fora do workspace"**: o editor atual usa o workspace atual ativo. Topo: te permito trocar de workspace ali dentro (dropdown "Editando: <ws>"). Confirmo essa abordagem?
-
-3. **Sprites por workspace exclusivos** podem ser vistos por **membros daquele ws apenas** (correto?), ou você quer também conseguir atribuir um sprite exclusivo de um ws para um usuário que não é membro?
-
-Responde 1/2/3 e eu sigo.
+- Edição de skins já salvas (continua só renomear / mover de workspace / excluir). Pra re-cropar, sobe a folha-fonte de novo.
+- Suporte a layouts diferentes de 4×6 (mantemos como hoje).
