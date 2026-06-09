@@ -254,7 +254,42 @@ export function AiWalkComposer({ onSheetReady }: Props) {
         </p>
       </div>
 
-      {/* Slots de upload */}
+      {/* Seletor de modo de upload */}
+      <div className="flex gap-2">
+        <button
+          type="button"
+          onClick={() => setUploadMode("four")}
+          className={`px-3 py-1.5 rounded-lg text-[11px] font-medium ${uploadMode === "four" ? "bg-foreground text-background" : "bg-muted text-foreground"}`}
+        >
+          4 imagens separadas
+        </button>
+        <button
+          type="button"
+          onClick={() => setUploadMode("sheet")}
+          className={`px-3 py-1.5 rounded-lg text-[11px] font-medium ${uploadMode === "sheet" ? "bg-foreground text-background" : "bg-muted text-foreground"}`}
+        >
+          1 folha 2×2 (auto-fatiar)
+        </button>
+      </div>
+
+      {uploadMode === "sheet" && (
+        <div className="p-3 rounded-lg border border-dashed border-border bg-background/50">
+          <label className="block text-[10px] uppercase tracking-wider text-muted-foreground mb-1.5">
+            Folha 2×2 (frente / costas em cima — esquerda / direita embaixo)
+          </label>
+          <input
+            type="file"
+            accept="image/png,image/jpeg,image/webp"
+            onChange={(e) => onUploadSheet(e.target.files?.[0] ?? null)}
+            className="w-full text-[11px]"
+          />
+          <p className="text-[10px] text-muted-foreground mt-1.5">
+            A imagem é dividida em 4 quadrantes iguais e cada um vira a referência de uma direção.
+          </p>
+        </div>
+      )}
+
+      {/* Slots de upload / preview */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {FACINGS.map((f) => (
           <div key={f} className="space-y-1.5">
@@ -270,15 +305,14 @@ export function AiWalkComposer({ onSheetReady }: Props) {
                 </div>
               )}
             </div>
-            <input
-              type="file"
-              accept="image/png,image/jpeg,image/webp"
-              onChange={(e) => onUpload(f, e.target.files?.[0] ?? null)}
-              className="w-full text-[10px]"
-            />
-          </div>
-        ))}
-      </div>
+            {uploadMode === "four" && (
+              <input
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                onChange={(e) => onUpload(f, e.target.files?.[0] ?? null)}
+                className="w-full text-[10px]"
+              />
+            )}
 
       <button
         type="button"
