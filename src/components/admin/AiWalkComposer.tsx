@@ -59,10 +59,9 @@ export function AiWalkComposer({ onSheetReady }: Props) {
   });
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
+  const [uploadMode, setUploadMode] = useState<"four" | "sheet">("four");
 
-  const onUpload = async (facing: Facing, f: File | null) => {
-    if (!f) return;
-    const url = await fileToDataUrl(f);
+  const setRefAndFrame0 = (facing: Facing, url: string) => {
     setRefs((p) => ({ ...p, [facing]: url }));
     setFrames((p) => {
       const next = { ...p };
@@ -71,6 +70,41 @@ export function AiWalkComposer({ onSheetReady }: Props) {
       next[facing] = arr;
       return next;
     });
+  };
+
+  const onUpload = async (facing: Facing, f: File | null) => {
+    if (!f) return;
+    const url = await fileToDataUrl(f);
+    setRefAndFrame0(facing, url);
+  };
+
+  /** Fatia 1 imagem em grade 2×2 → down (TL), up (TR), left (BL), right (BR). */
+  const onUploadSheet = async (f: File | null) => {
+    if (!f) return;
+    try {
+      const url = await fileToDataUrl(f);
+      const img = await loadImg(url);
+      const halfW = Math.floor(img.width / 2);
+      const halfH = Math.floor(img.height / 2);
+      const slice = (sx: number, sy: number): string => {
+        const c = document.createElement("canvas");
+        c.width = halfW;
+        c.height = halfH;
+        const ctx = c.getContext("2d")!;
+        ctx.drawImage(img, sx, sy, halfW, halfH, 0, 0, halfW, halfH);
+        return c.toDataURL("image/png");
+      };
+      const tiles: Record<Facing, string> = {
+        down: slice(0, 0),
+        up: slice(halfW, 0),
+        left: slice(0, halfH),
+        right: slice(halfW, halfH),
+      };
+      for (const fac of FACINGS) setRefAndFrame0(fac, tiles[fac]);
+      toast.success("Folha fatiada nas 4 poses.");
+    } catch (e: any) {
+      toast.error(e?.message ?? "Erro ao fatiar a imagem");
+    }
   };
 
   /** Gera frames 1..5 de uma facing. Mapeamento:
