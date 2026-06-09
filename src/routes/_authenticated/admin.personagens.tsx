@@ -187,124 +187,16 @@ function AdminPersonagensPage() {
           só se algum frame precisar de refino.
         </p>
 
-        <form onSubmit={create} className="glass-panel rounded-2xl p-6 mb-10 space-y-5">
-          <h2 className="text-sm font-medium uppercase tracking-wider text-muted-foreground flex items-center gap-2">
-            <Plus size={14} /> Novo personagem
+        <div className="glass-panel rounded-2xl p-6 mb-10 border border-dashed">
+          <h2 className="text-sm font-medium uppercase tracking-wider text-muted-foreground mb-2">
+            Novo personagem — temporariamente desativado
           </h2>
-          <div className="grid sm:grid-cols-3 gap-3">
-            <div>
-              <label className="block text-xs font-medium mb-1.5">ID (slug)</label>
-              <input value={skinId} onChange={(e) => setSkinId(e.target.value.toLowerCase())}
-                required pattern="[a-z0-9-]{2,32}" placeholder="ex: barbara"
-                className="w-full rounded-lg border bg-background px-3 py-2 text-sm font-mono" />
-            </div>
-            <div>
-              <label className="block text-xs font-medium mb-1.5">Rótulo</label>
-              <input value={label} onChange={(e) => setLabel(e.target.value)} required
-                placeholder="Ex: Bárbara"
-                className="w-full rounded-lg border bg-background px-3 py-2 text-sm" />
-            </div>
-            <div>
-              <label className="block text-xs font-medium mb-1.5">Gênero</label>
-              <select value={gender} onChange={(e) => setGender(e.target.value as any)}
-                className="w-full rounded-lg border bg-background px-3 py-2 text-sm">
-                <option value="f">Feminino</option>
-                <option value="m">Masculino</option>
-                <option value="n">Neutro</option>
-              </select>
-            </div>
-            <div className="sm:col-span-2">
-              <label className="block text-xs font-medium mb-1.5">Espaço (vazio = global)</label>
-              <select value={wsId} onChange={(e) => setWsId(e.target.value)}
-                className="w-full rounded-lg border bg-background px-3 py-2 text-sm">
-                <option value="">— Global (todos veem) —</option>
-                {workspaces.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
-              </select>
-            </div>
-            <div className="flex items-end">
-              <label className="text-xs inline-flex items-center gap-2 cursor-pointer">
-                <input type="checkbox" checked={mirrorRight} onChange={(e) => setMirrorRight(e.target.checked)} />
-                Espelhar right do left
-              </label>
-            </div>
-          </div>
+          <p className="text-xs text-muted-foreground leading-relaxed">
+            O fluxo de criação de skins (upload de folha e geração com IA) está suspenso nesta fase de validação.
+            Estamos focando o piloto na Prestativa com as 9 skins padrão. A função volta depois da escala.
+          </p>
+        </div>
 
-          <div>
-            <div className="flex gap-2 mb-2">
-              <button
-                type="button"
-                onClick={() => { setMode("sheet"); setSourceFile(null); setOutputs(null); }}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium ${mode === "sheet" ? "bg-foreground text-background" : "bg-muted text-foreground"}`}
-              >
-                Subir folha pronta (4×6)
-              </button>
-              <button
-                type="button"
-                onClick={() => { setMode("ai"); setSourceFile(null); setOutputs(null); }}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium ${mode === "ai" ? "bg-foreground text-background" : "bg-muted text-foreground"}`}
-              >
-                Gerar com IA (4 fotos)
-              </button>
-            </div>
-
-            {mode === "sheet" && (
-              <>
-                <label className="block text-xs font-medium mb-1.5">Folha-fonte (PNG, 4×6)</label>
-                <input
-                  type="file"
-                  accept="image/png"
-                  onChange={(e) => {
-                    const f = e.target.files?.[0] ?? null;
-                    setSourceFile(f);
-                    setOutputs(null);
-                  }}
-                  className="w-full text-xs"
-                />
-              </>
-            )}
-
-            {mode === "ai" && !sourceFile && (
-              <>
-                <div className="rounded-xl border bg-muted/30 p-4 space-y-3">
-                  <div className="flex items-center gap-2 text-xs font-medium text-foreground">
-                    <Lightbulb size={14} className="text-yellow-500" />
-                    Exemplo ideal — 4 poses estáticas
-                  </div>
-                  <img
-                    src={spriteMatrixExample}
-                    alt="Exemplo de matriz de poses: frente, costas, esquerda, direita"
-                    className="w-full max-w-md mx-auto rounded-lg border bg-white"
-                    loading="lazy"
-                    width={512}
-                    height={512}
-                  />
-                  <p className="text-[11px] text-muted-foreground leading-relaxed">
-                    Suba <strong>4 imagens separadas</strong> (ou uma única imagem com as 4 poses):
-                    personagem parado de <strong>frente</strong>, <strong>costas</strong>, <strong>lado esquerdo</strong> e <strong>lado direito</strong>.
-                    Use fundo transparente se possível. A IA vai gerar os frames de caminhada automaticamente a partir dessas referências.
-                  </p>
-                </div>
-                <AiWalkComposer onSheetReady={(f) => { setSourceFile(f); setOutputs(null); }} />
-              </>
-            )}
-          </div>
-
-          {sourceFile && (
-            <SkinSheetEditor
-              file={sourceFile}
-              includeRight={!mirrorRight}
-              onReady={(outs) => {
-                setOutputs(outs);
-                toast.success(`${outs.length} folhas prontas pra envio`);
-              }}
-            />
-          )}
-
-          <button type="submit" disabled={busy || !outputs}
-            className="px-4 py-2 rounded-lg gradient-primary text-primary-foreground text-sm font-medium inline-flex items-center gap-2 hover:opacity-90 shadow-glow disabled:opacity-50">
-            <Upload size={14} /> {busy ? "Enviando…" : "Salvar personagem"}
-          </button>
-        </form>
 
         <div className="text-xs uppercase tracking-wider text-muted-foreground mb-3">
           Personagens dinâmicos ({skins.length})
