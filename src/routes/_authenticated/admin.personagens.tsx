@@ -182,8 +182,9 @@ function AdminPersonagensPage() {
         </button>
         <h1 className="text-3xl font-semibold tracking-tight mb-2">Personagens (skins)</h1>
         <p className="text-sm text-muted-foreground mb-6">
-          Suba uma folha de sprite (PNG, 4 linhas × 6 colunas: down, up, left, right) e o sistema fatia
-          automaticamente. Ajuste qualquer frame manualmente antes de salvar.
+          Suba uma folha de sprite (PNG, 4 linhas × 6 colunas: down, up, left, right). O sistema fatia,
+          remove o fundo, alinha pelo centro e pela linha do pé — tudo em 1 clique. Use "Ajustar manualmente"
+          só se algum frame precisar de refino.
         </p>
 
         <form onSubmit={create} className="glass-panel rounded-2xl p-6 mb-10 space-y-5">
