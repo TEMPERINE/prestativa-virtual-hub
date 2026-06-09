@@ -98,7 +98,7 @@ function AdminEspacosPage() {
   };
 
   const remove = async (ws: Ws) => {
-    if (!confirm(`Excluir definitivamente "${ws.name}"? Todos os dados do espaço serão perdidos.`)) return;
+    if (!(await appConfirm({ title: `Excluir "${ws.name}"?`, description: "Todos os dados do espaço serão perdidos. Isto não pode ser desfeito.", confirmLabel: "Excluir", destructive: true }))) return;
     try {
       await deleteFn({ data: { id: ws.id } });
       toast.success("Espaço excluído.");
