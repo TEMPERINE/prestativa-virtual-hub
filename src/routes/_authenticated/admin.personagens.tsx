@@ -44,8 +44,6 @@ function AdminPersonagensPage() {
   const navigate = useNavigate();
   const listFn = useServerFn(adminListSkins);
   const wsListFn = useServerFn(adminListWorkspacesFull);
-  const signFn = useServerFn(adminCreateSignedUploadUrls);
-  const saveFn = useServerFn(adminSaveSkin);
   const updateFn = useServerFn(adminUpdateSkin);
   const deleteFn = useServerFn(adminDeleteSkin);
 
@@ -53,17 +51,6 @@ function AdminPersonagensPage() {
   const [loading, setLoading] = useState(true);
   const [skins, setSkins] = useState<Skin[]>([]);
   const [workspaces, setWorkspaces] = useState<Ws[]>([]);
-
-  // form
-  const [skinId, setSkinId] = useState("");
-  const [label, setLabel] = useState("");
-  const [gender, setGender] = useState<"m" | "f" | "n">("n");
-  const [wsId, setWsId] = useState<string>("");
-  const [mirrorRight, setMirrorRight] = useState(true);
-  const [sourceFile, setSourceFile] = useState<File | null>(null);
-  const [outputs, setOutputs] = useState<FacingOutput[] | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [mode, setMode] = useState<"sheet" | "ai">("sheet");
 
   const check = async () => {
     const { data: u } = await supabase.auth.getUser();
@@ -87,57 +74,6 @@ function AdminPersonagensPage() {
   };
   useEffect(() => { load(); }, []);
 
-  const create = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!outputs || outputs.length === 0) {
-      toast.error("Gere os PNGs no editor antes de salvar.");
-      return;
-    }
-    setBusy(true);
-    try {
-      const facings = outputs.map((o) => o.facing);
-      const { uploads } = (await signFn({ data: { skinId, facings } })) as any;
-
-      const sheets: Record<Facing, string> = {} as any;
-      const dims: Record<Facing, { w: number; h: number }> = {} as any;
-
-      for (const out of outputs) {
-        const u = uploads[out.facing];
-        const file = new File([out.blob], `${out.facing}.png`, { type: "image/png" });
-        const { error } = await supabase.storage
-          .from("sprite-sheets")
-          .uploadToSignedUrl(u.path, u.token, file, { contentType: "image/png" });
-        if (error) throw new Error(`Falha enviando ${out.facing}: ${error.message}`);
-        sheets[out.facing] = u.path;
-        // cellW = width / 6 (sheet tem 6 frames)
-        dims[out.facing] = { w: Math.round(out.width / 6), h: out.height };
-      }
-      if (mirrorRight && !sheets.right) {
-        sheets.right = sheets.left;
-        dims.right = dims.left;
-      }
-
-      await saveFn({
-        data: {
-          id: skinId,
-          label,
-          gender,
-          workspaceId: wsId || null,
-          sheets,
-          dims,
-          mirrorRightFromLeft: mirrorRight,
-          mirrorLeftFromRight: false,
-        },
-      });
-      toast.success("Personagem criado!");
-      invalidateSpriteCatalog();
-      setSkinId(""); setLabel(""); setWsId(""); setSourceFile(null); setOutputs(null);
-      load();
-    } catch (e: any) {
-      toast.error(e?.message ?? "Erro ao criar");
-    }
-    setBusy(false);
-  };
 
   const rename = async (s: Skin) => {
     const newLabel = prompt("Novo rótulo:", s.label);
