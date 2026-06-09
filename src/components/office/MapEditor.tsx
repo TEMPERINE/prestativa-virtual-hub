@@ -563,26 +563,27 @@ export function MapEditor() {
     }
   }, [overrides]);
 
-  const reset = useCallback(() => {
-    if (!confirm("Limpar todas as células pintadas?")) return;
+  const reset = useCallback(async () => {
+    if (!(await appConfirm({ title: "Limpar todas as células pintadas?", confirmLabel: "Limpar", destructive: true }))) return;
     setOverrides(newOverrides());
     setDirty(true);
   }, []);
 
-  const reseed = useCallback(() => {
-    if (!confirm("Recarregar layout padrão (descarta alterações)?")) return;
+  const reseed = useCallback(async () => {
+    if (!(await appConfirm({ title: "Recarregar layout padrão?", description: "As alterações não salvas serão descartadas.", confirmLabel: "Recarregar", destructive: true }))) return;
     setOverrides(seedFromDefaults());
     setDirty(true);
   }, []);
 
   const clearSaved = useCallback(async () => {
-    if (!confirm("Remover overrides salvos (local e nuvem)? O mapa voltará ao padrão.")) return;
+    if (!(await appConfirm({ title: "Remover overrides salvos?", description: "Remove local e nuvem. O mapa voltará ao padrão.", confirmLabel: "Remover", destructive: true }))) return;
     clearOverrides();
     await clearOverridesInCloud();
     setOverrides(seedFromDefaults());
     setDirty(true);
     toast.success("Overrides removidos.");
   }, []);
+
 
   // --- Importar paredes/zonas de outro espaço ----------------------------
   const [importOpen, setImportOpen] = useState(false);
