@@ -43,13 +43,18 @@ export function SkinSheetEditor({ file, includeRight, onReady, autoApply = true 
   useEffect(() => {
     let cancelled = false;
     setSlice(null);
+    setPreviews(null);
+    setShowEditor(!autoApply);
     setBusy(true);
     sliceSheetFromFile(file, { includeRight })
-      .then((s) => {
+      .then(async (s) => {
         if (cancelled) return;
         setSlice(s);
         setFrames(s.frames);
         setSelected(0);
+        if (autoApply) {
+          await runGenerate(s, s.frames);
+        }
         setBusy(false);
       })
       .catch((e) => {
@@ -60,6 +65,7 @@ export function SkinSheetEditor({ file, includeRight, onReady, autoApply = true 
     return () => {
       cancelled = true;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [file, includeRight]);
 
   const cleanedUrl = useMemo(
@@ -75,17 +81,24 @@ export function SkinSheetEditor({ file, includeRight, onReady, autoApply = true 
     });
   };
 
+  const runGenerate = async (s: SliceResult, fs: Frame[]) => {
+    const facingsToEmit = includeRight ? FACINGS : (["down", "up", "left"] as Facing[]);
+    const outputs: FacingOutput[] = [];
+    const prevs: { facing: Facing; url: string }[] = [];
+    for (const f of facingsToEmit) {
+      const { blob, dataUrl, w, h } = composeFacingSheet(s.cleanedCanvas, fs, f);
+      outputs.push({ facing: f, blob: await blob, width: w, height: h });
+      prevs.push({ facing: f, url: dataUrl });
+    }
+    setPreviews(prevs);
+    onReady(outputs);
+  };
+
   const handleGenerate = async () => {
     if (!slice) return;
     setBusy(true);
     try {
-      const facingsToEmit = includeRight ? FACINGS : (["down", "up", "left"] as Facing[]);
-      const outputs: FacingOutput[] = [];
-      for (const f of facingsToEmit) {
-        const { blob, w, h } = composeFacingSheet(slice.cleanedCanvas, frames, f);
-        outputs.push({ facing: f, blob: await blob, width: w, height: h });
-      }
-      onReady(outputs);
+      await runGenerate(slice, frames);
     } catch (e: any) {
       setErr(e?.message ?? "Falha ao gerar PNGs");
     }
@@ -96,12 +109,61 @@ export function SkinSheetEditor({ file, includeRight, onReady, autoApply = true 
   if (busy && !slice) return <div className="text-sm text-muted-foreground">Detectando frames…</div>;
   if (!slice || !cleanedUrl) return null;
 
+  if (autoApply && !showEditor) {
+    return (
+      <div className="space-y-3">
+        <div className="flex items-center justify-between gap-3">
+          <p className="text-[11px] text-muted-foreground">
+            {busy
+              ? "Processando folha…"
+              : `Pronto! ${previews?.length ?? 0} folhas geradas automaticamente (fundo removido, frames alinhados pelo centro e linha do pé).`}
+          </p>
+          <button
+            type="button"
+            onClick={() => setShowEditor(true)}
+            className="px-2.5 py-1 rounded-md bg-muted text-xs hover:bg-muted/70 shrink-0"
+          >
+            Ajustar manualmente
+          </button>
+        </div>
+        {previews && (
+          <div className="space-y-2 rounded-lg border bg-muted/20 p-3">
+            {previews.map((p) => (
+              <div key={p.facing} className="flex items-center gap-3">
+                <div className="w-12 text-[10px] uppercase tracking-wider text-muted-foreground">
+                  {p.facing}
+                </div>
+                <img
+                  src={p.url}
+                  alt={p.facing}
+                  className="h-16 rounded bg-[#1a1a1a]"
+                  style={{ imageRendering: "pixelated" }}
+                />
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4">
-      <p className="text-[11px] text-muted-foreground">
-        Layout {slice.rows}×{slice.cols}. Os {frames.length} frames foram detectados automaticamente.
-        Clique em qualquer frame pra ajustar o recorte; arraste as bordas pra redimensionar ou o miolo pra mover.
-      </p>
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-[11px] text-muted-foreground">
+          Layout {slice.rows}×{slice.cols}. Os {frames.length} frames foram detectados automaticamente.
+          Clique em qualquer frame pra ajustar o recorte; arraste as bordas pra redimensionar ou o miolo pra mover.
+        </p>
+        {autoApply && (
+          <button
+            type="button"
+            onClick={() => setShowEditor(false)}
+            className="px-2.5 py-1 rounded-md bg-muted text-xs hover:bg-muted/70 shrink-0"
+          >
+            Fechar editor
+          </button>
+        )}
+      </div>
 
       <FrameGrid
         slice={slice}
@@ -118,10 +180,8 @@ export function SkinSheetEditor({ file, includeRight, onReady, autoApply = true 
         index={selected}
         onChange={(patch) => updateFrame(selected, patch)}
         onResetAuto={async () => {
-          // refaz auto só desse frame
           const f = frames[selected];
           if (!f) return;
-          const r = FACINGS.indexOf(f.facing);
           const sub = await sliceSheetFromFile(file, { includeRight });
           const fresh = sub.frames.find((x) => x.facing === f.facing && x.col === f.col);
           if (fresh) updateFrame(selected, { ...fresh, edited: false });
