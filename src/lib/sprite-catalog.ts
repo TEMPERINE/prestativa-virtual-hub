@@ -14,7 +14,7 @@ import blondeRight from "@/assets/sprites/blonde-right.png";
 import curlyDown from "@/assets/sprites/curly-down.png";
 import curlyUp from "@/assets/sprites/curly-up.png";
 import curlyLeft from "@/assets/sprites/curly-left.png";
-import curlyRight from "@/assets/sprites/curly-right.png";
+
 
 import redheadDown from "@/assets/sprites/redhead-down.png";
 import redheadUp from "@/assets/sprites/redhead-up.png";
