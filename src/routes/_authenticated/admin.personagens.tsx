@@ -96,7 +96,7 @@ function AdminPersonagensPage() {
   };
 
   const remove = async (s: Skin) => {
-    if (!confirm(`Excluir "${s.label}"?`)) return;
+    if (!(await appConfirm({ title: `Excluir "${s.label}"?`, confirmLabel: "Excluir", destructive: true }))) return;
     try {
       await deleteFn({ data: { id: s.id } });
       invalidateSpriteCatalog();
