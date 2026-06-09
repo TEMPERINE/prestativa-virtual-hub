@@ -312,7 +312,11 @@ export function AiWalkComposer({ onSheetReady }: Props) {
                 onChange={(e) => onUpload(f, e.target.files?.[0] ?? null)}
                 className="w-full text-[10px]"
               />
-            )}
+          </div>
+        ))}
+      </div>
+
+
 
       <button
         type="button"
