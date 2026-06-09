@@ -11,6 +11,8 @@ import {
 } from "@/lib/admin/sprites.functions";
 import { adminListWorkspacesFull } from "@/lib/admin/workspaces.functions";
 import { invalidateSpriteCatalog } from "@/lib/sprites/useSpriteCatalog";
+import { appPrompt, appConfirm } from "@/components/ui/app-dialogs";
+
 
 
 export const Route = createFileRoute("/_authenticated/admin/personagens")({
