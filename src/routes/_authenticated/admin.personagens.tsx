@@ -3,7 +3,8 @@ import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { ArrowLeft, Upload, Trash2, Pencil, Plus } from "lucide-react";
+import { ArrowLeft, Upload, Trash2, Pencil, Plus, Lightbulb } from "lucide-react";
+import spriteMatrixExample from "@/assets/sprite-matrix-example.png";
 import {
   adminListSkins,
   adminCreateSignedUploadUrls,
@@ -262,7 +263,28 @@ function AdminPersonagensPage() {
             )}
 
             {mode === "ai" && !sourceFile && (
-              <AiWalkComposer onSheetReady={(f) => { setSourceFile(f); setOutputs(null); }} />
+              <>
+                <div className="rounded-xl border bg-muted/30 p-4 space-y-3">
+                  <div className="flex items-center gap-2 text-xs font-medium text-foreground">
+                    <Lightbulb size={14} className="text-yellow-500" />
+                    Exemplo ideal — 4 poses estáticas
+                  </div>
+                  <img
+                    src={spriteMatrixExample}
+                    alt="Exemplo de matriz de poses: frente, costas, esquerda, direita"
+                    className="w-full max-w-md mx-auto rounded-lg border bg-white"
+                    loading="lazy"
+                    width={512}
+                    height={512}
+                  />
+                  <p className="text-[11px] text-muted-foreground leading-relaxed">
+                    Suba <strong>4 imagens separadas</strong> (ou uma única imagem com as 4 poses):
+                    personagem parado de <strong>frente</strong>, <strong>costas</strong>, <strong>lado esquerdo</strong> e <strong>lado direito</strong>.
+                    Use fundo transparente se possível. A IA vai gerar os frames de caminhada automaticamente a partir dessas referências.
+                  </p>
+                </div>
+                <AiWalkComposer onSheetReady={(f) => { setSourceFile(f); setOutputs(null); }} />
+              </>
             )}
           </div>
 
