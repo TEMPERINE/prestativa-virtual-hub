@@ -79,7 +79,40 @@ export function AiWalkComposer({ onSheetReady }: Props) {
     setRefAndFrame0(facing, url);
   };
 
-  /** Fatia 1 imagem em grade 2×2 → down (TL), up (TR), left (BL), right (BR). */
+  /** Detecta bbox do personagem em uma ImageData (após remoção de fundo branco).
+   *  Devolve bbox, centro horizontal ponderado e linha do pé. */
+  const detectBbox = (img: ImageData) => {
+    const { width: W, height: H, data } = img;
+    let x0 = W, y0 = H, x1 = -1, y1 = -1;
+    const colCounts = new Int32Array(W);
+    for (let y = 0; y < H; y++) {
+      for (let x = 0; x < W; x++) {
+        const a = data[(y * W + x) * 4 + 3];
+        if (a <= 24) continue;
+        if (x < x0) x0 = x;
+        if (x > x1) x1 = x;
+        if (y < y0) y0 = y;
+        if (y > y1) y1 = y;
+        colCounts[x]++;
+      }
+    }
+    if (x1 < 0) return null;
+    let maxC = 0;
+    for (let i = x0; i <= x1; i++) if (colCounts[i] > maxC) maxC = colCounts[i];
+    const thr = Math.max(1, Math.floor(maxC * 0.05));
+    let num = 0, den = 0;
+    for (let i = x0; i <= x1; i++) {
+      const c = colCounts[i] >= thr ? colCounts[i] : 0;
+      num += i * c;
+      den += c;
+    }
+    const cx = den > 0 ? num / den : (x0 + x1) / 2;
+    return { x0, y0, x1: x1 + 1, y1: y1 + 1, cx, footY: y1 + 1 };
+  };
+
+  /** Fatia 1 imagem em grade 2×2 → down (TL), up (TR), left (BL), right (BR).
+   *  Cada quadrante é normalizado: fundo removido, personagem centralizado
+   *  horizontalmente e alinhado pelos pés numa baseline comum aos 4. */
   const onUploadSheet = async (f: File | null) => {
     if (!f) return;
     try {
@@ -87,26 +120,77 @@ export function AiWalkComposer({ onSheetReady }: Props) {
       const img = await loadImg(url);
       const halfW = Math.floor(img.width / 2);
       const halfH = Math.floor(img.height / 2);
-      const slice = (sx: number, sy: number): string => {
+
+      // Extrai cada quadrante já com fundo removido + bbox detectada.
+      type Tile = { canvas: HTMLCanvasElement; bbox: ReturnType<typeof detectBbox> };
+      const extract = (sx: number, sy: number): Tile => {
         const c = document.createElement("canvas");
         c.width = halfW;
         c.height = halfH;
         const ctx = c.getContext("2d")!;
         ctx.drawImage(img, sx, sy, halfW, halfH, 0, 0, halfW, halfH);
+        const id = ctx.getImageData(0, 0, halfW, halfH);
+        removeWhiteBackground(id);
+        ctx.clearRect(0, 0, halfW, halfH);
+        ctx.putImageData(id, 0, 0);
+        return { canvas: c, bbox: detectBbox(id) };
+      };
+
+      const tilesRaw: Record<Facing, Tile> = {
+        down: extract(0, 0),
+        up: extract(halfW, 0),
+        left: extract(0, halfH),
+        right: extract(halfW, halfH),
+      };
+
+      // Calcula o "canvas comum" para alinhar todos pelos pés/centro.
+      let maxLeft = 0, maxRight = 0, maxAbove = 0;
+      for (const fac of FACINGS) {
+        const bb = tilesRaw[fac].bbox;
+        if (!bb) continue;
+        maxLeft = Math.max(maxLeft, Math.ceil(bb.cx - bb.x0));
+        maxRight = Math.max(maxRight, Math.ceil(bb.x1 - bb.cx));
+        maxAbove = Math.max(maxAbove, bb.footY - bb.y0);
+      }
+      const padX = Math.max(8, Math.floor(Math.max(maxLeft, maxRight) * 0.08));
+      const padTop = Math.max(8, Math.floor(maxAbove * 0.04));
+      const padBot = Math.max(8, Math.floor(maxAbove * 0.06));
+      const outW = maxLeft + maxRight + padX * 2;
+      const outH = maxAbove + padTop + padBot;
+
+      const renderNormalized = (t: Tile): string => {
+        const c = document.createElement("canvas");
+        c.width = outW;
+        c.height = outH;
+        const ctx = c.getContext("2d")!;
+        ctx.imageSmoothingEnabled = false;
+        // fundo branco para que o pipeline downstream (sheet-processor)
+        // continue identificando o background via flood-fill.
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(0, 0, outW, outH);
+        if (!t.bbox) return c.toDataURL("image/png");
+        const { x0, y0, x1, y1, cx, footY } = t.bbox;
+        const w = x1 - x0;
+        const h = y1 - y0;
+        const dstX = Math.round(outW / 2 - (cx - x0));
+        const dstY = Math.round(outH - padBot - (footY - y0));
+        ctx.drawImage(t.canvas, x0, y0, w, h, dstX, dstY, w, h);
         return c.toDataURL("image/png");
       };
+
       const tiles: Record<Facing, string> = {
-        down: slice(0, 0),
-        up: slice(halfW, 0),
-        left: slice(0, halfH),
-        right: slice(halfW, halfH),
+        down: renderNormalized(tilesRaw.down),
+        up: renderNormalized(tilesRaw.up),
+        left: renderNormalized(tilesRaw.left),
+        right: renderNormalized(tilesRaw.right),
       };
       for (const fac of FACINGS) setRefAndFrame0(fac, tiles[fac]);
-      toast.success("Folha fatiada nas 4 poses.");
+      toast.success("Folha fatiada — personagens centralizados e alinhados pelos pés.");
     } catch (e: any) {
       toast.error(e?.message ?? "Erro ao fatiar a imagem");
     }
   };
+
 
   /** Gera frames 1..5 de uma facing. Mapeamento:
    *  frame 0 = idle (upload)
