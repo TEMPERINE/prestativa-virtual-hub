@@ -605,11 +605,33 @@ export function useRtcMesh(myId: string | null, desiredPeers: string[]): RtcMesh
       analyser.fftSize = 512;
       src.connect(analyser);
       const data = new Uint8Array(new ArrayBuffer(analyser.frequencyBinCount));
+      // Mesmo limiar/hangover dos peers: balão de fala próprio só aparece
+      // quando há voz real (acima do ruído ambiente) por ~120ms, e some
+      // ~450ms depois do silêncio. Antes piscava só por estar com o mic on.
+      const ON_THRESHOLD = 28;
+      const OFF_THRESHOLD = 18;
+      const ATTACK_MS = 120;
+      const RELEASE_MS = 450;
+      let speaking = false;
+      let aboveSince = 0;
+      let belowSince = performance.now();
       const tick = () => {
         analyser.getByteFrequencyData(data);
         let sum = 0;
         for (let i = 0; i < data.length; i++) sum += data[i];
-        setSelfSpeaking(sum / data.length > 12);
+        const level = sum / data.length;
+        const now = performance.now();
+        if (level >= ON_THRESHOLD) {
+          if (!aboveSince) aboveSince = now;
+          belowSince = 0;
+          if (!speaking && now - aboveSince >= ATTACK_MS) { speaking = true; setSelfSpeaking(true); }
+        } else if (level <= OFF_THRESHOLD) {
+          if (!belowSince) belowSince = now;
+          aboveSince = 0;
+          if (speaking && now - belowSince >= RELEASE_MS) { speaking = false; setSelfSpeaking(false); }
+        } else {
+          if (speaking) aboveSince = 0; else belowSince = 0;
+        }
         raf = requestAnimationFrame(tick);
       };
       raf = requestAnimationFrame(tick);
@@ -620,6 +642,7 @@ export function useRtcMesh(myId: string | null, desiredPeers: string[]): RtcMesh
       setSelfSpeaking(false);
     };
   }, [micOn]);
+
 
 
   const acquireMic = useCallback(async (deviceId?: string): Promise<MediaStreamTrack | null> => {
