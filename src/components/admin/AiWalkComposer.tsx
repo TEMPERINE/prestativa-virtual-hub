@@ -3,6 +3,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { adminGenerateWalkFrame } from "@/lib/admin/ai-sprite.functions";
 import { Loader2, Wand2, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
+import { removeWhiteBackground } from "@/lib/sprites/sheet-processor";
 
 type Facing = "down" | "up" | "left" | "right";
 const FACINGS: Facing[] = ["down", "up", "left", "right"];
