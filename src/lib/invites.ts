@@ -28,6 +28,26 @@ export function getPendingInviteToken(): string | null {
   try { return sessionStorage.getItem(STORAGE_KEY); } catch { return null; }
 }
 
+/**
+ * Base pública pra montar links de convite.
+ * O preview do Lovable (`*.lovableproject.com`) exige login na Lovable pra abrir,
+ * então quem recebe o link não consegue acessar. Trocamos pela URL publicada estável.
+ */
+export function publicAppBaseUrl(): string {
+  if (typeof window === "undefined") return "";
+  const envUrl = (import.meta.env.VITE_PUBLIC_APP_URL as string | undefined)?.replace(/\/$/, "");
+  if (envUrl) return envUrl;
+  const { origin } = window.location;
+  if (/lovableproject\.com$/i.test(window.location.hostname)) {
+    return "https://prestativa-virtual-hub.lovable.app";
+  }
+  return origin;
+}
+
+export function buildInviteUrl(token: string): string {
+  return `${publicAppBaseUrl()}/convite/${token}`;
+}
+
 export async function peekInvite(token: string): Promise<InvitePeek> {
   const { data, error } = await supabase.rpc("invite_peek", { _token: token });
   if (error || !data) return { kind: null, valid: false };
