@@ -1,4 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
+import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 export type IceServer = {
   urls: string | string[];
@@ -6,7 +7,9 @@ export type IceServer = {
   credential?: string;
 };
 
-export const getIceServers = createServerFn({ method: "GET" }).handler(async (): Promise<IceServer[]> => {
+export const getIceServers = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async (): Promise<IceServer[]> => {
   const username = process.env.TURN_USERNAME;
   const credential = process.env.TURN_CREDENTIAL;
   const servers: IceServer[] = [
