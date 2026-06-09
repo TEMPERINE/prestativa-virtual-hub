@@ -1015,6 +1015,14 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
       }).catch(() => { /* noop */ });
     }, 1000);
 
+    // Reconcile periódico: peers que fecharam o app sem disparar
+    // beforeunload/pagehide ficam com is_online=true no DB. A reconciliação
+    // baseada em presence é a fonte da verdade.
+    const reconcileInterval = window.setInterval(() => {
+      reconcilePresence();
+    }, 5000);
+
+
     // Reconnection + resync watchdog: when the tab regains focus (or the
     // browser wakes from sleep), force a position sync, re-track presence
     // and re-broadcast our position. Supabase Realtime auto-reconnects the
