@@ -114,7 +114,6 @@ const MAX_STEP_FACTOR = 3;       // evita pulos enormes quando a aba volta do ba
 const SEND_INTERVAL_MS = 120;
 const POSITION_BROADCAST_CHANNEL = "positions-broadcast-v1";
 const POSITION_PRESENCE_CHANNEL = "positions-presence-v1";
-const REMOTE_TELEPORT_MIN_DISTANCE = 0.075;
 
 const timestampForPosition = (p: Partial<Pick<RemotePos, "updated_at" | "ts">>) =>
   p.ts ?? (p.updated_at ? Date.parse(p.updated_at) : 0);
@@ -267,17 +266,6 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
     );
     remoteTeleportTimers.current.set(userId, timers);
   }, []);
-  const maybeStartRemoteTeleportFromCurrent = useCallback((userId: string, to: Point, incomingTs: number) => {
-    if (!userId || userId === meIdRef.current || !validPoint(to)) return;
-    if (remoteTeleportTimers.current.has(userId)) return;
-    const cur = positionsRef.current[userId];
-    if (!cur || !validPoint(cur)) return;
-    const curTs = timestampForPosition(cur) || (positionFreshTs.current.get(userId) ?? 0);
-    if (incomingTs && curTs && incomingTs < curTs) return;
-    const from = { x: cur.x, y: cur.y };
-    if (distanceBetween(from, to) < REMOTE_TELEPORT_MIN_DISTANCE) return;
-    startRemoteTeleport(userId, from, to);
-  }, [startRemoteTeleport]);
   // Per-remote-user walking animation state. Advances frame while position is changing.
   const remoteAnimRef = useRef<Map<string, { frame: number; lastMove: number; lastX: number; lastY: number; lastTick: number }>>(new Map());
   const [remoteFrames, setRemoteFrames] = useState<Record<string, number>>({});
