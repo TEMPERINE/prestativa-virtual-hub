@@ -1230,6 +1230,8 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
       positionBroadcastReadyRef.current = false;
       window.clearInterval(positionsPoll);
       window.clearInterval(presenceHeartbeat);
+      window.clearInterval(reconcileInterval);
+
       window.clearInterval(persistHeartbeat);
       window.removeEventListener("beforeunload", persistFinalPosition);
       window.removeEventListener("pagehide", onPageHide);
