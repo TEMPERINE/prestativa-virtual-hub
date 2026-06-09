@@ -922,9 +922,38 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
         });
       }
     };
+    // Presence is the authoritative source for "who is currently inside this
+    // workspace world". DB rows can stay is_online=true if a peer closed the
+    // app without firing beforeunload/pagehide (common on Electron quit). After
+    // a short grace period (so peers have time to track themselves), we
+    // reconcile: any peer in our positions map that is NOT in the presence
+    // state is treated as offline locally.
+    let presenceReconcileReady = false;
+    const reconcilePresence = () => {
+      if (!presenceReconcileReady) return;
+      const state = presenceCh.presenceState() as Record<string, PresenceState[]>;
+      const onlineIds = new Set<string>();
+      for (const list of Object.values(state)) {
+        for (const s of list) if (s?.user_id) onlineIds.add(s.user_id);
+      }
+      const myId = meIdRef.current;
+      setPositions((p) => {
+        let changed = false;
+        const next = { ...p };
+        for (const [uid, cur] of Object.entries(p)) {
+          if (uid === myId) continue;
+          if (cur.is_online && !onlineIds.has(uid)) {
+            next[uid] = { ...cur, is_online: false };
+            changed = true;
+          }
+        }
+        return changed ? next : p;
+      });
+    };
     presenceCh.on("presence", { event: "sync" }, () => {
       const state = presenceCh.presenceState() as Record<string, PresenceState[]>;
       for (const list of Object.values(state)) mergePresence(list);
+      reconcilePresence();
     });
     presenceCh.on("presence", { event: "join" }, ({ newPresences }) => mergePresence(newPresences));
     presenceCh.on("presence", { event: "leave" }, ({ leftPresences }) => {
@@ -981,6 +1010,11 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
             zone: zoneAt(cur).id, facing: facingRef.current, ts: Date.now(),
           });
         } catch { /* noop */ }
+        // Give peers ~8s to track themselves before we start reconciling.
+        window.setTimeout(() => {
+          presenceReconcileReady = true;
+          reconcilePresence();
+        }, 8000);
       });
     })();
 
