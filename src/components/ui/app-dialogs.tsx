@@ -198,7 +198,8 @@ export function AppDialogsHost() {
             {o.confirmLabel ?? "Confirmar"}
           </button>
         </DialogFooter>
-      </Dialog>
+      </DialogContent>
+
     </Dialog>
   );
 }
