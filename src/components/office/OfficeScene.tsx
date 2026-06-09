@@ -710,13 +710,31 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
         const z = findZoneById(myClaimZone);
         const rect = zoneRectFromOverrides(myClaimZone as ZoneId) ?? z?.rect ?? null;
         const sp = spawnPointForZone(myClaimZone);
-        // Preferimos o spawn point frontal explícito; se não houver, usamos
-        // o ponto frontal calculado do rect da cadeira.
-        startPoint = sp ?? (rect ? seatPointForRect(rect) : SPAWN);
+        // Preferimos o spawn point frontal explícito; se houver mas colidir
+        // (móvel adicionado por cima depois), caímos pro seat point do rect.
+        if (sp && !collides(sp)) {
+          startPoint = sp;
+        } else if (rect) {
+          startPoint = seatPointForRect(rect);
+        } else {
+          startPoint = randomCorridorPoint();
+        }
       } else {
         startPoint = randomCorridorPoint();
       }
-      const safeStart = collides(startPoint) ? SPAWN : startPoint;
+      // Last-resort: se ainda colide, anda até achar livre em vez de teleportar pro SPAWN longe da cadeira.
+      let safeStart = startPoint;
+      if (collides(safeStart)) {
+        let found = false;
+        for (let r = 0.01; r <= 0.2 && !found; r += 0.01) {
+          for (const [dx, dy] of [[0, r], [0, -r], [r, 0], [-r, 0], [r, r], [-r, r], [r, -r], [-r, -r]] as const) {
+            const p = { x: startPoint.x + dx, y: startPoint.y + dy };
+            if (!collides(p)) { safeStart = p; found = true; break; }
+          }
+        }
+        if (!found) safeStart = SPAWN;
+      }
+
 
       posRef.current = safeStart;
       setPos(safeStart);
