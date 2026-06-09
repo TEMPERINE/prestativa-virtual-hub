@@ -1,7 +1,8 @@
 import { createFileRoute, Link, redirect } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { getPendingInviteToken } from "@/lib/invites";
 
 export const Route = createFileRoute("/auth")({
   head: () => ({
