@@ -952,8 +952,14 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
     presenceCh.on("presence", { event: "sync" }, () => {
       const state = presenceCh.presenceState() as Record<string, PresenceState[]>;
       for (const list of Object.values(state)) mergePresence(list);
+      // A primeira sync já carrega o roster real do canal — a partir daí a
+      // presence vira a fonte da verdade pra "quem está no espaço". Sem
+      // ativar imediatamente, ficávamos 3s confiando no DB e peers fantasmas
+      // (apps fechados sem aviso) continuavam visíveis nesse intervalo.
+      presenceReconcileReady = true;
       reconcilePresence();
     });
+
     presenceCh.on("presence", { event: "join" }, ({ newPresences }) => mergePresence(newPresences));
     presenceCh.on("presence", { event: "leave" }, ({ leftPresences }) => {
       const arr = leftPresences as unknown as PresenceState[];
