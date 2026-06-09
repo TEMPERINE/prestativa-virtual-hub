@@ -167,7 +167,9 @@ export function AppDialogsHost() {
       </DialogContent>
     </Dialog>
   );
-}
+  }
+
+
 
 
   const o = current.opts;
