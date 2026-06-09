@@ -183,20 +183,12 @@ function WorkspacesHubPage() {
             </p>
           </div>
           {isAdmin && (
-            <div className="flex items-center gap-2">
-              <Link
-                to="/admin/contas"
-                className="px-3 py-2 rounded-lg bg-muted hover:bg-muted/70 text-xs font-medium inline-flex items-center gap-1.5"
-              >
-                Gerenciar contas
-              </Link>
-              <Link
-                to="/workspaces/new"
-                className="px-4 py-2 rounded-lg gradient-primary text-primary-foreground text-sm font-medium inline-flex items-center gap-2 hover:opacity-90 shadow-glow"
-              >
-                <Plus size={14} /> Novo espaço
-              </Link>
-            </div>
+            <Link
+              to="/admin"
+              className="px-4 py-2 rounded-lg gradient-primary text-primary-foreground text-sm font-medium inline-flex items-center gap-2 hover:opacity-90 shadow-glow"
+            >
+              <Plus size={14} /> Painel Admin
+            </Link>
           )}
         </div>
 
