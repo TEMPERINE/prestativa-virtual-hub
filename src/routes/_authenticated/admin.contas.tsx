@@ -14,6 +14,8 @@ import {
   adminRemoveFromWorkspace,
   adminListWorkspaces,
 } from "@/lib/admin/accounts.functions";
+import { appPrompt, appConfirm } from "@/components/ui/app-dialogs";
+
 
 export const Route = createFileRoute("/_authenticated/admin/contas")({
   ssr: false,
