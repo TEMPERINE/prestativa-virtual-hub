@@ -14,7 +14,7 @@ import blondeRight from "@/assets/sprites/blonde-right.png";
 import curlyDown from "@/assets/sprites/curly-down.png";
 import curlyUp from "@/assets/sprites/curly-up.png";
 import curlyLeft from "@/assets/sprites/curly-left.png";
-import curlyRight from "@/assets/sprites/curly-right.png";
+
 
 import redheadDown from "@/assets/sprites/redhead-down.png";
 import redheadUp from "@/assets/sprites/redhead-up.png";
@@ -90,15 +90,16 @@ export const SPRITES: SpriteDef[] = [
     id: "curly",
     label: "Morena Cacheada",
     gender: "f",
-    sheets: { up: curlyUp, down: curlyDown, left: curlyLeft, right: curlyRight },
+    sheets: { up: curlyUp, down: curlyDown, left: curlyLeft, right: curlyLeft },
     dims: {
-      down: { w: 255, h: 226 },
-      up: { w: 255, h: 251 },
-      left: { w: 255, h: 205 },
-      right: { w: 255, h: 205 },
+      down: { w: 144, h: 242 },
+      up: { w: 136, h: 240 },
+      left: { w: 148, h: 242 },
+      right: { w: 148, h: 242 },
     },
-    mirrorLeftFromRight: true,
+    mirrorRightFromLeft: true,
   },
+
   {
     id: "redhead",
     label: "Ruiva",
