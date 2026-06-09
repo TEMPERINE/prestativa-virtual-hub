@@ -3118,12 +3118,15 @@ function WorkspaceZoneHover({
             style={{
               position: "fixed",
               left: pos.left,
-              // Flutua acima do retângulo da mesa pra não cobrir o sprite do personagem
-              top: pos.top - 90,
-              transform: "translate(-50%, -100%)",
+              // Centraliza dentro do retângulo do espaço — assim o mouse
+              // que está sobre a mesa já está sobre o botão (sem "gap" que
+              // faz o hover sumir antes de alcançar).
+              top: pos.top,
+              transform: "translate(-50%, -50%)",
               zIndex: 2147483647,
               pointerEvents: "auto",
             }}
+
           >
             {children}
           </div>,
