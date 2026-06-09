@@ -114,12 +114,10 @@ const MAX_STEP_FACTOR = 3;       // evita pulos enormes quando a aba volta do ba
 const SEND_INTERVAL_MS = 120;
 const POSITION_BROADCAST_CHANNEL = "positions-broadcast-v1";
 const POSITION_PRESENCE_CHANNEL = "positions-presence-v1";
-const REMOTE_TELEPORT_MIN_DISTANCE = 0.075;
 
 const timestampForPosition = (p: Partial<Pick<RemotePos, "updated_at" | "ts">>) =>
   p.ts ?? (p.updated_at ? Date.parse(p.updated_at) : 0);
 
-const distanceBetween = (a: Point, b: Point) => Math.hypot(a.x - b.x, a.y - b.y);
 const validPoint = (p: Point | undefined): p is Point =>
   !!p && Number.isFinite(p.x) && Number.isFinite(p.y);
 const LAST_POSITION_KEY_PREFIX = "office:last-position:v1:";
@@ -267,17 +265,6 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
     );
     remoteTeleportTimers.current.set(userId, timers);
   }, []);
-  const maybeStartRemoteTeleportFromCurrent = useCallback((userId: string, to: Point, incomingTs: number) => {
-    if (!userId || userId === meIdRef.current || !validPoint(to)) return;
-    if (remoteTeleportTimers.current.has(userId)) return;
-    const cur = positionsRef.current[userId];
-    if (!cur || !validPoint(cur)) return;
-    const curTs = timestampForPosition(cur) || (positionFreshTs.current.get(userId) ?? 0);
-    if (incomingTs && curTs && incomingTs < curTs) return;
-    const from = { x: cur.x, y: cur.y };
-    if (distanceBetween(from, to) < REMOTE_TELEPORT_MIN_DISTANCE) return;
-    startRemoteTeleport(userId, from, to);
-  }, [startRemoteTeleport]);
   // Per-remote-user walking animation state. Advances frame while position is changing.
   const remoteAnimRef = useRef<Map<string, { frame: number; lastMove: number; lastX: number; lastY: number; lastTick: number }>>(new Map());
   const [remoteFrames, setRemoteFrames] = useState<Record<string, number>>({});
@@ -799,8 +786,6 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
         (payload) => {
           const row = (payload.new ?? payload.old) as RemotePos & { updated_at?: string };
           if (!row) return;
-          const rowTs = timestampForPosition(row) || Date.now();
-          if (row.is_online) maybeStartRemoteTeleportFromCurrent(row.user_id, { x: row.x, y: row.y }, rowTs);
           setPositions((prev) => {
             const next = { ...prev };
             if (payload.eventType === "DELETE") {
@@ -812,7 +797,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
             if (dbTs && dbTs < freshTs) {
               const cur = prev[row.user_id];
               if (cur) {
-                next[row.user_id] = { ...cur, is_online: row.is_online };
+                next[row.user_id] = { ...cur, is_online: row.is_online || cur.is_online };
                 return next;
               }
             }
@@ -849,7 +834,6 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
         const row = payload.payload as RemotePos;
         if (!row?.user_id) return;
         const incomingTs = timestampForPosition(row) || Date.now();
-        maybeStartRemoteTeleportFromCurrent(row.user_id, { x: row.x, y: row.y }, incomingTs);
         setPositions((prev) => {
           const curTs = timestampForPosition(prev[row.user_id] ?? {}) || (positionFreshTs.current.get(row.user_id) ?? 0);
           if (incomingTs < curTs) return prev;
@@ -906,7 +890,6 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
         const prev = presenceLastTs.get(s.user_id) ?? 0;
         if (s.ts <= prev) continue;
         presenceLastTs.set(s.user_id, s.ts);
-        maybeStartRemoteTeleportFromCurrent(s.user_id, { x: s.x, y: s.y }, s.ts);
         setPositions((p) => {
           const cur = p[s.user_id];
           // Presence heartbeat is hydration-guarded (never advertises SPAWN),
@@ -980,15 +963,16 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
 
     presenceCh.on("presence", { event: "join" }, ({ newPresences }) => mergePresence(newPresences));
     presenceCh.on("presence", { event: "leave" }, ({ leftPresences }) => {
+      // Não esconda imediatamente no leave: o realtime pode emitir leave/join
+      // durante re-track, reconexão ou troca de foco. O reconcilePresence aplica
+      // a carência antes de marcar offline, evitando piscar ao andar.
+      const now = Date.now();
       const arr = leftPresences as unknown as PresenceState[];
       for (const s of arr ?? []) {
         if (!s?.user_id || s.user_id === meIdRef.current) continue;
-        setPositions((p) => {
-          const cur = p[s.user_id];
-          if (!cur) return p;
-          return { ...p, [s.user_id]: { ...cur, is_online: false } };
-        });
+        if (!presenceMissingSince.has(s.user_id)) presenceMissingSince.set(s.user_id, now);
       }
+      reconcilePresence();
     });
 
     const claimsCh = supabase
@@ -1169,22 +1153,33 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
       for (const list of Object.values(presenceState)) {
         for (const s of list) if (s?.user_id) presenceOnlineIds.add(s.user_id);
       }
+      const now = Date.now();
       setPositions((prev) => {
         const next: Record<string, RemotePos> = { ...prev };
         (data as Array<RemotePos & { updated_at?: string }>).forEach((p) => {
           if (uid && p.user_id === uid) return; // handled below
           const dbTs = p.updated_at ? Date.parse(p.updated_at) : 0;
           const freshTs = positionFreshTs.current.get(p.user_id) ?? 0;
-          // Online efetivo = DB diz online E peer está em presence (após o
-          // grace period inicial). Antes do grace, confiamos no DB.
-          const effectiveOnline = presenceReconcileReady
-            ? (p.is_online && presenceOnlineIds.has(p.user_id))
-            : p.is_online;
-          if (effectiveOnline) maybeStartRemoteTeleportFromCurrent(p.user_id, { x: p.x, y: p.y }, dbTs || Date.now());
+          const cur = prev[p.user_id];
+          // Online efetivo: DB false derruba; DB true + absence temporária de
+          // presence mantém o avatar por alguns segundos. Sem isso o poll de DB
+          // escondia o colega em qualquer blip de websocket/presence.
+          let effectiveOnline = p.is_online;
+          if (p.is_online && presenceReconcileReady) {
+            if (presenceOnlineIds.has(p.user_id)) {
+              presenceMissingSince.delete(p.user_id);
+              effectiveOnline = true;
+            } else if (cur?.is_online) {
+              const since = presenceMissingSince.get(p.user_id) ?? now;
+              presenceMissingSince.set(p.user_id, since);
+              effectiveOnline = now - since < PRESENCE_OFFLINE_GRACE_MS;
+            } else {
+              effectiveOnline = false;
+            }
+          }
           // Strict LWW: DB rows older than the freshest known live sample are
           // never allowed to move a stopped avatar back to a spawn/old spot.
           if (dbTs && dbTs < freshTs) {
-            const cur = prev[p.user_id];
             if (cur) next[p.user_id] = { ...cur, is_online: effectiveOnline };
             else next[p.user_id] = { ...p, is_online: effectiveOnline };
           } else {
