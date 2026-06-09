@@ -14,6 +14,7 @@ import {
 import { adminListWorkspacesFull } from "@/lib/admin/workspaces.functions";
 import { invalidateSpriteCatalog } from "@/lib/sprites/useSpriteCatalog";
 import { SkinSheetEditor, type FacingOutput } from "@/components/admin/SkinSheetEditor";
+import { AiWalkComposer } from "@/components/admin/AiWalkComposer";
 
 export const Route = createFileRoute("/_authenticated/admin/personagens")({
   ssr: false,
