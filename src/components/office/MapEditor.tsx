@@ -320,8 +320,8 @@ export function MapEditor() {
     setDirty(true);
   }, [defaultKindOf]);
 
-  const addCustomZone = useCallback(() => {
-    const label = window.prompt("Nome da nova zona:");
+  const addCustomZone = useCallback(async () => {
+    const label = await appPrompt({ title: "Nova zona", placeholder: "Nome da zona", confirmLabel: "Criar" });
     if (!label || !label.trim()) return;
     const palette = ["#22d3ee", "#fb7185", "#a3e635", "#fbbf24", "#c084fc", "#34d399", "#f472b6", "#60a5fa"];
     setOverrides((prev) => {
