@@ -3,19 +3,15 @@ import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { ArrowLeft, Upload, Trash2, Pencil, Plus, Lightbulb } from "lucide-react";
-import spriteMatrixExample from "@/assets/sprite-matrix-example.png";
+import { ArrowLeft, Trash2, Pencil } from "lucide-react";
 import {
   adminListSkins,
-  adminCreateSignedUploadUrls,
-  adminSaveSkin,
   adminUpdateSkin,
   adminDeleteSkin,
 } from "@/lib/admin/sprites.functions";
 import { adminListWorkspacesFull } from "@/lib/admin/workspaces.functions";
 import { invalidateSpriteCatalog } from "@/lib/sprites/useSpriteCatalog";
-import { SkinSheetEditor, type FacingOutput } from "@/components/admin/SkinSheetEditor";
-import { AiWalkComposer } from "@/components/admin/AiWalkComposer";
+
 
 export const Route = createFileRoute("/_authenticated/admin/personagens")({
   ssr: false,
@@ -48,8 +44,6 @@ function AdminPersonagensPage() {
   const navigate = useNavigate();
   const listFn = useServerFn(adminListSkins);
   const wsListFn = useServerFn(adminListWorkspacesFull);
-  const signFn = useServerFn(adminCreateSignedUploadUrls);
-  const saveFn = useServerFn(adminSaveSkin);
   const updateFn = useServerFn(adminUpdateSkin);
   const deleteFn = useServerFn(adminDeleteSkin);
 
@@ -57,17 +51,6 @@ function AdminPersonagensPage() {
   const [loading, setLoading] = useState(true);
   const [skins, setSkins] = useState<Skin[]>([]);
   const [workspaces, setWorkspaces] = useState<Ws[]>([]);
-
-  // form
-  const [skinId, setSkinId] = useState("");
-  const [label, setLabel] = useState("");
-  const [gender, setGender] = useState<"m" | "f" | "n">("n");
-  const [wsId, setWsId] = useState<string>("");
-  const [mirrorRight, setMirrorRight] = useState(true);
-  const [sourceFile, setSourceFile] = useState<File | null>(null);
-  const [outputs, setOutputs] = useState<FacingOutput[] | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [mode, setMode] = useState<"sheet" | "ai">("sheet");
 
   const check = async () => {
     const { data: u } = await supabase.auth.getUser();
@@ -91,57 +74,6 @@ function AdminPersonagensPage() {
   };
   useEffect(() => { load(); }, []);
 
-  const create = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!outputs || outputs.length === 0) {
-      toast.error("Gere os PNGs no editor antes de salvar.");
-      return;
-    }
-    setBusy(true);
-    try {
-      const facings = outputs.map((o) => o.facing);
-      const { uploads } = (await signFn({ data: { skinId, facings } })) as any;
-
-      const sheets: Record<Facing, string> = {} as any;
-      const dims: Record<Facing, { w: number; h: number }> = {} as any;
-
-      for (const out of outputs) {
-        const u = uploads[out.facing];
-        const file = new File([out.blob], `${out.facing}.png`, { type: "image/png" });
-        const { error } = await supabase.storage
-          .from("sprite-sheets")
-          .uploadToSignedUrl(u.path, u.token, file, { contentType: "image/png" });
-        if (error) throw new Error(`Falha enviando ${out.facing}: ${error.message}`);
-        sheets[out.facing] = u.path;
-        // cellW = width / 6 (sheet tem 6 frames)
-        dims[out.facing] = { w: Math.round(out.width / 6), h: out.height };
-      }
-      if (mirrorRight && !sheets.right) {
-        sheets.right = sheets.left;
-        dims.right = dims.left;
-      }
-
-      await saveFn({
-        data: {
-          id: skinId,
-          label,
-          gender,
-          workspaceId: wsId || null,
-          sheets,
-          dims,
-          mirrorRightFromLeft: mirrorRight,
-          mirrorLeftFromRight: false,
-        },
-      });
-      toast.success("Personagem criado!");
-      invalidateSpriteCatalog();
-      setSkinId(""); setLabel(""); setWsId(""); setSourceFile(null); setOutputs(null);
-      load();
-    } catch (e: any) {
-      toast.error(e?.message ?? "Erro ao criar");
-    }
-    setBusy(false);
-  };
 
   const rename = async (s: Skin) => {
     const newLabel = prompt("Novo rótulo:", s.label);
@@ -182,129 +114,20 @@ function AdminPersonagensPage() {
         </button>
         <h1 className="text-3xl font-semibold tracking-tight mb-2">Personagens (skins)</h1>
         <p className="text-sm text-muted-foreground mb-6">
-          Suba uma folha de sprite (PNG, 4 linhas × 6 colunas: down, up, left, right). O sistema fatia,
-          remove o fundo, alinha pelo centro e pela linha do pé — tudo em 1 clique. Use "Ajustar manualmente"
-          só se algum frame precisar de refino.
+          Gerenciamento das skins existentes. Criação de novas skins está suspensa nesta fase do piloto.
         </p>
 
-        <form onSubmit={create} className="glass-panel rounded-2xl p-6 mb-10 space-y-5">
-          <h2 className="text-sm font-medium uppercase tracking-wider text-muted-foreground flex items-center gap-2">
-            <Plus size={14} /> Novo personagem
+
+        <div className="glass-panel rounded-2xl p-6 mb-10 border border-dashed">
+          <h2 className="text-sm font-medium uppercase tracking-wider text-muted-foreground mb-2">
+            Novo personagem — temporariamente desativado
           </h2>
-          <div className="grid sm:grid-cols-3 gap-3">
-            <div>
-              <label className="block text-xs font-medium mb-1.5">ID (slug)</label>
-              <input value={skinId} onChange={(e) => setSkinId(e.target.value.toLowerCase())}
-                required pattern="[a-z0-9-]{2,32}" placeholder="ex: barbara"
-                className="w-full rounded-lg border bg-background px-3 py-2 text-sm font-mono" />
-            </div>
-            <div>
-              <label className="block text-xs font-medium mb-1.5">Rótulo</label>
-              <input value={label} onChange={(e) => setLabel(e.target.value)} required
-                placeholder="Ex: Bárbara"
-                className="w-full rounded-lg border bg-background px-3 py-2 text-sm" />
-            </div>
-            <div>
-              <label className="block text-xs font-medium mb-1.5">Gênero</label>
-              <select value={gender} onChange={(e) => setGender(e.target.value as any)}
-                className="w-full rounded-lg border bg-background px-3 py-2 text-sm">
-                <option value="f">Feminino</option>
-                <option value="m">Masculino</option>
-                <option value="n">Neutro</option>
-              </select>
-            </div>
-            <div className="sm:col-span-2">
-              <label className="block text-xs font-medium mb-1.5">Espaço (vazio = global)</label>
-              <select value={wsId} onChange={(e) => setWsId(e.target.value)}
-                className="w-full rounded-lg border bg-background px-3 py-2 text-sm">
-                <option value="">— Global (todos veem) —</option>
-                {workspaces.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
-              </select>
-            </div>
-            <div className="flex items-end">
-              <label className="text-xs inline-flex items-center gap-2 cursor-pointer">
-                <input type="checkbox" checked={mirrorRight} onChange={(e) => setMirrorRight(e.target.checked)} />
-                Espelhar right do left
-              </label>
-            </div>
-          </div>
+          <p className="text-xs text-muted-foreground leading-relaxed">
+            O fluxo de criação de skins (upload de folha e geração com IA) está suspenso nesta fase de validação.
+            Estamos focando o piloto na Prestativa com as 9 skins padrão. A função volta depois da escala.
+          </p>
+        </div>
 
-          <div>
-            <div className="flex gap-2 mb-2">
-              <button
-                type="button"
-                onClick={() => { setMode("sheet"); setSourceFile(null); setOutputs(null); }}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium ${mode === "sheet" ? "bg-foreground text-background" : "bg-muted text-foreground"}`}
-              >
-                Subir folha pronta (4×6)
-              </button>
-              <button
-                type="button"
-                onClick={() => { setMode("ai"); setSourceFile(null); setOutputs(null); }}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium ${mode === "ai" ? "bg-foreground text-background" : "bg-muted text-foreground"}`}
-              >
-                Gerar com IA (4 fotos)
-              </button>
-            </div>
-
-            {mode === "sheet" && (
-              <>
-                <label className="block text-xs font-medium mb-1.5">Folha-fonte (PNG, 4×6)</label>
-                <input
-                  type="file"
-                  accept="image/png"
-                  onChange={(e) => {
-                    const f = e.target.files?.[0] ?? null;
-                    setSourceFile(f);
-                    setOutputs(null);
-                  }}
-                  className="w-full text-xs"
-                />
-              </>
-            )}
-
-            {mode === "ai" && !sourceFile && (
-              <>
-                <div className="rounded-xl border bg-muted/30 p-4 space-y-3">
-                  <div className="flex items-center gap-2 text-xs font-medium text-foreground">
-                    <Lightbulb size={14} className="text-yellow-500" />
-                    Exemplo ideal — 4 poses estáticas
-                  </div>
-                  <img
-                    src={spriteMatrixExample}
-                    alt="Exemplo de matriz de poses: frente, costas, esquerda, direita"
-                    className="w-full max-w-md mx-auto rounded-lg border bg-white"
-                    loading="lazy"
-                    width={512}
-                    height={512}
-                  />
-                  <p className="text-[11px] text-muted-foreground leading-relaxed">
-                    Suba <strong>4 imagens separadas</strong> (ou uma única imagem com as 4 poses):
-                    personagem parado de <strong>frente</strong>, <strong>costas</strong>, <strong>lado esquerdo</strong> e <strong>lado direito</strong>.
-                    Use fundo transparente se possível. A IA vai gerar os frames de caminhada automaticamente a partir dessas referências.
-                  </p>
-                </div>
-                <AiWalkComposer onSheetReady={(f) => { setSourceFile(f); setOutputs(null); }} />
-              </>
-            )}
-          </div>
-
-          {sourceFile && (
-            <SkinSheetEditor
-              file={sourceFile}
-              includeRight={!mirrorRight}
-              onReady={(outs) => {
-                setOutputs(outs);
-                toast.success(`${outs.length} folhas prontas pra envio`);
-              }}
-            />
-          )}
-
-          <button type="submit" disabled={busy || !outputs}
-            className="px-4 py-2 rounded-lg gradient-primary text-primary-foreground text-sm font-medium inline-flex items-center gap-2 hover:opacity-90 shadow-glow disabled:opacity-50">
-            <Upload size={14} /> {busy ? "Enviando…" : "Salvar personagem"}
-          </button>
-        </form>
 
         <div className="text-xs uppercase tracking-wider text-muted-foreground mb-3">
           Personagens dinâmicos ({skins.length})
