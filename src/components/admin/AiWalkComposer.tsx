@@ -59,10 +59,9 @@ export function AiWalkComposer({ onSheetReady }: Props) {
   });
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
+  const [uploadMode, setUploadMode] = useState<"four" | "sheet">("four");
 
-  const onUpload = async (facing: Facing, f: File | null) => {
-    if (!f) return;
-    const url = await fileToDataUrl(f);
+  const setRefAndFrame0 = (facing: Facing, url: string) => {
     setRefs((p) => ({ ...p, [facing]: url }));
     setFrames((p) => {
       const next = { ...p };
@@ -71,6 +70,41 @@ export function AiWalkComposer({ onSheetReady }: Props) {
       next[facing] = arr;
       return next;
     });
+  };
+
+  const onUpload = async (facing: Facing, f: File | null) => {
+    if (!f) return;
+    const url = await fileToDataUrl(f);
+    setRefAndFrame0(facing, url);
+  };
+
+  /** Fatia 1 imagem em grade 2×2 → down (TL), up (TR), left (BL), right (BR). */
+  const onUploadSheet = async (f: File | null) => {
+    if (!f) return;
+    try {
+      const url = await fileToDataUrl(f);
+      const img = await loadImg(url);
+      const halfW = Math.floor(img.width / 2);
+      const halfH = Math.floor(img.height / 2);
+      const slice = (sx: number, sy: number): string => {
+        const c = document.createElement("canvas");
+        c.width = halfW;
+        c.height = halfH;
+        const ctx = c.getContext("2d")!;
+        ctx.drawImage(img, sx, sy, halfW, halfH, 0, 0, halfW, halfH);
+        return c.toDataURL("image/png");
+      };
+      const tiles: Record<Facing, string> = {
+        down: slice(0, 0),
+        up: slice(halfW, 0),
+        left: slice(0, halfH),
+        right: slice(halfW, halfH),
+      };
+      for (const fac of FACINGS) setRefAndFrame0(fac, tiles[fac]);
+      toast.success("Folha fatiada nas 4 poses.");
+    } catch (e: any) {
+      toast.error(e?.message ?? "Erro ao fatiar a imagem");
+    }
   };
 
   /** Gera frames 1..5 de uma facing. Mapeamento:
@@ -220,7 +254,42 @@ export function AiWalkComposer({ onSheetReady }: Props) {
         </p>
       </div>
 
-      {/* Slots de upload */}
+      {/* Seletor de modo de upload */}
+      <div className="flex gap-2">
+        <button
+          type="button"
+          onClick={() => setUploadMode("four")}
+          className={`px-3 py-1.5 rounded-lg text-[11px] font-medium ${uploadMode === "four" ? "bg-foreground text-background" : "bg-muted text-foreground"}`}
+        >
+          4 imagens separadas
+        </button>
+        <button
+          type="button"
+          onClick={() => setUploadMode("sheet")}
+          className={`px-3 py-1.5 rounded-lg text-[11px] font-medium ${uploadMode === "sheet" ? "bg-foreground text-background" : "bg-muted text-foreground"}`}
+        >
+          1 folha 2×2 (auto-fatiar)
+        </button>
+      </div>
+
+      {uploadMode === "sheet" && (
+        <div className="p-3 rounded-lg border border-dashed border-border bg-background/50">
+          <label className="block text-[10px] uppercase tracking-wider text-muted-foreground mb-1.5">
+            Folha 2×2 (frente / costas em cima — esquerda / direita embaixo)
+          </label>
+          <input
+            type="file"
+            accept="image/png,image/jpeg,image/webp"
+            onChange={(e) => onUploadSheet(e.target.files?.[0] ?? null)}
+            className="w-full text-[11px]"
+          />
+          <p className="text-[10px] text-muted-foreground mt-1.5">
+            A imagem é dividida em 4 quadrantes iguais e cada um vira a referência de uma direção.
+          </p>
+        </div>
+      )}
+
+      {/* Slots de upload / preview */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {FACINGS.map((f) => (
           <div key={f} className="space-y-1.5">
@@ -236,15 +305,19 @@ export function AiWalkComposer({ onSheetReady }: Props) {
                 </div>
               )}
             </div>
-            <input
-              type="file"
-              accept="image/png,image/jpeg,image/webp"
-              onChange={(e) => onUpload(f, e.target.files?.[0] ?? null)}
-              className="w-full text-[10px]"
-            />
+            {uploadMode === "four" && (
+              <input
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                onChange={(e) => onUpload(f, e.target.files?.[0] ?? null)}
+                className="w-full text-[10px]"
+              />
+            )}
           </div>
         ))}
       </div>
+
+
 
       <button
         type="button"
