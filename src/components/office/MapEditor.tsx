@@ -25,6 +25,8 @@ import { useOfficeTheme } from "@/hooks/useOfficeTheme";
 import { getCurrentWorkspaceId, subscribeCurrentWorkspaceId } from "@/lib/workspace/current";
 import { useWorkspaceTier } from "@/lib/workspace/useWorkspaceTier";
 import { toast } from "sonner";
+import { appPrompt, appConfirm } from "@/components/ui/app-dialogs";
+
 import { ArrowLeft, Eraser, Square, Download, Trash2, Eye, EyeOff, Undo, Plus, X, Briefcase, Users, MapPin, Hand, Zap, ZapOff, Lock, Map as MapIcon, Boxes, LayoutGrid, Upload, Loader2, Palette, Check } from "lucide-react";
 
 type Tool =
@@ -184,12 +186,14 @@ export function MapEditor() {
   }, []);
 
   const onUploadAsset = useCallback(async (file: File) => {
-    const label = window.prompt("Nome do elemento:", file.name.replace(/\.[^.]+$/, ""));
+    const label = await appPrompt({ title: "Nome do elemento", defaultValue: file.name.replace(/\.[^.]+$/, ""), placeholder: "Ex: mesa, planta…" });
     if (!label) return;
-    const framesStr = window.prompt(
-      "Quantos frames horizontais a imagem contém?\n(1 = imagem única; 2+ = sprite sheet dividido horizontalmente)",
-      "1"
-    );
+    const framesStr = await appPrompt({
+      title: "Frames horizontais",
+      description: "Quantos frames a imagem contém? 1 = imagem única; 2+ = sprite sheet dividido horizontalmente.",
+      defaultValue: "1",
+      placeholder: "1",
+    });
     if (!framesStr) return;
     const frameCount = Math.max(1, Math.floor(Number(framesStr)) || 1);
     setUploading(true);
@@ -205,7 +209,7 @@ export function MapEditor() {
   }, []);
 
   const onDeleteCustomProp = useCallback(async (id: string, label: string) => {
-    if (!confirm(`Remover "${label}" da galeria? Isso não apaga instâncias já colocadas no mapa.`)) return;
+    if (!(await appConfirm({ title: `Remover "${label}"?`, description: "Não apaga instâncias já colocadas no mapa.", confirmLabel: "Remover", destructive: true }))) return;
     try {
       await deleteCustomProp(id);
       toast.success("Elemento removido da galeria.");
@@ -316,8 +320,8 @@ export function MapEditor() {
     setDirty(true);
   }, [defaultKindOf]);
 
-  const addCustomZone = useCallback(() => {
-    const label = window.prompt("Nome da nova zona:");
+  const addCustomZone = useCallback(async () => {
+    const label = await appPrompt({ title: "Nova zona", placeholder: "Nome da zona", confirmLabel: "Criar" });
     if (!label || !label.trim()) return;
     const palette = ["#22d3ee", "#fb7185", "#a3e635", "#fbbf24", "#c084fc", "#34d399", "#f472b6", "#60a5fa"];
     setOverrides((prev) => {
@@ -331,8 +335,8 @@ export function MapEditor() {
   }, []);
 
   const removeCustomZone = useCallback(
-    (id: string) => {
-      if (!confirm("Remover esta zona e apagar suas células pintadas?")) return;
+    async (id: string) => {
+      if (!(await appConfirm({ title: "Remover esta zona?", description: "As células pintadas dela serão apagadas.", confirmLabel: "Remover", destructive: true }))) return;
       setOverrides((prev) => {
         const next: MapOverrides = {
           ...prev,
@@ -559,26 +563,27 @@ export function MapEditor() {
     }
   }, [overrides]);
 
-  const reset = useCallback(() => {
-    if (!confirm("Limpar todas as células pintadas?")) return;
+  const reset = useCallback(async () => {
+    if (!(await appConfirm({ title: "Limpar todas as células pintadas?", confirmLabel: "Limpar", destructive: true }))) return;
     setOverrides(newOverrides());
     setDirty(true);
   }, []);
 
-  const reseed = useCallback(() => {
-    if (!confirm("Recarregar layout padrão (descarta alterações)?")) return;
+  const reseed = useCallback(async () => {
+    if (!(await appConfirm({ title: "Recarregar layout padrão?", description: "As alterações não salvas serão descartadas.", confirmLabel: "Recarregar", destructive: true }))) return;
     setOverrides(seedFromDefaults());
     setDirty(true);
   }, []);
 
   const clearSaved = useCallback(async () => {
-    if (!confirm("Remover overrides salvos (local e nuvem)? O mapa voltará ao padrão.")) return;
+    if (!(await appConfirm({ title: "Remover overrides salvos?", description: "Remove local e nuvem. O mapa voltará ao padrão.", confirmLabel: "Remover", destructive: true }))) return;
     clearOverrides();
     await clearOverridesInCloud();
     setOverrides(seedFromDefaults());
     setDirty(true);
     toast.success("Overrides removidos.");
   }, []);
+
 
   // --- Importar paredes/zonas de outro espaço ----------------------------
   const [importOpen, setImportOpen] = useState(false);

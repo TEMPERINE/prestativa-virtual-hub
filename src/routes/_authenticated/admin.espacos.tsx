@@ -12,6 +12,8 @@ import {
 } from "@/lib/admin/workspaces.functions";
 import { adminListAccounts } from "@/lib/admin/accounts.functions";
 import { setCurrentWorkspaceId } from "@/lib/workspace/current";
+import { appPrompt, appConfirm } from "@/components/ui/app-dialogs";
+
 
 export const Route = createFileRoute("/_authenticated/admin/espacos")({
   ssr: false,
@@ -79,7 +81,7 @@ function AdminEspacosPage() {
   };
 
   const rename = async (ws: Ws) => {
-    const newName = prompt("Novo nome:", ws.name);
+    const newName = await appPrompt({ title: "Renomear espaço", defaultValue: ws.name, placeholder: "Novo nome" });
     if (!newName || newName === ws.name) return;
     try {
       await updateFn({ data: { id: ws.id, name: newName } });
@@ -96,7 +98,7 @@ function AdminEspacosPage() {
   };
 
   const remove = async (ws: Ws) => {
-    if (!confirm(`Excluir definitivamente "${ws.name}"? Todos os dados do espaço serão perdidos.`)) return;
+    if (!(await appConfirm({ title: `Excluir "${ws.name}"?`, description: "Todos os dados do espaço serão perdidos. Isto não pode ser desfeito.", confirmLabel: "Excluir", destructive: true }))) return;
     try {
       await deleteFn({ data: { id: ws.id } });
       toast.success("Espaço excluído.");

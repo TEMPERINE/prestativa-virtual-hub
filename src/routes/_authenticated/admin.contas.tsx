@@ -14,6 +14,8 @@ import {
   adminRemoveFromWorkspace,
   adminListWorkspaces,
 } from "@/lib/admin/accounts.functions";
+import { appPrompt, appConfirm } from "@/components/ui/app-dialogs";
+
 
 export const Route = createFileRoute("/_authenticated/admin/contas")({
   ssr: false,
@@ -123,7 +125,14 @@ function AdminContasPage() {
   };
 
   const resetPw = async (userId: string) => {
-    const pw = prompt("Nova senha (mín. 6 caracteres):");
+    const pw = await appPrompt({
+      title: "Redefinir senha",
+      description: "Defina uma nova senha provisória (mín. 6 caracteres).",
+      placeholder: "Nova senha",
+      inputType: "password",
+      minLength: 6,
+      confirmLabel: "Redefinir",
+    });
     if (!pw || pw.length < 6) return;
     try {
       await resetPwFn({ data: { userId, password: pw } });
@@ -132,13 +141,20 @@ function AdminContasPage() {
   };
 
   const removeAccount = async (acc: Account) => {
-    if (!confirm(`Excluir definitivamente a conta de ${acc.email}? Isto não pode ser desfeito.`)) return;
+    const ok = await appConfirm({
+      title: "Excluir conta?",
+      description: `A conta de ${acc.email} será apagada definitivamente. Isto não pode ser desfeito.`,
+      confirmLabel: "Excluir",
+      destructive: true,
+    });
+    if (!ok) return;
     try {
       await deleteFn({ data: { userId: acc.id } });
       toast.success("Conta excluída.");
       setAccounts((prev) => prev.filter((a) => a.id !== acc.id));
     } catch (e: any) { toast.error(e?.message ?? "Erro."); }
   };
+
 
   const assign = async (userId: string, workspaceId: string, role: "owner" | "admin" | "member") => {
     if (!workspaceId) return;

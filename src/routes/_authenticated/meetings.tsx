@@ -18,6 +18,8 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
+import { appPrompt, appConfirm } from "@/components/ui/app-dialogs";
+
 
 export const Route = createFileRoute("/_authenticated/meetings")({
   head: () => ({
@@ -191,34 +193,37 @@ function MeetingsPage() {
 
   // CRUD pastas
   const createFolder = async () => {
-    const name = window.prompt("Nome da nova pasta:")?.trim();
+    const raw = await appPrompt({ title: "Nova pasta", placeholder: "Nome da pasta", confirmLabel: "Criar" });
+    const name = raw?.trim();
     if (!name || !userId) return;
     const { data, error } = await sb
       .from("meeting_folders")
       .insert({ user_id: userId, name })
       .select("id, name")
       .single();
-    if (error) { alert(error.message); return; }
+    if (error) { toast.error(error.message); return; }
     setFolders((prev) => [...prev, data as FolderRow].sort((a, b) => a.name.localeCompare(b.name)));
     setSelected((data as FolderRow).id);
   };
 
   const renameFolder = async (f: FolderRow) => {
-    const name = window.prompt("Renomear pasta:", f.name)?.trim();
+    const raw = await appPrompt({ title: "Renomear pasta", defaultValue: f.name, placeholder: "Novo nome" });
+    const name = raw?.trim();
     if (!name || name === f.name) return;
     const { error } = await sb.from("meeting_folders").update({ name }).eq("id", f.id);
-    if (error) return alert(error.message);
+    if (error) { toast.error(error.message); return; }
     setFolders((prev) => prev.map((x) => (x.id === f.id ? { ...x, name } : x)).sort((a, b) => a.name.localeCompare(b.name)));
   };
 
   const deleteFolder = async (f: FolderRow) => {
-    if (!window.confirm(`Excluir a pasta "${f.name}"? As reuniões continuam no histórico.`)) return;
+    if (!(await appConfirm({ title: `Excluir "${f.name}"?`, description: "As reuniões continuam no histórico.", confirmLabel: "Excluir", destructive: true }))) return;
     const { error } = await sb.from("meeting_folders").delete().eq("id", f.id);
-    if (error) return alert(error.message);
+    if (error) { toast.error(error.message); return; }
     setFolders((prev) => prev.filter((x) => x.id !== f.id));
     setFolderItems((prev) => prev.filter((x) => x.folder_id !== f.id));
     if (selected === f.id) setSelected("all");
   };
+
 
   const toggleMembership = async (meetingId: string, folderId: string, isMember: boolean) => {
     if (!userId) return;

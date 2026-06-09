@@ -11,6 +11,8 @@ import {
 } from "@/lib/admin/sprites.functions";
 import { adminListWorkspacesFull } from "@/lib/admin/workspaces.functions";
 import { invalidateSpriteCatalog } from "@/lib/sprites/useSpriteCatalog";
+import { appPrompt, appConfirm } from "@/components/ui/app-dialogs";
+
 
 
 export const Route = createFileRoute("/_authenticated/admin/personagens")({
@@ -76,7 +78,7 @@ function AdminPersonagensPage() {
 
 
   const rename = async (s: Skin) => {
-    const newLabel = prompt("Novo rótulo:", s.label);
+    const newLabel = await appPrompt({ title: "Renomear personagem", defaultValue: s.label, placeholder: "Novo rótulo" });
     if (!newLabel || newLabel === s.label) return;
     try {
       await updateFn({ data: { id: s.id, label: newLabel } });
@@ -94,7 +96,7 @@ function AdminPersonagensPage() {
   };
 
   const remove = async (s: Skin) => {
-    if (!confirm(`Excluir "${s.label}"?`)) return;
+    if (!(await appConfirm({ title: `Excluir "${s.label}"?`, confirmLabel: "Excluir", destructive: true }))) return;
     try {
       await deleteFn({ data: { id: s.id } });
       invalidateSpriteCatalog();
