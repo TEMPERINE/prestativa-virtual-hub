@@ -26,6 +26,9 @@ function AuthPage() {
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
   const [loading, setLoading] = useState(false);
+  // Signup só é permitido quando há um convite pendente (link recebido por convite).
+  const [signupAllowed, setSignupAllowed] = useState(false);
+  useEffect(() => { setSignupAllowed(!!getPendingInviteToken()); }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
