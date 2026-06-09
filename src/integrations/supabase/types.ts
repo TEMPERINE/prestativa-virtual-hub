@@ -565,54 +565,6 @@ export type Database = {
         }
         Relationships: []
       }
-      signup_invites: {
-        Row: {
-          created_at: string
-          created_by: string
-          email: string | null
-          expires_at: string
-          id: string
-          max_uses: number
-          notes: string | null
-          plan: Database["public"]["Enums"]["account_plan"]
-          tier: number
-          token: string
-          updated_at: string
-          uses: number
-          workspace_name_suggestion: string | null
-        }
-        Insert: {
-          created_at?: string
-          created_by: string
-          email?: string | null
-          expires_at?: string
-          id?: string
-          max_uses?: number
-          notes?: string | null
-          plan?: Database["public"]["Enums"]["account_plan"]
-          tier?: number
-          token?: string
-          updated_at?: string
-          uses?: number
-          workspace_name_suggestion?: string | null
-        }
-        Update: {
-          created_at?: string
-          created_by?: string
-          email?: string | null
-          expires_at?: string
-          id?: string
-          max_uses?: number
-          notes?: string | null
-          plan?: Database["public"]["Enums"]["account_plan"]
-          tier?: number
-          token?: string
-          updated_at?: string
-          uses?: number
-          workspace_name_suggestion?: string | null
-        }
-        Relationships: []
-      }
       user_roles: {
         Row: {
           id: string
@@ -844,10 +796,6 @@ export type Database = {
       meeting_share_recording: {
         Args: { _meeting_id: string; _recipient_id: string }
         Returns: undefined
-      }
-      signup_invite_redeem: {
-        Args: { _token: string; _workspace_name?: string }
-        Returns: string
       }
       workspace_accept_invite: { Args: { _token: string }; Returns: string }
     }

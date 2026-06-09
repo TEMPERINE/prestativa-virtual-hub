@@ -185,10 +185,10 @@ function WorkspacesHubPage() {
           {isAdmin && (
             <div className="flex items-center gap-2">
               <Link
-                to="/admin/invites"
+                to="/admin/contas"
                 className="px-3 py-2 rounded-lg bg-muted hover:bg-muted/70 text-xs font-medium inline-flex items-center gap-1.5"
               >
-                Convites de cadastro
+                Gerenciar contas
               </Link>
               <Link
                 to="/workspaces/new"

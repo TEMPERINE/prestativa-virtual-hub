@@ -14,7 +14,6 @@ import { Route as DownloadRouteImport } from './routes/download'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as ConviteTokenRouteImport } from './routes/convite.$token'
 import { Route as AuthenticatedOnboardingRouteImport } from './routes/_authenticated/onboarding'
 import { Route as AuthenticatedOfficeRouteImport } from './routes/_authenticated/office'
 import { Route as AuthenticatedMeetingsRouteImport } from './routes/_authenticated/meetings'
@@ -23,7 +22,7 @@ import { Route as AuthenticatedWorkspacesIndexRouteImport } from './routes/_auth
 import { Route as AuthenticatedWorkspacesNewRouteImport } from './routes/_authenticated/workspaces.new'
 import { Route as AuthenticatedWorkspacesWorkspaceIdRouteImport } from './routes/_authenticated/workspaces.$workspaceId'
 import { Route as AuthenticatedOfficeEditorRouteImport } from './routes/_authenticated/office_.editor'
-import { Route as AuthenticatedAdminInvitesRouteImport } from './routes/_authenticated/admin.invites'
+import { Route as AuthenticatedAdminContasRouteImport } from './routes/_authenticated/admin.contas'
 
 const SobreRoute = SobreRouteImport.update({
   id: '/sobre',
@@ -47,11 +46,6 @@ const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ConviteTokenRoute = ConviteTokenRouteImport.update({
-  id: '/convite/$token',
-  path: '/convite/$token',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthenticatedOnboardingRoute = AuthenticatedOnboardingRouteImport.update({
@@ -99,10 +93,10 @@ const AuthenticatedOfficeEditorRoute =
     path: '/office/editor',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
-const AuthenticatedAdminInvitesRoute =
-  AuthenticatedAdminInvitesRouteImport.update({
-    id: '/admin/invites',
-    path: '/admin/invites',
+const AuthenticatedAdminContasRoute =
+  AuthenticatedAdminContasRouteImport.update({
+    id: '/admin/contas',
+    path: '/admin/contas',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 
@@ -115,8 +109,7 @@ export interface FileRoutesByFullPath {
   '/meetings': typeof AuthenticatedMeetingsRoute
   '/office': typeof AuthenticatedOfficeRoute
   '/onboarding': typeof AuthenticatedOnboardingRoute
-  '/convite/$token': typeof ConviteTokenRoute
-  '/admin/invites': typeof AuthenticatedAdminInvitesRoute
+  '/admin/contas': typeof AuthenticatedAdminContasRoute
   '/office/editor': typeof AuthenticatedOfficeEditorRoute
   '/workspaces/$workspaceId': typeof AuthenticatedWorkspacesWorkspaceIdRoute
   '/workspaces/new': typeof AuthenticatedWorkspacesNewRoute
@@ -131,8 +124,7 @@ export interface FileRoutesByTo {
   '/meetings': typeof AuthenticatedMeetingsRoute
   '/office': typeof AuthenticatedOfficeRoute
   '/onboarding': typeof AuthenticatedOnboardingRoute
-  '/convite/$token': typeof ConviteTokenRoute
-  '/admin/invites': typeof AuthenticatedAdminInvitesRoute
+  '/admin/contas': typeof AuthenticatedAdminContasRoute
   '/office/editor': typeof AuthenticatedOfficeEditorRoute
   '/workspaces/$workspaceId': typeof AuthenticatedWorkspacesWorkspaceIdRoute
   '/workspaces/new': typeof AuthenticatedWorkspacesNewRoute
@@ -149,8 +141,7 @@ export interface FileRoutesById {
   '/_authenticated/meetings': typeof AuthenticatedMeetingsRoute
   '/_authenticated/office': typeof AuthenticatedOfficeRoute
   '/_authenticated/onboarding': typeof AuthenticatedOnboardingRoute
-  '/convite/$token': typeof ConviteTokenRoute
-  '/_authenticated/admin/invites': typeof AuthenticatedAdminInvitesRoute
+  '/_authenticated/admin/contas': typeof AuthenticatedAdminContasRoute
   '/_authenticated/office_/editor': typeof AuthenticatedOfficeEditorRoute
   '/_authenticated/workspaces/$workspaceId': typeof AuthenticatedWorkspacesWorkspaceIdRoute
   '/_authenticated/workspaces/new': typeof AuthenticatedWorkspacesNewRoute
@@ -167,8 +158,7 @@ export interface FileRouteTypes {
     | '/meetings'
     | '/office'
     | '/onboarding'
-    | '/convite/$token'
-    | '/admin/invites'
+    | '/admin/contas'
     | '/office/editor'
     | '/workspaces/$workspaceId'
     | '/workspaces/new'
@@ -183,8 +173,7 @@ export interface FileRouteTypes {
     | '/meetings'
     | '/office'
     | '/onboarding'
-    | '/convite/$token'
-    | '/admin/invites'
+    | '/admin/contas'
     | '/office/editor'
     | '/workspaces/$workspaceId'
     | '/workspaces/new'
@@ -200,8 +189,7 @@ export interface FileRouteTypes {
     | '/_authenticated/meetings'
     | '/_authenticated/office'
     | '/_authenticated/onboarding'
-    | '/convite/$token'
-    | '/_authenticated/admin/invites'
+    | '/_authenticated/admin/contas'
     | '/_authenticated/office_/editor'
     | '/_authenticated/workspaces/$workspaceId'
     | '/_authenticated/workspaces/new'
@@ -214,7 +202,6 @@ export interface RootRouteChildren {
   AuthRoute: typeof AuthRoute
   DownloadRoute: typeof DownloadRoute
   SobreRoute: typeof SobreRoute
-  ConviteTokenRoute: typeof ConviteTokenRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -252,13 +239,6 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/convite/$token': {
-      id: '/convite/$token'
-      path: '/convite/$token'
-      fullPath: '/convite/$token'
-      preLoaderRoute: typeof ConviteTokenRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authenticated/onboarding': {
@@ -317,11 +297,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedOfficeEditorRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
-    '/_authenticated/admin/invites': {
-      id: '/_authenticated/admin/invites'
-      path: '/admin/invites'
-      fullPath: '/admin/invites'
-      preLoaderRoute: typeof AuthenticatedAdminInvitesRouteImport
+    '/_authenticated/admin/contas': {
+      id: '/_authenticated/admin/contas'
+      path: '/admin/contas'
+      fullPath: '/admin/contas'
+      preLoaderRoute: typeof AuthenticatedAdminContasRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
   }
@@ -332,7 +312,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedMeetingsRoute: typeof AuthenticatedMeetingsRoute
   AuthenticatedOfficeRoute: typeof AuthenticatedOfficeRoute
   AuthenticatedOnboardingRoute: typeof AuthenticatedOnboardingRoute
-  AuthenticatedAdminInvitesRoute: typeof AuthenticatedAdminInvitesRoute
+  AuthenticatedAdminContasRoute: typeof AuthenticatedAdminContasRoute
   AuthenticatedOfficeEditorRoute: typeof AuthenticatedOfficeEditorRoute
   AuthenticatedWorkspacesWorkspaceIdRoute: typeof AuthenticatedWorkspacesWorkspaceIdRoute
   AuthenticatedWorkspacesNewRoute: typeof AuthenticatedWorkspacesNewRoute
@@ -344,7 +324,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedMeetingsRoute: AuthenticatedMeetingsRoute,
   AuthenticatedOfficeRoute: AuthenticatedOfficeRoute,
   AuthenticatedOnboardingRoute: AuthenticatedOnboardingRoute,
-  AuthenticatedAdminInvitesRoute: AuthenticatedAdminInvitesRoute,
+  AuthenticatedAdminContasRoute: AuthenticatedAdminContasRoute,
   AuthenticatedOfficeEditorRoute: AuthenticatedOfficeEditorRoute,
   AuthenticatedWorkspacesWorkspaceIdRoute:
     AuthenticatedWorkspacesWorkspaceIdRoute,
@@ -361,18 +341,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthRoute: AuthRoute,
   DownloadRoute: DownloadRoute,
   SobreRoute: SobreRoute,
-  ConviteTokenRoute: ConviteTokenRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
