@@ -25,6 +25,8 @@ import { useOfficeTheme } from "@/hooks/useOfficeTheme";
 import { getCurrentWorkspaceId, subscribeCurrentWorkspaceId } from "@/lib/workspace/current";
 import { useWorkspaceTier } from "@/lib/workspace/useWorkspaceTier";
 import { toast } from "sonner";
+import { appPrompt, appConfirm } from "@/components/ui/app-dialogs";
+
 import { ArrowLeft, Eraser, Square, Download, Trash2, Eye, EyeOff, Undo, Plus, X, Briefcase, Users, MapPin, Hand, Zap, ZapOff, Lock, Map as MapIcon, Boxes, LayoutGrid, Upload, Loader2, Palette, Check } from "lucide-react";
 
 type Tool =
