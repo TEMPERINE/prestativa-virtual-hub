@@ -78,7 +78,7 @@ function AdminPersonagensPage() {
 
 
   const rename = async (s: Skin) => {
-    const newLabel = prompt("Novo rótulo:", s.label);
+    const newLabel = await appPrompt({ title: "Renomear personagem", defaultValue: s.label, placeholder: "Novo rótulo" });
     if (!newLabel || newLabel === s.label) return;
     try {
       await updateFn({ data: { id: s.id, label: newLabel } });
