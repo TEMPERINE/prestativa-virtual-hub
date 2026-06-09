@@ -209,7 +209,7 @@ export function MapEditor() {
   }, []);
 
   const onDeleteCustomProp = useCallback(async (id: string, label: string) => {
-    if (!confirm(`Remover "${label}" da galeria? Isso não apaga instâncias já colocadas no mapa.`)) return;
+    if (!(await appConfirm({ title: `Remover "${label}"?`, description: "Não apaga instâncias já colocadas no mapa.", confirmLabel: "Remover", destructive: true }))) return;
     try {
       await deleteCustomProp(id);
       toast.success("Elemento removido da galeria.");
