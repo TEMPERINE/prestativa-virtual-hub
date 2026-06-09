@@ -694,6 +694,12 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
       });
       setClaims(cmap);
 
+      // Garante que os overrides do mapa (rects e spawn points custom) estejam
+      // carregados do cloud ANTES de calcular o ponto de spawn. Sem isto,
+      // zonas customizadas caem em SPAWN porque zoneRectFromOverrides/
+      // spawnPointForZone leem do localStorage ainda vazio.
+      try { await pullOverridesFromCloud(); } catch { /* noop */ }
+
       // Ao entrar no workspace, o personagem sempre nasce no spawn point da
       // sua cadeira reivindicada (posição frontal). Quem não tem cadeira cai
       // num ponto aleatório do corredor. Não preservamos posição anterior:
@@ -702,13 +708,16 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
       let startPoint: Point;
       if (myClaimZone) {
         const z = findZoneById(myClaimZone);
-        const sp = spawnPointForZone(myClaimZone);
         const rect = zoneRectFromOverrides(myClaimZone as ZoneId) ?? z?.rect ?? null;
+        const sp = spawnPointForZone(myClaimZone);
+        // Preferimos o spawn point frontal explícito; se não houver, usamos
+        // o ponto frontal calculado do rect da cadeira.
         startPoint = sp ?? (rect ? seatPointForRect(rect) : SPAWN);
       } else {
         startPoint = randomCorridorPoint();
       }
       const safeStart = collides(startPoint) ? SPAWN : startPoint;
+
       posRef.current = safeStart;
       setPos(safeStart);
       const startZone = zoneAt(safeStart).id;
@@ -982,11 +991,14 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
             zone: zoneAt(cur).id, facing: facingRef.current, ts: Date.now(),
           });
         } catch { /* noop */ }
-        // Give peers ~8s to track themselves before we start reconciling.
+        // Give peers ~3s to track themselves before we start reconciling,
+        // depois faz reconcile periódico para capturar peers que fecharam o
+        // app bruscamente sem disparar beforeunload/pagehide.
         window.setTimeout(() => {
           presenceReconcileReady = true;
           reconcilePresence();
-        }, 8000);
+        }, 3000);
+
       });
     })();
 
@@ -1002,6 +1014,14 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
         zone: zoneAt(cur).id, facing: facingRef.current, ts: Date.now(),
       }).catch(() => { /* noop */ });
     }, 1000);
+
+    // Reconcile periódico: peers que fecharam o app sem disparar
+    // beforeunload/pagehide ficam com is_online=true no DB. A reconciliação
+    // baseada em presence é a fonte da verdade.
+    const reconcileInterval = window.setInterval(() => {
+      reconcilePresence();
+    }, 5000);
+
 
     // Reconnection + resync watchdog: when the tab regains focus (or the
     // browser wakes from sleep), force a position sync, re-track presence
@@ -1210,6 +1230,8 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
       positionBroadcastReadyRef.current = false;
       window.clearInterval(positionsPoll);
       window.clearInterval(presenceHeartbeat);
+      window.clearInterval(reconcileInterval);
+
       window.clearInterval(persistHeartbeat);
       window.removeEventListener("beforeunload", persistFinalPosition);
       window.removeEventListener("pagehide", onPageHide);
