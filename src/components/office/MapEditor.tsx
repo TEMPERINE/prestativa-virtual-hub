@@ -186,12 +186,14 @@ export function MapEditor() {
   }, []);
 
   const onUploadAsset = useCallback(async (file: File) => {
-    const label = window.prompt("Nome do elemento:", file.name.replace(/\.[^.]+$/, ""));
+    const label = await appPrompt({ title: "Nome do elemento", defaultValue: file.name.replace(/\.[^.]+$/, ""), placeholder: "Ex: mesa, planta…" });
     if (!label) return;
-    const framesStr = window.prompt(
-      "Quantos frames horizontais a imagem contém?\n(1 = imagem única; 2+ = sprite sheet dividido horizontalmente)",
-      "1"
-    );
+    const framesStr = await appPrompt({
+      title: "Frames horizontais",
+      description: "Quantos frames a imagem contém? 1 = imagem única; 2+ = sprite sheet dividido horizontalmente.",
+      defaultValue: "1",
+      placeholder: "1",
+    });
     if (!framesStr) return;
     const frameCount = Math.max(1, Math.floor(Number(framesStr)) || 1);
     setUploading(true);
