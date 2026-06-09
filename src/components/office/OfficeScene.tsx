@@ -991,11 +991,14 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
             zone: zoneAt(cur).id, facing: facingRef.current, ts: Date.now(),
           });
         } catch { /* noop */ }
-        // Give peers ~8s to track themselves before we start reconciling.
+        // Give peers ~3s to track themselves before we start reconciling,
+        // depois faz reconcile periódico para capturar peers que fecharam o
+        // app bruscamente sem disparar beforeunload/pagehide.
         window.setTimeout(() => {
           presenceReconcileReady = true;
           reconcilePresence();
-        }, 8000);
+        }, 3000);
+
       });
     })();
 
