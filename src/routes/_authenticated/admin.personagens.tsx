@@ -114,10 +114,9 @@ function AdminPersonagensPage() {
         </button>
         <h1 className="text-3xl font-semibold tracking-tight mb-2">Personagens (skins)</h1>
         <p className="text-sm text-muted-foreground mb-6">
-          Suba uma folha de sprite (PNG, 4 linhas × 6 colunas: down, up, left, right). O sistema fatia,
-          remove o fundo, alinha pelo centro e pela linha do pé — tudo em 1 clique. Use "Ajustar manualmente"
-          só se algum frame precisar de refino.
+          Gerenciamento das skins existentes. Criação de novas skins está suspensa nesta fase do piloto.
         </p>
+
 
         <div className="glass-panel rounded-2xl p-6 mb-10 border border-dashed">
           <h2 className="text-sm font-medium uppercase tracking-wider text-muted-foreground mb-2">
