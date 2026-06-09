@@ -1,103 +1,90 @@
+# Hub Admin único — Contas, Espaços e Personagens
 
-## Objetivo
+Hoje só você é admin. A ideia é centralizar tudo em `/admin/*` para que ninguém mais precise (nem possa) criar/editar espaços ou cadastrar personagens.
 
-Eliminar todo o fluxo de auto-cadastro. Só **você (admin)** cria contas. Usuário recebe email + senha, faz login direto, escolhe personagem e cai num espaço que **você já atribuiu**.
+## 1. Espaços (workspaces) — só admin cria
 
----
+**Mudanças de regra:**
+- Remover criação de workspace pelo usuário comum. A rota `/workspaces/new` passa a redirecionar para `/workspaces` (ou some do menu). O botão "Criar novo espaço" no hub de workspaces some para não-admins.
+- Migration: política RLS de INSERT em `workspaces` passa a exigir `has_role(auth.uid(), 'admin')`. UPDATE/DELETE idem (já tem owner check, vou somar admin override).
 
-## Mudanças no comportamento
+**Nova aba `/admin/espacos`:**
+- Listar todos os workspaces (nome, tier, dono, nº membros).
+- Criar novo: nome, tier (1/2/3), dono (escolhe entre contas existentes — usa lista que já está em `/admin/contas`).
+- Para cada workspace, atalhos diretos pros editores **sem precisar entrar no workspace**:
+  - "Editar mapa" → abre `/office/editor?workspaceId=<id>` (a rota `office_.editor.tsx` já existe; vou ajustar pra aceitar `workspaceId` na query e, se admin, carregar o mapa daquele ws sem exigir membership).
+  - "Áreas / zonas" → mesmo editor (é tudo no MapEditor).
+  - "Props customizados" → reaproveita o editor existente, escopado ao workspace selecionado.
+- Renomear, mudar tier, excluir.
 
-### 1. Cadastro público — DESLIGADO
-- Supabase: `disable_signup: true`, `auto_confirm_email: true` (já está).
-- Página `/auth` passa a ter **só login** — aba "Criar conta" some pra sempre.
-- Rota `/convite/$token` e tabela `signup_invites` viram desnecessárias → **removidas**.
+## 2. Personagens (sprites) — editor admin
 
-### 2. Admin cria contas
-- Nova tela `/admin/contas` (super-admin only):
-  - Campos: email, senha provisória, nome, plano (essencial/pro/premium), opcional: workspace + role pra já entrar como membro.
-  - Backend: server function com `supabaseAdmin.auth.admin.createUser({ email, password, email_confirm: true })` + define plano no `profiles` + opcionalmente adiciona em `workspace_members`.
-  - Lista de contas existentes com: trocar plano, resetar senha, desativar, adicionar a workspaces.
+Hoje sprites são **hard-coded** em `src/lib/sprite-catalog.ts` (importados como assets do bundle). Para você poder adicionar/renomear/criar exclusivos por workspace em runtime, precisamos mover pra banco + storage:
 
-### 3. Onboarding simplificado
-- Wizard atual de avatar continua.
-- **Some** o passo de criar/escolher workspace.
-- Após avatar:
-  - Se tem 1 workspace → vai direto pro escritório.
-  - Se tem 2+ → tela de seleção.
-  - Se tem 0 → tela `aguardando-convite` (renomear pra `sem-acesso`) dizendo "Fale com seu admin".
+**Banco (migration):**
+- Tabela `sprite_skins`:
+  - `id` (slug, ex: `marcio`), `label`, `gender` (m/f/n)
+  - `workspace_id uuid null` — `null` = global (todo mundo vê); preenchido = exclusivo daquele workspace
+  - `mirror_right_from_left bool`, `mirror_left_from_right bool`
+  - `sheets jsonb` — `{ up: path, down: path, left: path, right: path }` (paths no bucket)
+  - `dims jsonb` — `{ up:{w,h}, down:{w,h}, ... }`
+  - `created_by`, timestamps
+- Bucket storage **público** `sprite-sheets/` (sprites precisam ser lidos no `<img>`, então público é simples).
+- RLS: SELECT liberado pra `authenticated` que seja membro do workspace OU sprite global. INSERT/UPDATE/DELETE só admin.
+- Seed: inserir as 9 skins atuais (marcio, blonde, curly, redhead, afro, japa, morena, latina, indi) como global, com os mesmos `dims` e os assets já no bucket (upload do `src/assets/sprites/*` via script de seed na própria migration usando os caminhos atuais — alternativa: manter as 9 atuais hard-coded como fallback e o catálogo db é "extras". **Vou fazer essa rota** — mais simples e zero risco de quebrar o que já funciona.).
 
-### 4. Convites de workspace (manter, mas simplificado)
-- Admin de um workspace ainda pode adicionar membros, mas **direto** (escolhendo de uma lista de contas existentes) — não por link.
-- Mantém `workspace_invites` só pro caso futuro de vendas, mas a UI atual oculta o gerador de link.
+**Catálogo runtime (`sprite-catalog.ts`):**
+- Mantém as 9 skins atuais hard-coded (fallback offline-friendly).
+- Nova função `loadSpriteCatalog(workspaceId)` que faz fetch das skins do db (globais + do ws) e devolve `SPRITES` merged. Hook `useSpriteCatalog(workspaceId)` com cache.
+- `AlignedSprite` continua igual — só passa a aceitar sprite dinâmico do catálogo merged.
 
-### 5. Super-admin
-- Você (márcio) é o único `role = 'admin'` na tabela `user_roles`.
-- Garante via migration que seu user_id já tem esse role.
-- Telas `/admin/*` exigem `has_role(auth.uid(), 'admin')`.
+**Nova aba `/admin/personagens`:**
+- Lista todas as skins (badge "Global" ou nome do workspace).
+- Renomear (label), trocar gender, ajustar dims/mirror, excluir, **renomear inclui as 9 default** (vou permitir override de label das default skins gravando uma row "override" — ou mais simples: também migrar as 9 pro db e sumir com o hard-code). Decisão: **migro as 9 pro banco** com upload automático dos PNGs atuais via storage na primeira inicialização (script `seed-default-sprites.ts` rodado uma vez via server fn admin-only "Inicializar skins padrão"). Catálogo passa a vir 100% do db.
+- Criar nova skin: upload de 3 ou 4 sheets PNG (down/up/left + opcional right), dims auto-detectadas (lê dimensões da imagem no browser antes do upload e divide largura por 6 frames), opção "espelhar right do left", workspace (global ou um específico).
+- O script `scripts/process-skin-sheet.py` continua sendo o jeito recomendado pra preparar a folha; UI vai mostrar uma nota "Recomendado: rode o script de pré-processamento antes do upload".
 
----
+## 3. Mover navegação para um hub admin
+
+`/admin` vira página índice com 3 cards:
+- Contas (`/admin/contas` — já existe)
+- Espaços (`/admin/espacos` — novo)
+- Personagens (`/admin/personagens` — novo)
+
+Botão "Admin" só aparece no hub de workspaces se `has_role admin`.
 
 ## Arquivos afetados
 
-**Removidos:**
-- `src/routes/convite.$token.tsx`
-- `src/routes/_authenticated/admin.invites.tsx` (substituída por `admin.contas.tsx`)
-- `src/lib/invites.ts` (ou reduzido pra zero)
+**Novos:**
+- `src/routes/_authenticated/admin.index.tsx` (hub)
+- `src/routes/_authenticated/admin.espacos.tsx`
+- `src/routes/_authenticated/admin.personagens.tsx`
+- `src/lib/admin/workspaces.functions.ts`
+- `src/lib/admin/sprites.functions.ts`
+- `src/lib/sprites/useSpriteCatalog.ts`
+- Migration (tabela `sprite_skins`, bucket `sprite-sheets`, políticas, RLS de `workspaces` para admin)
 
 **Editados:**
-- `src/routes/auth.tsx` — remove aba signup, remove leitura de `pendingInviteToken`.
-- `src/routes/_authenticated/onboarding.tsx` — remove `redeemPendingInvite`, lógica de redirect baseada em quantos workspaces o user tem.
-- `src/routes/_authenticated/aguardando-convite.tsx` → renomeada `sem-acesso.tsx`, texto novo.
-- `src/routes/_authenticated/workspaces.index.tsx` — remove atalho pra invites.
+- `src/lib/sprite-catalog.ts` (passa a ser async + fallback)
+- `src/components/sprites/AlignedSprite.tsx` (aceitar SpriteDef direto além de spriteId)
+- `src/components/profile/SpritePreview.tsx`, `EditCharacterModal.tsx`, `OnboardingWizard.tsx` (usar hook com workspaceId)
+- `src/routes/_authenticated/workspaces.index.tsx` (link "Admin", remove "Criar novo espaço" para não-admin)
+- `src/routes/_authenticated/workspaces.new.tsx` (redirect ou bloqueio para não-admin)
+- `src/routes/_authenticated/office_.editor.tsx` (aceitar `?workspaceId=` admin override)
+- `src/routes/_authenticated/admin.contas.tsx` (vira sub-aba do hub admin, sem mudanças funcionais)
 
-**Criados:**
-- `src/routes/_authenticated/admin.contas.tsx` — UI de gestão de contas.
-- `src/lib/admin/accounts.functions.ts` — server functions `createAccount`, `listAccounts`, `resetPassword`, `setPlan`, `assignToWorkspace`.
+## Escopo / ordem de entrega
 
-**Banco (migration):**
-- `disable_signup = true` via `configure_auth`.
-- Drop `signup_invites` (ou só revoga grants).
-- Drop RPCs `signup_invite_redeem` e `invite_peek` (essa última só se nada mais usar).
-- Garante seu user como `admin` em `user_roles`.
+Como é grande, sugiro entregar em 2 PRs lógicos no mesmo loop:
+1. **Espaços** (mais simples — só RLS + UI nova, reaproveita editor).
+2. **Personagens** (migração das skins pro banco + uploader).
 
----
+## Pergunta antes de começar
 
-## Detalhes técnicos
+1. **Migrar as 9 skins atuais pro banco** (recomendo) ou **manter hard-coded e só permitir adicionar extras**? Migrar é mais limpo (você renomeia tudo, edita dims, deleta o que não quer), mas exige um seed automático que sobe os PNGs pro storage na primeira execução. Se preferir o caminho conservador (mais rápido, menos risco), faço só "extras".
 
-**Server fn de criação de conta:**
-```ts
-createAccount({ email, password, displayName, plan, workspaceId?, role? })
-  → supabaseAdmin.auth.admin.createUser({ email, password, email_confirm: true,
-      user_metadata: { display_name } })
-  → trigger handle_new_user já cria profile + user_roles('member')
-  → UPDATE profiles SET plan = ? WHERE id = newUser.id
-  → if workspaceId: INSERT workspace_members
-```
+2. **Editor de mapa "fora do workspace"**: o editor atual usa o workspace atual ativo. Topo: te permito trocar de workspace ali dentro (dropdown "Editando: <ws>"). Confirmo essa abordagem?
 
-**Guarda admin:**
-- Server fn checa `has_role(context.userId, 'admin')` antes de qualquer operação privilegiada.
-- Front: `useMyRole()` hook lendo `user_roles` pra esconder/mostrar menu admin.
+3. **Sprites por workspace exclusivos** podem ser vistos por **membros daquele ws apenas** (correto?), ou você quer também conseguir atribuir um sprite exclusivo de um ws para um usuário que não é membro?
 
-**Onboarding flow novo:**
-```text
-login → /onboarding (só avatar)
-       → ao terminar, conta workspaces do user:
-         0 → /sem-acesso
-         1 → /workspaces/<id>
-         2+ → /workspaces (lista)
-```
-
----
-
-## O que NÃO faço agora
-
-- Não removo `workspace_invites` (você pode querer reativar pra venda externa).
-- Não mexo no fluxo de meetings, sprites, mapa.
-- Não construo cobrança/Stripe — fica pra depois.
-
----
-
-## Pergunta antes de executar
-
-Confirma que **só você** é admin? (vou hardcodar seu email na migration pra garantir o role).
-Qual é o email da sua conta admin?
+Responde 1/2/3 e eu sigo.
