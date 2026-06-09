@@ -76,22 +76,18 @@ function AuthPage() {
         </div>
 
         <div className="glass-panel rounded-2xl p-8 shadow-soft">
-          <div className="flex gap-1 p-1 bg-muted rounded-lg mb-5">
-            <button
-              type="button"
-              onClick={() => setMode("signin")}
-              className={`flex-1 py-2 rounded-md text-sm font-medium transition ${!isSignup ? "bg-background shadow-sm" : "text-muted-foreground"}`}
-            >
-              Entrar
-            </button>
-            <button
-              type="button"
-              onClick={() => setMode("signup")}
-              className={`flex-1 py-2 rounded-md text-sm font-medium transition ${isSignup ? "bg-background shadow-sm" : "text-muted-foreground"}`}
-            >
-              Criar conta
-            </button>
-          </div>
+          {signupAllowed && (
+            <div className="flex gap-1 p-1 bg-muted rounded-lg mb-5">
+              <button type="button" onClick={() => setMode("signin")}
+                className={`flex-1 py-2 rounded-md text-sm font-medium transition ${!isSignup ? "bg-background shadow-sm" : "text-muted-foreground"}`}>
+                Entrar
+              </button>
+              <button type="button" onClick={() => setMode("signup")}
+                className={`flex-1 py-2 rounded-md text-sm font-medium transition ${isSignup ? "bg-background shadow-sm" : "text-muted-foreground"}`}>
+                Criar conta
+              </button>
+            </div>
+          )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
             {isSignup && (
