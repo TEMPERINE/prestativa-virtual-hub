@@ -1006,13 +1006,6 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
       claimsCh.subscribe();
       presenceCh.subscribe(async (status) => {
         if (status !== "SUBSCRIBED") return;
-        // Ativa a reconciliação independentemente do nosso estado de
-        // hidratação — peers fantasmas (que fecharam o app sem aviso) precisam
-        // ser detectados mesmo enquanto ainda estamos entrando.
-        window.setTimeout(() => {
-          presenceReconcileReady = true;
-          reconcilePresence();
-        }, 3000);
         const uid = meIdRef.current;
         if (!uid || !positionHydratedRef.current) return;
         const cur = posRef.current;
@@ -1025,6 +1018,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
       });
 
     })();
+
 
     // Heartbeat presence every second so peers detect each other within 1s of
     // joining and the "frozen avatar" symptom can't happen even if both
