@@ -656,16 +656,20 @@ export function useRtcMesh(myId: string | null, desiredPeers: string[]): RtcMesh
 
 
   const acquireMic = useCallback(async (deviceId?: string): Promise<MediaStreamTrack | null> => {
-    const audioConstraints: MediaTrackConstraints = {
+    const audioConstraints: MediaTrackConstraints & { latency?: number } = {
       echoCancellation: true,
       noiseSuppression: true,
       autoGainControl: true,
+      latency: 0.01, // 10ms — pede ao SO o menor buffer possível (Chromium)
       ...(deviceId ? { deviceId: { exact: deviceId } } : {}),
     };
     const stream = await navigator.mediaDevices.getUserMedia({ audio: audioConstraints });
     const track = stream.getAudioTracks()[0];
     if (!track) return null;
+    // contentHint="speech" → encoder Opus prioriza latência sobre qualidade musical.
+    try { (track as MediaStreamTrack & { contentHint?: string }).contentHint = "speech"; } catch { /* noop */ }
     if (audioTrackRef.current) {
+
       try { audioTrackRef.current.stop(); } catch { /* noop */ }
       if (localStreamRef.current) {
         localStreamRef.current.getAudioTracks().forEach((t) => localStreamRef.current!.removeTrack(t));
