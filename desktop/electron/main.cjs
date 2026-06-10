@@ -74,21 +74,20 @@ function createWindow() {
 }
 
 // ============================================================
-// getDisplayMedia sem diálogo — usado por useMeetingRecorder
-// ============================================================
+// getDisplayMedia
+// - Gravação da reunião usa IPC dedicado `prestativa:get-screen-source-id`
+//   (captura direto a janela do Prestativa, sem seletor).
+// - Compartilhamento de tela na chamada usa `navigator.mediaDevices.getDisplayMedia`
+//   e DEVE abrir o seletor nativo do SO para o usuário escolher qual tela/janela
+//   compartilhar. Por isso usamos `useSystemPicker: true` e NÃO passamos um source
+//   pré-selecionado no callback.
 function setupDisplayMediaHandler() {
   session.defaultSession.setDisplayMediaRequestHandler(
     (_request, callback) => {
-      desktopCapturer
-        .getSources({ types: ["window", "screen"] })
-        .then((sources) => {
-          const own =
-            sources.find((s) => s.name.includes("Prestativa")) ?? sources[0];
-          callback({ video: own, audio: "loopback" });
-        })
-        .catch(() => callback({}));
+      // Sem source → Electron delega ao picker nativo do sistema operacional.
+      callback({});
     },
-    { useSystemPicker: false },
+    { useSystemPicker: true },
   );
 }
 
