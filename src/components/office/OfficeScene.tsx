@@ -1966,19 +1966,12 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
 
 
 
-  // Re-evaluate "is fresh" periodically — a peer that died without cleanup
-  // keeps is_online=true in DB but stops heartbeating; we treat anyone whose
-  // freshest sample is older than STALE_MS as offline for rendering purposes.
-  // NOTE: browsers throttle (or fully pause) setInterval in background tabs and
-  // suspend timers when the OS sleeps, so a short window made idle peers vanish
-  // for everyone after ~30s of inactivity. We rely on explicit cleanup
-  // (sign-out, tab close via beforeunload, presence "leave") for real
-  // disconnects, and use a very generous staleness threshold here only as a
-  // safety net against truly dead sessions that never cleaned up.
-  const STALE_MS = 24 * 60 * 60_000; // 24h
+  // Re-render periódico (5s) para reavaliar "atividade recente" do peer.
+  // Cadência curta para que peers que pararam de heartbeatar (aba fechada,
+  // SO suspendeu) saiam do espaço dentro do PRESENCE_GRACE_MS.
   const [staleTick, setStaleTick] = useState(0);
   useEffect(() => {
-    const id = window.setInterval(() => setStaleTick((t) => t + 1), 30_000);
+    const id = window.setInterval(() => setStaleTick((t) => t + 1), 5_000);
     return () => window.clearInterval(id);
   }, []);
 
