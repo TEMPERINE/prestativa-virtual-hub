@@ -42,7 +42,7 @@ function AuthPage() {
           <img
             src={logoAsset.url}
             alt="Virtual Office"
-            className="mx-auto h-28 w-auto object-contain mb-4"
+            className="mx-auto h-20 w-auto object-contain mb-4"
           />
           <p className="text-sm text-muted-foreground mt-2">
             Seu espaço virtual. Presença, proximidade, colaboração.
