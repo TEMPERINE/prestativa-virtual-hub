@@ -870,6 +870,43 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
           return { ...prev, [row.user_id]: { ...row, ts: incomingTs } };
         });
       })
+      .on("broadcast", { event: "state-request" }, (payload) => {
+        const { requester_id, request_id } = (payload.payload ?? {}) as { requester_id?: string; request_id?: string };
+        const uid = meIdRef.current;
+        if (!uid || !requester_id || requester_id === uid || !positionHydratedRef.current) return;
+        const cur = posRef.current;
+        const curZone = zoneAt(cur).id;
+        const ts = Date.now();
+        void positionBroadcastCh.send({
+          type: "broadcast",
+          event: "state-response",
+          payload: {
+            request_id,
+            requester_id,
+            user_id: uid,
+            x: cur.x,
+            y: cur.y,
+            zone: curZone,
+            facing: facingRef.current,
+            is_online: true,
+            ts,
+            client_id: clientInstanceIdRef.current,
+          },
+        });
+      })
+      .on("broadcast", { event: "state-response" }, (payload) => {
+        const row = payload.payload as RemotePos & { requester_id?: string; client_id?: string };
+        const uid = meIdRef.current;
+        if (!uid || row?.requester_id !== uid || !row.user_id || row.client_id === clientInstanceIdRef.current) return;
+        const incomingTs = timestampForPosition(row) || Date.now();
+        maybeStartRemoteTeleportFromCurrent(row.user_id, { x: row.x, y: row.y }, incomingTs);
+        setPositions((prev) => {
+          const curTs = timestampForPosition(prev[row.user_id] ?? {}) || (positionFreshTs.current.get(row.user_id) ?? 0);
+          if (incomingTs < curTs) return prev;
+          positionFreshTs.current.set(row.user_id, incomingTs);
+          return { ...prev, [row.user_id]: { ...row, is_online: true, ts: incomingTs } };
+        });
+      })
       .on("broadcast", { event: "teleport" }, (payload) => {
         const { user_id, from, to } = (payload.payload ?? {}) as {
           user_id?: string;
