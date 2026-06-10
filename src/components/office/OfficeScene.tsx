@@ -441,7 +441,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
     const candidates: { uid: string; score: number }[] = [];
     for (const [uid, p] of Object.entries(positions)) {
       if (uid === meId) continue;
-      if (!p.is_online) continue;
+      if (!p.is_online && !presentPeerIds.has(uid)) continue;
       // Same physical room/area → connect only while both avatars are there.
       // A claimed desk alone must not pull users into a call from elsewhere.
       const sameActiveRoom = zone !== "lobby" && p.zone === zone;
@@ -458,7 +458,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
     }
     // A browser mesh is capped to keep the room stable with ~15 collaborators.
     return candidates.sort((a, b) => a.score - b.score).slice(0, 14).map((c) => c.uid);
-  }, [me?.id, positions, pos.x, pos.y, zone]);
+  }, [me?.id, positions, presentPeerIds, pos.x, pos.y, zone]);
 
   const rtc = useRtcMesh(me?.id ?? null, desiredPeers);
   useEffect(() => {
