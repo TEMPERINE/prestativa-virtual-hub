@@ -1,8 +1,8 @@
 import { createFileRoute, Link, redirect } from "@tanstack/react-router";
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { lovable } from "@/integrations/lovable";
 import { toast } from "sonner";
+import logoAsset from "@/assets/virtual-office-logo.png.asset.json";
 
 export const Route = createFileRoute("/auth")({
   head: () => ({
