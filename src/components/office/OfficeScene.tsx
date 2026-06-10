@@ -37,6 +37,10 @@ const EMOJI_MAP: Record<string, string> = {
   "4": "🙌",
   "5": "🤯",
   "6": "💩",
+  "7": "🔥",
+  "8": "🥹",
+  "9": "🤯",
+  "0": "✅",
 };
 const REACTION_DURATION_MS = 3000;
 import { toast } from "sonner";
