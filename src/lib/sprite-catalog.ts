@@ -46,6 +46,10 @@ import biaDown from "@/assets/sprites/bia-down.png";
 import biaUp from "@/assets/sprites/bia-up.png";
 import biaLeft from "@/assets/sprites/bia-left.png";
 
+import patDown from "@/assets/sprites/pat-down.png";
+import patUp from "@/assets/sprites/pat-up.png";
+import patLeft from "@/assets/sprites/pat-left.png";
+
 export type Facing = "up" | "down" | "left" | "right";
 
 export type SpriteSheets = Record<Facing, string>;
@@ -191,6 +195,19 @@ export const SPRITES: SpriteDef[] = [
       up: { w: 120, h: 230 },
       left: { w: 126, h: 230 },
       right: { w: 126, h: 230 },
+    },
+    mirrorRightFromLeft: true,
+  },
+  {
+    id: "pat",
+    label: "Pat",
+    gender: "f",
+    sheets: { up: patUp, down: patDown, left: patLeft, right: patLeft },
+    dims: {
+      down: { w: 122, h: 248 },
+      up: { w: 120, h: 248 },
+      left: { w: 130, h: 248 },
+      right: { w: 130, h: 248 },
     },
     mirrorRightFromLeft: true,
   },
