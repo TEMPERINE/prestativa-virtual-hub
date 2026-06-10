@@ -1982,6 +1982,13 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
     return () => window.clearInterval(id);
   }, []);
 
+  // "Presente no espaço" combina dois sinais para evitar bugs de visibilidade:
+  //  1) presença Realtime (`presentPeerIds`): autoridade quando entrega ok.
+  //  2) heartbeat/broadcast/DB recentes (<= PRESENCE_GRACE_MS): cobre janelas
+  //     em que a entrega do canal de presença atrasa/hiccupa mas o peer está
+  //     claramente vivo (até em chamada com a gente). Um peer só some quando
+  //     AMBOS os sinais falham por mais de PRESENCE_GRACE_MS.
+  const PRESENCE_GRACE_MS = 20_000;
   const onlineList = useMemo(() => {
     const now = Date.now();
     const myId = meIdRef.current;
@@ -1989,18 +1996,51 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
       .filter((p) => {
         if (!p.is_online) return false;
         if (p.user_id === myId) return true; // self is always fresh
-        // Hard gate: peer must be in presence channel right now. Treat the
-        // workspace like a game lobby — only avatars whose clients are
-        // currently connected to this room are visible.
-        if (!presentPeerIds.has(p.user_id)) return false;
         const tsBroadcast = p.ts ?? 0;
         const tsDb = p.updated_at ? new Date(p.updated_at).getTime() : 0;
         const fresh = Math.max(tsBroadcast, tsDb, positionFreshTs.current.get(p.user_id) ?? 0);
-        return fresh > 0 && now - fresh < STALE_MS;
+        const recentlyActive = fresh > 0 && now - fresh < PRESENCE_GRACE_MS;
+        return presentPeerIds.has(p.user_id) || recentlyActive;
       })
-      .map((p) => ({ pos: p, profile: profiles[p.user_id] }))
-      .filter((x) => x.profile);
+      .map((p) => ({
+        pos: p,
+        // Fallback: nunca esconde avatar só porque o profile ainda não chegou
+        // do banco. Ele é hidratado pelo efeito de lazy-load abaixo.
+        profile: profiles[p.user_id] ?? ({
+          id: p.user_id,
+          display_name: "…",
+          avatar_color: "#475569",
+        } as Profile),
+      }));
   }, [positions, profiles, staleTick, presentPeerIds]);
+
+  // Lazy-load de profiles: se aparece um peer nas posições/presença que
+  // ainda não temos cacheado, busca sob demanda para hidratar o avatar.
+  useEffect(() => {
+    const missing = new Set<string>();
+    for (const uid of Object.keys(positions)) {
+      if (uid !== meIdRef.current && !profiles[uid]) missing.add(uid);
+    }
+    for (const uid of presentPeerIds) {
+      if (uid !== meIdRef.current && !profiles[uid]) missing.add(uid);
+    }
+    if (missing.size === 0) return;
+    let cancelled = false;
+    void (async () => {
+      const ids = Array.from(missing);
+      const { data } = await supabase
+        .from("profiles")
+        .select("id, display_name, avatar_color, sprite_id, tagline, status, onboarded_at, first_name, last_name, birth_date, city, state, country_code")
+        .in("id", ids);
+      if (cancelled || !data || data.length === 0) return;
+      setProfiles((prev) => {
+        const next = { ...prev };
+        for (const row of data) next[(row as Profile).id] = row as Profile;
+        return next;
+      });
+    })();
+    return () => { cancelled = true; };
+  }, [positions, presentPeerIds, profiles]);
 
   const offlineList = useMemo(() => {
     const onlineIds = new Set(onlineList.map((x) => x.profile.id));
