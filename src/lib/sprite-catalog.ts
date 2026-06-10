@@ -65,6 +65,11 @@ import lolaUp from "@/assets/sprites/lola-up.png";
 import lolaLeft from "@/assets/sprites/lola-left.png";
 import lolaRight from "@/assets/sprites/lola-right.png";
 
+import yuryDown from "@/assets/sprites/yury-down.png";
+import yuryUp from "@/assets/sprites/yury-up.png";
+import yuryLeft from "@/assets/sprites/yury-left.png";
+import yuryRight from "@/assets/sprites/yury-right.png";
+
 export type Facing = "up" | "down" | "left" | "right";
 
 export type SpriteSheets = Record<Facing, string>;
@@ -260,6 +265,18 @@ export const SPRITES: SpriteDef[] = [
       up: { w: 116, h: 254 },
       left: { w: 120, h: 252 },
       right: { w: 114, h: 248 },
+    },
+  },
+  {
+    id: "yury",
+    label: "Yury",
+    gender: "m",
+    sheets: { up: yuryUp, down: yuryDown, left: yuryLeft, right: yuryRight },
+    dims: {
+      down: { w: 130, h: 236 },
+      up: { w: 130, h: 236 },
+      left: { w: 156, h: 234 },
+      right: { w: 154, h: 232 },
     },
   },
 ];
