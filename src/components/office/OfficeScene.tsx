@@ -2618,8 +2618,11 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
         </div>
         {/* /Camera transform layer */}
 
-        {/* Map navigation controls (top-left corner) */}
-        <div className="absolute left-3 top-3 flex flex-col gap-2 z-[90] pointer-events-auto">
+        {/* Map navigation controls — float next to team panel (outside the box, follows collapse) */}
+        <div
+          className="absolute bottom-6 flex flex-col gap-2 z-[90] pointer-events-auto transition-all"
+          style={{ right: showTeam ? "calc(18rem + 0.75rem)" : "2.5rem" }}
+        >
           <button
             type="button"
             title="Aproximar"
