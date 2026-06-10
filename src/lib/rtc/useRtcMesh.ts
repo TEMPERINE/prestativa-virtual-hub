@@ -188,15 +188,48 @@ export function useRtcMesh(myId: string | null, desiredPeers: string[]): RtcMesh
     preferCodecs(videoTx, "video");
     preferCodecs(screenTx, "video");
 
-    // Reduce audio playout latency where supported (Chromium).
+    // Reduce playout latency where supported (Chromium).
+    // playoutDelayHint baixa = menos buffer no receptor → menos delay.
+    // jitterBufferTarget=0 pede ao buffer pra ficar o mais raso possível.
     try {
-      (audioTx.receiver as unknown as { playoutDelayHint?: number }).playoutDelayHint = 0.05;
+      const ar = audioTx.receiver as unknown as { playoutDelayHint?: number; jitterBufferTarget?: number };
+      ar.playoutDelayHint = 0;
+      ar.jitterBufferTarget = 0;
     } catch { /* noop */ }
+    try {
+      const vr = videoTx.receiver as unknown as { playoutDelayHint?: number; jitterBufferTarget?: number };
+      vr.playoutDelayHint = 0;
+      vr.jitterBufferTarget = 0;
+    } catch { /* noop */ }
+    // Screen share pode tolerar um pouco mais de buffer (qualidade > latência),
+    // então deixamos o default do navegador.
+
+    // Hint de prioridade de rede pra que mídia tenha precedência no socket.
+    const bumpPriority = (sender: RTCRtpSender, isVideo: boolean) => {
+      try {
+        const params = sender.getParameters();
+        if (!params.encodings || params.encodings.length === 0) params.encodings = [{}];
+        for (const enc of params.encodings) {
+          (enc as RTCRtpEncodingParameters & { priority?: string; networkPriority?: string }).priority = "high";
+          (enc as RTCRtpEncodingParameters & { priority?: string; networkPriority?: string }).networkPriority = "high";
+          if (isVideo) {
+            enc.maxBitrate = 800_000; // 800 kbps — suficiente pra 320x240 fluido
+            enc.maxFramerate = 30;
+          } else {
+            enc.maxBitrate = 64_000; // Opus voice
+          }
+        }
+        void sender.setParameters(params);
+      } catch { /* noop */ }
+    };
+    bumpPriority(audioTx.sender, false);
+    bumpPriority(videoTx.sender, true);
 
     // If we already have local tracks, attach now
     if (audioTrackRef.current) void audioTx.sender.replaceTrack(audioTrackRef.current);
     if (videoTrackRef.current) void videoTx.sender.replaceTrack(videoTrackRef.current);
     if (screenTrackRef.current) void screenTx.sender.replaceTrack(screenTrackRef.current);
+
 
     const entry: PeerEntry = {
       pc,
@@ -623,16 +656,20 @@ export function useRtcMesh(myId: string | null, desiredPeers: string[]): RtcMesh
 
 
   const acquireMic = useCallback(async (deviceId?: string): Promise<MediaStreamTrack | null> => {
-    const audioConstraints: MediaTrackConstraints = {
+    const audioConstraints: MediaTrackConstraints & { latency?: number } = {
       echoCancellation: true,
       noiseSuppression: true,
       autoGainControl: true,
+      latency: 0.01, // 10ms — pede ao SO o menor buffer possível (Chromium)
       ...(deviceId ? { deviceId: { exact: deviceId } } : {}),
     };
     const stream = await navigator.mediaDevices.getUserMedia({ audio: audioConstraints });
     const track = stream.getAudioTracks()[0];
     if (!track) return null;
+    // contentHint="speech" → encoder Opus prioriza latência sobre qualidade musical.
+    try { (track as MediaStreamTrack & { contentHint?: string }).contentHint = "speech"; } catch { /* noop */ }
     if (audioTrackRef.current) {
+
       try { audioTrackRef.current.stop(); } catch { /* noop */ }
       if (localStreamRef.current) {
         localStreamRef.current.getAudioTracks().forEach((t) => localStreamRef.current!.removeTrack(t));
@@ -726,13 +763,20 @@ export function useRtcMesh(myId: string | null, desiredPeers: string[]): RtcMesh
   }, []);
 
   const acquireCam = useCallback(async (deviceId?: string) => {
+    // frameRate alto + resolução baixa = encoder não acumula frames pra comprimir.
+    const videoBase: MediaTrackConstraints = {
+      width: { ideal: 320 },
+      height: { ideal: 240 },
+      frameRate: { ideal: 30, max: 30 },
+    };
     const constraints: MediaStreamConstraints = {
-      video: deviceId
-        ? { deviceId: { exact: deviceId }, width: 320, height: 240 }
-        : { width: 320, height: 240 },
+      video: deviceId ? { ...videoBase, deviceId: { exact: deviceId } } : videoBase,
     };
     const stream = await navigator.mediaDevices.getUserMedia(constraints);
     const track = stream.getVideoTracks()[0];
+    // contentHint="motion" → encoder VP8 reduz B-frames/buffer pra latência.
+    try { (track as MediaStreamTrack & { contentHint?: string }).contentHint = "motion"; } catch { /* noop */ }
+
     // Tear down any previous video track
     if (videoTrackRef.current) {
       try { videoTrackRef.current.stop(); } catch { /* noop */ }
