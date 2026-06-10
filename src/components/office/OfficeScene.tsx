@@ -2621,7 +2621,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
         {/* Map navigation controls — float next to team panel (outside the box, follows collapse) */}
         <div
           className="absolute bottom-6 flex flex-col gap-2 z-[90] pointer-events-auto transition-all"
-          style={{ right: showTeam ? "calc(18rem + 0.5rem)" : "2.75rem" }}
+          style={{ right: showTeam ? "calc(19rem + 0.5rem)" : "2rem" }}
         >
           <button
             type="button"

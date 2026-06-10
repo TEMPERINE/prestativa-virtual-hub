@@ -1,6 +1,6 @@
 {
   "name": "prestativa-virtual-desktop",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "Prestativa Virtual Office — desktop shell (Windows)",
   "main": "electron/main.cjs",
   "author": "Prestativa",
@@ -16,7 +16,9 @@
     "productName": "Prestativa Virtual",
     "asar": true,
     "win": {
-      "target": ["nsis"],
+      "target": [
+        "nsis"
+      ],
       "icon": "build/icon.ico"
     },
     "nsis": {
