@@ -1173,17 +1173,24 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
         (data as Array<RemotePos & { updated_at?: string }>).forEach((p) => {
           if (uid && p.user_id === uid) return; // handled below
           const dbTs = p.updated_at ? Date.parse(p.updated_at) : 0;
-          const freshTs = positionFreshTs.current.get(p.user_id) ?? 0;
+          const lastDbTs = dbFreshTs.current.get(p.user_id) ?? 0;
           if (p.is_online) maybeStartRemoteTeleportFromCurrent(p.user_id, { x: p.x, y: p.y }, dbTs || Date.now());
-          // Strict LWW: DB rows older than the freshest known live sample are
-          // never allowed to move a stopped avatar or flip it offline.
-          if (dbTs && dbTs < freshTs) {
+          // DB-clock vs DB-clock only; live samples (peer client clock) are
+          // tracked separately to avoid cross-clock skew freezing avatars.
+          if (dbTs && dbTs < lastDbTs) {
             const cur = prev[p.user_id];
             if (cur) next[p.user_id] = cur;
             else next[p.user_id] = p;
           } else {
-            if (dbTs) positionFreshTs.current.set(p.user_id, dbTs);
-            next[p.user_id] = p;
+            if (dbTs) dbFreshTs.current.set(p.user_id, dbTs);
+            // If a fresher live sample already arrived, keep its x/y/facing.
+            const liveTs = positionFreshTs.current.get(p.user_id) ?? 0;
+            const cur = prev[p.user_id];
+            if (liveTs && cur && (cur.ts ?? 0) >= liveTs) {
+              next[p.user_id] = { ...p, x: cur.x, y: cur.y, facing: cur.facing, ts: cur.ts };
+            } else {
+              next[p.user_id] = p;
+            }
           }
         });
         if (uid) {
