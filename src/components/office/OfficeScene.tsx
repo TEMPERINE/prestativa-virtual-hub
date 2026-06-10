@@ -246,6 +246,18 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
   const [pos, setPos] = useState<Point>(SPAWN);
   const [zone, setZone] = useState<ZoneId>("lobby");
   const [showTeam, setShowTeam] = useState(true);
+  const [isMasterAdmin, setIsMasterAdmin] = useState(false);
+  useEffect(() => {
+    if (!me?.id) { setIsMasterAdmin(false); return; }
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from("user_roles").select("role")
+        .eq("user_id", me.id).eq("role", "admin").maybeSingle();
+      if (!cancelled) setIsMasterAdmin(!!data);
+    })();
+    return () => { cancelled = true; };
+  }, [me?.id]);
   const [showHint, setShowHint] = useState(true);
   const [facing, setFacing] = useState<Facing>("down");
   const facingRef = useRef<Facing>("down");
