@@ -835,45 +835,6 @@ export function useRtcMesh(myId: string | null, desiredPeers: string[]): RtcMesh
     void refreshDevices();
   }, [refreshDevices]);
 
-  const enableCam = useCallback(async () => {
-    if (videoTrackRef.current) {
-      videoTrackRef.current.enabled = true;
-      setCamOn(true);
-      return;
-    }
-    try {
-      await acquireCam(selectedVideoDeviceId ?? undefined);
-      setCamOn(true);
-    } catch (err) {
-      console.error("camera access denied", err);
-      throw err;
-    }
-  }, [acquireCam, selectedVideoDeviceId]);
-
-  const disableCam = useCallback(() => {
-    if (videoTrackRef.current) {
-      videoTrackRef.current.stop();
-      videoTrackRef.current = null;
-      for (const entry of peersRef.current.values()) {
-        if (entry.videoSender) void entry.videoSender.replaceTrack(null);
-      }
-    }
-    setLocalVideoStream(null);
-    setCamOn(false);
-  }, []);
-
-  const toggleCam = useCallback(async () => {
-    if (camOn) disableCam();
-    else await enableCam();
-  }, [camOn, enableCam, disableCam]);
-
-  const setVideoDevice = useCallback(async (deviceId: string) => {
-    setSelectedVideoDeviceId(deviceId);
-    if (camOn) {
-      try { await acquireCam(deviceId); } catch (err) { console.error(err); }
-    }
-  }, [camOn, acquireCam]);
-
   // Force every existing peer to renegotiate so that newly-added/removed
   // tracks (in particular screen share) propagate correctly. replaceTrack
   // alone does not always cause the remote side to start rendering the
@@ -899,6 +860,55 @@ export function useRtcMesh(myId: string | null, desiredPeers: string[]): RtcMesh
       }
     }
   }, [sendSignal]);
+
+  const enableCam = useCallback(async () => {
+    if (videoTrackRef.current) {
+      videoTrackRef.current.enabled = true;
+      setCamOn(true);
+      void renegotiateAll();
+      return;
+    }
+    try {
+      await acquireCam(selectedVideoDeviceId ?? undefined);
+      setCamOn(true);
+      // Força offer/answer novo para que peers remotos comecem a renderizar
+      // o track. replaceTrack sozinho não dispara 'unmute' de forma confiável
+      // em transceivers sendrecv que nasceram sem track.
+      void renegotiateAll();
+    } catch (err) {
+      console.error("camera access denied", err);
+      throw err;
+    }
+  }, [acquireCam, selectedVideoDeviceId, renegotiateAll]);
+
+  const disableCam = useCallback(() => {
+    if (videoTrackRef.current) {
+      videoTrackRef.current.stop();
+      videoTrackRef.current = null;
+      for (const entry of peersRef.current.values()) {
+        if (entry.videoSender) void entry.videoSender.replaceTrack(null);
+      }
+    }
+    setLocalVideoStream(null);
+    setCamOn(false);
+    void renegotiateAll();
+  }, [renegotiateAll]);
+
+  const toggleCam = useCallback(async () => {
+    if (camOn) disableCam();
+    else await enableCam();
+  }, [camOn, enableCam, disableCam]);
+
+  const setVideoDevice = useCallback(async (deviceId: string) => {
+    setSelectedVideoDeviceId(deviceId);
+    if (camOn) {
+      try {
+        await acquireCam(deviceId);
+        void renegotiateAll();
+      } catch (err) { console.error(err); }
+    }
+  }, [camOn, acquireCam, renegotiateAll]);
+
 
   // ---------- Screen share ----------
   const stopScreenInternal = useCallback(() => {
