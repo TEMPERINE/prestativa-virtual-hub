@@ -50,6 +50,10 @@ import patDown from "@/assets/sprites/pat-down.png";
 import patUp from "@/assets/sprites/pat-up.png";
 import patLeft from "@/assets/sprites/pat-left.png";
 
+import luDown from "@/assets/sprites/lu-down.png";
+import luUp from "@/assets/sprites/lu-up.png";
+import luLeft from "@/assets/sprites/lu-left.png";
+
 export type Facing = "up" | "down" | "left" | "right";
 
 export type SpriteSheets = Record<Facing, string>;
