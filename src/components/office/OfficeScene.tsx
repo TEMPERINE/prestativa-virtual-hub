@@ -660,6 +660,25 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
 
   // Load me + all profiles + initial positions
   useEffect(() => {
+    const requestLiveState = () => {
+      const uid = meIdRef.current;
+      const ch = positionBroadcastChannelRef.current;
+      if (!uid || !ch || !positionBroadcastReadyRef.current) return;
+      const requestId = `${clientInstanceIdRef.current}:${Date.now()}`;
+      STATE_REQUEST_RETRIES_MS.forEach((delay) => {
+        window.setTimeout(() => {
+          const curUid = meIdRef.current;
+          const curCh = positionBroadcastChannelRef.current;
+          if (!curUid || !curCh || !positionBroadcastReadyRef.current) return;
+          void curCh.send({
+            type: "broadcast",
+            event: "state-request",
+            payload: { requester_id: curUid, request_id: requestId, ts: Date.now() },
+          });
+        }, delay);
+      });
+    };
+
     (async () => {
       const { data: userData } = await supabase.auth.getUser();
       if (!userData.user) { try { onHydrated?.(); } catch { /* noop */ } return; }
@@ -786,6 +805,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
         is_online: true,
         updated_at: new Date().toISOString(),
       }, { onConflict: "workspace_id,user_id" });
+      requestLiveState();
     })();
 
     // IMPORTANT: garantir que o socket de realtime carregue o JWT do usuário
