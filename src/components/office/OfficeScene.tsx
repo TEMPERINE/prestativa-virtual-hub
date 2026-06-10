@@ -1111,8 +1111,12 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
       }, { onConflict: "workspace_id,user_id" });
     };
     const tearingDown = { current: false };
-    const onPageHide = () => { tearingDown.current = true; persistFinalPosition(); };
-    const onBeforeUnload = () => { tearingDown.current = true; persistFinalPosition(); };
+    // Fechar a aba/janela = sair do mundo. Marca offline E reseta a posição
+    // pro ponto de ressurgimento, para que ao retornar o avatar apareça no
+    // início (não no último ponto onde parou). Mesmo comportamento da
+    // navegação saindo do workspace.
+    const onPageHide = () => { tearingDown.current = true; leaveWorkspaceReset(); };
+    const onBeforeUnload = () => { tearingDown.current = true; leaveWorkspaceReset(); };
     window.addEventListener("beforeunload", onBeforeUnload);
     window.addEventListener("pagehide", onPageHide);
 
