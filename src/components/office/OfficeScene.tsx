@@ -2479,6 +2479,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
           <TeleportFx
             point={teleport.phase === "out" ? teleport.from : teleport.to}
             phase={teleport.phase}
+            color={me?.avatar_color}
             key={`me-${teleport.id}-${teleport.phase}`}
           />
         )}
@@ -2487,6 +2488,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
             key={`${uid}-${tp.id}-${tp.phase}`}
             point={tp.phase === "out" ? tp.from : tp.to}
             phase={tp.phase}
+            color={profiles[uid]?.avatar_color}
           />
         ))}
 
@@ -3337,7 +3339,7 @@ function WorkspaceZoneHover({
   );
 }
 
-function TeleportFx({ point, phase }: { point: Point; phase: "out" | "in" }) {
+function TeleportFx({ point, phase, color }: { point: Point; phase: "out" | "in"; color?: string }) {
 
   const particles = useMemo(() => {
     return Array.from({ length: 18 }).map((_, i) => {
@@ -3356,6 +3358,11 @@ function TeleportFx({ point, phase }: { point: Point; phase: "out" | "in" }) {
     });
   }, [point.x, point.y, phase]);
 
+  const c = color || "var(--primary)";
+  const glow = color
+    ? `color-mix(in oklab, ${color} 70%, white)`
+    : "var(--primary-glow)";
+
   return (
     <div
       className="absolute pointer-events-none z-[80]"
@@ -3371,8 +3378,7 @@ function TeleportFx({ point, phase }: { point: Point; phase: "out" | "in" }) {
           width: 90,
           height: 90,
           transform: "translate(-50%, -50%)",
-          background:
-            "radial-gradient(circle, color-mix(in oklab, var(--primary) 70%, transparent) 0%, transparent 70%)",
+          background: `radial-gradient(circle, color-mix(in oklab, ${c} 70%, transparent) 0%, transparent 70%)`,
           animation: `tp-halo-${phase} 600ms ease-out forwards`,
           filter: "blur(2px)",
         }}
@@ -3383,8 +3389,8 @@ function TeleportFx({ point, phase }: { point: Point; phase: "out" | "in" }) {
           width: 30,
           height: 30,
           transform: "translate(-50%, -50%)",
-          borderColor: "var(--primary)",
-          boxShadow: "0 0 24px var(--primary-glow)",
+          borderColor: c,
+          boxShadow: `0 0 24px ${glow}`,
           animation: `tp-ring 700ms ease-out forwards`,
         }}
       />
@@ -3395,8 +3401,8 @@ function TeleportFx({ point, phase }: { point: Point; phase: "out" | "in" }) {
           style={{
             width: p.size,
             height: p.size,
-            background: "var(--primary)",
-            boxShadow: "0 0 8px var(--primary), 0 0 14px var(--primary-glow)",
+            background: c,
+            boxShadow: `0 0 8px ${c}, 0 0 14px ${glow}`,
             ["--tp-dx" as string]: `${p.dx}px`,
             ["--tp-dy" as string]: `${p.dy}px`,
             animation: `tp-particle-${phase} ${p.duration}ms ease-out ${p.delay}ms forwards`,
