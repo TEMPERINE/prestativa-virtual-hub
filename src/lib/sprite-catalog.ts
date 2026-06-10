@@ -220,14 +220,13 @@ export const SPRITES: SpriteDef[] = [
     id: "lu",
     label: "Lu",
     gender: "f",
-    sheets: { up: luUp, down: luDown, left: luLeft, right: luLeft },
+    sheets: { up: luUp, down: luDown, left: luLeft, right: luRight },
     dims: {
-      down: { w: 124, h: 228 },
-      up: { w: 120, h: 230 },
-      left: { w: 118, h: 228 },
-      right: { w: 118, h: 228 },
+      down: { w: 118, h: 226 },
+      up: { w: 116, h: 228 },
+      left: { w: 124, h: 226 },
+      right: { w: 116, h: 224 },
     },
-    mirrorRightFromLeft: true,
   },
 ];
 
