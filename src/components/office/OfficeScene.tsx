@@ -1303,6 +1303,32 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
           });
         }
       );
+    // Realtime de profiles: quando alguém troca skin/nome/cor/status,
+    // todos os outros recebem a atualização sem precisar recarregar.
+    const profilesCh = supabase
+      .channel(`profiles-room:${wsSuffix}:${realtimeChannelSuffix}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "profiles" },
+        (payload) => {
+          if (payload.eventType === "DELETE") {
+            const old = payload.old as { id?: string };
+            if (!old?.id) return;
+            setProfiles((prev) => {
+              const next = { ...prev };
+              delete next[old.id!];
+              return next;
+            });
+            return;
+          }
+          const row = payload.new as Profile;
+          if (!row?.id) return;
+          setProfiles((prev) => ({ ...prev, [row.id]: { ...(prev[row.id] ?? {}), ...row } }));
+          if (row.id === meIdRef.current) {
+            setMe((prev) => ({ ...(prev ?? {} as Profile), ...row }));
+          }
+        }
+      );
     // assina depois que o JWT estiver hidratado no socket de realtime
     void (async () => {
       const { data: sess } = await supabase.auth.getSession();
@@ -1311,7 +1337,9 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
         try { await supabase.realtime.setAuth(token); } catch { /* noop */ }
       }
       notesCh.subscribe();
+      profilesCh.subscribe();
     })();
+
 
     return () => {
       supabase.removeChannel(ch);
