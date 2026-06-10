@@ -58,7 +58,7 @@ export function PropsLayer({ selfX, selfY, focusedRect = null }: Props) {
   // PK real é (workspace_id, prop_id) e a tabela é per-workspace, então
   // precisamos refazer fetch/subscribe sempre que o workspace ativo muda.
   const [wsId, setWsId] = useState<string | null>(() => getCurrentWorkspaceId());
-  useEffect(() => subscribeCurrentWorkspaceId(setWsId), []);
+  useEffect(() => { const u = subscribeCurrentWorkspaceId(setWsId); return () => { u(); }; }, []);
 
   useEffect(() => {
     if (!wsId) { setFrames({}); return; }
