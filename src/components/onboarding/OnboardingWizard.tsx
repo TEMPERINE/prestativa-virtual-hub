@@ -66,23 +66,32 @@ export function OnboardingWizard({ userId, initialName, onDone }: Props) {
           <div className="space-y-4">
             <h2 className="text-2xl font-semibold">Escolha seu personagem</h2>
             <p className="text-sm text-muted-foreground">Esse será você no espaço.</p>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
-              {SPRITES.map((s) => {
-                const sel = s.id === spriteId;
-                return (
-                  <button
-                    key={s.id}
-                    onClick={() => setSpriteId(s.id)}
-                    className="flex flex-col items-center gap-2 p-3 rounded-xl transition-all"
-                    style={{ background: sel ? `${color}22` : "hsl(var(--muted))", border: `2px solid ${sel ? color : "transparent"}` }}
-                  >
-                    <div className="h-24 flex items-end justify-center">
-                      <SpritePreview spriteId={s.id} animate={sel} size={96} />
-                    </div>
-                    <span className="text-xs font-medium">{s.label}</span>
-                  </button>
-                );
-              })}
+            <div className="space-y-5 max-h-[55vh] overflow-y-auto pr-1">
+              {groupSpritesByGender(SPRITES).map((group) => (
+                <div key={group.key} className="space-y-2">
+                  <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground px-1">
+                    {group.label}
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
+                    {group.items.map((s) => {
+                      const sel = s.id === spriteId;
+                      return (
+                        <button
+                          key={s.id}
+                          onClick={() => setSpriteId(s.id)}
+                          className="flex flex-col items-center gap-2 p-3 rounded-xl transition-all"
+                          style={{ background: sel ? `${color}22` : "hsl(var(--muted))", border: `2px solid ${sel ? color : "transparent"}` }}
+                        >
+                          <div className="h-24 flex items-end justify-center">
+                            <SpritePreview spriteId={s.id} animate={sel} size={96} />
+                          </div>
+                          <span className="text-xs font-medium">{s.label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         )}
