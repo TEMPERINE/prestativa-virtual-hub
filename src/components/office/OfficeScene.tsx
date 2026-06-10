@@ -222,6 +222,11 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
   const [positions, setPositions] = useState<Record<string, RemotePos>>({});
   const positionsRef = useRef<Record<string, RemotePos>>({});
   positionsRef.current = positions;
+  // Authoritative set of peers currently present in this workspace's realtime
+  // channel. Source of truth for "who is in the world right now" — DB
+  // is_online can lag (Electron quit without cleanup), so we render only
+  // peers we actually see in presence (plus self).
+  const [presentPeerIds, setPresentPeerIds] = useState<Set<string>>(() => new Set());
   // LWW tracker — wall-clock ts of the freshest known sample per user (broadcast/presence).
   // Lets us discard stale DB poll rows that would otherwise snap remote avatars back.
   const positionFreshTs = useRef<Map<string, number>>(new Map());
@@ -950,12 +955,31 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
         return changed ? next : p;
       });
     };
+    const syncPresentIds = () => {
+      const state = presenceCh.presenceState() as Record<string, PresenceState[]>;
+      const ids = new Set<string>();
+      for (const list of Object.values(state)) {
+        for (const s of list) if (s?.user_id) ids.add(s.user_id);
+      }
+      setPresentPeerIds((prev) => {
+        if (prev.size === ids.size) {
+          let same = true;
+          for (const id of ids) if (!prev.has(id)) { same = false; break; }
+          if (same) return prev;
+        }
+        return ids;
+      });
+    };
     presenceCh.on("presence", { event: "sync" }, () => {
       const state = presenceCh.presenceState() as Record<string, PresenceState[]>;
       for (const list of Object.values(state)) mergePresence(list);
+      syncPresentIds();
       reconcilePresence();
     });
-    presenceCh.on("presence", { event: "join" }, ({ newPresences }) => mergePresence(newPresences));
+    presenceCh.on("presence", { event: "join" }, ({ newPresences }) => {
+      mergePresence(newPresences);
+      syncPresentIds();
+    });
     presenceCh.on("presence", { event: "leave" }, ({ leftPresences }) => {
       const arr = leftPresences as unknown as PresenceState[];
       for (const s of arr ?? []) {
@@ -966,6 +990,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
           return { ...p, [s.user_id]: { ...cur, is_online: false } };
         });
       }
+      syncPresentIds();
     });
 
     const claimsCh = supabase
@@ -1964,6 +1989,10 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
       .filter((p) => {
         if (!p.is_online) return false;
         if (p.user_id === myId) return true; // self is always fresh
+        // Hard gate: peer must be in presence channel right now. Treat the
+        // workspace like a game lobby — only avatars whose clients are
+        // currently connected to this room are visible.
+        if (!presentPeerIds.has(p.user_id)) return false;
         const tsBroadcast = p.ts ?? 0;
         const tsDb = p.updated_at ? new Date(p.updated_at).getTime() : 0;
         const fresh = Math.max(tsBroadcast, tsDb, positionFreshTs.current.get(p.user_id) ?? 0);
@@ -1971,7 +2000,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
       })
       .map((p) => ({ pos: p, profile: profiles[p.user_id] }))
       .filter((x) => x.profile);
-  }, [positions, profiles, staleTick]);
+  }, [positions, profiles, staleTick, presentPeerIds]);
 
   const offlineList = useMemo(() => {
     const onlineIds = new Set(onlineList.map((x) => x.profile.id));
