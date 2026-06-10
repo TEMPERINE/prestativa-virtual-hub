@@ -215,6 +215,19 @@ export const SPRITES: SpriteDef[] = [
     },
     mirrorRightFromLeft: true,
   },
+  {
+    id: "lu",
+    label: "Lu",
+    gender: "f",
+    sheets: { up: luUp, down: luDown, left: luLeft, right: luLeft },
+    dims: {
+      down: { w: 124, h: 272 },
+      up: { w: 120, h: 274 },
+      left: { w: 126, h: 274 },
+      right: { w: 126, h: 274 },
+    },
+    mirrorRightFromLeft: true,
+  },
 ];
 
 export const SPRITE_FRAMES = 6;
