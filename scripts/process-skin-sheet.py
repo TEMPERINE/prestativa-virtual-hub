@@ -27,7 +27,9 @@ FACINGS = ["down", "up", "left", "right"]
 ALPHA_T = 24          # treat as transparent below this
 WHITE_T = 232         # near-white threshold (becomes fully transparent)
 HALO_ALPHA_T = 240    # halo cleanup applies to pixels with alpha below this
-EDGE_ERODE_PASSES = 2 # how many 1-px halo rings to erode around the silhouette
+EDGE_ERODE_PASSES = 4 # how many 1-px halo rings to erode around the silhouette
+EDGE_WHITISH_T = 185  # rgb.min above this counts as whitish fringe on the edge
+SEMI_ALPHA_T   = 245  # semi-transparent whitish pixels under this get killed
 
 
 def remove_white_bg(arr: np.ndarray) -> np.ndarray:
@@ -67,10 +69,16 @@ def remove_white_bg(arr: np.ndarray) -> np.ndarray:
 
     a = np.where(background, 0, a)
 
+    # Kill semi-transparent whitish pixels everywhere — these are the leftover
+    # halo of an already-cleaned sprite (alpha < 1 + bright RGB = white fringe
+    # baked into the source anti-aliasing).
+    semi_whitish = (a < SEMI_ALPHA_T) & (a > 0) & (rgb.min(axis=-1) >= EDGE_WHITISH_T)
+    a = np.where(semi_whitish, 0, a)
+
     # Edge erosion restricted to the silhouette boundary against true
     # background (not against interior cavities, which don't exist here).
-    whitish_edge = rgb.min(axis=-1) >= 210
-    cleared = background.copy()
+    whitish_edge = rgb.min(axis=-1) >= EDGE_WHITISH_T
+    cleared = background.copy() | semi_whitish
     for _ in range(EDGE_ERODE_PASSES):
         opaque = a > 0
         neighbor_cleared = (
@@ -83,7 +91,21 @@ def remove_white_bg(arr: np.ndarray) -> np.ndarray:
         a = np.where(edge_halo, 0, a)
         cleared = cleared | edge_halo
 
-    out = np.dstack([arr[..., :3], a.astype(np.uint8)])
+    # Edge color decontamination: opaque pixels on the silhouette boundary
+    # that are still whitish get their RGB darkened toward the neighboring
+    # hair/skin color so the leftover 1px ring doesn't read as white halo.
+    opaque = a > 0
+    edge_pix = opaque & (
+        np.pad(cleared[:-1, :], ((1, 0), (0, 0))) |
+        np.pad(cleared[1:, :],  ((0, 1), (0, 0))) |
+        np.pad(cleared[:, :-1], ((0, 0), (1, 0))) |
+        np.pad(cleared[:, 1:],  ((0, 0), (0, 1)))
+    ) & (rgb.min(axis=-1) >= 170)
+    # Pull RGB 35% toward black to neutralize the bright fringe.
+    rgb_out = arr[..., :3].astype(np.int16)
+    rgb_out = np.where(edge_pix[..., None], (rgb_out * 0.65).astype(np.int16), rgb_out)
+
+    out = np.dstack([rgb_out.astype(np.uint8), a.astype(np.uint8)])
     return out
 
 
