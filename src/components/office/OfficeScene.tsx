@@ -2618,8 +2618,8 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
         </div>
         {/* /Camera transform layer */}
 
-        {/* Map navigation controls (bottom-right corner) */}
-        <div className="absolute right-3 bottom-3 flex flex-col gap-2 z-[90] pointer-events-auto">
+        {/* Map navigation controls (top-left corner) */}
+        <div className="absolute left-3 top-3 flex flex-col gap-2 z-[90] pointer-events-auto">
           <button
             type="button"
             title="Aproximar"
