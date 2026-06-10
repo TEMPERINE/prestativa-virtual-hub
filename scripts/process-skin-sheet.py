@@ -27,7 +27,9 @@ FACINGS = ["down", "up", "left", "right"]
 ALPHA_T = 24          # treat as transparent below this
 WHITE_T = 232         # near-white threshold (becomes fully transparent)
 HALO_ALPHA_T = 240    # halo cleanup applies to pixels with alpha below this
-EDGE_ERODE_PASSES = 2 # how many 1-px halo rings to erode around the silhouette
+EDGE_ERODE_PASSES = 4 # how many 1-px halo rings to erode around the silhouette
+EDGE_WHITISH_T = 185  # rgb.min above this counts as whitish fringe on the edge
+SEMI_ALPHA_T   = 245  # semi-transparent whitish pixels under this get killed
 
 
 def remove_white_bg(arr: np.ndarray) -> np.ndarray:
