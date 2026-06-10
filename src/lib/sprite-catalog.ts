@@ -42,6 +42,10 @@ import indiDown from "@/assets/sprites/indi-down.png";
 import indiUp from "@/assets/sprites/indi-up.png";
 import indiLeft from "@/assets/sprites/indi-left.png";
 
+import biaDown from "@/assets/sprites/bia-down.png";
+import biaUp from "@/assets/sprites/bia-up.png";
+import biaLeft from "@/assets/sprites/bia-left.png";
+
 export type Facing = "up" | "down" | "left" | "right";
 
 export type SpriteSheets = Record<Facing, string>;
