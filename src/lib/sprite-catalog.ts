@@ -60,6 +60,11 @@ import wilyUp from "@/assets/sprites/wily-up.png";
 import wilyLeft from "@/assets/sprites/wily-left.png";
 import wilyRight from "@/assets/sprites/wily-right.png";
 
+import lolaDown from "@/assets/sprites/lola-down.png";
+import lolaUp from "@/assets/sprites/lola-up.png";
+import lolaLeft from "@/assets/sprites/lola-left.png";
+import lolaRight from "@/assets/sprites/lola-right.png";
+
 export type Facing = "up" | "down" | "left" | "right";
 
 export type SpriteSheets = Record<Facing, string>;
