@@ -1299,13 +1299,9 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
       window.removeEventListener("pagehide", onPageHide);
       document.removeEventListener("visibilitychange", onVisible);
       window.removeEventListener("focus", onVisible);
-      if (tearingDown.current) {
-        // Aba sendo fechada/recarregada — preserva a posição atual.
-        persistFinalPosition();
-      } else {
-        // Navegação saindo do workspace — sai do mundo e volta ao spawn.
-        leaveWorkspaceReset();
-      }
+      // Em qualquer caso (fechar aba ou navegar pra fora) o personagem
+      // sai do mundo e volta ao ponto de ressurgimento.
+      leaveWorkspaceReset();
     };
   }, []);
 
