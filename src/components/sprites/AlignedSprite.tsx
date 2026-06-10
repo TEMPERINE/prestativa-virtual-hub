@@ -168,7 +168,7 @@ export function AlignedSprite({
       ? {
           position: "relative",
           height: "min(9vh, 94px)",
-          aspectRatio: `${refW} / ${refH}`,
+          aspectRatio: `${refW} / ${refHPadded}`,
           ...style,
         }
       : {
