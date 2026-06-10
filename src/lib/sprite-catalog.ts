@@ -250,6 +250,18 @@ export const SPRITES: SpriteDef[] = [
       right: { w: 114, h: 248 },
     },
   },
+  {
+    id: "lola",
+    label: "Lola",
+    gender: "f",
+    sheets: { up: lolaUp, down: lolaDown, left: lolaLeft, right: lolaRight },
+    dims: {
+      down: { w: 120, h: 254 },
+      up: { w: 116, h: 254 },
+      left: { w: 120, h: 252 },
+      right: { w: 114, h: 248 },
+    },
+  },
 ];
 
 export const SPRITE_FRAMES = 6;
