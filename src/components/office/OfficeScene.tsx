@@ -222,10 +222,10 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
   const [positions, setPositions] = useState<Record<string, RemotePos>>({});
   const positionsRef = useRef<Record<string, RemotePos>>({});
   positionsRef.current = positions;
-  // Authoritative set of peers currently present in this workspace's realtime
-  // channel. Source of truth for "who is in the world right now" — DB
-  // is_online can lag (Electron quit without cleanup), so we render only
-  // peers we actually see in presence (plus self).
+  // Fast realtime presence signal. It accelerates discovery, but is NOT the
+  // authority for visibility: the database `is_online` flag is the durable
+  // game-state source, so idle players never disappear just because a presence
+  // heartbeat or browser tab event was missed.
   const [presentPeerIds, setPresentPeerIds] = useState<Set<string>>(() => new Set());
   // LWW tracker — wall-clock ts of the freshest known sample per user (broadcast/presence).
   // Lets us discard stale DB poll rows that would otherwise snap remote avatars back.
@@ -520,7 +520,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
           facing: f,
           is_online: true,
           updated_at: updatedAt,
-        });
+        }, { onConflict: "workspace_id,user_id" });
       }
     };
     if (knownId) {
