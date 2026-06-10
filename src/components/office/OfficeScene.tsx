@@ -1169,10 +1169,10 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
           const freshTs = positionFreshTs.current.get(p.user_id) ?? 0;
           if (p.is_online) maybeStartRemoteTeleportFromCurrent(p.user_id, { x: p.x, y: p.y }, dbTs || Date.now());
           // Strict LWW: DB rows older than the freshest known live sample are
-          // never allowed to move a stopped avatar back to a spawn/old spot.
+          // never allowed to move a stopped avatar or flip it offline.
           if (dbTs && dbTs < freshTs) {
             const cur = prev[p.user_id];
-            if (cur) next[p.user_id] = { ...cur, is_online: p.is_online };
+            if (cur) next[p.user_id] = cur;
             else next[p.user_id] = p;
           } else {
             if (dbTs) positionFreshTs.current.set(p.user_id, dbTs);
