@@ -115,6 +115,7 @@ const SEND_INTERVAL_MS = 120;
 const POSITION_BROADCAST_CHANNEL = "positions-broadcast-v1";
 const POSITION_PRESENCE_CHANNEL = "positions-presence-v1";
 const REMOTE_TELEPORT_MIN_DISTANCE = 0.075;
+const STATE_REQUEST_RETRIES_MS = [0, 450, 1200, 2500];
 
 const timestampForPosition = (p: Partial<Pick<RemotePos, "updated_at" | "ts">>) =>
   p.ts ?? (p.updated_at ? Date.parse(p.updated_at) : 0);
@@ -308,6 +309,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
   const reactionChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const positionBroadcastChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const positionBroadcastReadyRef = useRef(false);
+  const clientInstanceIdRef = useRef(`client:${Date.now()}:${Math.random().toString(36).slice(2)}`);
 
   const meIdRef = useRef<string | null>(null);
   const accessTokenRef = useRef<string | null>(null);
@@ -658,6 +660,25 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
 
   // Load me + all profiles + initial positions
   useEffect(() => {
+    const requestLiveState = () => {
+      const uid = meIdRef.current;
+      const ch = positionBroadcastChannelRef.current;
+      if (!uid || !ch || !positionBroadcastReadyRef.current) return;
+      const requestId = `${clientInstanceIdRef.current}:${Date.now()}`;
+      STATE_REQUEST_RETRIES_MS.forEach((delay) => {
+        window.setTimeout(() => {
+          const curUid = meIdRef.current;
+          const curCh = positionBroadcastChannelRef.current;
+          if (!curUid || !curCh || !positionBroadcastReadyRef.current) return;
+          void curCh.send({
+            type: "broadcast",
+            event: "state-request",
+            payload: { requester_id: curUid, request_id: requestId, ts: Date.now() },
+          });
+        }, delay);
+      });
+    };
+
     (async () => {
       const { data: userData } = await supabase.auth.getUser();
       if (!userData.user) { try { onHydrated?.(); } catch { /* noop */ } return; }
@@ -784,6 +805,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
         is_online: true,
         updated_at: new Date().toISOString(),
       }, { onConflict: "workspace_id,user_id" });
+      requestLiveState();
     })();
 
     // IMPORTANT: garantir que o socket de realtime carregue o JWT do usuário
@@ -866,6 +888,43 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
           if (incomingTs < curTs) return prev;
           positionFreshTs.current.set(row.user_id, incomingTs);
           return { ...prev, [row.user_id]: { ...row, ts: incomingTs } };
+        });
+      })
+      .on("broadcast", { event: "state-request" }, (payload) => {
+        const { requester_id, request_id } = (payload.payload ?? {}) as { requester_id?: string; request_id?: string };
+        const uid = meIdRef.current;
+        if (!uid || !requester_id || requester_id === uid || !positionHydratedRef.current) return;
+        const cur = posRef.current;
+        const curZone = zoneAt(cur).id;
+        const ts = Date.now();
+        void positionBroadcastCh.send({
+          type: "broadcast",
+          event: "state-response",
+          payload: {
+            request_id,
+            requester_id,
+            user_id: uid,
+            x: cur.x,
+            y: cur.y,
+            zone: curZone,
+            facing: facingRef.current,
+            is_online: true,
+            ts,
+            client_id: clientInstanceIdRef.current,
+          },
+        });
+      })
+      .on("broadcast", { event: "state-response" }, (payload) => {
+        const row = payload.payload as RemotePos & { requester_id?: string; client_id?: string };
+        const uid = meIdRef.current;
+        if (!uid || row?.requester_id !== uid || !row.user_id || row.client_id === clientInstanceIdRef.current) return;
+        const incomingTs = timestampForPosition(row) || Date.now();
+        maybeStartRemoteTeleportFromCurrent(row.user_id, { x: row.x, y: row.y }, incomingTs);
+        setPositions((prev) => {
+          const curTs = timestampForPosition(prev[row.user_id] ?? {}) || (positionFreshTs.current.get(row.user_id) ?? 0);
+          if (incomingTs < curTs) return prev;
+          positionFreshTs.current.set(row.user_id, incomingTs);
+          return { ...prev, [row.user_id]: { ...row, is_online: true, ts: incomingTs } };
         });
       })
       .on("broadcast", { event: "teleport" }, (payload) => {
@@ -1000,6 +1059,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
       reactionCh.subscribe();
       positionBroadcastCh.subscribe((status) => {
         positionBroadcastReadyRef.current = status === "SUBSCRIBED";
+        if (status === "SUBSCRIBED") requestLiveState();
       });
       claimsCh.subscribe();
       presenceCh.subscribe(async (status) => {
