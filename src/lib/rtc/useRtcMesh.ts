@@ -632,7 +632,7 @@ export function useRtcMesh(myId: string | null, desiredPeers: string[]): RtcMesh
   }, [remoteStreams]);
 
 
-  // Self speaking detection (analyse local mic level only when mic is on).
+  // Self speaking detection — RMS + EMA + histerese (mesmo algoritmo do remoto).
   useEffect(() => {
     if (!micOn) { setSelfSpeaking(false); return; }
     const track = audioTrackRef.current;
@@ -643,14 +643,31 @@ export function useRtcMesh(myId: string | null, desiredPeers: string[]): RtcMesh
       ctx = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
       const src = ctx.createMediaStreamSource(new MediaStream([track]));
       const analyser = ctx.createAnalyser();
-      analyser.fftSize = 512;
+      analyser.fftSize = 1024;
+      analyser.smoothingTimeConstant = 0.2;
       src.connect(analyser);
-      const data = new Uint8Array(new ArrayBuffer(analyser.frequencyBinCount));
+      const data = new Uint8Array(new ArrayBuffer(analyser.fftSize));
+      const SPEAK_ON = 0.030, SPEAK_OFF = 0.012, ON_HOLD_MS = 120, OFF_HOLD_MS = 700, EMA = 0.35;
+      let ema = 0, aboveSince = 0, belowSince = performance.now(), speaking = false;
       const tick = () => {
-        analyser.getByteFrequencyData(data);
-        let sum = 0;
-        for (let i = 0; i < data.length; i++) sum += data[i];
-        setSelfSpeaking(sum / data.length > 12);
+        analyser.getByteTimeDomainData(data);
+        let sumSq = 0;
+        for (let i = 0; i < data.length; i++) {
+          const v = (data[i] - 128) / 128;
+          sumSq += v * v;
+        }
+        const rms = Math.sqrt(sumSq / data.length);
+        ema = ema * (1 - EMA) + rms * EMA;
+        const now = performance.now();
+        if (ema >= SPEAK_ON) {
+          if (!aboveSince) aboveSince = now;
+          belowSince = 0;
+          if (!speaking && now - aboveSince >= ON_HOLD_MS) { speaking = true; setSelfSpeaking(true); }
+        } else if (ema <= SPEAK_OFF) {
+          if (!belowSince) belowSince = now;
+          aboveSince = 0;
+          if (speaking && now - belowSince >= OFF_HOLD_MS) { speaking = false; setSelfSpeaking(false); }
+        }
         raf = requestAnimationFrame(tick);
       };
       raf = requestAnimationFrame(tick);
@@ -661,6 +678,7 @@ export function useRtcMesh(myId: string | null, desiredPeers: string[]): RtcMesh
       setSelfSpeaking(false);
     };
   }, [micOn]);
+
 
 
   const acquireMic = useCallback(async (deviceId?: string): Promise<MediaStreamTrack | null> => {
