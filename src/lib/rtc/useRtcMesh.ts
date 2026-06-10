@@ -554,7 +554,9 @@ export function useRtcMesh(myId: string | null, desiredPeers: string[]): RtcMesh
     return () => window.clearInterval(timer);
   }, [myId, createPeer, sendSignal]);
 
-  // Speaking detection (simple: analyse remote audio levels)
+  // Speaking detection (analyse remote audio levels — RMS time-domain + EMA).
+  // Time-domain RMS é mais estável que frequência média (que oscila bastante
+  // com sons consonantais), e o EMA elimina o piscar entre "fala/silêncio".
   useEffect(() => {
     const ctxRef: { ctx?: AudioContext } = {};
     const analysers: { peerId: string; analyser: AnalyserNode; data: Uint8Array<ArrayBuffer> }[] = [];
@@ -568,33 +570,40 @@ export function useRtcMesh(myId: string | null, desiredPeers: string[]): RtcMesh
       try {
         const src = ctxRef.ctx.createMediaStreamSource(new MediaStream([audioTracks[0]]));
         const analyser = ctxRef.ctx.createAnalyser();
-        analyser.fftSize = 512;
+        analyser.fftSize = 1024;
+        analyser.smoothingTimeConstant = 0.2;
         src.connect(analyser);
-        analysers.push({ peerId, analyser, data: new Uint8Array(new ArrayBuffer(analyser.frequencyBinCount)) });
+        analysers.push({ peerId, analyser, data: new Uint8Array(new ArrayBuffer(analyser.fftSize)) });
       } catch { /* noop */ }
     });
 
     if (!analysers.length) return;
     let raf = 0;
-    // Voice-activity calibration (filter small noises/keyboard/breath):
-    // - SPEAK_ON: louder threshold to "turn on" (real speech energy)
-    // - SPEAK_OFF: lower threshold to "turn off" (hysteresis)
-    // - ON_HOLD_MS: must stay above SPEAK_ON for N ms before showing bubble
-    // - OFF_HOLD_MS: must stay below SPEAK_OFF for N ms before hiding
-    const SPEAK_ON = 26;
-    const SPEAK_OFF = 16;
-    const ON_HOLD_MS = 180;
-    const OFF_HOLD_MS = 550;
-    const state: Record<string, { speaking: boolean; aboveSince: number; belowSince: number }> = {};
+    // Thresholds em RMS normalizado [0..1]:
+    //  - SPEAK_ON ~0.03 (~-30dBFS) cobre voz baixa sem disparar com ruído
+    //  - SPEAK_OFF ~0.012 (~-38dBFS) — janela de histerese ampla
+    //  - ON/OFF_HOLD evitam pisca-pisca; OFF maior pra suavizar pausas naturais
+    const SPEAK_ON = 0.030;
+    const SPEAK_OFF = 0.012;
+    const ON_HOLD_MS = 120;
+    const OFF_HOLD_MS = 700;
+    const EMA = 0.35; // peso do sample novo vs histórico
+    const state: Record<string, { speaking: boolean; aboveSince: number; belowSince: number; ema: number }> = {};
     const tick = () => {
       const now = performance.now();
       const next: Record<string, boolean> = {};
       for (const a of analysers) {
-        a.analyser.getByteFrequencyData(a.data);
-        let sum = 0;
-        for (let i = 0; i < a.data.length; i++) sum += a.data[i];
-        const level = sum / a.data.length;
-        const s = state[a.peerId] ?? (state[a.peerId] = { speaking: false, aboveSince: 0, belowSince: now });
+        a.analyser.getByteTimeDomainData(a.data);
+        // RMS normalizado: cada byte é amplitude em [0..255] com 128 = silêncio.
+        let sumSq = 0;
+        for (let i = 0; i < a.data.length; i++) {
+          const v = (a.data[i] - 128) / 128;
+          sumSq += v * v;
+        }
+        const rms = Math.sqrt(sumSq / a.data.length);
+        const s = state[a.peerId] ?? (state[a.peerId] = { speaking: false, aboveSince: 0, belowSince: now, ema: 0 });
+        s.ema = s.ema * (1 - EMA) + rms * EMA;
+        const level = s.ema;
         if (level >= SPEAK_ON) {
           if (!s.aboveSince) s.aboveSince = now;
           s.belowSince = 0;
@@ -603,11 +612,9 @@ export function useRtcMesh(myId: string | null, desiredPeers: string[]): RtcMesh
           if (!s.belowSince) s.belowSince = now;
           s.aboveSince = 0;
           if (s.speaking && now - s.belowSince >= OFF_HOLD_MS) s.speaking = false;
-        } else {
-          // mid-zone: keep current state but reset timers
-          s.aboveSince = 0;
-          s.belowSince = 0;
         }
+        // Zona morta: NÃO zera os timers — só pausa a transição. Isso evita
+        // que uma queda momentânea entre sílabas reinicie o ON_HOLD.
         next[a.peerId] = s.speaking;
       }
       setSpeakingPeers((prev) => {
@@ -624,7 +631,8 @@ export function useRtcMesh(myId: string | null, desiredPeers: string[]): RtcMesh
     };
   }, [remoteStreams]);
 
-  // Self speaking detection (analyse local mic level only when mic is on).
+
+  // Self speaking detection — RMS + EMA + histerese (mesmo algoritmo do remoto).
   useEffect(() => {
     if (!micOn) { setSelfSpeaking(false); return; }
     const track = audioTrackRef.current;
@@ -635,14 +643,31 @@ export function useRtcMesh(myId: string | null, desiredPeers: string[]): RtcMesh
       ctx = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
       const src = ctx.createMediaStreamSource(new MediaStream([track]));
       const analyser = ctx.createAnalyser();
-      analyser.fftSize = 512;
+      analyser.fftSize = 1024;
+      analyser.smoothingTimeConstant = 0.2;
       src.connect(analyser);
-      const data = new Uint8Array(new ArrayBuffer(analyser.frequencyBinCount));
+      const data = new Uint8Array(new ArrayBuffer(analyser.fftSize));
+      const SPEAK_ON = 0.030, SPEAK_OFF = 0.012, ON_HOLD_MS = 120, OFF_HOLD_MS = 700, EMA = 0.35;
+      let ema = 0, aboveSince = 0, belowSince = performance.now(), speaking = false;
       const tick = () => {
-        analyser.getByteFrequencyData(data);
-        let sum = 0;
-        for (let i = 0; i < data.length; i++) sum += data[i];
-        setSelfSpeaking(sum / data.length > 12);
+        analyser.getByteTimeDomainData(data);
+        let sumSq = 0;
+        for (let i = 0; i < data.length; i++) {
+          const v = (data[i] - 128) / 128;
+          sumSq += v * v;
+        }
+        const rms = Math.sqrt(sumSq / data.length);
+        ema = ema * (1 - EMA) + rms * EMA;
+        const now = performance.now();
+        if (ema >= SPEAK_ON) {
+          if (!aboveSince) aboveSince = now;
+          belowSince = 0;
+          if (!speaking && now - aboveSince >= ON_HOLD_MS) { speaking = true; setSelfSpeaking(true); }
+        } else if (ema <= SPEAK_OFF) {
+          if (!belowSince) belowSince = now;
+          aboveSince = 0;
+          if (speaking && now - belowSince >= OFF_HOLD_MS) { speaking = false; setSelfSpeaking(false); }
+        }
         raf = requestAnimationFrame(tick);
       };
       raf = requestAnimationFrame(tick);
@@ -653,6 +678,7 @@ export function useRtcMesh(myId: string | null, desiredPeers: string[]): RtcMesh
       setSelfSpeaking(false);
     };
   }, [micOn]);
+
 
 
   const acquireMic = useCallback(async (deviceId?: string): Promise<MediaStreamTrack | null> => {
