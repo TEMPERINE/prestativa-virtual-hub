@@ -1064,59 +1064,13 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
     document.addEventListener("visibilitychange", onVisible);
     window.addEventListener("focus", onVisible);
 
-    // Persist the user's CURRENT position synchronously on unload/hide so a
-    // refresh, tab close or app switch never loses the last few movements
-    // (which would make the avatar appear to "respawn" at an old spot).
-    const persistFinalPosition = () => {
-      const uid = meIdRef.current;
-      if (!uid || !positionHydratedRef.current) return;
-      const cur = posRef.current;
-      const z = zoneAt(cur).id;
-      writeLocalSavedPosition(uid, cur, z, facingRef.current);
-      const body = JSON.stringify({
-        workspace_id: getCurrentWorkspaceId(),
-        user_id: uid,
-        x: cur.x,
-        y: cur.y,
-        zone: z,
-        facing: facingRef.current,
-        is_online: false,
-        updated_at: new Date().toISOString(),
-      });
-      try {
-        const url = `${import.meta.env.VITE_SUPABASE_URL}/rest/v1/positions?on_conflict=workspace_id,user_id`;
-        const token = accessTokenRef.current;
-        const headers = {
-          "Content-Type": "application/json",
-          apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-          Authorization: `Bearer ${token ?? import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-          Prefer: "resolution=merge-duplicates",
-        };
-        // Prefer fetch keepalive (allows custom headers); fall back to sendBeacon
-        void fetch(url, { method: "POST", headers, body, keepalive: true }).catch(() => {
-          try { navigator.sendBeacon?.(url, new Blob([body], { type: "application/json" })); } catch { /* noop */ }
-        });
-      } catch { /* noop */ }
-      // Also fire a normal async upsert as a backup (works if the page isn't fully torn down yet)
-      const _wsOff = getCurrentWorkspaceId();
-      if (_wsOff) void supabase.from("positions").upsert({
-        workspace_id: _wsOff,
-        user_id: uid,
-        x: cur.x,
-        y: cur.y,
-        zone: z,
-        facing: facingRef.current,
-        is_online: false,
-        updated_at: new Date().toISOString(),
-      }, { onConflict: "workspace_id,user_id" });
-    };
-    const tearingDown = { current: false };
     // Fechar a aba/janela = sair do mundo. Marca offline E reseta a posição
     // pro ponto de ressurgimento, para que ao retornar o avatar apareça no
     // início (não no último ponto onde parou). Mesmo comportamento da
     // navegação saindo do workspace.
-    const onPageHide = () => { tearingDown.current = true; leaveWorkspaceReset(); };
-    const onBeforeUnload = () => { tearingDown.current = true; leaveWorkspaceReset(); };
+    const onPageHide = () => { leaveWorkspaceReset(); };
+    const onBeforeUnload = () => { leaveWorkspaceReset(); };
+
     window.addEventListener("beforeunload", onBeforeUnload);
     window.addEventListener("pagehide", onPageHide);
 
