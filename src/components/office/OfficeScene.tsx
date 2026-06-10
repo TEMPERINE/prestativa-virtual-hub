@@ -439,37 +439,45 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
     setFacing(nextFacing);
   }, []);
 
-  // ---- WebRTC mesh: voice/video by proximity or same physical room ----
-  // Raio de "conversa de corredor": só conecta quando os personagens estão
-  // bem próximos (cerca da distância de um sprite) e desconecta rapidamente
-  // assim que a bolha de papo é rompida.
+  // ---- WebRTC mesh: voice/video por sala privada OU por proximidade no lobby ----
+  // Regra de produto:
+  //  • Em QUALQUER zona privada (qualquer rect != lobby) todos os avatares
+  //    fisicamente dentro do rect entram automaticamente na chamada, com ou
+  //    sem câmera/mic ligados, INDEPENDENTE da distância entre eles.
+  //  • No lobby/corredor a chamada só rola por proximidade ("conversa de
+  //    corredor") — pequeno raio com histerese.
+  // A zona do peer é calculada LOCALMENTE via zoneAt({x,y}) para não depender
+  // do campo p.zone (que vem com lag/staleness do broadcast de presença).
   const PROXIMITY_CONNECT = 0.05;
   const PROXIMITY_DISCONNECT = 0.06;
   const connectedPeersRef = useRef<Set<string>>(new Set());
   const desiredPeers = useMemo(() => {
     const meId = me?.id;
     if (!meId) return [] as string[];
+    const myZoneId = zoneAt(pos).id;
     const candidates: { uid: string; score: number }[] = [];
     for (const [uid, p] of Object.entries(positions)) {
       if (uid === meId) continue;
       if (!p.is_online && !presentPeerIds.has(uid)) continue;
-      // Same physical room/area → connect only while both avatars are there.
-      // A claimed desk alone must not pull users into a call from elsewhere.
-      const sameActiveRoom = zone !== "lobby" && p.zone === zone;
-      // Proximity with hysteresis
+      // Zona do peer calculada localmente — robusto contra p.zone defasado.
+      const peerZoneId = zoneAt({ x: p.x, y: p.y }).id;
+      const sameActiveRoom = myZoneId !== "lobby" && peerZoneId === myZoneId;
+      // Proximidade só importa no lobby (e como fallback).
       const dx = p.x - pos.x;
       const dy = p.y - pos.y;
       const dist = Math.hypot(dx, dy);
       const already = connectedPeersRef.current.has(uid);
       const closeEnough = already ? dist <= PROXIMITY_DISCONNECT : dist <= PROXIMITY_CONNECT;
       if (sameActiveRoom || closeEnough) {
+        // Mesma sala privada vence: score 0 + dist (sempre antes dos de corredor).
         const score = (sameActiveRoom ? 0 : 1) + dist;
         candidates.push({ uid, score });
       }
     }
-    // A browser mesh is capped to keep the room stable with ~15 collaborators.
+    // Cap em ~15 pra estabilidade do mesh; ordenação prioriza mesma sala.
     return candidates.sort((a, b) => a.score - b.score).slice(0, 14).map((c) => c.uid);
-  }, [me?.id, positions, presentPeerIds, pos.x, pos.y, zone]);
+  }, [me?.id, positions, presentPeerIds, pos, zone]);
+
 
   const rtc = useRtcMesh(me?.id ?? null, desiredPeers);
   useEffect(() => {
@@ -2018,11 +2026,13 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
   }, [currentZone]);
 
   // Histórico "Minhas reuniões" — registra entrada/saída quando o usuário
-  // está numa sala de reunião (supportsVideo) com pelo menos 1 outro peer.
+  // está em QUALQUER zona privada (não-lobby) com pelo menos 1 outro peer.
+  // Toda zona privada conta como reunião automática (com ou sem câmera).
+  const isPrivateZone = currentZone.id !== "lobby";
   const { activeMeetingId } = useMeetingTracker({
     zoneId: currentZone.id,
     zoneLabel: currentZone.label,
-    isMeetingZone: !!currentZone.supportsVideo,
+    isMeetingZone: isPrivateZone,
     peerCount: rtc.connectedPeers.length,
     enabled: !!me?.id,
   });
@@ -3020,9 +3030,9 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
               <Hand className="w-4 h-4" />
             </IconButton>
 
-            {/* Botão de gravação — aparece em qualquer sala de reunião (mesmo sozinho).
+            {/* Botão de gravação — aparece em qualquer zona privada (não-lobby).
                 Se não houver reunião ativa ainda, criamos sob demanda via meeting_join. */}
-            {!!currentZone.supportsVideo && tierCaps.canRecordMeetings && (
+            {isPrivateZone && tierCaps.canRecordMeetings && (
               <button
                 onClick={async () => {
                   if (recorder.isUploading) return;
