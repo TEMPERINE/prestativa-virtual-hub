@@ -97,7 +97,7 @@ export const SPRITES: SpriteDef[] = [
   },
   {
     id: "blonde",
-    label: "Loira",
+    label: "Dany",
     gender: "f",
     sheets: { up: blondeUp, down: blondeDown, left: blondeLeft, right: blondeRight },
     dims: {
@@ -110,7 +110,7 @@ export const SPRITES: SpriteDef[] = [
   },
   {
     id: "curly",
-    label: "Morena Cacheada",
+    label: "Anne",
     gender: "f",
     sheets: { up: curlyUp, down: curlyDown, left: curlyLeft, right: curlyLeft },
     dims: {
@@ -124,7 +124,7 @@ export const SPRITES: SpriteDef[] = [
 
   {
     id: "redhead",
-    label: "Ruiva",
+    label: "Lele",
     gender: "f",
     sheets: { up: redheadUp, down: redheadDown, left: redheadLeft, right: redheadRight },
     dims: {
@@ -137,7 +137,7 @@ export const SPRITES: SpriteDef[] = [
   },
   {
     id: "afro",
-    label: "Afro",
+    label: "Thamy",
     gender: "f",
     sheets: { up: afroUp, down: afroDown, left: afroLeft, right: afroRight },
     dims: {
@@ -150,7 +150,7 @@ export const SPRITES: SpriteDef[] = [
   },
   {
     id: "japa",
-    label: "Japa",
+    label: "Chun",
     gender: "f",
     sheets: { up: japaUp, down: japaDown, left: japaLeft, right: japaLeft },
     dims: {
@@ -163,7 +163,7 @@ export const SPRITES: SpriteDef[] = [
   },
   {
     id: "morena",
-    label: "Morena Iluminada",
+    label: "Shae",
     gender: "f",
     sheets: { up: morenaUp, down: morenaDown, left: morenaLeft, right: morenaLeft },
     dims: {
@@ -176,7 +176,7 @@ export const SPRITES: SpriteDef[] = [
   },
   {
     id: "latina",
-    label: "Latina",
+    label: "Deby",
     gender: "f",
     sheets: { up: latinaUp, down: latinaDown, left: latinaLeft, right: latinaLeft },
     dims: {
@@ -189,7 +189,7 @@ export const SPRITES: SpriteDef[] = [
   },
   {
     id: "indi",
-    label: "Indi",
+    label: "Lory",
     gender: "f",
     sheets: { up: indiUp, down: indiDown, left: indiLeft, right: indiLeft },
     dims: {
