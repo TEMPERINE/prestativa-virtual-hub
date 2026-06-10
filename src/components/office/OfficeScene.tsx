@@ -955,12 +955,31 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
         return changed ? next : p;
       });
     };
+    const syncPresentIds = () => {
+      const state = presenceCh.presenceState() as Record<string, PresenceState[]>;
+      const ids = new Set<string>();
+      for (const list of Object.values(state)) {
+        for (const s of list) if (s?.user_id) ids.add(s.user_id);
+      }
+      setPresentPeerIds((prev) => {
+        if (prev.size === ids.size) {
+          let same = true;
+          for (const id of ids) if (!prev.has(id)) { same = false; break; }
+          if (same) return prev;
+        }
+        return ids;
+      });
+    };
     presenceCh.on("presence", { event: "sync" }, () => {
       const state = presenceCh.presenceState() as Record<string, PresenceState[]>;
       for (const list of Object.values(state)) mergePresence(list);
+      syncPresentIds();
       reconcilePresence();
     });
-    presenceCh.on("presence", { event: "join" }, ({ newPresences }) => mergePresence(newPresences));
+    presenceCh.on("presence", { event: "join" }, ({ newPresences }) => {
+      mergePresence(newPresences);
+      syncPresentIds();
+    });
     presenceCh.on("presence", { event: "leave" }, ({ leftPresences }) => {
       const arr = leftPresences as unknown as PresenceState[];
       for (const s of arr ?? []) {
@@ -971,6 +990,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
           return { ...p, [s.user_id]: { ...cur, is_online: false } };
         });
       }
+      syncPresentIds();
     });
 
     const claimsCh = supabase
