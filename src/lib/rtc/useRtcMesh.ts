@@ -835,6 +835,32 @@ export function useRtcMesh(myId: string | null, desiredPeers: string[]): RtcMesh
     void refreshDevices();
   }, [refreshDevices]);
 
+  // Force every existing peer to renegotiate so that newly-added/removed
+  // tracks (in particular screen share) propagate correctly. replaceTrack
+  // alone does not always cause the remote side to start rendering the
+  // new stream — we need a fresh offer/answer exchange.
+  const renegotiateAll = useCallback(async () => {
+    for (const [peerId, entry] of peersRef.current.entries()) {
+      try {
+        if (entry.isOfferer) {
+          if (entry.pc.signalingState !== "stable") continue;
+          entry.makingOffer = true;
+          const offer = await entry.pc.createOffer();
+          if (entry.pc.signalingState !== "stable") { entry.makingOffer = false; continue; }
+          await entry.pc.setLocalDescription(offer);
+          sendSignal({ to: peerId, type: "offer", sdp: entry.pc.localDescription! });
+          entry.makingOffer = false;
+        } else {
+          // Ask the offerer to drive the renegotiation.
+          sendSignal({ to: peerId, type: "renegotiate" });
+        }
+      } catch (err) {
+        console.error("renegotiate peer failed", err);
+        entry.makingOffer = false;
+      }
+    }
+  }, [sendSignal]);
+
   const enableCam = useCallback(async () => {
     if (videoTrackRef.current) {
       videoTrackRef.current.enabled = true;
