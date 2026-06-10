@@ -181,6 +181,19 @@ export const SPRITES: SpriteDef[] = [
     },
     mirrorRightFromLeft: true,
   },
+  {
+    id: "bia",
+    label: "Bia",
+    gender: "f",
+    sheets: { up: biaUp, down: biaDown, left: biaLeft, right: biaLeft },
+    dims: {
+      down: { w: 124, h: 228 },
+      up: { w: 120, h: 230 },
+      left: { w: 126, h: 230 },
+      right: { w: 126, h: 230 },
+    },
+    mirrorRightFromLeft: true,
+  },
 ];
 
 export const SPRITE_FRAMES = 6;
@@ -188,4 +201,16 @@ export const DEFAULT_SPRITE_ID = "marcio";
 
 export function getSprite(id: string | null | undefined): SpriteDef {
   return SPRITES.find((s) => s.id === id) ?? SPRITES[0];
+}
+
+export const GENDER_GROUPS: { key: "m" | "f"; label: string }[] = [
+  { key: "m", label: "Meninos" },
+  { key: "f", label: "Meninas" },
+];
+
+export function groupSpritesByGender<T extends { gender: "m" | "f" | "n" }>(list: T[]) {
+  return GENDER_GROUPS.map((g) => ({
+    ...g,
+    items: list.filter((s) => s.gender === g.key),
+  })).filter((g) => g.items.length > 0);
 }
