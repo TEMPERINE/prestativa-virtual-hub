@@ -70,6 +70,16 @@ import yuryUp from "@/assets/sprites/yury-up.png";
 import yuryLeft from "@/assets/sprites/yury-left.png";
 import yuryRight from "@/assets/sprites/yury-right.png";
 
+import lexaDown from "@/assets/sprites/lexa-down.png";
+import lexaUp from "@/assets/sprites/lexa-up.png";
+import lexaLeft from "@/assets/sprites/lexa-left.png";
+import lexaRight from "@/assets/sprites/lexa-right.png";
+
+import karenDown from "@/assets/sprites/karen-down.png";
+import karenUp from "@/assets/sprites/karen-up.png";
+import karenLeft from "@/assets/sprites/karen-left.png";
+import karenRight from "@/assets/sprites/karen-right.png";
+
 export type Facing = "up" | "down" | "left" | "right";
 
 export type SpriteSheets = Record<Facing, string>;
@@ -277,6 +287,30 @@ export const SPRITES: SpriteDef[] = [
       up: { w: 130, h: 236 },
       left: { w: 156, h: 234 },
       right: { w: 154, h: 232 },
+    },
+  },
+  {
+    id: "lexa",
+    label: "Lexa",
+    gender: "f",
+    sheets: { up: lexaUp, down: lexaDown, left: lexaLeft, right: lexaRight },
+    dims: {
+      down: { w: 168, h: 242 },
+      up: { w: 162, h: 242 },
+      left: { w: 158, h: 244 },
+      right: { w: 150, h: 242 },
+    },
+  },
+  {
+    id: "karen",
+    label: "Karen",
+    gender: "f",
+    sheets: { up: karenUp, down: karenDown, left: karenLeft, right: karenRight },
+    dims: {
+      down: { w: 126, h: 238 },
+      up: { w: 126, h: 240 },
+      left: { w: 142, h: 238 },
+      right: { w: 136, h: 238 },
     },
   },
 ];
