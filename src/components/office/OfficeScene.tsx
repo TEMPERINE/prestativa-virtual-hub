@@ -501,6 +501,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
     const knownId = meIdRef.current;
     const write = (userId: string) => {
       const payload = { user_id: userId, x, y, zone: z, facing: f, is_online: true, ts: Date.now() };
+      const updatedAt = new Date(payload.ts).toISOString();
       writeLocalSavedPosition(userId, { x, y }, z, f);
       const ch = positionBroadcastChannelRef.current;
       if (ch && positionBroadcastReadyRef.current) {
@@ -518,6 +519,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
           zone: z,
           facing: f,
           is_online: true,
+          updated_at: updatedAt,
         });
       }
     };
@@ -775,6 +777,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
         zone: startZone,
         facing: startFacing,
         is_online: true,
+        updated_at: new Date().toISOString(),
       });
     })();
 
