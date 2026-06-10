@@ -1987,13 +1987,18 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
     const myId = meIdRef.current;
     return Object.values(positions)
       .filter((p) => {
-        if (!p.is_online) return false;
-        if (p.user_id === myId) return true; // self is always fresh
+        if (p.user_id === myId) return true; // self sempre visível
+        // Visibilidade NÃO depende mais de `is_online` (campo do DB pode
+        // ficar defasado e a presence-leave temporária do canal Realtime
+        // pode marcá-lo false por engano, fazendo o peer parado "sumir").
+        // Critério: presença Realtime ativa OU heartbeat/broadcast/DB
+        // recente (≤ PRESENCE_GRACE_MS). O heartbeat de presença roda a
+        // cada 1s, então peers vivos nunca caem nesse limite.
+        if (presentPeerIds.has(p.user_id)) return true;
         const tsBroadcast = p.ts ?? 0;
         const tsDb = p.updated_at ? new Date(p.updated_at).getTime() : 0;
         const fresh = Math.max(tsBroadcast, tsDb, positionFreshTs.current.get(p.user_id) ?? 0);
-        const recentlyActive = fresh > 0 && now - fresh < PRESENCE_GRACE_MS;
-        return presentPeerIds.has(p.user_id) || recentlyActive;
+        return fresh > 0 && now - fresh < PRESENCE_GRACE_MS;
       })
       .map((p) => ({
         pos: p,
