@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { SPRITES } from "@/lib/sprite-catalog";
+import { SPRITES, groupSpritesByGender } from "@/lib/sprite-catalog";
 import { SpritePreview } from "@/components/profile/SpritePreview";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
