@@ -543,13 +543,39 @@ export function useRtcMesh(myId: string | null, desiredPeers: string[]): RtcMesh
 
     if (!analysers.length) return;
     let raf = 0;
+    // Voice-activity calibration (filter small noises/keyboard/breath):
+    // - SPEAK_ON: louder threshold to "turn on" (real speech energy)
+    // - SPEAK_OFF: lower threshold to "turn off" (hysteresis)
+    // - ON_HOLD_MS: must stay above SPEAK_ON for N ms before showing bubble
+    // - OFF_HOLD_MS: must stay below SPEAK_OFF for N ms before hiding
+    const SPEAK_ON = 26;
+    const SPEAK_OFF = 16;
+    const ON_HOLD_MS = 180;
+    const OFF_HOLD_MS = 550;
+    const state: Record<string, { speaking: boolean; aboveSince: number; belowSince: number }> = {};
     const tick = () => {
+      const now = performance.now();
       const next: Record<string, boolean> = {};
       for (const a of analysers) {
         a.analyser.getByteFrequencyData(a.data);
         let sum = 0;
         for (let i = 0; i < a.data.length; i++) sum += a.data[i];
-        next[a.peerId] = sum / a.data.length > 12;
+        const level = sum / a.data.length;
+        const s = state[a.peerId] ?? (state[a.peerId] = { speaking: false, aboveSince: 0, belowSince: now });
+        if (level >= SPEAK_ON) {
+          if (!s.aboveSince) s.aboveSince = now;
+          s.belowSince = 0;
+          if (!s.speaking && now - s.aboveSince >= ON_HOLD_MS) s.speaking = true;
+        } else if (level <= SPEAK_OFF) {
+          if (!s.belowSince) s.belowSince = now;
+          s.aboveSince = 0;
+          if (s.speaking && now - s.belowSince >= OFF_HOLD_MS) s.speaking = false;
+        } else {
+          // mid-zone: keep current state but reset timers
+          s.aboveSince = 0;
+          s.belowSince = 0;
+        }
+        next[a.peerId] = s.speaking;
       }
       setSpeakingPeers((prev) => {
         const keys = new Set([...Object.keys(prev), ...Object.keys(next)]);

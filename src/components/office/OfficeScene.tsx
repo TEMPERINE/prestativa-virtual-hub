@@ -2360,7 +2360,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
               }}
             >
               <div className="flex flex-col items-center">
-                {(isMe ? (rtc.micOn && rtc.selfSpeaking) : !!rtc.speakingPeers[profile.id]) && (
+                {!isMe && !!rtc.speakingPeers[profile.id] && (
                   <SpeechBubble />
                 )}
                 <div
