@@ -814,15 +814,21 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
               return next;
             }
             const dbTs = row.updated_at ? Date.parse(row.updated_at) : 0;
-            const freshTs = positionFreshTs.current.get(row.user_id) ?? 0;
-            if (dbTs && dbTs < freshTs) {
-              // Never let an older database event override a fresher live
-              // sample. This includes stale `is_online=false` writes from tab
-              // lifecycle events, which previously made idle avatars vanish.
-              return next;
+            const lastDbTs = dbFreshTs.current.get(row.user_id) ?? 0;
+            // Only compare DB-clock with DB-clock. Never compare with
+            // broadcast/presence ts (peer client clock) — clock skew between
+            // peers and the server would silently freeze valid live updates.
+            if (dbTs && dbTs < lastDbTs) return next;
+            if (dbTs) dbFreshTs.current.set(row.user_id, dbTs);
+            // If a fresher live (broadcast/presence) sample already arrived,
+            // keep the live position but still update non-positional fields.
+            const liveTs = positionFreshTs.current.get(row.user_id) ?? 0;
+            const cur = prev[row.user_id];
+            if (liveTs && cur && (cur.ts ?? 0) >= liveTs) {
+              next[row.user_id] = { ...row, x: cur.x, y: cur.y, facing: cur.facing, ts: cur.ts };
+            } else {
+              next[row.user_id] = row;
             }
-            if (dbTs) positionFreshTs.current.set(row.user_id, dbTs);
-            next[row.user_id] = row;
             return next;
           });
         }
