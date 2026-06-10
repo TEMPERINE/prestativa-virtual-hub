@@ -1348,6 +1348,8 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
       supabase.removeChannel(claimsCh);
       supabase.removeChannel(presenceCh);
       supabase.removeChannel(notesCh);
+      supabase.removeChannel(profilesCh);
+
       reactionChannelRef.current = null;
       positionBroadcastChannelRef.current = null;
       positionBroadcastReadyRef.current = false;
