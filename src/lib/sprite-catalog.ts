@@ -171,9 +171,9 @@ export const SPRITES: SpriteDef[] = [
     gender: "f",
     sheets: { up: indiUp, down: indiDown, left: indiLeft, right: indiRight },
     dims: {
-      down: { w: 108, h: 232 },
-      up: { w: 106, h: 232 },
-      left: { w: 154, h: 232 },
+      down: { w: 162, h: 232 },
+      up: { w: 162, h: 232 },
+      left: { w: 162, h: 232 },
       right: { w: 162, h: 232 },
     },
   },
