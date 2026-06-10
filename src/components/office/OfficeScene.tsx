@@ -691,7 +691,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
       const pmap: Record<string, RemotePos> = {};
       (posData ?? []).forEach((p) => {
         pmap[p.user_id] = p as RemotePos;
-        if (p.updated_at) positionFreshTs.current.set(p.user_id, Date.parse(p.updated_at));
+        if (p.updated_at) dbFreshTs.current.set(p.user_id, Date.parse(p.updated_at));
       });
 
       // Load workspace claims (escopado pelo workspace atual)
