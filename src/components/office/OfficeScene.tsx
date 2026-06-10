@@ -3030,9 +3030,9 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
               <Hand className="w-4 h-4" />
             </IconButton>
 
-            {/* Botão de gravação — aparece em qualquer sala de reunião (mesmo sozinho).
+            {/* Botão de gravação — aparece em qualquer zona privada (não-lobby).
                 Se não houver reunião ativa ainda, criamos sob demanda via meeting_join. */}
-            {!!currentZone.supportsVideo && tierCaps.canRecordMeetings && (
+            {isPrivateZone && tierCaps.canRecordMeetings && (
               <button
                 onClick={async () => {
                   if (recorder.isUploading) return;
