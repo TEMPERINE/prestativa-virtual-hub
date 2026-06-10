@@ -39,8 +39,8 @@ jobs:
       - name: List build output
         shell: pwsh
         run: |
-          Write-Host "=== desktop/dist contents ==="
-          Get-ChildItem -Path desktop/dist -Recurse | Select-Object FullName, Length
+          Write-Host "=== dist contents (cwd=desktop) ==="
+          if (Test-Path dist) { Get-ChildItem -Path dist -Recurse | Select-Object FullName, Length } else { Write-Host "dist/ does not exist" }
 
       - name: Attach installer to GitHub release
         uses: softprops/action-gh-release@v2
