@@ -36,10 +36,17 @@ jobs:
       - name: Build and publish Windows installer
         run: npm run dist:win
 
+      - name: List build output
+        shell: pwsh
+        run: |
+          Write-Host "=== desktop/dist contents ==="
+          Get-ChildItem -Path desktop/dist -Recurse | Select-Object FullName, Length
+
       - name: Attach installer to GitHub release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+          fail_on_unmatched_files: true
           files: |
             desktop/dist/*.exe
             desktop/dist/*.blockmap
