@@ -55,6 +55,11 @@ import luUp from "@/assets/sprites/lu-up.png";
 import luLeft from "@/assets/sprites/lu-left.png";
 import luRight from "@/assets/sprites/lu-right.png";
 
+import wilyDown from "@/assets/sprites/wily-down.png";
+import wilyUp from "@/assets/sprites/wily-up.png";
+import wilyLeft from "@/assets/sprites/wily-left.png";
+import wilyRight from "@/assets/sprites/wily-right.png";
+
 export type Facing = "up" | "down" | "left" | "right";
 
 export type SpriteSheets = Record<Facing, string>;
@@ -226,6 +231,18 @@ export const SPRITES: SpriteDef[] = [
       up: { w: 116, h: 228 },
       left: { w: 124, h: 226 },
       right: { w: 116, h: 224 },
+    },
+  },
+  {
+    id: "wily",
+    label: "Wily",
+    gender: "f",
+    sheets: { up: wilyUp, down: wilyDown, left: wilyLeft, right: wilyRight },
+    dims: {
+      down: { w: 120, h: 258 },
+      up: { w: 116, h: 258 },
+      left: { w: 120, h: 254 },
+      right: { w: 114, h: 248 },
     },
   },
 ];
