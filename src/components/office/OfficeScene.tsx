@@ -501,6 +501,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
     const knownId = meIdRef.current;
     const write = (userId: string) => {
       const payload = { user_id: userId, x, y, zone: z, facing: f, is_online: true, ts: Date.now() };
+      const updatedAt = new Date(payload.ts).toISOString();
       writeLocalSavedPosition(userId, { x, y }, z, f);
       const ch = positionBroadcastChannelRef.current;
       if (ch && positionBroadcastReadyRef.current) {
@@ -518,6 +519,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
           zone: z,
           facing: f,
           is_online: true,
+          updated_at: updatedAt,
         });
       }
     };
@@ -667,7 +669,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
       if (wsId) {
         void supabase
           .from("positions")
-          .update({ is_online: false })
+          .update({ is_online: false, updated_at: new Date().toISOString() })
           .eq("user_id", userData.user.id)
           .neq("workspace_id", wsId);
       }
@@ -775,6 +777,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
         zone: startZone,
         facing: startFacing,
         is_online: true,
+        updated_at: new Date().toISOString(),
       });
     })();
 
@@ -1101,15 +1104,17 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
       const z = zoneAt(cur).id;
       writeLocalSavedPosition(uid, cur, z, facingRef.current);
       const body = JSON.stringify({
+        workspace_id: getCurrentWorkspaceId(),
         user_id: uid,
         x: cur.x,
         y: cur.y,
         zone: z,
         facing: facingRef.current,
         is_online: false,
+        updated_at: new Date().toISOString(),
       });
       try {
-        const url = `${import.meta.env.VITE_SUPABASE_URL}/rest/v1/positions?on_conflict=user_id`;
+        const url = `${import.meta.env.VITE_SUPABASE_URL}/rest/v1/positions?on_conflict=workspace_id,user_id`;
         const token = accessTokenRef.current;
         const headers = {
           "Content-Type": "application/json",
@@ -1132,6 +1137,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
         zone: z,
         facing: facingRef.current,
         is_online: false,
+        updated_at: new Date().toISOString(),
       });
     };
     const onPageHide = () => persistFinalPosition();
@@ -1207,6 +1213,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
         zone: zoneAt(cur).id,
         facing: facingRef.current,
         is_online: true,
+        updated_at: new Date().toISOString(),
       });
     }, 750);
 
