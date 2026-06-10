@@ -1101,13 +1101,9 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
     };
     const tearingDown = { current: false };
     const onPageHide = () => { tearingDown.current = true; persistFinalPosition(); };
-    const onVisibilityHidden = () => {
-      if (document.visibilityState === "hidden") persistFinalPosition();
-    };
     const onBeforeUnload = () => { tearingDown.current = true; persistFinalPosition(); };
     window.addEventListener("beforeunload", onBeforeUnload);
     window.addEventListener("pagehide", onPageHide);
-    document.addEventListener("visibilitychange", onVisibilityHidden);
 
     // Saída do workspace via navegação (route unmount): trata como "sair do
     // mundo do jogo". O personagem vai offline E volta ao ponto de
@@ -1279,7 +1275,6 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
       window.clearInterval(persistHeartbeat);
       window.removeEventListener("beforeunload", onBeforeUnload);
       window.removeEventListener("pagehide", onPageHide);
-      document.removeEventListener("visibilitychange", onVisibilityHidden);
       document.removeEventListener("visibilitychange", onVisible);
       window.removeEventListener("focus", onVisible);
       if (tearingDown.current) {
