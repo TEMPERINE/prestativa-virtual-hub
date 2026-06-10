@@ -222,6 +222,11 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
   const [positions, setPositions] = useState<Record<string, RemotePos>>({});
   const positionsRef = useRef<Record<string, RemotePos>>({});
   positionsRef.current = positions;
+  // Authoritative set of peers currently present in this workspace's realtime
+  // channel. Source of truth for "who is in the world right now" — DB
+  // is_online can lag (Electron quit without cleanup), so we render only
+  // peers we actually see in presence (plus self).
+  const [presentPeerIds, setPresentPeerIds] = useState<Set<string>>(() => new Set());
   // LWW tracker — wall-clock ts of the freshest known sample per user (broadcast/presence).
   // Lets us discard stale DB poll rows that would otherwise snap remote avatars back.
   const positionFreshTs = useRef<Map<string, number>>(new Map());
