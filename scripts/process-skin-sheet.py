@@ -175,6 +175,39 @@ def robust_center_x(mask: np.ndarray) -> float:
     return float(np.average(np.arange(len(cc)), weights=cc))
 
 
+def detect_row_bands(arr: np.ndarray, rows: int) -> list[tuple[int, int]] | None:
+    """Detect the actual vertical band of each character row.
+
+    AI-generated sheets are NOT evenly spaced: rows drift, so a fixed H//rows
+    grid slices heads/feet. We project alpha onto the Y axis, find contiguous
+    content bands, merge tiny gaps, and use those as the row windows.
+    Returns None if the detected band count doesn't match `rows` (caller
+    falls back to the even grid).
+    """
+    a = arr[..., 3] > ALPHA_T
+    rowsum = a.sum(axis=1)
+    bands: list[list[int]] = []
+    start = None
+    for y, has in enumerate(rowsum > 3):
+        if has and start is None:
+            start = y
+        elif not has and start is not None:
+            bands.append([start, y]); start = None
+    if start is not None:
+        bands.append([start, len(rowsum)])
+    merged: list[list[int]] = []
+    for b in bands:
+        if merged and b[0] - merged[-1][1] < 12:
+            merged[-1][1] = b[1]
+        else:
+            merged.append(b)
+    # Drop slivers (stray pixels) shorter than 12px.
+    merged = [b for b in merged if b[1] - b[0] >= 12]
+    if len(merged) != rows:
+        return None
+    return [(b[0], b[1]) for b in merged]
+
+
 def process(src_path: str, skin_id: str, rows: int, cols: int, out_dir: str, out_cols: int, include_right: bool = False):
     img = Image.open(src_path).convert("RGBA")
     arr = np.array(img)
@@ -183,6 +216,13 @@ def process(src_path: str, skin_id: str, rows: int, cols: int, out_dir: str, out
     H, W = arr.shape[:2]
     cell_h = H // rows
     cell_w = W // cols
+
+    row_bands = detect_row_bands(arr, rows)
+    if row_bands is None:
+        print("  (row auto-detect failed; falling back to even grid)")
+        row_bands = [(r * cell_h, (r + 1) * cell_h) for r in range(rows)]
+    else:
+        print(f"  detected row bands: {row_bands}")
 
     os.makedirs(out_dir, exist_ok=True)
 
@@ -198,18 +238,18 @@ def process(src_path: str, skin_id: str, rows: int, cols: int, out_dir: str, out
         if facing == "right" and not include_right:
             continue
         frames = []
-        # Bleed margin below the strict row to capture feet/shoes that the
-        # source art lets dangle past the grid line (e.g. heels under pants).
-        # Horizontal bleed catches curly-hair strands that extend past the
-        # column line. The connected-components bbox keeps only the main
-        # blob, so we don't pull in neighbors.
-        bleed_bottom = int(cell_h * 0.18)
+        # Use the detected row band (real character extent) plus a small
+        # safety margin instead of the even grid — AI sheets drift rows.
+        # Horizontal bleed catches hair strands extending past the column
+        # line; the connected-components bbox keeps only the main blob.
+        band_y0, band_y1 = row_bands[r]
+        y_start = max(0, band_y0 - 4)
+        y_end = min(H, band_y1 + 4)
         bleed_x = int(cell_w * 0.12)
         for c in range(cols):
-            y_end = min(H, (r + 1) * cell_h + bleed_bottom)
             x_start = max(0, c * cell_w - bleed_x)
             x_end = min(W, (c + 1) * cell_w + bleed_x)
-            cell = arr[r*cell_h:y_end, x_start:x_end].copy()
+            cell = arr[y_start:y_end, x_start:x_end].copy()
             bb = bbox(cell[..., 3])
             if bb is None:
                 frames.append(None)
