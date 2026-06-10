@@ -6,6 +6,7 @@ const { app, BrowserWindow, desktopCapturer, ipcMain, session, shell } = require
 const path = require("path");
 const log = require("electron-log");
 const { autoUpdater } = require("electron-updater");
+const { pickSource } = require("./picker.cjs");
 
 // ============================================================
 // Config
@@ -78,16 +79,31 @@ function createWindow() {
 // - Gravação da reunião usa IPC dedicado `prestativa:get-screen-source-id`
 //   (captura direto a janela do Prestativa, sem seletor).
 // - Compartilhamento de tela na chamada usa `navigator.mediaDevices.getDisplayMedia`
-//   e DEVE abrir o seletor nativo do SO para o usuário escolher qual tela/janela
-//   compartilhar. Por isso usamos `useSystemPicker: true` e NÃO passamos um source
-//   pré-selecionado no callback.
+//   e abre um seletor próprio do Prestativa (in-app picker) listando todas as
+//   telas e janelas com miniaturas. Tentamos primeiro o picker nativo do SO
+//   (Windows 10 22H2+/macOS 15+) e caímos no nosso quando indisponível.
 function setupDisplayMediaHandler() {
-  session.defaultSession.setDisplayMediaRequestHandler(
-    (_request, callback) => {
-      // Sem source → Electron delega ao picker nativo do sistema operacional.
-      callback({});
+  const ses = session.defaultSession;
+  const nativeAvailable =
+    typeof ses.isDisplayMediaSystemPickerAvailable === "function" &&
+    ses.isDisplayMediaSystemPickerAvailable();
+
+  ses.setDisplayMediaRequestHandler(
+    async (_request, callback) => {
+      try {
+        const source = await pickSource(mainWindow);
+        if (!source) {
+          // Usuário cancelou.
+          callback({});
+          return;
+        }
+        callback({ video: source, audio: "loopback" });
+      } catch (err) {
+        log.error("display-media-picker", err);
+        callback({});
+      }
     },
-    { useSystemPicker: true },
+    { useSystemPicker: nativeAvailable },
   );
 }
 
