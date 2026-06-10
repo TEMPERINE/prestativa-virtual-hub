@@ -669,7 +669,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
       if (wsId) {
         void supabase
           .from("positions")
-          .update({ is_online: false })
+          .update({ is_online: false, updated_at: new Date().toISOString() })
           .eq("user_id", userData.user.id)
           .neq("workspace_id", wsId);
       }
@@ -1104,15 +1104,17 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
       const z = zoneAt(cur).id;
       writeLocalSavedPosition(uid, cur, z, facingRef.current);
       const body = JSON.stringify({
+        workspace_id: getCurrentWorkspaceId(),
         user_id: uid,
         x: cur.x,
         y: cur.y,
         zone: z,
         facing: facingRef.current,
         is_online: false,
+        updated_at: new Date().toISOString(),
       });
       try {
-        const url = `${import.meta.env.VITE_SUPABASE_URL}/rest/v1/positions?on_conflict=user_id`;
+        const url = `${import.meta.env.VITE_SUPABASE_URL}/rest/v1/positions?on_conflict=workspace_id,user_id`;
         const token = accessTokenRef.current;
         const headers = {
           "Content-Type": "application/json",
@@ -1135,6 +1137,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
         zone: z,
         facing: facingRef.current,
         is_online: false,
+        updated_at: new Date().toISOString(),
       });
     };
     const onPageHide = () => persistFinalPosition();
