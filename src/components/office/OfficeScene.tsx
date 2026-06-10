@@ -241,7 +241,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
   const positionHydratedRef = useRef(false);
   const [pos, setPos] = useState<Point>(SPAWN);
   const [zone, setZone] = useState<ZoneId>("lobby");
-  const [showTeam, setShowTeam] = useState(false);
+  const [showTeam, setShowTeam] = useState(true);
   const [showHint, setShowHint] = useState(true);
   const [facing, setFacing] = useState<Facing>("down");
   const facingRef = useRef<Facing>("down");
