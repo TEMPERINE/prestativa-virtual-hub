@@ -811,11 +811,10 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
             const dbTs = row.updated_at ? Date.parse(row.updated_at) : 0;
             const freshTs = positionFreshTs.current.get(row.user_id) ?? 0;
             if (dbTs && dbTs < freshTs) {
-              const cur = prev[row.user_id];
-              if (cur) {
-                next[row.user_id] = { ...cur, is_online: row.is_online };
-                return next;
-              }
+              // Never let an older database event override a fresher live
+              // sample. This includes stale `is_online=false` writes from tab
+              // lifecycle events, which previously made idle avatars vanish.
+              return next;
             }
             if (dbTs) positionFreshTs.current.set(row.user_id, dbTs);
             next[row.user_id] = row;
@@ -930,34 +929,9 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
         });
       }
     };
-    // Presence is the authoritative source for "who is currently inside this
-    // workspace world". DB rows can stay is_online=true if a peer closed the
-    // app without firing beforeunload/pagehide (common on Electron quit). After
-    // a short grace period (so peers have time to track themselves), we
-    // reconcile: any peer in our positions map that is NOT in the presence
-    // state is treated as offline locally.
-    let presenceReconcileReady = false;
-    const reconcilePresence = () => {
-      if (!presenceReconcileReady) return;
-      const state = presenceCh.presenceState() as Record<string, PresenceState[]>;
-      const onlineIds = new Set<string>();
-      for (const list of Object.values(state)) {
-        for (const s of list) if (s?.user_id) onlineIds.add(s.user_id);
-      }
-      const myId = meIdRef.current;
-      setPositions((p) => {
-        let changed = false;
-        const next = { ...p };
-        for (const [uid, cur] of Object.entries(p)) {
-          if (uid === myId) continue;
-          if (cur.is_online && !onlineIds.has(uid)) {
-            next[uid] = { ...cur, is_online: false };
-            changed = true;
-          }
-        }
-        return changed ? next : p;
-      });
-    };
+    // Presence is only a fast discovery/position channel. It must never decide
+    // that a player is offline by itself; durable online/offline state is the
+    // `positions.is_online` row, updated on entry and on real workspace exit.
     const syncPresentIds = () => {
       const state = presenceCh.presenceState() as Record<string, PresenceState[]>;
       const ids = new Set<string>();
@@ -977,22 +951,12 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
       const state = presenceCh.presenceState() as Record<string, PresenceState[]>;
       for (const list of Object.values(state)) mergePresence(list);
       syncPresentIds();
-      reconcilePresence();
     });
     presenceCh.on("presence", { event: "join" }, ({ newPresences }) => {
       mergePresence(newPresences);
       syncPresentIds();
     });
-    presenceCh.on("presence", { event: "leave" }, ({ leftPresences }) => {
-      const arr = leftPresences as unknown as PresenceState[];
-      for (const s of arr ?? []) {
-        if (!s?.user_id || s.user_id === meIdRef.current) continue;
-        setPositions((p) => {
-          const cur = p[s.user_id];
-          if (!cur) return p;
-          return { ...p, [s.user_id]: { ...cur, is_online: false } };
-        });
-      }
+    presenceCh.on("presence", { event: "leave" }, () => {
       syncPresentIds();
     });
 
