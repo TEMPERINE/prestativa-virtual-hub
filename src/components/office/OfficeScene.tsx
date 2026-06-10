@@ -227,9 +227,14 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
   // game-state source, so idle players never disappear just because a presence
   // heartbeat or browser tab event was missed.
   const [presentPeerIds, setPresentPeerIds] = useState<Set<string>>(() => new Set());
-  // LWW tracker — wall-clock ts of the freshest known sample per user (broadcast/presence).
-  // Lets us discard stale DB poll rows that would otherwise snap remote avatars back.
+  // LWW tracker — freshest per-peer ts from BROADCAST/PRESENCE (peer client clock).
+  // Used to dedupe duplicate live samples from the same producer.
+  // IMPORTANT: do NOT mix with DB updated_at — server clock vs peer client clock
+  // skew would cause valid live updates to be discarded, freezing avatars.
   const positionFreshTs = useRef<Map<string, number>>(new Map());
+  // Separate LWW tracker for DB-sourced rows (server clock). Used only to dedupe
+  // postgres_changes / poll responses against each other.
+  const dbFreshTs = useRef<Map<string, number>>(new Map());
   // Prevents the initial SPAWN placeholder from being advertised/persisted before
   // the user's real saved position has loaded.
   const positionHydratedRef = useRef(false);
