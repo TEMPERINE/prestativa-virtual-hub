@@ -1059,21 +1059,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
       reactionCh.subscribe();
       positionBroadcastCh.subscribe((status) => {
         positionBroadcastReadyRef.current = status === "SUBSCRIBED";
-        if (status !== "SUBSCRIBED") return;
-        const uid = meIdRef.current;
-        if (!uid) return;
-        const requestId = `${clientInstanceIdRef.current}:${Date.now()}`;
-        STATE_REQUEST_RETRIES_MS.forEach((delay) => {
-          window.setTimeout(() => {
-            const curUid = meIdRef.current;
-            if (!curUid || !positionBroadcastReadyRef.current) return;
-            void positionBroadcastCh.send({
-              type: "broadcast",
-              event: "state-request",
-              payload: { requester_id: curUid, request_id: requestId, ts: Date.now() },
-            });
-          }, delay);
-        });
+        if (status === "SUBSCRIBED") requestLiveState();
       });
       claimsCh.subscribe();
       presenceCh.subscribe(async (status) => {
