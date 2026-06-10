@@ -2026,11 +2026,13 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
   }, [currentZone]);
 
   // Histórico "Minhas reuniões" — registra entrada/saída quando o usuário
-  // está numa sala de reunião (supportsVideo) com pelo menos 1 outro peer.
+  // está em QUALQUER zona privada (não-lobby) com pelo menos 1 outro peer.
+  // Toda zona privada conta como reunião automática (com ou sem câmera).
+  const isPrivateZone = currentZone.id !== "lobby";
   const { activeMeetingId } = useMeetingTracker({
     zoneId: currentZone.id,
     zoneLabel: currentZone.label,
-    isMeetingZone: !!currentZone.supportsVideo,
+    isMeetingZone: isPrivateZone,
     peerCount: rtc.connectedPeers.length,
     enabled: !!me?.id,
   });
