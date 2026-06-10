@@ -1213,6 +1213,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
         zone: zoneAt(cur).id,
         facing: facingRef.current,
         is_online: true,
+        updated_at: new Date().toISOString(),
       });
     }, 750);
 
