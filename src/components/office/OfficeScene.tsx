@@ -2479,6 +2479,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
           <TeleportFx
             point={teleport.phase === "out" ? teleport.from : teleport.to}
             phase={teleport.phase}
+            color={me?.avatar_color}
             key={`me-${teleport.id}-${teleport.phase}`}
           />
         )}
@@ -2487,6 +2488,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
             key={`${uid}-${tp.id}-${tp.phase}`}
             point={tp.phase === "out" ? tp.from : tp.to}
             phase={tp.phase}
+            color={profiles[uid]?.avatar_color}
           />
         ))}
 
