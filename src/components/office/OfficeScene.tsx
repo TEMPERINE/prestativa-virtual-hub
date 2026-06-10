@@ -1318,12 +1318,18 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
       window.clearInterval(positionsPoll);
       window.clearInterval(presenceHeartbeat);
       window.clearInterval(persistHeartbeat);
-      window.removeEventListener("beforeunload", persistFinalPosition);
+      window.removeEventListener("beforeunload", onBeforeUnload);
       window.removeEventListener("pagehide", onPageHide);
       document.removeEventListener("visibilitychange", onVisibilityHidden);
       document.removeEventListener("visibilitychange", onVisible);
       window.removeEventListener("focus", onVisible);
-      persistFinalPosition();
+      if (tearingDown.current) {
+        // Aba sendo fechada/recarregada — preserva a posição atual.
+        persistFinalPosition();
+      } else {
+        // Navegação saindo do workspace — sai do mundo e volta ao spawn.
+        leaveWorkspaceReset();
+      }
     };
   }, []);
 
