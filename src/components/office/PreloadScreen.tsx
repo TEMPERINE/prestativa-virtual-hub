@@ -107,7 +107,7 @@ export function PreloadScreen({ onReady, canFinish = true }: Props) {
         }}
       />
 
-      <div className="relative w-[min(80vw,520px)] flex flex-col items-center gap-5">
+      <div className="relative w-[min(40vw,260px)] flex flex-col items-center gap-5">
         <div className="text-center">
           <div
             className="text-2xl font-bold tracking-wide"
