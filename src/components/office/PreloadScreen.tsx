@@ -107,7 +107,7 @@ export function PreloadScreen({ onReady, canFinish = true }: Props) {
         }}
       />
 
-      <div className="relative w-[min(80vw,520px)] flex flex-col items-center gap-5">
+      <div className="relative w-[min(40vw,260px)] flex flex-col items-center gap-5">
         <div className="text-center">
           <div
             className="text-2xl font-bold tracking-wide"
@@ -123,31 +123,8 @@ export function PreloadScreen({ onReady, canFinish = true }: Props) {
           </div>
         </div>
 
-        {/* Trilho da barra com sprite andando em cima */}
+        {/* Trilho da barra */}
         <div className="relative w-full">
-          {/* Dani caminhando (frame da sprite-sheet de 6 frames) */}
-          <div
-            className="absolute -top-[58px]"
-            style={{
-              left: `calc(${pct}% - ${SPRITE_SIZE / 2}px)`,
-              width: SPRITE_SIZE,
-              height: SPRITE_SIZE,
-              transition: "left 0.35s cubic-bezier(0.22, 1, 0.36, 1)",
-              filter: "drop-shadow(0 4px 8px rgba(236,72,153,0.45))",
-            }}
-          >
-            <div
-              style={{
-                width: SPRITE_SIZE,
-                height: SPRITE_SIZE,
-                backgroundImage: `url(${daniWalk})`,
-                backgroundSize: `${SPRITE_FRAMES * 100}% 100%`,
-                backgroundPosition: `${(frame / (SPRITE_FRAMES - 1)) * 100}% 0`,
-                backgroundRepeat: "no-repeat",
-                imageRendering: "pixelated",
-              }}
-            />
-          </div>
 
           {/* Barra rosa */}
           <div
