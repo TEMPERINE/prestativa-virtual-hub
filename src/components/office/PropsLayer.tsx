@@ -4,6 +4,7 @@ import { loadOverrides, subscribeOverridesFromCloud, zoneFromOverrides, type Pro
 import { getPropDef, subscribePropCatalog } from "@/lib/prop-catalog";
 import { loadCustomPropsFromCloud } from "@/lib/custom-props";
 import { publishProps, publishFrames } from "@/lib/prop-gates";
+import { getCurrentWorkspaceId, subscribeCurrentWorkspaceId } from "@/lib/workspace/current";
 
 const INTERACT_RADIUS = 0.1; // distância (em fração do mapa) para o avatar poder interagir
 
@@ -53,22 +54,31 @@ export function PropsLayer({ selfX, selfY, focusedRect = null }: Props) {
   // movimento (OfficeScene) saiba quais zonas estão trancadas.
   useEffect(() => { publishProps(propsList); }, [propsList]);
 
-  // Carrega estados (frames) e escuta realtime
+  // Carrega estados (frames) e escuta realtime — escopado por workspace.
+  // PK real é (workspace_id, prop_id) e a tabela é per-workspace, então
+  // precisamos refazer fetch/subscribe sempre que o workspace ativo muda.
+  const [wsId, setWsId] = useState<string | null>(() => getCurrentWorkspaceId());
+  useEffect(() => { const u = subscribeCurrentWorkspaceId(setWsId); return () => { u(); }; }, []);
+
   useEffect(() => {
+    if (!wsId) { setFrames({}); return; }
     let cancelled = false;
     (async () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data } = await (supabase as any).from("prop_states").select("prop_id, frame");
+      const { data } = await (supabase as any)
+        .from("prop_states")
+        .select("prop_id, frame")
+        .eq("workspace_id", wsId);
       if (cancelled || !data) return;
       const map: Record<string, number> = {};
       for (const row of data as PropStateRow[]) map[row.prop_id] = row.frame;
       setFrames(map);
     })();
     const channel = supabase
-      .channel(`prop_states-${Date.now()}`)
+      .channel(`prop_states-${wsId}-${Date.now()}`)
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "prop_states" },
+        { event: "*", schema: "public", table: "prop_states", filter: `workspace_id=eq.${wsId}` },
         (payload) => {
           const row = (payload.new ?? payload.old) as PropStateRow | null;
           if (!row?.prop_id) return;
@@ -88,7 +98,7 @@ export function PropsLayer({ selfX, selfY, focusedRect = null }: Props) {
       cancelled = true;
       supabase.removeChannel(channel);
     };
-  }, []);
+  }, [wsId]);
 
   useEffect(() => { publishFrames(frames); }, [frames]);
 
@@ -97,16 +107,25 @@ export function PropsLayer({ selfX, selfY, focusedRect = null }: Props) {
   const triggerInteract = useCallback((prop: PropInstance) => {
     const def = getPropDef(prop.defId);
     if (!def?.interactive) return;
+    const ws = getCurrentWorkspaceId();
+    if (!ws) return;
     setFrames((p) => {
       const cur = p[prop.id] ?? 0;
       const next = (cur + 1) % def.frames.length;
       void (async () => {
         const { data: u } = await supabase.auth.getUser();
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        await (supabase as any).from("prop_states").upsert(
-          { prop_id: prop.id, frame: next, updated_by: u.user?.id ?? null, updated_at: new Date().toISOString() },
-          { onConflict: "prop_id" }
+        const { error } = await (supabase as any).from("prop_states").upsert(
+          {
+            workspace_id: ws,
+            prop_id: prop.id,
+            frame: next,
+            updated_by: u.user?.id ?? null,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: "workspace_id,prop_id" }
         );
+        if (error) console.error("[PropsLayer] upsert prop_states failed:", error);
       })();
       return { ...p, [prop.id]: next };
     });
