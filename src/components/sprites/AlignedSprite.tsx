@@ -206,7 +206,7 @@ export function AlignedSprite({
                 left: "50%",
                 bottom: 0,
                 transform: `translate(-50%, ${dyPct}%) ${useMirror ? "scaleX(-1)" : ""}`,
-                height: `${(dim.h / refH) * 100}%`,
+                height: `${(dim.h / refHPadded) * 100}%`,
                 width: `${(dim.w / refW) * 100}%`,
                 backgroundImage: `url(${sheet})`,
                 backgroundRepeat: "no-repeat",
