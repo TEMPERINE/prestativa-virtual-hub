@@ -4,6 +4,7 @@ import { loadOverrides, subscribeOverridesFromCloud, zoneFromOverrides, type Pro
 import { getPropDef, subscribePropCatalog } from "@/lib/prop-catalog";
 import { loadCustomPropsFromCloud } from "@/lib/custom-props";
 import { publishProps, publishFrames } from "@/lib/prop-gates";
+import { getCurrentWorkspaceId, subscribeCurrentWorkspaceId } from "@/lib/workspace/current";
 
 const INTERACT_RADIUS = 0.1; // distância (em fração do mapa) para o avatar poder interagir
 
