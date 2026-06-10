@@ -248,23 +248,34 @@ export function useRtcMesh(myId: string | null, desiredPeers: string[]): RtcMesh
       sendSignal({ to: peerId, type: "ice", candidate: e.candidate ? e.candidate.toJSON() : null });
     };
 
+    // Identifica se um transceiver é o de SCREEN (2ª trilha de vídeo do PC).
+    // Por convenção fixa, criamos sempre na ordem: audio, cam-video, screen-video.
+    // Identificar por POSIÇÃO entre os transceivers de vídeo do PC funciona
+    // simetricamente no offerer (refs locais) e no answerer (refs criados pelo
+    // setRemoteDescription a partir das m-lines remotas), enquanto a comparação
+    // por referência (`e.transceiver === entry.screenTransceiver`) falha no
+    // answerer porque os transceivers efetivos podem não ser os pré-criados.
+    const isScreenTransceiver = (tx: RTCRtpTransceiver) => {
+      const videoTxs = pc.getTransceivers().filter(
+        (t) => t.receiver.track?.kind === "video" || t.sender.track?.kind === "video",
+      );
+      // Fallback: se nem 2 transceivers de vídeo existem ainda, considera cam.
+      if (videoTxs.length < 2) return false;
+      return tx === videoTxs[1];
+    };
+
     pc.ontrack = (e) => {
-      const isScreen = e.transceiver === entry.screenTransceiver;
+      const isScreen = e.track.kind === "video" && isScreenTransceiver(e.transceiver);
       const target = isScreen ? remoteScreenStream : remoteStream;
       if (!target.getTracks().find((rt) => rt.id === e.track.id)) target.addTrack(e.track);
       if (isScreen) {
         setRemoteScreenStreams((prev) => ({ ...prev, [peerId]: remoteScreenStream }));
-        // Re-publish when media actually starts flowing (covers cases where
-        // ontrack fired before the sender attached a real track).
         e.track.onunmute = () => {
           setRemoteScreenStreams((prev) => ({ ...prev, [peerId]: remoteScreenStream }));
         };
-        e.track.onmute = () => {
-          // Keep the entry; the viewer's filter on readyState handles cleanup
-          // when the track actually ends.
-        };
+        e.track.onmute = () => { /* viewer filtra por readyState */ };
         e.track.onended = () => {
-          target.removeTrack(e.track);
+          try { target.removeTrack(e.track); } catch { /* noop */ }
           setRemoteScreenStreams((prev) => {
             if (target.getVideoTracks().length === 0) {
               const next = { ...prev };
@@ -276,10 +287,8 @@ export function useRtcMesh(myId: string | null, desiredPeers: string[]): RtcMesh
         };
       } else {
         setRemoteStreams((prev) => ({ ...prev, [peerId]: remoteStream }));
-        // Quando o peer remoto liga/desliga câmera/mic via replaceTrack, NÃO
-        // disparamos ontrack de novo — o transceiver já existia. A trilha
-        // apenas muda muted→unmuted. Forçamos re-render trocando a referência
-        // do MediaStream pra que <video>/<audio> reavaliem hasLiveVideo.
+        // Forçamos re-render trocando a referência do MediaStream nos eventos
+        // muted/unmuted pra que <video>/<audio> reavaliem hasLiveVideo.
         const bump = () => {
           setRemoteStreams((prev) => ({ ...prev, [peerId]: new MediaStream(remoteStream.getTracks()) }));
         };
