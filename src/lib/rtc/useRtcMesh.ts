@@ -188,15 +188,48 @@ export function useRtcMesh(myId: string | null, desiredPeers: string[]): RtcMesh
     preferCodecs(videoTx, "video");
     preferCodecs(screenTx, "video");
 
-    // Reduce audio playout latency where supported (Chromium).
+    // Reduce playout latency where supported (Chromium).
+    // playoutDelayHint baixa = menos buffer no receptor → menos delay.
+    // jitterBufferTarget=0 pede ao buffer pra ficar o mais raso possível.
     try {
-      (audioTx.receiver as unknown as { playoutDelayHint?: number }).playoutDelayHint = 0.05;
+      const ar = audioTx.receiver as unknown as { playoutDelayHint?: number; jitterBufferTarget?: number };
+      ar.playoutDelayHint = 0;
+      ar.jitterBufferTarget = 0;
     } catch { /* noop */ }
+    try {
+      const vr = videoTx.receiver as unknown as { playoutDelayHint?: number; jitterBufferTarget?: number };
+      vr.playoutDelayHint = 0;
+      vr.jitterBufferTarget = 0;
+    } catch { /* noop */ }
+    // Screen share pode tolerar um pouco mais de buffer (qualidade > latência),
+    // então deixamos o default do navegador.
+
+    // Hint de prioridade de rede pra que mídia tenha precedência no socket.
+    const bumpPriority = (sender: RTCRtpSender, isVideo: boolean) => {
+      try {
+        const params = sender.getParameters();
+        if (!params.encodings || params.encodings.length === 0) params.encodings = [{}];
+        for (const enc of params.encodings) {
+          (enc as RTCRtpEncodingParameters & { priority?: string; networkPriority?: string }).priority = "high";
+          (enc as RTCRtpEncodingParameters & { priority?: string; networkPriority?: string }).networkPriority = "high";
+          if (isVideo) {
+            enc.maxBitrate = 800_000; // 800 kbps — suficiente pra 320x240 fluido
+            enc.maxFramerate = 30;
+          } else {
+            enc.maxBitrate = 64_000; // Opus voice
+          }
+        }
+        void sender.setParameters(params);
+      } catch { /* noop */ }
+    };
+    bumpPriority(audioTx.sender, false);
+    bumpPriority(videoTx.sender, true);
 
     // If we already have local tracks, attach now
     if (audioTrackRef.current) void audioTx.sender.replaceTrack(audioTrackRef.current);
     if (videoTrackRef.current) void videoTx.sender.replaceTrack(videoTrackRef.current);
     if (screenTrackRef.current) void screenTx.sender.replaceTrack(screenTrackRef.current);
+
 
     const entry: PeerEntry = {
       pc,
