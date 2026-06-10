@@ -2014,7 +2014,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
         // jogador parado que já está online no lobby.
         const tsBroadcast = p.ts ?? 0;
         const tsDb = p.updated_at ? new Date(p.updated_at).getTime() : 0;
-        const fresh = Math.max(tsBroadcast, tsDb, positionFreshTs.current.get(p.user_id) ?? 0);
+        const fresh = Math.max(tsBroadcast, tsDb, positionFreshTs.current.get(p.user_id) ?? 0, dbFreshTs.current.get(p.user_id) ?? 0);
         return fresh > 0 && Date.now() - fresh < 5_000;
       })
       .map((p) => ({
