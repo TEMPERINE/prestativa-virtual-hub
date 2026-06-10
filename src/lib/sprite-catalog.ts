@@ -41,7 +41,6 @@ import latinaLeft from "@/assets/sprites/latina-left.png";
 import indiDown from "@/assets/sprites/indi-down.png";
 import indiUp from "@/assets/sprites/indi-up.png";
 import indiLeft from "@/assets/sprites/indi-left.png";
-import indiRight from "@/assets/sprites/indi-right.png";
 
 export type Facing = "up" | "down" | "left" | "right";
 
@@ -169,13 +168,14 @@ export const SPRITES: SpriteDef[] = [
     id: "indi",
     label: "Indi",
     gender: "f",
-    sheets: { up: indiUp, down: indiDown, left: indiLeft, right: indiRight },
+    sheets: { up: indiUp, down: indiDown, left: indiLeft, right: indiLeft },
     dims: {
       down: { w: 162, h: 232 },
       up: { w: 162, h: 232 },
       left: { w: 162, h: 232 },
       right: { w: 162, h: 232 },
     },
+    mirrorRightFromLeft: true,
   },
 ];
 
