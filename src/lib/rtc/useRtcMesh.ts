@@ -763,13 +763,20 @@ export function useRtcMesh(myId: string | null, desiredPeers: string[]): RtcMesh
   }, []);
 
   const acquireCam = useCallback(async (deviceId?: string) => {
+    // frameRate alto + resolução baixa = encoder não acumula frames pra comprimir.
+    const videoBase: MediaTrackConstraints = {
+      width: { ideal: 320 },
+      height: { ideal: 240 },
+      frameRate: { ideal: 30, max: 30 },
+    };
     const constraints: MediaStreamConstraints = {
-      video: deviceId
-        ? { deviceId: { exact: deviceId }, width: 320, height: 240 }
-        : { width: 320, height: 240 },
+      video: deviceId ? { ...videoBase, deviceId: { exact: deviceId } } : videoBase,
     };
     const stream = await navigator.mediaDevices.getUserMedia(constraints);
     const track = stream.getVideoTracks()[0];
+    // contentHint="motion" → encoder VP8 reduz B-frames/buffer pra latência.
+    try { (track as MediaStreamTrack & { contentHint?: string }).contentHint = "motion"; } catch { /* noop */ }
+
     // Tear down any previous video track
     if (videoTrackRef.current) {
       try { videoTrackRef.current.stop(); } catch { /* noop */ }
