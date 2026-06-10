@@ -289,6 +289,30 @@ export const SPRITES: SpriteDef[] = [
       right: { w: 154, h: 232 },
     },
   },
+  {
+    id: "lexa",
+    label: "Lexa",
+    gender: "f",
+    sheets: { up: lexaUp, down: lexaDown, left: lexaLeft, right: lexaRight },
+    dims: {
+      down: { w: 168, h: 242 },
+      up: { w: 162, h: 242 },
+      left: { w: 158, h: 244 },
+      right: { w: 150, h: 242 },
+    },
+  },
+  {
+    id: "karen",
+    label: "Karen",
+    gender: "f",
+    sheets: { up: karenUp, down: karenDown, left: karenLeft, right: karenRight },
+    dims: {
+      down: { w: 126, h: 238 },
+      up: { w: 126, h: 240 },
+      left: { w: 142, h: 238 },
+      right: { w: 136, h: 238 },
+    },
+  },
 ];
 
 export const SPRITE_FRAMES = 6;
