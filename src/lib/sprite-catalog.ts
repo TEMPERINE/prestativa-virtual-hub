@@ -70,6 +70,16 @@ import yuryUp from "@/assets/sprites/yury-up.png";
 import yuryLeft from "@/assets/sprites/yury-left.png";
 import yuryRight from "@/assets/sprites/yury-right.png";
 
+import lexaDown from "@/assets/sprites/lexa-down.png";
+import lexaUp from "@/assets/sprites/lexa-up.png";
+import lexaLeft from "@/assets/sprites/lexa-left.png";
+import lexaRight from "@/assets/sprites/lexa-right.png";
+
+import karenDown from "@/assets/sprites/karen-down.png";
+import karenUp from "@/assets/sprites/karen-up.png";
+import karenLeft from "@/assets/sprites/karen-left.png";
+import karenRight from "@/assets/sprites/karen-right.png";
+
 export type Facing = "up" | "down" | "left" | "right";
 
 export type SpriteSheets = Record<Facing, string>;
