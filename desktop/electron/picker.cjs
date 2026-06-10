@@ -88,7 +88,7 @@ async function pickSource(parent) {
     fetchWindowIcons: false,
   });
 
-  return new Promise((resolve) => {
+  const id = await new Promise((resolve) => {
     pendingResolve = resolve;
     pickerWindow = new BrowserWindow({
       width: 880,
@@ -121,12 +121,10 @@ async function pickSource(parent) {
     pickerWindow.loadURL(
       "data:text/html;charset=utf-8," + encodeURIComponent(html),
     );
-
-    return { sources };
-  }).then((id) => {
-    if (!id) return null;
-    return sources.find((s) => s.id === id) ?? null;
   });
+
+  if (!id) return null;
+  return sources.find((s) => s.id === id) ?? null;
 }
 
 module.exports = { pickSource };
