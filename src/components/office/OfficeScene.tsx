@@ -778,7 +778,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
         facing: startFacing,
         is_online: true,
         updated_at: new Date().toISOString(),
-      });
+      }, { onConflict: "workspace_id,user_id" });
     })();
 
     // IMPORTANT: garantir que o socket de realtime carregue o JWT do usuário
@@ -1097,7 +1097,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
         facing: facingRef.current,
         is_online: false,
         updated_at: new Date().toISOString(),
-      });
+      }, { onConflict: "workspace_id,user_id" });
     };
     const tearingDown = { current: false };
     const onPageHide = () => { tearingDown.current = true; persistFinalPosition(); };
@@ -1151,7 +1151,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
         };
         void fetch(url, { method: "POST", headers, body: JSON.stringify(payload), keepalive: true }).catch(() => { /* noop */ });
       } catch { /* noop */ }
-      void supabase.from("positions").upsert(payload);
+      void supabase.from("positions").upsert(payload, { onConflict: "workspace_id,user_id" });
     };
 
 
@@ -1220,7 +1220,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
         facing: facingRef.current,
         is_online: true,
         updated_at: new Date().toISOString(),
-      });
+      }, { onConflict: "workspace_id,user_id" });
     }, 750);
 
 
