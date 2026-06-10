@@ -837,16 +837,23 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
             }
             const dbTs = row.updated_at ? Date.parse(row.updated_at) : 0;
             const lastDbTs = dbFreshTs.current.get(row.user_id) ?? 0;
-            // Only compare DB-clock with DB-clock. Never compare with
-            // broadcast/presence ts (peer client clock) — clock skew between
-            // peers and the server would silently freeze valid live updates.
             if (dbTs && dbTs < lastDbTs) return next;
             if (dbTs) dbFreshTs.current.set(row.user_id, dbTs);
-            // If a fresher live (broadcast/presence) sample already arrived,
-            // keep the live position but still update non-positional fields.
             const liveTs = positionFreshTs.current.get(row.user_id) ?? 0;
             const cur = prev[row.user_id];
-            if (liveTs && cur && (cur.ts ?? 0) >= liveTs) {
+            const curLiveTs = cur?.ts ?? 0;
+            // Offline→online (re)entry: trust the DB row completely. Any
+            // cached x/y in `prev` is stale state from before the player
+            // left, and preserving it would pin them at their previous spot
+            // until presence catches up — causing the "teleport between
+            // spawn and old position" oscillation peers see when someone
+            // reconnects.
+            const wasOffline = !cur || cur.is_online === false;
+            if (wasOffline && row.is_online) {
+              next[row.user_id] = row;
+            } else if (liveTs > 0 && curLiveTs > 0 && curLiveTs >= liveTs) {
+              // A fresher live sample already won; keep its position and
+              // refresh only the non-positional fields from this DB row.
               next[row.user_id] = { ...row, x: cur.x, y: cur.y, facing: cur.facing, ts: cur.ts };
             } else {
               next[row.user_id] = row;
@@ -1201,10 +1208,16 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
             else next[p.user_id] = p;
           } else {
             if (dbTs) dbFreshTs.current.set(p.user_id, dbTs);
-            // If a fresher live sample already arrived, keep its x/y/facing.
             const liveTs = positionFreshTs.current.get(p.user_id) ?? 0;
             const cur = prev[p.user_id];
-            if (liveTs && cur && (cur.ts ?? 0) >= liveTs) {
+            const curLiveTs = cur?.ts ?? 0;
+            const wasOffline = !cur || cur.is_online === false;
+            // Offline→online re-entry: trust the DB row. See postgres_changes
+            // handler above for why preserving cached x/y here causes the
+            // "teleport between spawn and old position" oscillation.
+            if (wasOffline && p.is_online) {
+              next[p.user_id] = p;
+            } else if (liveTs > 0 && curLiveTs > 0 && curLiveTs >= liveTs) {
               next[p.user_id] = { ...p, x: cur.x, y: cur.y, facing: cur.facing, ts: cur.ts };
             } else {
               next[p.user_id] = p;
