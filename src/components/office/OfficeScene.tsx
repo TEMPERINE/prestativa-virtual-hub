@@ -1208,21 +1208,21 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
             else next[p.user_id] = p;
           } else {
             if (dbTs) dbFreshTs.current.set(p.user_id, dbTs);
-            // If a fresher live sample already arrived, keep its x/y/facing.
             const liveTs = positionFreshTs.current.get(p.user_id) ?? 0;
             const cur = prev[p.user_id];
-            if (liveTs && cur && (cur.ts ?? 0) >= liveTs) {
+            const curLiveTs = cur?.ts ?? 0;
+            const wasOffline = !cur || cur.is_online === false;
+            // Offline→online re-entry: trust the DB row. See postgres_changes
+            // handler above for why preserving cached x/y here causes the
+            // "teleport between spawn and old position" oscillation.
+            if (wasOffline && p.is_online) {
+              next[p.user_id] = p;
+            } else if (liveTs > 0 && curLiveTs > 0 && curLiveTs >= liveTs) {
               next[p.user_id] = { ...p, x: cur.x, y: cur.y, facing: cur.facing, ts: cur.ts };
             } else {
               next[p.user_id] = p;
             }
           }
-        });
-        if (uid) {
-          const cur = posRef.current;
-          const curZone = zoneAt(cur).id;
-          next[uid] = {
-            ...(next[uid] ?? { user_id: uid, x: cur.x, y: cur.y, zone: curZone, is_online: true }),
             x: cur.x,
             y: cur.y,
             zone: curZone,
