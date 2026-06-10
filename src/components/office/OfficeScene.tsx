@@ -222,10 +222,10 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
   const [positions, setPositions] = useState<Record<string, RemotePos>>({});
   const positionsRef = useRef<Record<string, RemotePos>>({});
   positionsRef.current = positions;
-  // Authoritative set of peers currently present in this workspace's realtime
-  // channel. Source of truth for "who is in the world right now" — DB
-  // is_online can lag (Electron quit without cleanup), so we render only
-  // peers we actually see in presence (plus self).
+  // Fast realtime presence signal. It accelerates discovery, but is NOT the
+  // authority for visibility: the database `is_online` flag is the durable
+  // game-state source, so idle players never disappear just because a presence
+  // heartbeat or browser tab event was missed.
   const [presentPeerIds, setPresentPeerIds] = useState<Set<string>>(() => new Set());
   // LWW tracker — wall-clock ts of the freshest known sample per user (broadcast/presence).
   // Lets us discard stale DB poll rows that would otherwise snap remote avatars back.
@@ -441,7 +441,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
     const candidates: { uid: string; score: number }[] = [];
     for (const [uid, p] of Object.entries(positions)) {
       if (uid === meId) continue;
-      if (!p.is_online) continue;
+      if (!p.is_online && !presentPeerIds.has(uid)) continue;
       // Same physical room/area → connect only while both avatars are there.
       // A claimed desk alone must not pull users into a call from elsewhere.
       const sameActiveRoom = zone !== "lobby" && p.zone === zone;
@@ -458,7 +458,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
     }
     // A browser mesh is capped to keep the room stable with ~15 collaborators.
     return candidates.sort((a, b) => a.score - b.score).slice(0, 14).map((c) => c.uid);
-  }, [me?.id, positions, pos.x, pos.y, zone]);
+  }, [me?.id, positions, presentPeerIds, pos.x, pos.y, zone]);
 
   const rtc = useRtcMesh(me?.id ?? null, desiredPeers);
   useEffect(() => {
@@ -520,7 +520,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
           facing: f,
           is_online: true,
           updated_at: updatedAt,
-        });
+        }, { onConflict: "workspace_id,user_id" });
       }
     };
     if (knownId) {
@@ -778,7 +778,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
         facing: startFacing,
         is_online: true,
         updated_at: new Date().toISOString(),
-      });
+      }, { onConflict: "workspace_id,user_id" });
     })();
 
     // IMPORTANT: garantir que o socket de realtime carregue o JWT do usuário
@@ -811,11 +811,10 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
             const dbTs = row.updated_at ? Date.parse(row.updated_at) : 0;
             const freshTs = positionFreshTs.current.get(row.user_id) ?? 0;
             if (dbTs && dbTs < freshTs) {
-              const cur = prev[row.user_id];
-              if (cur) {
-                next[row.user_id] = { ...cur, is_online: row.is_online };
-                return next;
-              }
+              // Never let an older database event override a fresher live
+              // sample. This includes stale `is_online=false` writes from tab
+              // lifecycle events, which previously made idle avatars vanish.
+              return next;
             }
             if (dbTs) positionFreshTs.current.set(row.user_id, dbTs);
             next[row.user_id] = row;
@@ -930,34 +929,9 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
         });
       }
     };
-    // Presence is the authoritative source for "who is currently inside this
-    // workspace world". DB rows can stay is_online=true if a peer closed the
-    // app without firing beforeunload/pagehide (common on Electron quit). After
-    // a short grace period (so peers have time to track themselves), we
-    // reconcile: any peer in our positions map that is NOT in the presence
-    // state is treated as offline locally.
-    let presenceReconcileReady = false;
-    const reconcilePresence = () => {
-      if (!presenceReconcileReady) return;
-      const state = presenceCh.presenceState() as Record<string, PresenceState[]>;
-      const onlineIds = new Set<string>();
-      for (const list of Object.values(state)) {
-        for (const s of list) if (s?.user_id) onlineIds.add(s.user_id);
-      }
-      const myId = meIdRef.current;
-      setPositions((p) => {
-        let changed = false;
-        const next = { ...p };
-        for (const [uid, cur] of Object.entries(p)) {
-          if (uid === myId) continue;
-          if (cur.is_online && !onlineIds.has(uid)) {
-            next[uid] = { ...cur, is_online: false };
-            changed = true;
-          }
-        }
-        return changed ? next : p;
-      });
-    };
+    // Presence is only a fast discovery/position channel. It must never decide
+    // that a player is offline by itself; durable online/offline state is the
+    // `positions.is_online` row, updated on entry and on real workspace exit.
     const syncPresentIds = () => {
       const state = presenceCh.presenceState() as Record<string, PresenceState[]>;
       const ids = new Set<string>();
@@ -977,22 +951,12 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
       const state = presenceCh.presenceState() as Record<string, PresenceState[]>;
       for (const list of Object.values(state)) mergePresence(list);
       syncPresentIds();
-      reconcilePresence();
     });
     presenceCh.on("presence", { event: "join" }, ({ newPresences }) => {
       mergePresence(newPresences);
       syncPresentIds();
     });
-    presenceCh.on("presence", { event: "leave" }, ({ leftPresences }) => {
-      const arr = leftPresences as unknown as PresenceState[];
-      for (const s of arr ?? []) {
-        if (!s?.user_id || s.user_id === meIdRef.current) continue;
-        setPositions((p) => {
-          const cur = p[s.user_id];
-          if (!cur) return p;
-          return { ...p, [s.user_id]: { ...cur, is_online: false } };
-        });
-      }
+    presenceCh.on("presence", { event: "leave" }, () => {
       syncPresentIds();
     });
 
@@ -1038,11 +1002,6 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
             zone: zoneAt(cur).id, facing: facingRef.current, ts: Date.now(),
           });
         } catch { /* noop */ }
-        // Give peers ~8s to track themselves before we start reconciling.
-        window.setTimeout(() => {
-          presenceReconcileReady = true;
-          reconcilePresence();
-        }, 8000);
       });
     })();
 
@@ -1138,17 +1097,13 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
         facing: facingRef.current,
         is_online: false,
         updated_at: new Date().toISOString(),
-      });
+      }, { onConflict: "workspace_id,user_id" });
     };
     const tearingDown = { current: false };
     const onPageHide = () => { tearingDown.current = true; persistFinalPosition(); };
-    const onVisibilityHidden = () => {
-      if (document.visibilityState === "hidden") persistFinalPosition();
-    };
     const onBeforeUnload = () => { tearingDown.current = true; persistFinalPosition(); };
     window.addEventListener("beforeunload", onBeforeUnload);
     window.addEventListener("pagehide", onPageHide);
-    document.addEventListener("visibilitychange", onVisibilityHidden);
 
     // Saída do workspace via navegação (route unmount): trata como "sair do
     // mundo do jogo". O personagem vai offline E volta ao ponto de
@@ -1192,7 +1147,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
         };
         void fetch(url, { method: "POST", headers, body: JSON.stringify(payload), keepalive: true }).catch(() => { /* noop */ });
       } catch { /* noop */ }
-      void supabase.from("positions").upsert(payload);
+      void supabase.from("positions").upsert(payload, { onConflict: "workspace_id,user_id" });
     };
 
 
@@ -1210,10 +1165,10 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
           const freshTs = positionFreshTs.current.get(p.user_id) ?? 0;
           if (p.is_online) maybeStartRemoteTeleportFromCurrent(p.user_id, { x: p.x, y: p.y }, dbTs || Date.now());
           // Strict LWW: DB rows older than the freshest known live sample are
-          // never allowed to move a stopped avatar back to a spawn/old spot.
+          // never allowed to move a stopped avatar or flip it offline.
           if (dbTs && dbTs < freshTs) {
             const cur = prev[p.user_id];
-            if (cur) next[p.user_id] = { ...cur, is_online: p.is_online };
+            if (cur) next[p.user_id] = cur;
             else next[p.user_id] = p;
           } else {
             if (dbTs) positionFreshTs.current.set(p.user_id, dbTs);
@@ -1261,7 +1216,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
         facing: facingRef.current,
         is_online: true,
         updated_at: new Date().toISOString(),
-      });
+      }, { onConflict: "workspace_id,user_id" });
     }, 750);
 
 
@@ -1320,7 +1275,6 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
       window.clearInterval(persistHeartbeat);
       window.removeEventListener("beforeunload", onBeforeUnload);
       window.removeEventListener("pagehide", onPageHide);
-      document.removeEventListener("visibilitychange", onVisibilityHidden);
       document.removeEventListener("visibilitychange", onVisible);
       window.removeEventListener("focus", onVisible);
       if (tearingDown.current) {
@@ -2026,39 +1980,24 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
 
 
 
-  // Re-render periódico (5s) para reavaliar "atividade recente" do peer.
-  // Cadência curta para que peers que pararam de heartbeatar (aba fechada,
-  // SO suspendeu) saiam do espaço dentro do PRESENCE_GRACE_MS.
-  const [staleTick, setStaleTick] = useState(0);
-  useEffect(() => {
-    const id = window.setInterval(() => setStaleTick((t) => t + 1), 5_000);
-    return () => window.clearInterval(id);
-  }, []);
-
-  // "Presente no espaço" combina dois sinais para evitar bugs de visibilidade:
-  //  1) presença Realtime (`presentPeerIds`): autoridade quando entrega ok.
-  //  2) heartbeat/broadcast/DB recentes (<= PRESENCE_GRACE_MS): cobre janelas
-  //     em que a entrega do canal de presença atrasa/hiccupa mas o peer está
-  //     claramente vivo (até em chamada com a gente). Um peer só some quando
-  //     AMBOS os sinais falham por mais de PRESENCE_GRACE_MS.
-  const PRESENCE_GRACE_MS = 20_000;
+  // "Presente no espaço" segue modelo de jogo colaborativo:
+  // - `positions.is_online=true` é o estado durável/autoritativo do lobby.
+  // - Presence/broadcast só aceleram descoberta e movimento em tempo real.
+  // - Timestamp antigo NÃO remove avatar; jogador parado continua no mundo.
   const onlineList = useMemo(() => {
-    const now = Date.now();
     const myId = meIdRef.current;
     return Object.values(positions)
       .filter((p) => {
         if (p.user_id === myId) return true; // self sempre visível
-        // Visibilidade NÃO depende mais de `is_online` (campo do DB pode
-        // ficar defasado e a presence-leave temporária do canal Realtime
-        // pode marcá-lo false por engano, fazendo o peer parado "sumir").
-        // Critério: presença Realtime ativa OU heartbeat/broadcast/DB
-        // recente (≤ PRESENCE_GRACE_MS). O heartbeat de presença roda a
-        // cada 1s, então peers vivos nunca caem nesse limite.
+        if (p.is_online) return true;
         if (presentPeerIds.has(p.user_id)) return true;
+        // Grace curto só cobre o instante entre receber um broadcast/presence
+        // e a linha do banco ser marcada online. Não é usado para derrubar
+        // jogador parado que já está online no lobby.
         const tsBroadcast = p.ts ?? 0;
         const tsDb = p.updated_at ? new Date(p.updated_at).getTime() : 0;
         const fresh = Math.max(tsBroadcast, tsDb, positionFreshTs.current.get(p.user_id) ?? 0);
-        return fresh > 0 && now - fresh < PRESENCE_GRACE_MS;
+        return fresh > 0 && Date.now() - fresh < 5_000;
       })
       .map((p) => ({
         pos: p,
@@ -2070,7 +2009,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
           avatar_color: "#475569",
         } as Profile),
       }));
-  }, [positions, profiles, staleTick, presentPeerIds]);
+  }, [positions, profiles, presentPeerIds]);
 
   // Lazy-load de profiles: se aparece um peer nas posições/presença que
   // ainda não temos cacheado, busca sob demanda para hidratar o avatar.
