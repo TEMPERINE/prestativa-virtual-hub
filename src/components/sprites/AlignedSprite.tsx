@@ -153,7 +153,12 @@ export function AlignedSprite({
   // visibly clip (curly hair, swinging arms). Inflate refW so every facing
   // gets ~12% horizontal slack inside the wrapper.
   const SCENE_LATERAL_PAD = 1.18;
+  // Vertical breathing room: per-frame head alignment (dyPct) can push frames
+  // UP by up to ~10% of cell height. Without slack, the top of the hair / any
+  // accessory (bow, hat, halo) gets clipped by the parent stacking context.
+  const SCENE_TOP_PAD = 1.18;
   const refW = Math.max(...facings.map((f) => sprite.dims[f].w)) * SCENE_LATERAL_PAD;
+  const refHPadded = refH * SCENE_TOP_PAD;
   // Referência global: a maior altura de cell entre todas as skins do catálogo.
   // Mantida com folga (300) para que mesmo a maior skin caiba com margem.
   const PREVIEW_REF_H = 300;
