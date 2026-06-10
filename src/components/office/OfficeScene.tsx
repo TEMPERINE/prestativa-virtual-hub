@@ -1223,6 +1223,12 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
               next[p.user_id] = p;
             }
           }
+        });
+        if (uid) {
+          const cur = posRef.current;
+          const curZone = zoneAt(cur).id;
+          next[uid] = {
+            ...(next[uid] ?? { user_id: uid, x: cur.x, y: cur.y, zone: curZone, is_online: true }),
             x: cur.x,
             y: cur.y,
             zone: curZone,
