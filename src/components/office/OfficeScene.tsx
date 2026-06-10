@@ -115,6 +115,7 @@ const SEND_INTERVAL_MS = 120;
 const POSITION_BROADCAST_CHANNEL = "positions-broadcast-v1";
 const POSITION_PRESENCE_CHANNEL = "positions-presence-v1";
 const REMOTE_TELEPORT_MIN_DISTANCE = 0.075;
+const STATE_REQUEST_RETRIES_MS = [0, 450, 1200, 2500];
 
 const timestampForPosition = (p: Partial<Pick<RemotePos, "updated_at" | "ts">>) =>
   p.ts ?? (p.updated_at ? Date.parse(p.updated_at) : 0);
@@ -308,6 +309,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
   const reactionChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const positionBroadcastChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const positionBroadcastReadyRef = useRef(false);
+  const clientInstanceIdRef = useRef(`client:${Date.now()}:${Math.random().toString(36).slice(2)}`);
 
   const meIdRef = useRef<string | null>(null);
   const accessTokenRef = useRef<string | null>(null);
