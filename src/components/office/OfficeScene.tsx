@@ -1140,13 +1140,60 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
         updated_at: new Date().toISOString(),
       });
     };
-    const onPageHide = () => persistFinalPosition();
+    const tearingDown = { current: false };
+    const onPageHide = () => { tearingDown.current = true; persistFinalPosition(); };
     const onVisibilityHidden = () => {
       if (document.visibilityState === "hidden") persistFinalPosition();
     };
-    window.addEventListener("beforeunload", persistFinalPosition);
+    const onBeforeUnload = () => { tearingDown.current = true; persistFinalPosition(); };
+    window.addEventListener("beforeunload", onBeforeUnload);
     window.addEventListener("pagehide", onPageHide);
     document.addEventListener("visibilitychange", onVisibilityHidden);
+
+    // Saída do workspace via navegação (route unmount): trata como "sair do
+    // mundo do jogo". O personagem vai offline E volta ao ponto de
+    // ressurgimento (seat da claim, spawn da zona ou SPAWN padrão), para que
+    // ao retornar apareça no início — não no último lugar onde parou.
+    const leaveWorkspaceReset = () => {
+      const uid = meIdRef.current;
+      const wsId = getCurrentWorkspaceId();
+      if (!uid || !wsId) return;
+      const myClaimZone = Object.entries(claimsRef.current).find(([, u]) => u === uid)?.[0];
+      let spawn: Point = SPAWN;
+      if (myClaimZone) {
+        const sp = spawnPointForZone(myClaimZone);
+        if (sp) spawn = { x: sp.x, y: sp.y };
+        else {
+          const z = findZoneById(myClaimZone);
+          const rect = zoneRectFromOverrides(myClaimZone as ZoneId) ?? z?.rect ?? null;
+          if (rect) spawn = seatPointForRect(rect);
+        }
+      }
+      const spawnZone = zoneAt(spawn).id;
+      try { window.localStorage.removeItem(`${LAST_POSITION_KEY_PREFIX}${uid}`); } catch { /* noop */ }
+      const payload = {
+        workspace_id: wsId,
+        user_id: uid,
+        x: spawn.x,
+        y: spawn.y,
+        zone: spawnZone,
+        facing: "down" as Facing,
+        is_online: false,
+        updated_at: new Date().toISOString(),
+      };
+      try {
+        const url = `${import.meta.env.VITE_SUPABASE_URL}/rest/v1/positions?on_conflict=workspace_id,user_id`;
+        const token = accessTokenRef.current;
+        const headers = {
+          "Content-Type": "application/json",
+          apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+          Authorization: `Bearer ${token ?? import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          Prefer: "resolution=merge-duplicates",
+        };
+        void fetch(url, { method: "POST", headers, body: JSON.stringify(payload), keepalive: true }).catch(() => { /* noop */ });
+      } catch { /* noop */ }
+      void supabase.from("positions").upsert(payload);
+    };
 
 
     const syncPositions = async () => {
@@ -1271,12 +1318,18 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
       window.clearInterval(positionsPoll);
       window.clearInterval(presenceHeartbeat);
       window.clearInterval(persistHeartbeat);
-      window.removeEventListener("beforeunload", persistFinalPosition);
+      window.removeEventListener("beforeunload", onBeforeUnload);
       window.removeEventListener("pagehide", onPageHide);
       document.removeEventListener("visibilitychange", onVisibilityHidden);
       document.removeEventListener("visibilitychange", onVisible);
       window.removeEventListener("focus", onVisible);
-      persistFinalPosition();
+      if (tearingDown.current) {
+        // Aba sendo fechada/recarregada — preserva a posição atual.
+        persistFinalPosition();
+      } else {
+        // Navegação saindo do workspace — sai do mundo e volta ao spawn.
+        leaveWorkspaceReset();
+      }
     };
   }, []);
 
