@@ -227,9 +227,14 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
   // game-state source, so idle players never disappear just because a presence
   // heartbeat or browser tab event was missed.
   const [presentPeerIds, setPresentPeerIds] = useState<Set<string>>(() => new Set());
-  // LWW tracker — wall-clock ts of the freshest known sample per user (broadcast/presence).
-  // Lets us discard stale DB poll rows that would otherwise snap remote avatars back.
+  // LWW tracker — freshest per-peer ts from BROADCAST/PRESENCE (peer client clock).
+  // Used to dedupe duplicate live samples from the same producer.
+  // IMPORTANT: do NOT mix with DB updated_at — server clock vs peer client clock
+  // skew would cause valid live updates to be discarded, freezing avatars.
   const positionFreshTs = useRef<Map<string, number>>(new Map());
+  // Separate LWW tracker for DB-sourced rows (server clock). Used only to dedupe
+  // postgres_changes / poll responses against each other.
+  const dbFreshTs = useRef<Map<string, number>>(new Map());
   // Prevents the initial SPAWN placeholder from being advertised/persisted before
   // the user's real saved position has loaded.
   const positionHydratedRef = useRef(false);
@@ -686,7 +691,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
       const pmap: Record<string, RemotePos> = {};
       (posData ?? []).forEach((p) => {
         pmap[p.user_id] = p as RemotePos;
-        if (p.updated_at) positionFreshTs.current.set(p.user_id, Date.parse(p.updated_at));
+        if (p.updated_at) dbFreshTs.current.set(p.user_id, Date.parse(p.updated_at));
       });
 
       // Load workspace claims (escopado pelo workspace atual)
@@ -809,15 +814,21 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
               return next;
             }
             const dbTs = row.updated_at ? Date.parse(row.updated_at) : 0;
-            const freshTs = positionFreshTs.current.get(row.user_id) ?? 0;
-            if (dbTs && dbTs < freshTs) {
-              // Never let an older database event override a fresher live
-              // sample. This includes stale `is_online=false` writes from tab
-              // lifecycle events, which previously made idle avatars vanish.
-              return next;
+            const lastDbTs = dbFreshTs.current.get(row.user_id) ?? 0;
+            // Only compare DB-clock with DB-clock. Never compare with
+            // broadcast/presence ts (peer client clock) — clock skew between
+            // peers and the server would silently freeze valid live updates.
+            if (dbTs && dbTs < lastDbTs) return next;
+            if (dbTs) dbFreshTs.current.set(row.user_id, dbTs);
+            // If a fresher live (broadcast/presence) sample already arrived,
+            // keep the live position but still update non-positional fields.
+            const liveTs = positionFreshTs.current.get(row.user_id) ?? 0;
+            const cur = prev[row.user_id];
+            if (liveTs && cur && (cur.ts ?? 0) >= liveTs) {
+              next[row.user_id] = { ...row, x: cur.x, y: cur.y, facing: cur.facing, ts: cur.ts };
+            } else {
+              next[row.user_id] = row;
             }
-            if (dbTs) positionFreshTs.current.set(row.user_id, dbTs);
-            next[row.user_id] = row;
             return next;
           });
         }
@@ -1162,17 +1173,24 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
         (data as Array<RemotePos & { updated_at?: string }>).forEach((p) => {
           if (uid && p.user_id === uid) return; // handled below
           const dbTs = p.updated_at ? Date.parse(p.updated_at) : 0;
-          const freshTs = positionFreshTs.current.get(p.user_id) ?? 0;
+          const lastDbTs = dbFreshTs.current.get(p.user_id) ?? 0;
           if (p.is_online) maybeStartRemoteTeleportFromCurrent(p.user_id, { x: p.x, y: p.y }, dbTs || Date.now());
-          // Strict LWW: DB rows older than the freshest known live sample are
-          // never allowed to move a stopped avatar or flip it offline.
-          if (dbTs && dbTs < freshTs) {
+          // DB-clock vs DB-clock only; live samples (peer client clock) are
+          // tracked separately to avoid cross-clock skew freezing avatars.
+          if (dbTs && dbTs < lastDbTs) {
             const cur = prev[p.user_id];
             if (cur) next[p.user_id] = cur;
             else next[p.user_id] = p;
           } else {
-            if (dbTs) positionFreshTs.current.set(p.user_id, dbTs);
-            next[p.user_id] = p;
+            if (dbTs) dbFreshTs.current.set(p.user_id, dbTs);
+            // If a fresher live sample already arrived, keep its x/y/facing.
+            const liveTs = positionFreshTs.current.get(p.user_id) ?? 0;
+            const cur = prev[p.user_id];
+            if (liveTs && cur && (cur.ts ?? 0) >= liveTs) {
+              next[p.user_id] = { ...p, x: cur.x, y: cur.y, facing: cur.facing, ts: cur.ts };
+            } else {
+              next[p.user_id] = p;
+            }
           }
         });
         if (uid) {
@@ -1996,7 +2014,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
         // jogador parado que já está online no lobby.
         const tsBroadcast = p.ts ?? 0;
         const tsDb = p.updated_at ? new Date(p.updated_at).getTime() : 0;
-        const fresh = Math.max(tsBroadcast, tsDb, positionFreshTs.current.get(p.user_id) ?? 0);
+        const fresh = Math.max(tsBroadcast, tsDb, positionFreshTs.current.get(p.user_id) ?? 0, dbFreshTs.current.get(p.user_id) ?? 0);
         return fresh > 0 && Date.now() - fresh < 5_000;
       })
       .map((p) => ({
