@@ -276,6 +276,19 @@ export function useRtcMesh(myId: string | null, desiredPeers: string[]): RtcMesh
         };
       } else {
         setRemoteStreams((prev) => ({ ...prev, [peerId]: remoteStream }));
+        // Quando o peer remoto liga/desliga câmera/mic via replaceTrack, NÃO
+        // disparamos ontrack de novo — o transceiver já existia. A trilha
+        // apenas muda muted→unmuted. Forçamos re-render trocando a referência
+        // do MediaStream pra que <video>/<audio> reavaliem hasLiveVideo.
+        const bump = () => {
+          setRemoteStreams((prev) => ({ ...prev, [peerId]: new MediaStream(remoteStream.getTracks()) }));
+        };
+        e.track.onunmute = bump;
+        e.track.onmute = bump;
+        e.track.onended = () => {
+          try { remoteStream.removeTrack(e.track); } catch { /* noop */ }
+          bump();
+        };
       }
     };
 
