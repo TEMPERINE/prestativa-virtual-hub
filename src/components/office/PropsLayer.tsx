@@ -78,7 +78,12 @@ export function PropsLayer({ selfX, selfY, focusedRect = null }: Props) {
         .eq("workspace_id", wsId);
       if (cancelled || !data) return;
       const map: Record<string, number> = {};
-      for (const row of data as PropStateRow[]) map[row.prop_id] = row.frame;
+      for (const row of data as PropStateRow[]) {
+        map[row.prop_id] = row.frame;
+        // Marca tick atual como já tratado — evita disparar animação/som
+        // ao carregar o workspace (estado pré-existente não é um novo evento).
+        handledTicksRef.current[row.prop_id] = row.frame;
+      }
       setFrames(map);
     })();
     const channel = supabase
