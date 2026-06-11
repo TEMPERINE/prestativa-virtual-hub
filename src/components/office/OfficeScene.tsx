@@ -1876,28 +1876,19 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
     const uid = meIdRef.current;
     if (!uid) return;
     const dir = facingRef.current;
+    const cur = posRef.current;
     const ts = Date.now();
-    setConfettis((prev) => {
-      const list = prev[uid] ? [...prev[uid], { facing: dir, ts }] : [{ facing: dir, ts }];
-      return { ...prev, [uid]: list };
-    });
+    const id = `${uid}-${ts}-${Math.random().toString(36).slice(2, 7)}`;
+    setConfettis((prev) => [...prev, { id, x: cur.x, y: cur.y, facing: dir, ts }]);
     setTimeout(() => {
-      setConfettis((prev) => {
-        const list = prev[uid];
-        if (!list) return prev;
-        const nextList = list.filter((c) => c.ts !== ts);
-        const next = { ...prev };
-        if (nextList.length === 0) delete next[uid];
-        else next[uid] = nextList;
-        return next;
-      });
+      setConfettis((prev) => prev.filter((c) => c.id !== id));
     }, 1100);
     const ch = reactionChannelRef.current;
     if (ch) {
       void ch.send({
         type: "broadcast",
         event: "confetti",
-        payload: { user_id: uid, facing: dir },
+        payload: { user_id: uid, facing: dir, x: cur.x, y: cur.y },
       });
     }
   }, []);
