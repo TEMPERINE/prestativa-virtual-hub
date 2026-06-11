@@ -153,6 +153,15 @@ export function PropsLayer({ selfX, selfY, focusedRect = null }: Props) {
     if (!def?.interactive) return;
     const ws = getCurrentWorkspaceId();
     if (!ws) return;
+    // Som: cada clique cria uma nova instância de Audio para sobrepor
+    // chamadas sem interromper a anterior.
+    if (def.soundUrl) {
+      try {
+        const audio = new Audio(def.soundUrl);
+        audio.volume = 0.9;
+        void audio.play().catch(() => { /* autoplay bloqueado, ignora */ });
+      } catch { /* noop */ }
+    }
     // Animação one-shot: dispara local e broadcasta um "tick" via upsert.
     // Cada clique incrementa um contador no campo frame para garantir que
     // o realtime envie o evento mesmo se o valor não mudou.
