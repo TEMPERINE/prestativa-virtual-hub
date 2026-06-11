@@ -4,13 +4,14 @@
 
 import doorClosed from "@/assets/props/door-closed.png.asset.json";
 import doorOpen from "@/assets/props/door-open.png.asset.json";
-// Importados direto (bundle) — os assets externalizados serviam versões
-// antigas (217x245 sem recorte), deixando a animação imperceptível.
-import bell1Url from "@/assets/props/bell-1.png";
-import bell2Url from "@/assets/props/bell-2.png";
-import bell3Url from "@/assets/props/bell-3.png";
-import bell4Url from "@/assets/props/bell-4.png";
-import bell5Url from "@/assets/props/bell-5.png";
+// Sino Meta — frames gerados por scripts/build-bell-meta.py: suporte 100%
+// fixo, sino rotacionado em torno do pivô do gancho (0°, -18°, -9°, +9°, +18°).
+// Importados direto (bundle) para nunca servir versão desatualizada.
+import bellMeta1 from "@/assets/props/bell-meta-1.png";
+import bellMeta2 from "@/assets/props/bell-meta-2.png";
+import bellMeta3 from "@/assets/props/bell-meta-3.png";
+import bellMeta4 from "@/assets/props/bell-meta-4.png";
+import bellMeta5 from "@/assets/props/bell-meta-5.png";
 import bellSound from "@/assets/sounds/bell.mp3.asset.json";
 
 export type PropDef = {
@@ -56,24 +57,24 @@ export const BUILTIN_PROPS: PropDef[] = [
     foregroundWhenFocused: true,
   },
   {
-    id: "bell",
-    label: "Sino de Resultados",
-    // 0 = repouso (idle); 1..4 = poses de balanço usadas na animação
-    frames: [bell1Url, bell2Url, bell3Url, bell4Url, bell5Url],
-    defaultW: 0.06,
-    aspectRatio: 162 / 208, // canvas comum recortado ao conteúdo (anchor: suporte na parede)
+    id: "bell-meta",
+    label: "Sino Meta",
+    // índice → ângulo do sino: 0 = repouso (0°); 1 = -18°; 2 = -9°; 3 = +9°; 4 = +18°
+    frames: [bellMeta1, bellMeta2, bellMeta3, bellMeta4, bellMeta5],
+    defaultW: 0.05,
+    aspectRatio: 240 / 250, // canvas idêntico em todos os frames (pivô fixo)
     interactive: true,
     interactKey: "x",
     depthRefY: 0.5,
     foregroundWhenFocused: true,
     animation: {
-      // 3 loops dos 5 frames na ordem: 1→2→3→4→5
+      // pêndulo: 2 balanços completos + 1 amortecido, terminando no repouso
       sequence: [
-        0, 1, 2, 3, 4,
-        0, 1, 2, 3, 4,
-        0, 1, 2, 3, 4,
+        4, 3, 0, 2, 1, 2, 0, 3,
+        4, 3, 0, 2, 1, 2, 0, 3,
+        3, 0, 2, 0,
       ],
-      frameMs: 90,
+      frameMs: 75,
       restFrame: 0,
     },
     soundUrl: bellSound.url,
