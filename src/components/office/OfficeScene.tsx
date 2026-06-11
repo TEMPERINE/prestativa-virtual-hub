@@ -2558,28 +2558,26 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
         ))}
 
         {/* Confetti bursts — anchored at the launch position, do NOT follow the avatar */}
-        {confettis.map((c) => (
-          {(() => {
-            // For side-facing bursts, raise the origin to the shoulders instead
-            // of the feet so the confetti doesn't appear to come from the floor.
-            const isSide = c.facing === "left" || c.facing === "right";
-            const yOffsetPx = isSide ? -28 : 0;
-            return (
-              <div
-                key={c.id}
-                className="absolute pointer-events-none"
-                style={{
-                  left: `${c.x * 100}%`,
-                  top: `${c.y * 100}%`,
-                  transform: `translate(-50%, calc(-90% + ${yOffsetPx}px))`,
-                  zIndex: Math.round(c.y * 1000) + 1,
-                }}
-              >
-                <ConfettiBurst facing={c.facing} burstKey={c.ts} />
-              </div>
-            );
-          })()}
-        ))}
+        {confettis.map((c) => {
+          // For side-facing bursts, raise the origin to the shoulders instead
+          // of the feet so the confetti doesn't appear to come from the floor.
+          const isSide = c.facing === "left" || c.facing === "right";
+          const yOffsetPx = isSide ? -28 : 0;
+          return (
+            <div
+              key={c.id}
+              className="absolute pointer-events-none"
+              style={{
+                left: `${c.x * 100}%`,
+                top: `${c.y * 100}%`,
+                transform: `translate(-50%, calc(-90% + ${yOffsetPx}px))`,
+                zIndex: Math.round(c.y * 1000) + 1,
+              }}
+            >
+              <ConfettiBurst facing={c.facing} burstKey={c.ts} />
+            </div>
+          );
+        })}
 
 
 
