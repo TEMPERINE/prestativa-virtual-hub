@@ -3374,7 +3374,11 @@ function WorkspaceZoneHover({
       const el = anchorRef.current;
       if (el) {
         const r = el.getBoundingClientRect();
-        setPos({ left: r.left + r.width / 2, top: r.top + r.height / 2 });
+        const left = r.left + r.width / 2;
+        const top = r.top + r.height / 2;
+        // Só atualiza estado quando a posição realmente muda — setState com
+        // objeto novo a cada frame re-renderiza a cena 60x/s e trava o React.
+        setPos((prev) => (prev && prev.left === left && prev.top === top ? prev : { left, top }));
       }
       raf = window.requestAnimationFrame(tick);
     };
@@ -3553,7 +3557,8 @@ function AvatarHitArea({
           top = window.innerHeight - menuH - margin;
         }
         if (top < margin) top = margin;
-        setPos({ left, top });
+        // Só atualiza quando muda — evita re-render 60x/s (trava o React).
+        setPos((prev) => (prev && prev.left === left && prev.top === top ? prev : { left, top }));
       }
       raf = window.requestAnimationFrame(tick);
     };
