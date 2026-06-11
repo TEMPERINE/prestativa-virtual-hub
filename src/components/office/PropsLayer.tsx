@@ -133,6 +133,10 @@ export function PropsLayer({ selfX, selfY, focusedRect = null }: Props) {
       delete animTimersRef.current[propId];
     }
     const rest = anim.restFrame ?? 0;
+    // IMPORTANTE: capturar o frame ANTES do setState. O updater do React roda
+    // de forma assíncrona (no render), e ler `sequence[i]` lá dentro pega o
+    // `i` já incrementado — sob lag de render todos os updates colapsam para
+    // `undefined` e a animação parece "não rodar".
     let i = 0;
     const step = () => {
       if (i >= anim.sequence.length) {
@@ -144,8 +148,9 @@ export function PropsLayer({ selfX, selfY, focusedRect = null }: Props) {
         });
         return;
       }
-      setAnimFrames((p) => ({ ...p, [propId]: anim.sequence[i] }));
+      const frameValue = anim.sequence[i];
       i++;
+      setAnimFrames((p) => ({ ...p, [propId]: frameValue }));
       animTimersRef.current[propId] = window.setTimeout(step, anim.frameMs);
     };
     setAnimFrames((p) => ({ ...p, [propId]: rest }));
