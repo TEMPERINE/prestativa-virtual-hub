@@ -2463,7 +2463,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
                 zIndex: (focusedZone ? (inFocus ? 60000 : 20000) : 0) + Math.round(renderPoint.y * 1000),
                 opacity: tpOpacity,
                 filter: tpData
-                  ? `drop-shadow(0 0 18px var(--primary)) drop-shadow(0 0 36px var(--primary-glow)) brightness(${tpData.phase === "out" ? 1.8 : 1.4})`
+                  ? `drop-shadow(0 0 18px ${profile.avatar_color}) drop-shadow(0 0 36px ${profile.avatar_color}) brightness(${tpData.phase === "out" ? 1.8 : 1.4})`
                   : "none",
               }}
             >
