@@ -113,17 +113,21 @@ export function PropsLayer({ selfX, selfY, focusedRect = null }: Props) {
     const prop = propsRef.current.find((p) => p.id === propId);
     if (!prop) return;
     const def = getPropDef(prop.defId);
-    const anim = def?.animation;
-    if (!anim) return;
-    // se já está animando, ignora (não acumula)
-    if (animTimersRef.current[propId]) return;
-    // Som: cada disparo cria uma nova instância para sobrepor sem cortar.
+    // Som: cada disparo cria uma nova instância e sobrepõe sem cortar
+    // (campainha tocada múltiplas vezes). Roda independente da animação.
     if (def?.soundUrl) {
       try {
         const audio = new Audio(def.soundUrl);
         audio.volume = 0.9;
         void audio.play().catch(() => { /* autoplay bloqueado */ });
       } catch { /* noop */ }
+    }
+    const anim = def?.animation;
+    if (!anim) return;
+    // Se já está animando, reinicia do começo (não acumula timers).
+    if (animTimersRef.current[propId]) {
+      window.clearTimeout(animTimersRef.current[propId]);
+      delete animTimersRef.current[propId];
     }
     const rest = anim.restFrame ?? 0;
     let i = 0;
