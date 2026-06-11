@@ -1,19 +1,19 @@
 {
   "name": "prestativa-virtual-desktop",
-  "version": "1.0.1",
-  "description": "Prestativa Virtual Office — desktop shell (Windows)",
+  "version": "1.0.2",
+  "description": "Virtual Office — desktop shell (Windows)",
   "main": "electron/main.cjs",
   "author": "Prestativa",
   "license": "UNLICENSED",
   "private": true,
   "scripts": {
     "start": "electron .",
-    "pack:win": "electron-packager . PrestativaVirtual --platform=win32 --arch=x64 --icon=build/icon.ico --out=release --overwrite --asar",
+    "pack:win": "electron-packager . VirtualOffice --platform=win32 --arch=x64 --icon=build/icon.ico --out=release --overwrite --asar",
     "dist:win": "electron-builder --win --x64 --publish never"
   },
   "build": {
     "appId": "com.prestativa.virtualoffice",
-    "productName": "Prestativa Virtual",
+    "productName": "Virtual Office",
     "asar": true,
     "win": {
       "target": [
