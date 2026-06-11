@@ -70,11 +70,18 @@ export function PropsLayer({ selfX, selfY, focusedRect = null }: Props) {
   const [wsId, setWsId] = useState<string | null>(() => getCurrentWorkspaceId());
   useEffect(() => { const u = subscribeCurrentWorkspaceId(setWsId); return () => { u(); }; }, []);
 
+  // Canal de Broadcast por workspace — usado para sincronizar animação do
+  // sino (e qualquer prop animado) entre clientes em tempo real, sem depender
+  // da replicação do Postgres. O `prop_states` continua existindo apenas como
+  // SNAPSHOT (último estado) para quem entrar depois.
+  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+
   useEffect(() => {
-    if (!wsId) { setFrames({}); return; }
+    if (!wsId) { setFrames({}); channelRef.current = null; return; }
     let cancelled = false;
     let channel: ReturnType<typeof supabase.channel> | null = null;
     (async () => {
+      // Snapshot inicial (estado persistido).
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { data } = await (supabase as any)
         .from("prop_states")
@@ -85,48 +92,41 @@ export function PropsLayer({ selfX, selfY, focusedRect = null }: Props) {
         const map: Record<string, number> = {};
         for (const row of data as PropStateRow[]) {
           map[row.prop_id] = row.frame;
-          // Marca tick atual como já tratado — evita disparar animação/som
-          // ao carregar o workspace (estado pré-existente não é um novo evento).
+          // Marca tick atual como já tratado — não dispara animação ao carregar.
           handledTicksRef.current[row.prop_id] = row.frame;
         }
         setFrames(map);
       }
-      // CRÍTICO: autenticar o websocket ANTES de assinar o canal. A tabela
-      // prop_states tem RLS; sem o JWT no realtime, o servidor descarta os
-      // eventos em silêncio e o sino "congela" (nunca recebe os ticks).
-      const { data: s } = await supabase.auth.getSession();
       if (cancelled) return;
-      if (s.session?.access_token) {
-        try { await supabase.realtime.setAuth(s.session.access_token); } catch { /* noop */ }
-      }
-      if (cancelled) return;
-      channel = supabase
-        .channel(`prop_states-${wsId}-${Date.now()}`)
-        .on(
-          "postgres_changes",
-          { event: "*", schema: "public", table: "prop_states", filter: `workspace_id=eq.${wsId}` },
-          (payload) => {
-            const row = (payload.new ?? payload.old) as PropStateRow | null;
-            console.log("[PropsLayer] realtime event:", payload.eventType, row);
-            if (!row?.prop_id) return;
-            if (payload.eventType === "DELETE") {
-              setFrames((p) => {
-                const n = { ...p };
-                delete n[row.prop_id];
-                return n;
-              });
-            } else {
-              setFrames((p) => ({ ...p, [row.prop_id]: row.frame }));
-            }
-          }
-        )
-        .subscribe();
+      // Canal de broadcast — não depende de RLS nem de replicação.
+      // `self: false` para não receber o eco do próprio envio (já animamos local).
+      channel = supabase.channel(`props-bcast-${wsId}`, {
+        config: { broadcast: { self: false, ack: false } },
+      });
+      channel.on(
+        "broadcast",
+        { event: "prop_tick" },
+        (msg) => {
+          const payload = msg.payload as { propId?: string; tick?: number } | undefined;
+          const propId = payload?.propId;
+          const tick = payload?.tick;
+          if (!propId || typeof tick !== "number") return;
+          console.log("[PropsLayer] broadcast prop_tick:", propId, tick);
+          setFrames((p) => ({ ...p, [propId]: tick }));
+        },
+      );
+      channel.subscribe((status) => {
+        console.log("[PropsLayer] broadcast channel status:", status);
+      });
+      channelRef.current = channel;
     })();
     return () => {
       cancelled = true;
+      channelRef.current = null;
       if (channel) supabase.removeChannel(channel);
     };
   }, [wsId]);
+
 
 
   useEffect(() => { publishFrames(frames); }, [frames]);
