@@ -75,6 +75,7 @@ export const BUILTIN_PROPS: PropDef[] = [
       frameMs: 110,
       restFrame: 0,
     },
+    soundUrl: bellSound.url,
   },
 ];
 
