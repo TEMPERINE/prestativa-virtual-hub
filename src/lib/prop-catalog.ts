@@ -4,11 +4,13 @@
 
 import doorClosed from "@/assets/props/door-closed.png.asset.json";
 import doorOpen from "@/assets/props/door-open.png.asset.json";
-import bell1 from "@/assets/props/bell-1.png.asset.json";
-import bell2 from "@/assets/props/bell-2.png.asset.json";
-import bell3 from "@/assets/props/bell-3.png.asset.json";
-import bell4 from "@/assets/props/bell-4.png.asset.json";
-import bell5 from "@/assets/props/bell-5.png.asset.json";
+// Importados direto (bundle) — os assets externalizados serviam versões
+// antigas (217x245 sem recorte), deixando a animação imperceptível.
+import bell1Url from "@/assets/props/bell-1.png";
+import bell2Url from "@/assets/props/bell-2.png";
+import bell3Url from "@/assets/props/bell-3.png";
+import bell4Url from "@/assets/props/bell-4.png";
+import bell5Url from "@/assets/props/bell-5.png";
 import bellSound from "@/assets/sounds/bell.mp3.asset.json";
 
 export type PropDef = {
@@ -57,7 +59,7 @@ export const BUILTIN_PROPS: PropDef[] = [
     id: "bell",
     label: "Sino de Resultados",
     // 0 = repouso (idle); 1..4 = poses de balanço usadas na animação
-    frames: [bell1.url, bell2.url, bell3.url, bell4.url, bell5.url],
+    frames: [bell1Url, bell2Url, bell3Url, bell4Url, bell5Url],
     defaultW: 0.06,
     aspectRatio: 162 / 208, // canvas comum recortado ao conteúdo (anchor: suporte na parede)
     interactive: true,
