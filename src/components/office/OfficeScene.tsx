@@ -1877,6 +1877,31 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
     }
   }, []);
 
+  const sendConfetti = useCallback(() => {
+    const uid = meIdRef.current;
+    if (!uid) return;
+    const dir = facingRef.current;
+    const ts = Date.now();
+    setConfettis((prev) => ({ ...prev, [uid]: { facing: dir, ts } }));
+    setTimeout(() => {
+      setConfettis((prev) => {
+        const cur = prev[uid];
+        if (!cur || cur.ts !== ts) return prev;
+        const next = { ...prev };
+        delete next[uid];
+        return next;
+      });
+    }, 1100);
+    const ch = reactionChannelRef.current;
+    if (ch) {
+      void ch.send({
+        type: "broadcast",
+        event: "confetti",
+        payload: { user_id: uid, facing: dir },
+      });
+    }
+  }, []);
+
   // keyboard input — standard 2D game movement (hold to walk, release to idle)
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
