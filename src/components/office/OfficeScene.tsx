@@ -44,7 +44,9 @@ const EMOJI_MAP: Record<string, string> = {
 };
 const REACTION_DURATION_MS = 3000;
 import { toast } from "sonner";
-import { LogOut, Mic, MicOff, Video, VideoOff, MonitorUp, Users, Pencil, User as UserIcon, MessageCircle, StickyNote, X as XIcon, Plus, Minus, Locate, ChevronLeft, ChevronRight, Footprints, UserPlus, Hand, Circle, Square, Loader2 } from "lucide-react";
+import { LogOut, Mic, MicOff, Video, VideoOff, MonitorUp, Users, Pencil, User as UserIcon, MessageCircle, StickyNote, X as XIcon, Plus, Minus, Locate, ChevronLeft, ChevronRight, Footprints, UserPlus, Hand, Circle, Square, Loader2, Smile } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import EmojiPicker, { EmojiStyle, Theme as EmojiTheme } from "emoji-picker-react";
 import { Link } from "@tanstack/react-router";
 import { useLiveKit } from "@/lib/rtc/useLiveKit";
 import { installAudioUnlockListeners, unlockAudioPlayback } from "@/lib/rtc/audio-unlock";
@@ -2854,6 +2856,37 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
                 className="bg-transparent border-0 focus-visible:ring-0 resize-none text-sm placeholder:text-amber-900/50 min-h-[150px]"
                 autoFocus
               />
+              <div className="absolute bottom-2 right-2">
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <button
+                      type="button"
+                      className="p-1.5 rounded-full bg-amber-900/10 hover:bg-amber-900/20 text-amber-900 transition-colors"
+                      aria-label="Inserir emoji"
+                    >
+                      <Smile className="w-4 h-4" />
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent
+                    className="p-0 border-0 bg-transparent shadow-none w-auto"
+                    side="top"
+                    align="end"
+                  >
+                    <EmojiPicker
+                      onEmojiClick={(e) => {
+                        setComposeText((prev) => (prev + e.emoji).slice(0, 280));
+                      }}
+                      emojiStyle={EmojiStyle.NATIVE}
+                      theme={EmojiTheme.LIGHT}
+                      width={320}
+                      height={380}
+                      searchPlaceholder="Buscar emoji..."
+                      previewConfig={{ showPreview: false }}
+                      skinTonesDisabled
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
             </div>
             <div className="text-[10px] text-muted-foreground text-right mt-1">
               {composeText.length}/280
