@@ -201,11 +201,6 @@ export function PropsLayer({ selfX, selfY, focusedRect = null }: Props) {
     // o realtime envie o evento mesmo se o valor não mudou.
     if (def.animation) {
       playAnimation(prop.id);
-      // IMPORTANTE: avançar o tick a partir de um ref local (não do estado
-      // `frames`, que só é atualizado pelo eco do realtime). Cliques rápidos
-      // calculavam o mesmo tick → o servidor gravava o mesmo valor → as
-      // outras abas/desktop deduplicavam via handledTicksRef e o sino
-      // "travava" do outro lado.
       const prev = Math.max(
         lastSentTickRef.current[prop.id] ?? 0,
         frames[prop.id] ?? 0,
@@ -213,6 +208,16 @@ export function PropsLayer({ selfX, selfY, focusedRect = null }: Props) {
       const tick = (prev % 1_000_000) + 1;
       lastSentTickRef.current[prop.id] = tick;
       handledTicksRef.current[prop.id] = tick;
+      // 1) Broadcast IMEDIATO para outros clientes (latência ~ms, sem RLS).
+      const ch = channelRef.current;
+      if (ch) {
+        void ch.send({
+          type: "broadcast",
+          event: "prop_tick",
+          payload: { propId: prop.id, tick },
+        });
+      }
+      // 2) Snapshot persistente (fire-and-forget) — para quem entrar depois.
       void (async () => {
         const { data: u } = await supabase.auth.getUser();
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -226,10 +231,11 @@ export function PropsLayer({ selfX, selfY, focusedRect = null }: Props) {
           },
           { onConflict: "workspace_id,prop_id" }
         );
-        if (error) console.error("[PropsLayer] upsert prop_states failed:", error);
+        if (error) console.error("[PropsLayer] upsert snapshot failed:", error);
       })();
       return;
     }
+
     setFrames((p) => {
       const cur = p[prop.id] ?? 0;
       const next = (cur + 1) % def.frames.length;
