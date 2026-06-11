@@ -2870,7 +2870,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
                   <PopoverContent
                     className="p-0 border-0 bg-transparent shadow-none w-auto"
                     side="top"
-                    align="end"
+                    align="start"
                   >
                     <EmojiPicker
                       onEmojiClick={(e) => {
