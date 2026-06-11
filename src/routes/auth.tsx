@@ -36,13 +36,13 @@ function AuthPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-6 bg-gradient-to-br from-background via-accent/30 to-background">
+    <div className="min-h-screen flex items-center justify-center p-6 bg-white">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <img
             src={logoAsset.url}
             alt="Virtual Office"
-            className="mx-auto h-56 w-auto object-contain mb-4"
+            className="mx-auto h-[336px] w-auto object-contain mb-4"
           />
           <p className="text-sm text-muted-foreground mt-2">
             Seu espaço virtual. Presença, proximidade, colaboração.
