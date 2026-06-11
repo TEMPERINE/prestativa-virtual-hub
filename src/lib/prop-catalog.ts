@@ -59,7 +59,7 @@ export const BUILTIN_PROPS: PropDef[] = [
     // 0 = repouso (idle); 1..4 = poses de balanço usadas na animação
     frames: [bell1.url, bell2.url, bell3.url, bell4.url, bell5.url],
     defaultW: 0.06,
-    aspectRatio: 217 / 245, // canvas comum dos frames (anchor: suporte na parede)
+    aspectRatio: 162 / 208, // canvas comum recortado ao conteúdo (anchor: suporte na parede)
     interactive: true,
     interactKey: "x",
     depthRefY: 0.5,
