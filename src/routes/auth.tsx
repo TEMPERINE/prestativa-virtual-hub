@@ -2,7 +2,7 @@ import { createFileRoute, Link, redirect } from "@tanstack/react-router";
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import logoAsset from "@/assets/virtual-office-logo.png.asset.json";
+import logoAsset from "@/assets/virtual-office-hero.png.asset.json";
 
 export const Route = createFileRoute("/auth")({
   head: () => ({
@@ -42,7 +42,7 @@ function AuthPage() {
           <img
             src={logoAsset.url}
             alt="Virtual Office"
-            className="mx-auto h-20 w-auto object-contain mb-4"
+            className="mx-auto h-56 w-auto object-contain mb-4"
           />
           <p className="text-sm text-muted-foreground mt-2">
             Seu espaço virtual. Presença, proximidade, colaboração.
