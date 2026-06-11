@@ -9,6 +9,7 @@ import bell2 from "@/assets/props/bell-2.png.asset.json";
 import bell3 from "@/assets/props/bell-3.png.asset.json";
 import bell4 from "@/assets/props/bell-4.png.asset.json";
 import bell5 from "@/assets/props/bell-5.png.asset.json";
+import bellSound from "@/assets/sounds/bell.mp3.asset.json";
 
 export type PropDef = {
   id: string;
