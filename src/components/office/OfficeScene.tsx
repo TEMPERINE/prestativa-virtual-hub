@@ -53,6 +53,7 @@ import { CamPreviewAndPicker } from "./CamPreviewAndPicker";
 import { DeviceMenu } from "./DeviceMenu";
 import prestativaIcon from "@/assets/prestativa-icon.png.asset.json";
 import { ScreenShareViewer } from "./ScreenShareViewer";
+import { ConfettiBurst } from "./ConfettiBurst";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
