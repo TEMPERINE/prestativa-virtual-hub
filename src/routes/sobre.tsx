@@ -13,6 +13,17 @@ export const Route = createFileRoute("/sobre")({
 
 const CHANGELOG: Array<{ version: string; date: string; notes: string[] }> = [
   {
+    version: "v1.0.0",
+    date: "2026-06-11",
+    notes: [
+      "Primeira versão estável liberada.",
+      "Suporte a até 12 participantes simultâneos em reuniões via LiveKit.",
+      "Compartilhamento de tela com picker nativo do Windows.",
+      "Ícone oficial do aplicativo no instalador e taskbar.",
+      "Gravação de reuniões (browser e desktop via Electron).",
+    ],
+  },
+  {
     version: "v0.1.0-beta",
     date: "2026-06-08",
     notes: [
