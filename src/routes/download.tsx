@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { Download, Loader2, Github } from "lucide-react";
+import { Download, Loader2, Github, ShieldAlert, ChevronRight, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import logoAsset from "@/assets/virtual-office-hero.png.asset.json";
