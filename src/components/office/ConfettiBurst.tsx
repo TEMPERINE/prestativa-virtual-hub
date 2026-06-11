@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import type { Facing } from "@/lib/sprites/types";
+import type { Facing } from "@/lib/sprite-catalog";
 
 type Props = {
   /** Direction the avatar is facing; confetti shoots this way. */
