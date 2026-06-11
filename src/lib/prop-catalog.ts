@@ -59,7 +59,7 @@ export const BUILTIN_PROPS: PropDef[] = [
     id: "bell",
     label: "Sino de Resultados",
     // 0 = repouso (idle); 1..4 = poses de balanço usadas na animação
-    frames: [bell1.url, bell2.url, bell3.url, bell4.url, bell5.url],
+    frames: [bell1Url, bell2Url, bell3Url, bell4Url, bell5Url],
     defaultW: 0.06,
     aspectRatio: 162 / 208, // canvas comum recortado ao conteúdo (anchor: suporte na parede)
     interactive: true,
