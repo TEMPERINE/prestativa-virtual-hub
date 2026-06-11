@@ -262,6 +262,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
   const [facing, setFacing] = useState<Facing>("down");
   const facingRef = useRef<Facing>("down");
   const [reactions, setReactions] = useState<Record<string, { emoji: string; ts: number }>>({});
+  const [confettis, setConfettis] = useState<Record<string, { facing: Facing; ts: number }>>({});
   // Active remote-user teleport effects (so others see the sparkle/fade like a game).
   const [remoteTeleports, setRemoteTeleports] = useState<
     Record<string, { from: Point; to: Point; phase: "out" | "in"; id: number }>
