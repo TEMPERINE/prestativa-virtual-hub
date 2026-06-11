@@ -9,6 +9,7 @@ import bell2 from "@/assets/props/bell-2.png.asset.json";
 import bell3 from "@/assets/props/bell-3.png.asset.json";
 import bell4 from "@/assets/props/bell-4.png.asset.json";
 import bell5 from "@/assets/props/bell-5.png.asset.json";
+import bellSound from "@/assets/sounds/bell.mp3.asset.json";
 
 export type PropDef = {
   id: string;
@@ -34,6 +35,9 @@ export type PropDef = {
     frameMs: number;    // duração de cada frame
     restFrame?: number; // frame de repouso (default 0)
   };
+  /** URL de som tocado a cada interação. Múltiplos cliques se sobrepõem
+   *  (cada clique cria uma nova instância de Audio sem cortar a anterior). */
+  soundUrl?: string;
 };
 
 export const BUILTIN_PROPS: PropDef[] = [
@@ -71,6 +75,7 @@ export const BUILTIN_PROPS: PropDef[] = [
       frameMs: 110,
       restFrame: 0,
     },
+    soundUrl: bellSound.url,
   },
 ];
 
