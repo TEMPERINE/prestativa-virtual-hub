@@ -110,7 +110,7 @@ ipcMain.handle("prestativa:get-screen-source-id", async () => {
     types: ["window", "screen"],
   });
   const own =
-    sources.find((s) => s.name.includes("Prestativa")) ?? sources[0];
+    sources.find((s) => s.name.includes("Virtual Office") || s.name.includes("Prestativa")) ?? sources[0];
   return own ? own.id : null;
 });
 
