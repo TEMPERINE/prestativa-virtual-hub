@@ -1989,7 +1989,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
       window.removeEventListener("keyup", up);
       window.removeEventListener("blur", blur);
     };
-  }, [setLocalFacing, sendReaction, teleportToMyClaim, sendPos]);
+  }, [setLocalFacing, sendReaction, sendConfetti, teleportToMyClaim, sendPos]);
 
   // movement + animation loop
   useEffect(() => {
