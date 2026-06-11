@@ -36,7 +36,7 @@ function AuthPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-6 bg-white">
+    <div className="min-h-screen flex items-center justify-center p-6 bg-[#faf9f8]">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <img
