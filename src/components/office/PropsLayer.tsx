@@ -24,11 +24,15 @@ export function PropsLayer({ selfX, selfY, focusedRect = null }: Props) {
     () => loadOverrides()?.props ?? []
   );
   const [frames, setFrames] = useState<Record<string, number>>({});
+  // Override local de frame durante animação one-shot (não persiste no servidor).
+  const [animFrames, setAnimFrames] = useState<Record<string, number>>({});
+  const animTimersRef = useRef<Record<string, number>>({});
   const [, setCatalogVersion] = useState(0);
   const selfRef = useRef({ x: selfX, y: selfY });
   selfRef.current = { x: selfX, y: selfY };
   const propsRef = useRef(propsList);
   propsRef.current = propsList;
+
 
   // Carrega elementos personalizados e re-renderiza quando o catálogo muda
   useEffect(() => {
