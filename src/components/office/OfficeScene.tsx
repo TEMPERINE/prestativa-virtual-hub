@@ -2506,13 +2506,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
                     glowColor={isMe ? profile.avatar_color : undefined}
                     spriteId={profile.sprite_id}
                   />
-                  {confettis[profile.id]?.map((c) => (
-                    <ConfettiBurst
-                      key={c.ts}
-                      facing={c.facing}
-                      burstKey={c.ts}
-                    />
-                  ))}
+                  {/* Confetti is rendered in a separate layer below so it stays at launch position */}
                   {/* Hover/click hit-area for remote avatars (sits over the sprite) */}
                   {!isMe && (
                     <AvatarHitArea
