@@ -59,7 +59,7 @@ function DownloadPage() {
   const exeAsset = release?.assets.find((a) => a.name.toLowerCase().endsWith(".exe"));
 
   return (
-    <div className="min-h-screen bg-[#faf9f8] flex items-center justify-center p-6">
+    <div className="min-h-screen bg-[#faf9f8] py-12 px-6 flex flex-col items-center overflow-y-auto">
       <div className="max-w-2xl w-full flex flex-col items-center">
         <div className="text-center mb-6">
           <img
