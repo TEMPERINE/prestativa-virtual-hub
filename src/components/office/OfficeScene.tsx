@@ -409,8 +409,10 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
       const z = startZoom + (endZoom - startZoom) * k;
       const px = startPan.x + (endPan.x - startPan.x) * k;
       const py = startPan.y + (endPan.y - startPan.y) * k;
-      setZoom(z);
-      setPan({ x: px, y: py });
+      // Só atualiza quando realmente muda — setState com objeto novo a cada
+      // frame dispara re-render 60x/s e pode estourar o limite do React.
+      setZoom((prev) => (prev === z ? prev : z));
+      setPan((prev) => (prev.x === px && prev.y === py ? prev : { x: px, y: py }));
       if (t < 1) {
         tweenRafRef.current = requestAnimationFrame(step);
       } else {
