@@ -239,6 +239,15 @@ export function PropsLayer({ selfX, selfY, focusedRect = null }: Props) {
     setFrames((p) => {
       const cur = p[prop.id] ?? 0;
       const next = (cur + 1) % def.frames.length;
+      handledTicksRef.current[prop.id] = next;
+      const ch = channelRef.current;
+      if (ch) {
+        void ch.send({
+          type: "broadcast",
+          event: "prop_tick",
+          payload: { propId: prop.id, tick: next },
+        });
+      }
       void (async () => {
         const { data: u } = await supabase.auth.getUser();
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -252,7 +261,7 @@ export function PropsLayer({ selfX, selfY, focusedRect = null }: Props) {
           },
           { onConflict: "workspace_id,prop_id" }
         );
-        if (error) console.error("[PropsLayer] upsert prop_states failed:", error);
+        if (error) console.error("[PropsLayer] upsert snapshot failed:", error);
       })();
       return { ...p, [prop.id]: next };
     });
