@@ -455,6 +455,15 @@ export function MapEditor() {
         anchorTop: number;
         aspect: number;
       }
+    | {
+        id: string;
+        mode: "rotate";
+        pivotPxX: number;   // pivô em px (clientX-relative ao stage)
+        pivotPxY: number;
+        startAngle: number; // graus do vetor pivô→cursor no início
+        startRot: number;   // rotação do prop no início
+        fine: boolean;      // shift = controle fino
+      }
     | null
   >(null);
   const [ghostPos, setGhostPos] = useState<{ x: number; y: number } | null>(null);
