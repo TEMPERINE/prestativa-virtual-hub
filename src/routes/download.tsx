@@ -61,7 +61,7 @@ function DownloadPage() {
     <div className="min-h-screen bg-background flex items-center justify-center p-6">
       <Card className="max-w-2xl w-full">
         <CardHeader>
-          <CardTitle className="text-3xl">Prestativa Virtual Hub</CardTitle>
+          <CardTitle className="text-3xl">Virtual Office</CardTitle>
           <CardDescription>Baixe a versão mais recente para Windows</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
