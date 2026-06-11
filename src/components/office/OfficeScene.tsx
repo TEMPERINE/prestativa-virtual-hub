@@ -2842,7 +2842,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
           <div className="relative">
             <div className="absolute -top-3 left-1/2 -translate-x-1/2 text-3xl">🎁</div>
             <div
-              className="rounded-lg p-4 shadow-soft"
+              className="rounded-lg p-4 shadow-soft relative"
               style={{
                 background: "linear-gradient(180deg, #FFE680 0%, #FFD84D 100%)",
                 color: "#3a2e00",
@@ -2853,10 +2853,10 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
                 value={composeText}
                 onChange={(e) => setComposeText(e.target.value.slice(0, 280))}
                 placeholder="Escreva uma mensagem!"
-                className="bg-transparent border-0 focus-visible:ring-0 resize-none text-sm placeholder:text-amber-900/50 min-h-[150px]"
+                className="bg-transparent border-0 focus-visible:ring-0 resize-none text-sm placeholder:text-amber-900/50 min-h-[150px] pb-8"
                 autoFocus
               />
-              <div className="absolute bottom-2 right-2">
+              <div className="absolute bottom-2 left-2">
                 <Popover>
                   <PopoverTrigger asChild>
                     <button
