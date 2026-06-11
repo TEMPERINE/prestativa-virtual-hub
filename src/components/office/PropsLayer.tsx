@@ -96,6 +96,7 @@ export function PropsLayer({ selfX, selfY, focusedRect = null }: Props) {
         { event: "*", schema: "public", table: "prop_states", filter: `workspace_id=eq.${wsId}` },
         (payload) => {
           const row = (payload.new ?? payload.old) as PropStateRow | null;
+          console.log("[PropsLayer] realtime event:", payload.eventType, row);
           if (!row?.prop_id) return;
           if (payload.eventType === "DELETE") {
             setFrames((p) => {
@@ -121,6 +122,7 @@ export function PropsLayer({ selfX, selfY, focusedRect = null }: Props) {
   // Roda animação one-shot localmente (sem persistir no servidor).
   // Reproduz def.animation.sequence e termina no restFrame.
   const playAnimation = useCallback((propId: string) => {
+    console.log("[PropsLayer] playAnimation:", propId);
     const prop = propsRef.current.find((p) => p.id === propId);
     if (!prop) return;
     const def = getPropDef(prop.defId);
