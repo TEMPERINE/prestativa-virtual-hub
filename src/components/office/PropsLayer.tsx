@@ -183,7 +183,17 @@ export function PropsLayer({ selfX, selfY, focusedRect = null }: Props) {
     // o realtime envie o evento mesmo se o valor não mudou.
     if (def.animation) {
       playAnimation(prop.id);
-      const tick = ((frames[prop.id] ?? 0) % 1_000_000) + 1;
+      // IMPORTANTE: avançar o tick a partir do estado local IMEDIATAMENTE.
+      // Se lermos `frames[prop.id]` do closure, cliques rápidos calculam o
+      // mesmo tick (porque o eco do realtime ainda não voltou), o servidor
+      // grava o mesmo valor, e nas outras abas/desktop o handledTicksRef
+      // bate igual e a animação é pulada — o sino "trava" do outro lado.
+      let tick = 0;
+      setFrames((p) => {
+        const cur = p[prop.id] ?? 0;
+        tick = (cur % 1_000_000) + 1;
+        return { ...p, [prop.id]: tick };
+      });
       handledTicksRef.current[prop.id] = tick;
       void (async () => {
         const { data: u } = await supabase.auth.getUser();
