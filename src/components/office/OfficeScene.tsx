@@ -263,7 +263,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
   const [facing, setFacing] = useState<Facing>("down");
   const facingRef = useRef<Facing>("down");
   const [reactions, setReactions] = useState<Record<string, { emoji: string; ts: number }>>({});
-  const [confettis, setConfettis] = useState<Record<string, { facing: Facing; ts: number }>>({});
+  const [confettis, setConfettis] = useState<Record<string, Array<{ facing: Facing; ts: number }>>>({});
   // Active remote-user teleport effects (so others see the sparkle/fade like a game).
   const [remoteTeleports, setRemoteTeleports] = useState<
     Record<string, { from: Point; to: Point; phase: "out" | "in"; id: number }>
@@ -920,13 +920,18 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
         const { user_id, facing: dir } = (payload.payload ?? {}) as { user_id?: string; facing?: Facing };
         if (!user_id || !dir) return;
         const ts = Date.now();
-        setConfettis((prev) => ({ ...prev, [user_id]: { facing: dir, ts } }));
+        setConfettis((prev) => {
+          const list = prev[user_id] ? [...prev[user_id], { facing: dir, ts }] : [{ facing: dir, ts }];
+          return { ...prev, [user_id]: list };
+        });
         setTimeout(() => {
           setConfettis((prev) => {
-            const cur = prev[user_id];
-            if (!cur || cur.ts !== ts) return prev;
+            const list = prev[user_id];
+            if (!list) return prev;
+            const nextList = list.filter((c) => c.ts !== ts);
             const next = { ...prev };
-            delete next[user_id];
+            if (nextList.length === 0) delete next[user_id];
+            else next[user_id] = nextList;
             return next;
           });
         }, 1100);
@@ -1882,13 +1887,18 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
     if (!uid) return;
     const dir = facingRef.current;
     const ts = Date.now();
-    setConfettis((prev) => ({ ...prev, [uid]: { facing: dir, ts } }));
+    setConfettis((prev) => {
+      const list = prev[uid] ? [...prev[uid], { facing: dir, ts }] : [{ facing: dir, ts }];
+      return { ...prev, [uid]: list };
+    });
     setTimeout(() => {
       setConfettis((prev) => {
-        const cur = prev[uid];
-        if (!cur || cur.ts !== ts) return prev;
+        const list = prev[uid];
+        if (!list) return prev;
+        const nextList = list.filter((c) => c.ts !== ts);
         const next = { ...prev };
-        delete next[uid];
+        if (nextList.length === 0) delete next[uid];
+        else next[uid] = nextList;
         return next;
       });
     }, 1100);
@@ -2515,12 +2525,13 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
                     glowColor={isMe ? profile.avatar_color : undefined}
                     spriteId={profile.sprite_id}
                   />
-                  {confettis[profile.id] && (
+                  {confettis[profile.id]?.map((c) => (
                     <ConfettiBurst
-                      facing={confettis[profile.id].facing}
-                      burstKey={confettis[profile.id].ts}
+                      key={c.ts}
+                      facing={c.facing}
+                      burstKey={c.ts}
                     />
-                  )}
+                  ))}
                   {/* Hover/click hit-area for remote avatars (sits over the sprite) */}
                   {!isMe && (
                     <AvatarHitArea
