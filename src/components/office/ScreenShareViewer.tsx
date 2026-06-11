@@ -75,10 +75,10 @@ export function ScreenShareViewer({
   if (meetingMode) {
     const overlay = (
       <div
-        className="fixed inset-0 flex flex-col pointer-events-auto"
-        style={{ zIndex: 2147483600 }}
+        className="fixed inset-x-0 bottom-0 flex flex-col pointer-events-auto"
+        style={{ zIndex: 2147483600, top: 64 }}
       >
-        {/* Backdrop 50% sobre o cenário */}
+        {/* Backdrop 50% sobre o cenário (abaixo da barra superior, para não cobrir os controles) */}
         <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
 
         {/* Header da reunião */}
