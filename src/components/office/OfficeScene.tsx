@@ -917,23 +917,13 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
         }, REACTION_DURATION_MS);
       })
       .on("broadcast", { event: "confetti" }, (payload) => {
-        const { user_id, facing: dir } = (payload.payload ?? {}) as { user_id?: string; facing?: Facing };
-        if (!user_id || !dir) return;
+        const { user_id, facing: dir, x, y } = (payload.payload ?? {}) as { user_id?: string; facing?: Facing; x?: number; y?: number };
+        if (!user_id || !dir || typeof x !== "number" || typeof y !== "number") return;
         const ts = Date.now();
-        setConfettis((prev) => {
-          const list = prev[user_id] ? [...prev[user_id], { facing: dir, ts }] : [{ facing: dir, ts }];
-          return { ...prev, [user_id]: list };
-        });
+        const id = `${user_id}-${ts}-${Math.random().toString(36).slice(2, 7)}`;
+        setConfettis((prev) => [...prev, { id, x, y, facing: dir, ts }]);
         setTimeout(() => {
-          setConfettis((prev) => {
-            const list = prev[user_id];
-            if (!list) return prev;
-            const nextList = list.filter((c) => c.ts !== ts);
-            const next = { ...prev };
-            if (nextList.length === 0) delete next[user_id];
-            else next[user_id] = nextList;
-            return next;
-          });
+          setConfettis((prev) => prev.filter((c) => c.id !== id));
         }, 1100);
       });
     reactionChannelRef.current = reactionCh;
