@@ -915,6 +915,21 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
             return next;
           });
         }, REACTION_DURATION_MS);
+      })
+      .on("broadcast", { event: "confetti" }, (payload) => {
+        const { user_id, facing: dir } = (payload.payload ?? {}) as { user_id?: string; facing?: Facing };
+        if (!user_id || !dir) return;
+        const ts = Date.now();
+        setConfettis((prev) => ({ ...prev, [user_id]: { facing: dir, ts } }));
+        setTimeout(() => {
+          setConfettis((prev) => {
+            const cur = prev[user_id];
+            if (!cur || cur.ts !== ts) return prev;
+            const next = { ...prev };
+            delete next[user_id];
+            return next;
+          });
+        }, 1100);
       });
     reactionChannelRef.current = reactionCh;
 
