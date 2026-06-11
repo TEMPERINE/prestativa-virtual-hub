@@ -7,9 +7,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 export const Route = createFileRoute("/download")({
   head: () => ({
     meta: [
-      { title: "Baixar Prestativa Virtual Hub" },
-      { name: "description", content: "Baixe a versão mais recente do Prestativa Virtual Hub para Windows." },
-      { property: "og:title", content: "Baixar Prestativa Virtual Hub" },
+      { title: "Baixar Virtual Office" },
+      { name: "description", content: "Baixe a versão mais recente do Virtual Office para Windows." },
+      { property: "og:title", content: "Baixar Virtual Office" },
       { property: "og:description", content: "Versão mais recente para Windows." },
     ],
   }),
