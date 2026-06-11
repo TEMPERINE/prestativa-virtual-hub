@@ -4,7 +4,7 @@
 
 export type AppChannel = "beta" | "rc" | "stable";
 
-export const APP_VERSION = "1.0.0";
+export const APP_VERSION = "1.0.2";
 export const APP_CHANNEL: AppChannel = "stable";
 
 export const APP_VERSION_LABEL: string =
@@ -12,4 +12,4 @@ export const APP_VERSION_LABEL: string =
     ? `v${APP_VERSION}`
     : `v${APP_VERSION}-${APP_CHANNEL}`;
 
-export const APP_NAME = "Prestativa Virtual Office";
+export const APP_NAME = "Virtual Office";
