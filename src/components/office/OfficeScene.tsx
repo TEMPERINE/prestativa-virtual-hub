@@ -920,13 +920,18 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
         const { user_id, facing: dir } = (payload.payload ?? {}) as { user_id?: string; facing?: Facing };
         if (!user_id || !dir) return;
         const ts = Date.now();
-        setConfettis((prev) => ({ ...prev, [user_id]: { facing: dir, ts } }));
+        setConfettis((prev) => {
+          const list = prev[user_id] ? [...prev[user_id], { facing: dir, ts }] : [{ facing: dir, ts }];
+          return { ...prev, [user_id]: list };
+        });
         setTimeout(() => {
           setConfettis((prev) => {
-            const cur = prev[user_id];
-            if (!cur || cur.ts !== ts) return prev;
+            const list = prev[user_id];
+            if (!list) return prev;
+            const nextList = list.filter((c) => c.ts !== ts);
             const next = { ...prev };
-            delete next[user_id];
+            if (nextList.length === 0) delete next[user_id];
+            else next[user_id] = nextList;
             return next;
           });
         }, 1100);
