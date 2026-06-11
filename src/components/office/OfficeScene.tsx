@@ -44,7 +44,9 @@ const EMOJI_MAP: Record<string, string> = {
 };
 const REACTION_DURATION_MS = 3000;
 import { toast } from "sonner";
-import { LogOut, Mic, MicOff, Video, VideoOff, MonitorUp, Users, Pencil, User as UserIcon, MessageCircle, StickyNote, X as XIcon, Plus, Minus, Locate, ChevronLeft, ChevronRight, Footprints, UserPlus, Hand, Circle, Square, Loader2 } from "lucide-react";
+import { LogOut, Mic, MicOff, Video, VideoOff, MonitorUp, Users, Pencil, User as UserIcon, MessageCircle, StickyNote, X as XIcon, Plus, Minus, Locate, ChevronLeft, ChevronRight, Footprints, UserPlus, Hand, Circle, Square, Loader2, Smile } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import EmojiPicker, { EmojiStyle, Theme as EmojiTheme } from "emoji-picker-react";
 import { Link } from "@tanstack/react-router";
 import { useLiveKit } from "@/lib/rtc/useLiveKit";
 import { installAudioUnlockListeners, unlockAudioPlayback } from "@/lib/rtc/audio-unlock";
