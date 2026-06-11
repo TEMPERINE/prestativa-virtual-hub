@@ -73,47 +73,61 @@ export function PropsLayer({ selfX, selfY, focusedRect = null }: Props) {
   useEffect(() => {
     if (!wsId) { setFrames({}); return; }
     let cancelled = false;
+    let channel: ReturnType<typeof supabase.channel> | null = null;
     (async () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { data } = await (supabase as any)
         .from("prop_states")
         .select("prop_id, frame")
         .eq("workspace_id", wsId);
-      if (cancelled || !data) return;
-      const map: Record<string, number> = {};
-      for (const row of data as PropStateRow[]) {
-        map[row.prop_id] = row.frame;
-        // Marca tick atual como já tratado — evita disparar animação/som
-        // ao carregar o workspace (estado pré-existente não é um novo evento).
-        handledTicksRef.current[row.prop_id] = row.frame;
-      }
-      setFrames(map);
-    })();
-    const channel = supabase
-      .channel(`prop_states-${wsId}-${Date.now()}`)
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "prop_states", filter: `workspace_id=eq.${wsId}` },
-        (payload) => {
-          const row = (payload.new ?? payload.old) as PropStateRow | null;
-          if (!row?.prop_id) return;
-          if (payload.eventType === "DELETE") {
-            setFrames((p) => {
-              const n = { ...p };
-              delete n[row.prop_id];
-              return n;
-            });
-          } else {
-            setFrames((p) => ({ ...p, [row.prop_id]: row.frame }));
-          }
+      if (cancelled) return;
+      if (data) {
+        const map: Record<string, number> = {};
+        for (const row of data as PropStateRow[]) {
+          map[row.prop_id] = row.frame;
+          // Marca tick atual como já tratado — evita disparar animação/som
+          // ao carregar o workspace (estado pré-existente não é um novo evento).
+          handledTicksRef.current[row.prop_id] = row.frame;
         }
-      )
-      .subscribe();
+        setFrames(map);
+      }
+      // CRÍTICO: autenticar o websocket ANTES de assinar o canal. A tabela
+      // prop_states tem RLS; sem o JWT no realtime, o servidor descarta os
+      // eventos em silêncio e o sino "congela" (nunca recebe os ticks).
+      const { data: s } = await supabase.auth.getSession();
+      if (cancelled) return;
+      if (s.session?.access_token) {
+        try { await supabase.realtime.setAuth(s.session.access_token); } catch { /* noop */ }
+      }
+      if (cancelled) return;
+      channel = supabase
+        .channel(`prop_states-${wsId}-${Date.now()}`)
+        .on(
+          "postgres_changes",
+          { event: "*", schema: "public", table: "prop_states", filter: `workspace_id=eq.${wsId}` },
+          (payload) => {
+            const row = (payload.new ?? payload.old) as PropStateRow | null;
+            console.log("[PropsLayer] realtime event:", payload.eventType, row);
+            if (!row?.prop_id) return;
+            if (payload.eventType === "DELETE") {
+              setFrames((p) => {
+                const n = { ...p };
+                delete n[row.prop_id];
+                return n;
+              });
+            } else {
+              setFrames((p) => ({ ...p, [row.prop_id]: row.frame }));
+            }
+          }
+        )
+        .subscribe();
+    })();
     return () => {
       cancelled = true;
-      supabase.removeChannel(channel);
+      if (channel) supabase.removeChannel(channel);
     };
   }, [wsId]);
+
 
   useEffect(() => { publishFrames(frames); }, [frames]);
 
@@ -121,6 +135,7 @@ export function PropsLayer({ selfX, selfY, focusedRect = null }: Props) {
   // Roda animação one-shot localmente (sem persistir no servidor).
   // Reproduz def.animation.sequence e termina no restFrame.
   const playAnimation = useCallback((propId: string) => {
+    console.log("[PropsLayer] playAnimation:", propId);
     const prop = propsRef.current.find((p) => p.id === propId);
     if (!prop) return;
     const def = getPropDef(prop.defId);

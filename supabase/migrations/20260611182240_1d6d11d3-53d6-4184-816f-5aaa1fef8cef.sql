@@ -1,0 +1,1 @@
+ALTER TABLE public.prop_states REPLICA IDENTITY FULL;
