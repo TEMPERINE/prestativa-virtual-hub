@@ -115,6 +115,23 @@ export function PropsLayer({ selfX, selfY, focusedRect = null }: Props) {
           setFrames((p) => ({ ...p, [propId]: tick }));
         },
       );
+      // Compatibilidade retroativa: clientes antigos (ex.: app desktop com a
+      // versão publicada) ainda sincronizam via UPDATE em prop_states. Escutar
+      // postgres_changes garante interop nos dois sentidos até todo mundo
+      // estar na versão com broadcast. Duplicatas são ignoradas: mesmo tick
+      // não altera o estado e handledTicksRef impede re-animação.
+      channel.on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "prop_states", filter: `workspace_id=eq.${wsId}` },
+        (payload) => {
+          const row = (payload.new ?? {}) as { prop_id?: string; frame?: number };
+          const propId = row.prop_id;
+          const frame = row.frame;
+          if (!propId || typeof frame !== "number") return;
+          console.log("[PropsLayer] pg_changes prop_state:", propId, frame);
+          setFrames((p) => (p[propId] === frame ? p : { ...p, [propId]: frame }));
+        },
+      );
       channel.subscribe((status) => {
         console.log("[PropsLayer] broadcast channel status:", status);
       });
