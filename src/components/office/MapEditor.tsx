@@ -1651,6 +1651,15 @@ export function MapEditor() {
                             {pi.interactive ? <Zap size={12} /> : <ZapOff size={12} />}
                           </button>
                         )}
+                        {(pi.rotation ?? 0) !== 0 && (
+                          <button
+                            onClick={() => updateProp(pi.id, { rotation: 0 })}
+                            title="Zerar rotação"
+                            className="p-1 rounded text-muted-foreground hover:bg-muted font-mono text-[10px]"
+                          >
+                            {Math.round(pi.rotation ?? 0)}°
+                          </button>
+                        )}
                         <button
                           onClick={() => removeProp(pi.id)}
                           title="Remover"
