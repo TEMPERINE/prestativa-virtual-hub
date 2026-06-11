@@ -1887,13 +1887,18 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
     if (!uid) return;
     const dir = facingRef.current;
     const ts = Date.now();
-    setConfettis((prev) => ({ ...prev, [uid]: { facing: dir, ts } }));
+    setConfettis((prev) => {
+      const list = prev[uid] ? [...prev[uid], { facing: dir, ts }] : [{ facing: dir, ts }];
+      return { ...prev, [uid]: list };
+    });
     setTimeout(() => {
       setConfettis((prev) => {
-        const cur = prev[uid];
-        if (!cur || cur.ts !== ts) return prev;
+        const list = prev[uid];
+        if (!list) return prev;
+        const nextList = list.filter((c) => c.ts !== ts);
         const next = { ...prev };
-        delete next[uid];
+        if (nextList.length === 0) delete next[uid];
+        else next[uid] = nextList;
         return next;
       });
     }, 1100);
