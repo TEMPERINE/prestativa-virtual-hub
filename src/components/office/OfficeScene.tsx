@@ -1960,6 +1960,9 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
     const up = (e: KeyboardEvent) => {
       const dir = dirFromKey(e.key.toLowerCase());
       if (!dir) return;
+      const target = e.target as HTMLElement | null;
+      const tag = target?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || target?.isContentEditable) return;
       e.preventDefault();
       keysDown.current.delete(dir);
       if (lastDir.current === dir) {
