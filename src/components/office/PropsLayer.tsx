@@ -117,6 +117,14 @@ export function PropsLayer({ selfX, selfY, focusedRect = null }: Props) {
     if (!anim) return;
     // se já está animando, ignora (não acumula)
     if (animTimersRef.current[propId]) return;
+    // Som: cada disparo cria uma nova instância para sobrepor sem cortar.
+    if (def?.soundUrl) {
+      try {
+        const audio = new Audio(def.soundUrl);
+        audio.volume = 0.9;
+        void audio.play().catch(() => { /* autoplay bloqueado */ });
+      } catch { /* noop */ }
+    }
     const rest = anim.restFrame ?? 0;
     let i = 0;
     const step = () => {
