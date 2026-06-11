@@ -2557,6 +2557,26 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
           />
         ))}
 
+        {/* Confetti bursts — anchored at the launch position, do NOT follow the avatar */}
+        {confettis.map((c) => (
+          <div
+            key={c.id}
+            className="absolute pointer-events-none"
+            style={{
+              left: `${c.x * 100}%`,
+              top: `${c.y * 100}%`,
+              // Match the avatar's vertical anchor (translate -50%, -90%) so the
+              // burst originates from the character's body, not their feet.
+              transform: "translate(-50%, -90%)",
+              zIndex: Math.round(c.y * 1000) + 1,
+            }}
+          >
+            <ConfettiBurst facing={c.facing} burstKey={c.ts} />
+          </div>
+        ))}
+
+
+
 
         {/* Desk notes (post-it gifts) sitting on workstations */}
         {notes.map((n) => {
