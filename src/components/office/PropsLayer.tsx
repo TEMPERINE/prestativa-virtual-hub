@@ -327,6 +327,7 @@ export function PropsLayer({ selfX, selfY, focusedRect = null }: Props) {
         const refY = p.y - hNorm * (1 - (def.depthRefY ?? 1));
         const focusOffset = focusedRect && def.foregroundWhenFocused ? 60000 : 0;
         const zIndex = focusOffset + Math.max(1, Math.round(refY * 1000));
+        const rot = p.rotation ?? 0;
         return (
           <img
             key={p.id}
@@ -339,7 +340,8 @@ export function PropsLayer({ selfX, selfY, focusedRect = null }: Props) {
               top: `${p.y * 100}%`,
               width: `${wPct}%`,
               height: `${hPct}%`,
-              transform: "translate(-50%, -100%)",
+              transform: `translate(-50%, -100%) rotate(${rot}deg)`,
+              transformOrigin: "50% 100%",
               objectFit: "contain",
               objectPosition: "bottom center",
               zIndex,

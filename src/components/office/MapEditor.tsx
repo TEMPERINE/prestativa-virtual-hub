@@ -455,6 +455,15 @@ export function MapEditor() {
         anchorTop: number;
         aspect: number;
       }
+    | {
+        id: string;
+        mode: "rotate";
+        pivotPxX: number;   // pivô em px (clientX-relative ao stage)
+        pivotPxY: number;
+        startAngle: number; // graus do vetor pivô→cursor no início
+        startRot: number;   // rotação do prop no início
+        fine: boolean;      // shift = controle fino
+      }
     | null
   >(null);
   const [ghostPos, setGhostPos] = useState<{ x: number; y: number } | null>(null);
@@ -1383,7 +1392,7 @@ export function MapEditor() {
                     x: Math.max(0, Math.min(1, nx + drag.offX)),
                     y: Math.max(0, Math.min(1, ny + drag.offY)),
                   });
-                } else {
+                } else if (drag.mode === "resize") {
                   const newW = Math.max(0.01, Math.min(0.8, nx - drag.anchorLeft));
                   const newH = newW / drag.aspect;
                   updateProp(drag.id, {
@@ -1391,6 +1400,19 @@ export function MapEditor() {
                     x: drag.anchorLeft + newW / 2,
                     y: drag.anchorTop + newH,
                   });
+                } else {
+                  // rotate: ângulo do vetor pivô→cursor (em px do stage)
+                  const dx = e.clientX - rect.left - drag.pivotPxX;
+                  const dy = e.clientY - rect.top - drag.pivotPxY;
+                  const cur = (Math.atan2(dy, dx) * 180) / Math.PI;
+                  let delta = cur - drag.startAngle;
+                  if (drag.fine || e.shiftKey) delta *= 0.25; // controle sensível
+                  let next = drag.startRot + delta;
+                  // snap suave a múltiplos de 15° quando Alt
+                  if (e.altKey) next = Math.round(next / 15) * 15;
+                  // normaliza para -180..180
+                  next = ((next + 180) % 360 + 360) % 360 - 180;
+                  updateProp(drag.id, { rotation: next });
                 }
                 return;
               }
@@ -1511,7 +1533,8 @@ export function MapEditor() {
                     top: `${pi.y * 100}%`,
                     width: `${wPct}%`,
                     height: `${hPct}%`,
-                    transform: "translate(-50%, -100%)",
+                    transform: `translate(-50%, -100%) rotate(${pi.rotation ?? 0}deg)`,
+                    transformOrigin: "50% 100%",
                     zIndex: 30000 + Math.round(pi.y * 5000),
                     cursor: !isGhost && tool.kind === "select" ? "move" : "default",
                     pointerEvents: !isGhost && tool.kind === "select" ? "auto" : "none",
@@ -1574,6 +1597,36 @@ export function MapEditor() {
                           (stageRef.current as Element | null)?.setPointerCapture?.(e.pointerId);
                         }}
                       />
+                      {/* Rotation handles — cantos superiores. Pivô = base do prop.
+                          Shift = controle fino (sensível). Alt = snap 15°. */}
+                      {(["left", "right"] as const).map((side) => (
+                        <div
+                          key={side}
+                          className={`absolute -top-1 ${side === "left" ? "-left-1" : "-right-1"} w-3 h-3 rounded-full bg-card border-2 border-primary cursor-grab active:cursor-grabbing`}
+                          title="Arrastar p/ rotacionar · Shift = fino · Alt = snap 15°"
+                          onPointerDown={(e) => {
+                            e.stopPropagation();
+                            if (!stageRef.current) return;
+                            const rect = stageRef.current.getBoundingClientRect();
+                            // pivô = base do prop (pi.x, pi.y) em px do stage
+                            const pivotPxX = pi.x * rect.width;
+                            const pivotPxY = pi.y * rect.height;
+                            const dx = e.clientX - rect.left - pivotPxX;
+                            const dy = e.clientY - rect.top - pivotPxY;
+                            const startAngle = (Math.atan2(dy, dx) * 180) / Math.PI;
+                            draggingPropRef.current = {
+                              id: pi.id,
+                              mode: "rotate",
+                              pivotPxX,
+                              pivotPxY,
+                              startAngle,
+                              startRot: pi.rotation ?? 0,
+                              fine: e.shiftKey,
+                            };
+                            (stageRef.current as Element | null)?.setPointerCapture?.(e.pointerId);
+                          }}
+                        />
+                      ))}
                       {/* Toolbar flutuante */}
                       <div
                         className="absolute left-1/2 -translate-x-1/2 -top-7 flex items-center gap-1 bg-card border border-border rounded px-1 py-0.5 shadow-soft text-xs whitespace-nowrap"
@@ -1596,6 +1649,15 @@ export function MapEditor() {
                             className={`p-1 rounded ${pi.interactive ? "text-primary" : "text-muted-foreground"} hover:bg-muted`}
                           >
                             {pi.interactive ? <Zap size={12} /> : <ZapOff size={12} />}
+                          </button>
+                        )}
+                        {(pi.rotation ?? 0) !== 0 && (
+                          <button
+                            onClick={() => updateProp(pi.id, { rotation: 0 })}
+                            title="Zerar rotação"
+                            className="p-1 rounded text-muted-foreground hover:bg-muted font-mono text-[10px]"
+                          >
+                            {Math.round(pi.rotation ?? 0)}°
                           </button>
                         )}
                         <button
