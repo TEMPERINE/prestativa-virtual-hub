@@ -1597,6 +1597,36 @@ export function MapEditor() {
                           (stageRef.current as Element | null)?.setPointerCapture?.(e.pointerId);
                         }}
                       />
+                      {/* Rotation handles — cantos superiores. Pivô = base do prop.
+                          Shift = controle fino (sensível). Alt = snap 15°. */}
+                      {(["left", "right"] as const).map((side) => (
+                        <div
+                          key={side}
+                          className={`absolute -top-1 ${side === "left" ? "-left-1" : "-right-1"} w-3 h-3 rounded-full bg-card border-2 border-primary cursor-grab active:cursor-grabbing`}
+                          title="Arrastar p/ rotacionar · Shift = fino · Alt = snap 15°"
+                          onPointerDown={(e) => {
+                            e.stopPropagation();
+                            if (!stageRef.current) return;
+                            const rect = stageRef.current.getBoundingClientRect();
+                            // pivô = base do prop (pi.x, pi.y) em px do stage
+                            const pivotPxX = pi.x * rect.width;
+                            const pivotPxY = pi.y * rect.height;
+                            const dx = e.clientX - rect.left - pivotPxX;
+                            const dy = e.clientY - rect.top - pivotPxY;
+                            const startAngle = (Math.atan2(dy, dx) * 180) / Math.PI;
+                            draggingPropRef.current = {
+                              id: pi.id,
+                              mode: "rotate",
+                              pivotPxX,
+                              pivotPxY,
+                              startAngle,
+                              startRot: pi.rotation ?? 0,
+                              fine: e.shiftKey,
+                            };
+                            (stageRef.current as Element | null)?.setPointerCapture?.(e.pointerId);
+                          }}
+                        />
+                      ))}
                       {/* Toolbar flutuante */}
                       <div
                         className="absolute left-1/2 -translate-x-1/2 -top-7 flex items-center gap-1 bg-card border border-border rounded px-1 py-0.5 shadow-soft text-xs whitespace-nowrap"
