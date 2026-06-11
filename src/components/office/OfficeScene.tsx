@@ -2559,10 +2559,9 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
 
         {/* Confetti bursts — anchored at the launch position, do NOT follow the avatar */}
         {confettis.map((c) => {
-          // For side-facing bursts, raise the origin to the shoulders instead
-          // of the feet so the confetti doesn't appear to come from the floor.
-          const isSide = c.facing === "left" || c.facing === "right";
-          const yOffsetPx = isSide ? -28 : 0;
+          // Raise the origin to the shoulders so the confetti doesn't appear
+          // to come from the floor, regardless of facing direction.
+          const yOffsetPx = -28;
           return (
             <div
               key={c.id}
