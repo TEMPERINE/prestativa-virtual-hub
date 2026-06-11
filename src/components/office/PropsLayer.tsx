@@ -107,12 +107,75 @@ export function PropsLayer({ selfX, selfY, focusedRect = null }: Props) {
   useEffect(() => { publishFrames(frames); }, [frames]);
 
 
+  // Roda animação one-shot localmente (sem persistir no servidor).
+  // Reproduz def.animation.sequence e termina no restFrame.
+  const playAnimation = useCallback((propId: string) => {
+    const prop = propsRef.current.find((p) => p.id === propId);
+    if (!prop) return;
+    const def = getPropDef(prop.defId);
+    const anim = def?.animation;
+    if (!anim) return;
+    // se já está animando, ignora (não acumula)
+    if (animTimersRef.current[propId]) return;
+    const rest = anim.restFrame ?? 0;
+    let i = 0;
+    const step = () => {
+      if (i >= anim.sequence.length) {
+        delete animTimersRef.current[propId];
+        setAnimFrames((p) => {
+          const n = { ...p };
+          delete n[propId];
+          return n;
+        });
+        return;
+      }
+      setAnimFrames((p) => ({ ...p, [propId]: anim.sequence[i] }));
+      i++;
+      animTimersRef.current[propId] = window.setTimeout(step, anim.frameMs);
+    };
+    setAnimFrames((p) => ({ ...p, [propId]: rest }));
+    animTimersRef.current[propId] = window.setTimeout(step, 0);
+  }, []);
+
+  // Cleanup timers no unmount
+  useEffect(() => {
+    return () => {
+      for (const id of Object.keys(animTimersRef.current)) {
+        window.clearTimeout(animTimersRef.current[id]);
+      }
+      animTimersRef.current = {};
+    };
+  }, []);
+
   // Ação de interação reutilizável (chamada pelo teclado e pelo botão flutuante)
   const triggerInteract = useCallback((prop: PropInstance) => {
     const def = getPropDef(prop.defId);
     if (!def?.interactive) return;
     const ws = getCurrentWorkspaceId();
     if (!ws) return;
+    // Animação one-shot: dispara local e broadcasta um "tick" via upsert.
+    // Cada clique incrementa um contador no campo frame para garantir que
+    // o realtime envie o evento mesmo se o valor não mudou.
+    if (def.animation) {
+      playAnimation(prop.id);
+      void (async () => {
+        const { data: u } = await supabase.auth.getUser();
+        const tick = ((frames[prop.id] ?? 0) % 1_000_000) + 1;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { error } = await (supabase as any).from("prop_states").upsert(
+          {
+            workspace_id: ws,
+            prop_id: prop.id,
+            frame: tick,
+            updated_by: u.user?.id ?? null,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: "workspace_id,prop_id" }
+        );
+        if (error) console.error("[PropsLayer] upsert prop_states failed:", error);
+      })();
+      return;
+    }
     setFrames((p) => {
       const cur = p[prop.id] ?? 0;
       const next = (cur + 1) % def.frames.length;
@@ -133,7 +196,20 @@ export function PropsLayer({ selfX, selfY, focusedRect = null }: Props) {
       })();
       return { ...p, [prop.id]: next };
     });
-  }, []);
+  }, [frames, playAnimation]);
+
+  // Dispara animação local quando o frame remoto muda em props animados.
+  useEffect(() => {
+    for (const prop of propsList) {
+      const def = getPropDef(prop.defId);
+      if (!def?.animation) continue;
+      const f = frames[prop.id];
+      if (f !== undefined && f !== (def.animation.restFrame ?? 0)) {
+        playAnimation(prop.id);
+      }
+    }
+  }, [frames, propsList, playAnimation]);
+
 
   // Prop interativo mais próximo dentro do raio — usado pelo botão flutuante
   const nearestInteractive = useMemo(() => {
