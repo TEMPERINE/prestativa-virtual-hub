@@ -2876,7 +2876,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
                       onEmojiClick={(e) => {
                         setComposeText((prev) => (prev + e.emoji).slice(0, 280));
                       }}
-                      emojiStyle={EmojiStyle.NATIVE}
+                      emojiStyle={EmojiStyle.APPLE}
                       theme={EmojiTheme.LIGHT}
                       width={320}
                       height={380}
