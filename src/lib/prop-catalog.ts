@@ -35,6 +35,9 @@ export type PropDef = {
     frameMs: number;    // duração de cada frame
     restFrame?: number; // frame de repouso (default 0)
   };
+  /** URL de som tocado a cada interação. Múltiplos cliques se sobrepõem
+   *  (cada clique cria uma nova instância de Audio sem cortar a anterior). */
+  soundUrl?: string;
 };
 
 export const BUILTIN_PROPS: PropDef[] = [
