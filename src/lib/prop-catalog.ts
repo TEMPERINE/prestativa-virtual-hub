@@ -4,6 +4,11 @@
 
 import doorClosed from "@/assets/props/door-closed.png.asset.json";
 import doorOpen from "@/assets/props/door-open.png.asset.json";
+import bell1 from "@/assets/props/bell-1.png.asset.json";
+import bell2 from "@/assets/props/bell-2.png.asset.json";
+import bell3 from "@/assets/props/bell-3.png.asset.json";
+import bell4 from "@/assets/props/bell-4.png.asset.json";
+import bell5 from "@/assets/props/bell-5.png.asset.json";
 
 export type PropDef = {
   id: string;
@@ -22,6 +27,13 @@ export type PropDef = {
   foregroundWhenFocused?: boolean;
   /** Elementos carregados pelo usuário (galeria personalizada). */
   custom?: boolean;
+  /** Animação one-shot disparada pela interação. Em vez de ciclar frames,
+   *  reproduz a sequência localmente e retorna ao frame de repouso. */
+  animation?: {
+    sequence: number[]; // índices dentro de frames[] a exibir em ordem
+    frameMs: number;    // duração de cada frame
+    restFrame?: number; // frame de repouso (default 0)
+  };
 };
 
 export const BUILTIN_PROPS: PropDef[] = [
@@ -36,6 +48,29 @@ export const BUILTIN_PROPS: PropDef[] = [
     // meio do conteúdo visível: o alfa do PNG vai de y=56 a y=284 em 293px
     depthRefY: 0.58,
     foregroundWhenFocused: true,
+  },
+  {
+    id: "bell",
+    label: "Sino de Resultados",
+    // 0 = repouso (idle); 1..4 = poses de balanço usadas na animação
+    frames: [bell1.url, bell2.url, bell3.url, bell4.url, bell5.url],
+    defaultW: 0.06,
+    aspectRatio: 200 / 240, // canvas normalizado dos frames
+    interactive: true,
+    interactKey: "x",
+    depthRefY: 0.5,
+    foregroundWhenFocused: true,
+    animation: {
+      // 3 badaladas: balança esquerda↔direita usando os frames de pose,
+      // retornando ao centro entre cada uma.
+      sequence: [
+        2, 0, 3, 0,
+        2, 0, 3, 0,
+        2, 0, 3, 0,
+      ],
+      frameMs: 110,
+      restFrame: 0,
+    },
   },
 ];
 
