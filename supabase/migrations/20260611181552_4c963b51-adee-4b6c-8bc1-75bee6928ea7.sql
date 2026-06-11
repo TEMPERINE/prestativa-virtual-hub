@@ -1,0 +1,1 @@
+UPDATE public.prop_states SET frame = frame + 1, updated_at = now() WHERE workspace_id = '1a7cf2bb-3299-468a-b5a1-e298d6a2f0f7' AND prop_id = 'prop-mq9ll9v4-v0q7';
