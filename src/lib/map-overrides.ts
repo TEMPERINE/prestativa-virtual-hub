@@ -24,7 +24,6 @@ export type PropInstance = {
   interactive: boolean;  // toggle pelo editor
   frame?: number;        // frame inicial padrão (se não houver prop_state remoto)
   actions?: PropAction[]; // efeitos do prop sobre o mundo (ex.: trancar sala)
-  rotation?: number;     // graus, pivô = base inferior (ancoragem do prop)
 };
 
 export type MapOverrides = {
