@@ -23,11 +23,12 @@
     },
     "nsis": {
       "oneClick": false,
-      "perMachine": false,
+      "perMachine": true,
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "Virtual Office"
+      "shortcutName": "Virtual Office",
+      "include": "build/installer.nsh"
     },
     "publish": [
       {
