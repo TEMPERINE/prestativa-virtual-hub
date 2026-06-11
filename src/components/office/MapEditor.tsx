@@ -1392,7 +1392,7 @@ export function MapEditor() {
                     x: Math.max(0, Math.min(1, nx + drag.offX)),
                     y: Math.max(0, Math.min(1, ny + drag.offY)),
                   });
-                } else {
+                } else if (drag.mode === "resize") {
                   const newW = Math.max(0.01, Math.min(0.8, nx - drag.anchorLeft));
                   const newH = newW / drag.aspect;
                   updateProp(drag.id, {
@@ -1400,6 +1400,19 @@ export function MapEditor() {
                     x: drag.anchorLeft + newW / 2,
                     y: drag.anchorTop + newH,
                   });
+                } else {
+                  // rotate: ângulo do vetor pivô→cursor (em px do stage)
+                  const dx = e.clientX - rect.left - drag.pivotPxX;
+                  const dy = e.clientY - rect.top - drag.pivotPxY;
+                  const cur = (Math.atan2(dy, dx) * 180) / Math.PI;
+                  let delta = cur - drag.startAngle;
+                  if (drag.fine || e.shiftKey) delta *= 0.25; // controle sensível
+                  let next = drag.startRot + delta;
+                  // snap suave a múltiplos de 15° quando Alt
+                  if (e.altKey) next = Math.round(next / 15) * 15;
+                  // normaliza para -180..180
+                  next = ((next + 180) % 360 + 360) % 360 - 180;
+                  updateProp(drag.id, { rotation: next });
                 }
                 return;
               }
