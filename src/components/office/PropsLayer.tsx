@@ -30,6 +30,9 @@ export function PropsLayer({ selfX, selfY, focusedRect = null }: Props) {
   // Ticks já processados localmente — evita que o eco realtime do nosso
   // próprio clique reinicie a animação no meio.
   const handledTicksRef = useRef<Record<string, number>>({});
+  // Último tick que ESTE cliente já enviou para o servidor — usado para
+  // calcular o próximo tick sem depender do eco do realtime voltar primeiro.
+  const lastSentTickRef = useRef<Record<string, number>>({});
   const [, setCatalogVersion] = useState(0);
   const selfRef = useRef({ x: selfX, y: selfY });
   selfRef.current = { x: selfX, y: selfY };
