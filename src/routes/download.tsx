@@ -138,9 +138,92 @@ function DownloadPage() {
               </>
             )}
 
+
             <p className="text-xs text-muted-foreground text-center pt-2">
               Após instalado, o aplicativo se atualiza automaticamente quando novas versões forem publicadas.
             </p>
+          </CardContent>
+        </Card>
+
+        {/* Windows SmartScreen Installation Guide */}
+        <Card className="w-full mt-8 border bg-background/60 shadow-sm rounded-2xl overflow-hidden">
+          <CardHeader className="bg-amber-50/50 dark:bg-amber-950/10 border-b border-amber-100/50 dark:border-amber-950/20 py-4 flex flex-row items-center gap-3">
+            <div className="p-2 rounded-lg bg-amber-100 dark:bg-amber-950 text-amber-600 dark:text-amber-400">
+              <ShieldAlert className="h-5 w-5" />
+            </div>
+            <div>
+              <CardTitle className="text-base font-semibold text-amber-800 dark:text-amber-400">
+                Aviso de "Editor Desconhecido" no Windows?
+              </CardTitle>
+              <CardDescription className="text-xs text-amber-700/80 dark:text-amber-500/80">
+                Por ser um executável recém-compilado, o Windows SmartScreen pode alertar sobre a instalação.
+              </CardDescription>
+            </div>
+          </CardHeader>
+          <CardContent className="p-6 space-y-6">
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              Isso é normal para novos aplicativos que ainda não possuem um certificado pago digital. O app é <strong>100% seguro</strong>. Veja o passo a passo ilustrado para instalar normalmente:
+            </p>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
+              {/* Step 1 */}
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">1</span>
+                  <h4 className="text-sm font-semibold">Clique em "Mais informações"</h4>
+                </div>
+                
+                {/* Mock Windows Protected PC Blue Box Step 1 */}
+                <div className="bg-[#0078d4] text-white p-4 rounded-lg font-sans shadow-md border border-[#005a9e] text-xs space-y-3">
+                  <div className="font-semibold text-[14px]">O Windows protegeu o computador</div>
+                  <p className="opacity-90 text-[11px] leading-relaxed">
+                    O Microsoft Defender SmartScreen impediu o início de um aplicativo não reconhecido...
+                  </p>
+                  <div>
+                    <span className="underline cursor-pointer font-semibold text-[11px] text-white hover:text-blue-100 inline-flex items-center gap-1">
+                      Mais informações <ChevronRight className="h-3 w-3 animate-pulse" />
+                    </span>
+                  </div>
+                  <div className="flex justify-end pt-2">
+                    <span className="bg-white/20 px-4 py-1 border border-white/40 cursor-default text-[11px]">Não executar</span>
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground italic text-center">
+                  Clique no link sublinhado na tela azul.
+                </p>
+              </div>
+
+              {/* Step 2 */}
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">2</span>
+                  <h4 className="text-sm font-semibold">Clique em "Executar assim mesmo"</h4>
+                </div>
+
+                {/* Mock Windows Protected PC Blue Box Step 2 */}
+                <div className="bg-[#0078d4] text-white p-4 rounded-lg font-sans shadow-md border border-[#005a9e] text-xs space-y-3">
+                  <div className="font-semibold text-[14px]">O Windows protegeu o computador</div>
+                  <p className="opacity-90 text-[11px] leading-relaxed">
+                    O Microsoft Defender SmartScreen impediu o início de um aplicativo não reconhecido...
+                  </p>
+                  <div className="text-[11px] space-y-0.5 bg-black/10 p-2 rounded">
+                    <div><span className="opacity-70">Aplicativo:</span> VirtualOfficeSetup.exe</div>
+                    <div><span className="opacity-70">Fornecedor:</span> Editor desconhecido</div>
+                  </div>
+                  <div className="flex justify-end gap-2 pt-2">
+                    <span className="bg-white text-[#0078d4] font-semibold px-4 py-1 border border-transparent shadow cursor-default text-[11px] ring-2 ring-white/50">
+                      Executar assim mesmo
+                    </span>
+                    <span className="bg-white/20 px-4 py-1 border border-white/40 cursor-default text-[11px]">
+                      Não executar
+                    </span>
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground italic text-center">
+                  O botão "Executar assim mesmo" surgirá para iniciar a instalação.
+                </p>
+              </div>
+            </div>
           </CardContent>
         </Card>
       </div>
