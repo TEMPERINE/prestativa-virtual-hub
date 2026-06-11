@@ -1,11 +1,17 @@
-# Changelog — Prestativa Virtual Office
+# Changelog — Virtual Office
 
 Formato: [SemVer](https://semver.org/lang/pt-BR/) + canal (`-beta`, `-rc`, estável).
 Atualize `src/lib/version.ts` ao publicar uma nova versão.
 
+## v1.0.2 — 2026-06-11
+
+### Alterado
+- Renomeado o produto para **Virtual Office** em todas as referências visíveis (instalador, atalho, janela, metadados, página de download).
+- Efeito de confete com a tecla **F** (sai do personagem na direção em que ele está olhando).
+
 ## v1.0.0 — 2026-06-11
 
-Primeira versão estável do Prestativa Virtual Office.
+Primeira versão estável do Virtual Office.
 
 ### Adicionado
 - Suporte a até 12 participantes simultâneos em reuniões via LiveKit.

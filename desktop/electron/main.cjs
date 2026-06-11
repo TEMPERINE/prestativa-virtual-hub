@@ -1,4 +1,4 @@
-// Prestativa Virtual Office — Electron main process
+// Virtual Office — Electron main process
 // Boas práticas: contextIsolation + nodeIntegration:false + sandbox + CSP.
 // Carrega a URL publicada (web app) e adiciona capacidades nativas via preload.
 
@@ -31,7 +31,7 @@ function createWindow() {
     minWidth: 1024,
     minHeight: 640,
     backgroundColor: "#0b0b12",
-    title: "Prestativa Virtual",
+    title: "Virtual Office",
     icon: path.join(__dirname, "..", "build", "icon.ico"),
     autoHideMenuBar: true,
     webPreferences: {
@@ -110,7 +110,7 @@ ipcMain.handle("prestativa:get-screen-source-id", async () => {
     types: ["window", "screen"],
   });
   const own =
-    sources.find((s) => s.name.includes("Prestativa")) ?? sources[0];
+    sources.find((s) => s.name.includes("Virtual Office") || s.name.includes("Prestativa")) ?? sources[0];
   return own ? own.id : null;
 });
 

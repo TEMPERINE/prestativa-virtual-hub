@@ -9,7 +9,7 @@ import { getPlanInfo, type AccountPlan, DEFAULT_PLAN } from "@/lib/account/plans
 import { VersionBadge } from "@/components/VersionBadge";
 
 export const Route = createFileRoute("/_authenticated/workspaces/")({
-  head: () => ({ meta: [{ title: "Seus espaços — Prestativa Office" }] }),
+  head: () => ({ meta: [{ title: "Seus espaços — Virtual Office" }] }),
   component: WorkspacesHubPage,
 });
 
@@ -153,7 +153,7 @@ function WorkspacesHubPage() {
               <span className="text-primary-foreground font-bold">P</span>
             </div>
             <div>
-              <div className="text-xs uppercase tracking-wider text-muted-foreground">Prestativa Virtual Office</div>
+              <div className="text-xs uppercase tracking-wider text-muted-foreground">Virtual Office</div>
               <div className="text-sm font-medium flex items-center gap-2 flex-wrap">
                 <span>Olá, {profile?.display_name ?? "—"} 👋</span>
                 {profile && (

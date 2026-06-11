@@ -7,9 +7,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 export const Route = createFileRoute("/download")({
   head: () => ({
     meta: [
-      { title: "Baixar Prestativa Virtual Hub" },
-      { name: "description", content: "Baixe a versão mais recente do Prestativa Virtual Hub para Windows." },
-      { property: "og:title", content: "Baixar Prestativa Virtual Hub" },
+      { title: "Baixar Virtual Office" },
+      { name: "description", content: "Baixe a versão mais recente do Virtual Office para Windows." },
+      { property: "og:title", content: "Baixar Virtual Office" },
       { property: "og:description", content: "Versão mais recente para Windows." },
     ],
   }),
@@ -61,7 +61,7 @@ function DownloadPage() {
     <div className="min-h-screen bg-background flex items-center justify-center p-6">
       <Card className="max-w-2xl w-full">
         <CardHeader>
-          <CardTitle className="text-3xl">Prestativa Virtual Hub</CardTitle>
+          <CardTitle className="text-3xl">Virtual Office</CardTitle>
           <CardDescription>Baixe a versão mais recente para Windows</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">

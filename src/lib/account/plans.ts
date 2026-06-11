@@ -1,6 +1,6 @@
 // Planos de CONTA do Virtual Office (separado do nível do ESPAÇO).
 //
-// O usuário tem uma conta Prestativa Virtual Office com perfil + personagem
+// O usuário tem uma conta Virtual Office com perfil + personagem
 // e UM ou MAIS espaços. Cada plano de conta define quais NÍVEIS de
 // espaço ele pode criar/operar:
 //

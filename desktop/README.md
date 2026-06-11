@@ -1,4 +1,4 @@
-# Prestativa Virtual — Desktop (Windows)
+# Virtual Office — Desktop (Windows)
 
 Casca **Electron** que empacota o app web em um `.exe` instalável,
 com **gravação de tela sem diálogo** e **auto-update** via GitHub Releases.
@@ -63,7 +63,7 @@ npm run dist:win
 ```
 
 Saída em `dist/`:
-- `Prestativa Virtual Setup X.Y.Z.exe` — instalador
+- `Virtual Office Setup X.Y.Z.exe` — instalador
 - `latest.yml` — manifesto para o auto-updater
 
 Para apenas empacotar sem instalador (mais rápido, gera pasta portável):
