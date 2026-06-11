@@ -65,14 +65,13 @@ export const BUILTIN_PROPS: PropDef[] = [
     depthRefY: 0.5,
     foregroundWhenFocused: true,
     animation: {
-      // 3 badaladas: balança esquerda↔direita usando os frames de pose,
-      // retornando ao centro entre cada uma.
+      // 3 loops dos 5 frames na ordem: 1→2→3→4→5
       sequence: [
-        2, 0, 3, 0,
-        2, 0, 3, 0,
-        2, 0, 3, 0,
+        0, 1, 2, 3, 4,
+        0, 1, 2, 3, 4,
+        0, 1, 2, 3, 4,
       ],
-      frameMs: 110,
+      frameMs: 90,
       restFrame: 0,
     },
     soundUrl: bellSound.url,
