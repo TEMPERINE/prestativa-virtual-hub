@@ -46,7 +46,7 @@ const REACTION_DURATION_MS = 3000;
 import { toast } from "sonner";
 import { LogOut, Mic, MicOff, Video, VideoOff, MonitorUp, Users, Pencil, User as UserIcon, MessageCircle, StickyNote, X as XIcon, Plus, Minus, Locate, ChevronLeft, ChevronRight, Footprints, UserPlus, Hand, Circle, Square, Loader2 } from "lucide-react";
 import { Link } from "@tanstack/react-router";
-import { useRtcMesh } from "@/lib/rtc/useRtcMesh";
+import { useLiveKit } from "@/lib/rtc/useLiveKit";
 import { installAudioUnlockListeners, unlockAudioPlayback } from "@/lib/rtc/audio-unlock";
 import { RemoteVideoTiles } from "./RemoteVideoTiles";
 import { CamPreviewAndPicker } from "./CamPreviewAndPicker";
@@ -491,7 +491,16 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
   }, [me?.id, positions, presentPeerIds, pos, zone]);
 
 
-  const rtc = useRtcMesh(me?.id ?? null, desiredPeers);
+  // SFU LiveKit: one room per (workspace, zone). Lobby = single shared room
+  // per workspace; private zones isolate naturally. Replaces the P2P mesh.
+  const roomKey = useMemo(() => {
+    if (!me?.id) return null;
+    const wsId = getCurrentWorkspaceId();
+    if (!wsId) return null;
+    const zoneId = zoneAt(pos).id;
+    return `ws-${wsId}::zone-${zoneId}`;
+  }, [me?.id, pos]);
+  const rtc = useLiveKit(me?.id ?? null, roomKey);
   useEffect(() => {
     connectedPeersRef.current = new Set(desiredPeers);
   }, [desiredPeers]);
