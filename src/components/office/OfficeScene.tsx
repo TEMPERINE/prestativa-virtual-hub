@@ -1939,6 +1939,12 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
       }
       const dir = dirFromKey(key);
       if (!dir) return;
+      // Não capturar setas/WASD quando o usuário está digitando em um input/textarea
+      {
+        const target = e.target as HTMLElement | null;
+        const tag = target?.tagName;
+        if (tag === "INPUT" || tag === "TEXTAREA" || target?.isContentEditable) return;
+      }
       e.preventDefault();
       if (e.repeat) return;
       // Manual movement cancels auto-walk and any active follow
