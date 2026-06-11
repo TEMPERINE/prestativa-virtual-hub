@@ -1,4 +1,4 @@
-// Prestativa Virtual Office — Electron main process
+// Virtual Office — Electron main process
 // Boas práticas: contextIsolation + nodeIntegration:false + sandbox + CSP.
 // Carrega a URL publicada (web app) e adiciona capacidades nativas via preload.
 
