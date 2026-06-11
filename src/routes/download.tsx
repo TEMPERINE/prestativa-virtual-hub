@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { Download, Loader2, Github } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import logoAsset from "@/assets/virtual-office-hero.png.asset.json";
 
 export const Route = createFileRoute("/download")({
   head: () => ({
@@ -58,76 +59,91 @@ function DownloadPage() {
   const exeAsset = release?.assets.find((a) => a.name.toLowerCase().endsWith(".exe"));
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-6">
-      <Card className="max-w-2xl w-full">
-        <CardHeader>
-          <CardTitle className="text-3xl">Virtual Office</CardTitle>
-          <CardDescription>Baixe a versão mais recente para Windows</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          {loading && (
-            <div className="flex items-center gap-2 text-muted-foreground">
-              <Loader2 className="h-4 w-4 animate-spin" />
-              Buscando última versão...
-            </div>
-          )}
-
-          {error && (
-            <div className="space-y-3">
-              <p className="text-destructive">Não foi possível carregar a versão: {error}</p>
-              <Button asChild variant="outline">
-                <a href={`https://github.com/${REPO}/releases/latest`} target="_blank" rel="noreferrer">
-                  <Github className="mr-2 h-4 w-4" /> Ver no GitHub
-                </a>
-              </Button>
-            </div>
-          )}
-
-          {release && !loading && (
-            <>
-              <div>
-                <div className="text-sm text-muted-foreground">Versão</div>
-                <div className="text-xl font-semibold">{release.tag_name}</div>
-                <div className="text-xs text-muted-foreground mt-1">
-                  Publicada em {new Date(release.published_at).toLocaleDateString("pt-BR")}
-                </div>
-              </div>
-
-              {exeAsset ? (
-                <Button asChild size="lg" className="w-full">
-                  <a href={exeAsset.browser_download_url}>
-                    <Download className="mr-2 h-5 w-5" />
-                    Baixar para Windows ({formatSize(exeAsset.size)})
-                  </a>
-                </Button>
-              ) : (
-                <p className="text-muted-foreground">Nenhum instalador .exe encontrado nesta release.</p>
-              )}
-
-              {release.body && (
-                <div>
-                  <div className="text-sm font-medium mb-2">Novidades</div>
-                  <pre className="text-xs whitespace-pre-wrap bg-muted p-3 rounded max-h-64 overflow-auto">
-                    {release.body}
-                  </pre>
-                </div>
-              )}
-
-              <div className="pt-2 border-t">
-                <Button asChild variant="ghost" size="sm">
-                  <a href={`https://github.com/${REPO}/releases`} target="_blank" rel="noreferrer">
-                    <Github className="mr-2 h-4 w-4" /> Todas as versões
-                  </a>
-                </Button>
-              </div>
-            </>
-          )}
-
-          <p className="text-xs text-muted-foreground pt-4 border-t">
-            Após instalado, o aplicativo se atualiza automaticamente quando novas versões forem publicadas.
+    <div className="min-h-screen bg-[#faf9f8] flex items-center justify-center p-6">
+      <div className="max-w-2xl w-full flex flex-col items-center">
+        <div className="text-center mb-6">
+          <img
+            src={logoAsset.url}
+            alt="Virtual Office Logo"
+            className="mx-auto h-[240px] md:h-[300px] w-auto object-contain mb-2"
+          />
+          <p className="text-sm text-muted-foreground">
+            Seu espaço virtual. Presença, proximidade, colaboração.
           </p>
-        </CardContent>
-      </Card>
+        </div>
+
+        <Card className="w-full shadow-soft border bg-background/80 backdrop-blur-sm rounded-2xl">
+          <CardHeader className="text-center">
+            <CardTitle className="text-2xl font-bold">Virtual Office</CardTitle>
+            <CardDescription>Baixe a versão mais recente para Windows</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            {loading && (
+              <div className="flex items-center justify-center gap-2 text-muted-foreground py-4">
+                <Loader2 className="h-5 w-5 animate-spin" />
+                Buscando última versão...
+              </div>
+            )}
+
+            {error && (
+              <div className="space-y-3 text-center py-4">
+                <p className="text-destructive">Não foi possível carregar a versão: {error}</p>
+                <Button asChild variant="outline">
+                  <a href={`https://github.com/${REPO}/releases/latest`} target="_blank" rel="noreferrer">
+                    <Github className="mr-2 h-4 w-4" /> Ver no GitHub
+                  </a>
+                </Button>
+              </div>
+            )}
+
+            {release && !loading && (
+              <>
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-4 rounded-xl bg-muted/40">
+                  <div>
+                    <div className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Versão Atual</div>
+                    <div className="text-xl font-bold text-foreground mt-0.5">{release.tag_name}</div>
+                    <div className="text-xs text-muted-foreground mt-1">
+                      Publicada em {new Date(release.published_at).toLocaleDateString("pt-BR")}
+                    </div>
+                  </div>
+
+                  {exeAsset ? (
+                    <Button asChild size="lg" className="gradient-primary text-primary-foreground font-semibold px-6">
+                      <a href={exeAsset.browser_download_url}>
+                        <Download className="mr-2 h-5 w-5" />
+                        Baixar para Windows ({formatSize(exeAsset.size)})
+                      </a>
+                    </Button>
+                  ) : (
+                    <p className="text-muted-foreground text-sm">Nenhum instalador .exe encontrado.</p>
+                  )}
+                </div>
+
+                {release.body && (
+                  <div className="space-y-2">
+                    <div className="text-sm font-semibold text-foreground">Novidades desta versão</div>
+                    <pre className="text-xs whitespace-pre-wrap bg-muted/60 p-4 rounded-xl max-h-48 overflow-auto border">
+                      {release.body}
+                    </pre>
+                  </div>
+                )}
+
+                <div className="pt-4 border-t flex justify-between items-center">
+                  <Button asChild variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground">
+                    <a href={`https://github.com/${REPO}/releases`} target="_blank" rel="noreferrer">
+                      <Github className="mr-2 h-4 w-4" /> Todas as versões
+                    </a>
+                  </Button>
+                </div>
+              </>
+            )}
+
+            <p className="text-xs text-muted-foreground text-center pt-2">
+              Após instalado, o aplicativo se atualiza automaticamente quando novas versões forem publicadas.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }
