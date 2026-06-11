@@ -27,6 +27,9 @@ export function PropsLayer({ selfX, selfY, focusedRect = null }: Props) {
   // Override local de frame durante animação one-shot (não persiste no servidor).
   const [animFrames, setAnimFrames] = useState<Record<string, number>>({});
   const animTimersRef = useRef<Record<string, number>>({});
+  // Ticks já processados localmente — evita que o eco realtime do nosso
+  // próprio clique reinicie a animação no meio.
+  const handledTicksRef = useRef<Record<string, number>>({});
   const [, setCatalogVersion] = useState(0);
   const selfRef = useRef({ x: selfX, y: selfY });
   selfRef.current = { x: selfX, y: selfY };
@@ -170,9 +173,10 @@ export function PropsLayer({ selfX, selfY, focusedRect = null }: Props) {
     // o realtime envie o evento mesmo se o valor não mudou.
     if (def.animation) {
       playAnimation(prop.id);
+      const tick = ((frames[prop.id] ?? 0) % 1_000_000) + 1;
+      handledTicksRef.current[prop.id] = tick;
       void (async () => {
         const { data: u } = await supabase.auth.getUser();
-        const tick = ((frames[prop.id] ?? 0) % 1_000_000) + 1;
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const { error } = await (supabase as any).from("prop_states").upsert(
           {
@@ -211,14 +215,16 @@ export function PropsLayer({ selfX, selfY, focusedRect = null }: Props) {
   }, [frames, playAnimation]);
 
   // Dispara animação local quando o frame remoto muda em props animados.
+  // Ignora ticks que nós mesmos originamos (já animados localmente).
   useEffect(() => {
     for (const prop of propsList) {
       const def = getPropDef(prop.defId);
       if (!def?.animation) continue;
       const f = frames[prop.id];
-      if (f !== undefined && f !== (def.animation.restFrame ?? 0)) {
-        playAnimation(prop.id);
-      }
+      if (f === undefined || f === (def.animation.restFrame ?? 0)) continue;
+      if (handledTicksRef.current[prop.id] === f) continue;
+      handledTicksRef.current[prop.id] = f;
+      playAnimation(prop.id);
     }
   }, [frames, propsList, playAnimation]);
 
