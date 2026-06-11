@@ -79,39 +79,24 @@ function createWindow() {
 // - Gravação da reunião usa IPC dedicado `prestativa:get-screen-source-id`
 //   (captura direto a janela do Prestativa, sem seletor).
 // - Compartilhamento de tela na chamada usa `navigator.mediaDevices.getDisplayMedia`
-//   e abre um seletor próprio do Prestativa (in-app picker) listando todas as
-//   telas e janelas com miniaturas. Tentamos primeiro o picker nativo do SO
-//   (Windows 10 22H2+/macOS 15+) e caímos no nosso quando indisponível.
+//   e SEMPRE abre o seletor de telas/janelas (estilo Windows) antes de
+//   compartilhar. Nunca compartilha automaticamente.
+//   Obs.: o Electron 32 não expõe o picker nativo do SO no Windows, então o
+//   seletor é a janela do Prestativa com miniaturas de todas as telas/janelas.
 function setupDisplayMediaHandler() {
   const ses = session.defaultSession;
-  const nativeAvailable =
-    typeof ses.isDisplayMediaSystemPickerAvailable === "function" &&
-    ses.isDisplayMediaSystemPickerAvailable();
+  log.info("display-media-picker:setup", { appVersion: app.getVersion() });
 
-  log.info("display-media-picker:setup", { nativeAvailable });
-
-  if (nativeAvailable) {
-    // Windows 10 22H2+/Windows 11/macOS 15+: deixa o SO mostrar o seletor
-    // nativo. Quando useSystemPicker é true e disponível, o Chromium ignora
-    // a callback e usa o picker do sistema operacional. Mesmo assim
-    // Electron exige que um handler seja registrado.
-    ses.setDisplayMediaRequestHandler(
-      (_request, callback) => {
-        callback({});
-      },
-      { useSystemPicker: true },
-    );
-    return;
-  }
-
-  // Fallback: SO sem picker nativo (Windows <22H2, Linux). Mostramos o nosso.
   ses.setDisplayMediaRequestHandler(async (_request, callback) => {
+    log.info("display-media-picker:request — abrindo seletor");
     try {
       const source = await pickSource(mainWindow);
       if (!source) {
+        // Usuário cancelou — nega o compartilhamento.
         callback({});
         return;
       }
+      log.info("display-media-picker:picked", { id: source.id, name: source.name });
       callback({ video: source, audio: "loopback" });
     } catch (err) {
       log.error("display-media-picker", err);

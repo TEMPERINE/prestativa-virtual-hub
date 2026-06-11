@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { APP_NAME, APP_VERSION_LABEL, APP_CHANNEL } from "@/lib/version";
 
@@ -36,6 +37,17 @@ const CHANGELOG: Array<{ version: string; date: string; notes: string[] }> = [
 ];
 
 function SobrePage() {
+  const [desktopVersion, setDesktopVersion] = useState<string | null>(null);
+
+  useEffect(() => {
+    const desktop = (window as unknown as {
+      prestativaDesktop?: { isDesktop?: boolean; getAppVersion?: () => Promise<string> };
+    }).prestativaDesktop;
+    if (desktop?.getAppVersion) {
+      desktop.getAppVersion().then(setDesktopVersion).catch(() => {});
+    }
+  }, []);
+
   return (
     <div className="min-h-screen bg-background text-foreground">
       <div className="max-w-2xl mx-auto px-6 py-12 space-y-8">
@@ -51,6 +63,11 @@ function SobrePage() {
             <span className="text-sm font-mono px-2 py-1 rounded-full bg-muted">
               {APP_VERSION_LABEL}
             </span>
+            {desktopVersion && (
+              <span className="text-sm font-mono px-2 py-1 rounded-full bg-primary/10 text-primary">
+                App desktop v{desktopVersion}
+              </span>
+            )}
             {APP_CHANNEL === "beta" && (
               <span className="text-xs px-2 py-1 rounded-full bg-amber-500/15 text-amber-600 dark:text-amber-400">
                 Versão em teste
