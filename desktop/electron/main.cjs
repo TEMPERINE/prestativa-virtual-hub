@@ -88,23 +88,36 @@ function setupDisplayMediaHandler() {
     typeof ses.isDisplayMediaSystemPickerAvailable === "function" &&
     ses.isDisplayMediaSystemPickerAvailable();
 
-  ses.setDisplayMediaRequestHandler(
-    async (_request, callback) => {
-      try {
-        const source = await pickSource(mainWindow);
-        if (!source) {
-          // Usuário cancelou.
-          callback({});
-          return;
-        }
-        callback({ video: source, audio: "loopback" });
-      } catch (err) {
-        log.error("display-media-picker", err);
+  log.info("display-media-picker:setup", { nativeAvailable });
+
+  if (nativeAvailable) {
+    // Windows 10 22H2+/Windows 11/macOS 15+: deixa o SO mostrar o seletor
+    // nativo. Quando useSystemPicker é true e disponível, o Chromium ignora
+    // a callback e usa o picker do sistema operacional. Mesmo assim
+    // Electron exige que um handler seja registrado.
+    ses.setDisplayMediaRequestHandler(
+      (_request, callback) => {
         callback({});
+      },
+      { useSystemPicker: true },
+    );
+    return;
+  }
+
+  // Fallback: SO sem picker nativo (Windows <22H2, Linux). Mostramos o nosso.
+  ses.setDisplayMediaRequestHandler(async (_request, callback) => {
+    try {
+      const source = await pickSource(mainWindow);
+      if (!source) {
+        callback({});
+        return;
       }
-    },
-    { useSystemPicker: nativeAvailable },
-  );
+      callback({ video: source, audio: "loopback" });
+    } catch (err) {
+      log.error("display-media-picker", err);
+      callback({});
+    }
+  });
 }
 
 ipcMain.handle("prestativa:get-screen-source-id", async () => {
