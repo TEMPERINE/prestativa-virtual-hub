@@ -27,7 +27,7 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "Prestativa Virtual"
+      "shortcutName": "Virtual Office"
     },
     "publish": [
       {
