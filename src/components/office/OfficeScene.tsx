@@ -263,7 +263,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
   const [facing, setFacing] = useState<Facing>("down");
   const facingRef = useRef<Facing>("down");
   const [reactions, setReactions] = useState<Record<string, { emoji: string; ts: number }>>({});
-  const [confettis, setConfettis] = useState<Record<string, Array<{ facing: Facing; ts: number }>>>({});
+  const [confettis, setConfettis] = useState<Array<{ id: string; x: number; y: number; facing: Facing; ts: number }>>([]);
   // Active remote-user teleport effects (so others see the sparkle/fade like a game).
   const [remoteTeleports, setRemoteTeleports] = useState<
     Record<string, { from: Point; to: Point; phase: "out" | "in"; id: number }>
@@ -917,23 +917,13 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
         }, REACTION_DURATION_MS);
       })
       .on("broadcast", { event: "confetti" }, (payload) => {
-        const { user_id, facing: dir } = (payload.payload ?? {}) as { user_id?: string; facing?: Facing };
-        if (!user_id || !dir) return;
+        const { user_id, facing: dir, x, y } = (payload.payload ?? {}) as { user_id?: string; facing?: Facing; x?: number; y?: number };
+        if (!user_id || !dir || typeof x !== "number" || typeof y !== "number") return;
         const ts = Date.now();
-        setConfettis((prev) => {
-          const list = prev[user_id] ? [...prev[user_id], { facing: dir, ts }] : [{ facing: dir, ts }];
-          return { ...prev, [user_id]: list };
-        });
+        const id = `${user_id}-${ts}-${Math.random().toString(36).slice(2, 7)}`;
+        setConfettis((prev) => [...prev, { id, x, y, facing: dir, ts }]);
         setTimeout(() => {
-          setConfettis((prev) => {
-            const list = prev[user_id];
-            if (!list) return prev;
-            const nextList = list.filter((c) => c.ts !== ts);
-            const next = { ...prev };
-            if (nextList.length === 0) delete next[user_id];
-            else next[user_id] = nextList;
-            return next;
-          });
+          setConfettis((prev) => prev.filter((c) => c.id !== id));
         }, 1100);
       });
     reactionChannelRef.current = reactionCh;
@@ -1886,28 +1876,19 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
     const uid = meIdRef.current;
     if (!uid) return;
     const dir = facingRef.current;
+    const cur = posRef.current;
     const ts = Date.now();
-    setConfettis((prev) => {
-      const list = prev[uid] ? [...prev[uid], { facing: dir, ts }] : [{ facing: dir, ts }];
-      return { ...prev, [uid]: list };
-    });
+    const id = `${uid}-${ts}-${Math.random().toString(36).slice(2, 7)}`;
+    setConfettis((prev) => [...prev, { id, x: cur.x, y: cur.y, facing: dir, ts }]);
     setTimeout(() => {
-      setConfettis((prev) => {
-        const list = prev[uid];
-        if (!list) return prev;
-        const nextList = list.filter((c) => c.ts !== ts);
-        const next = { ...prev };
-        if (nextList.length === 0) delete next[uid];
-        else next[uid] = nextList;
-        return next;
-      });
+      setConfettis((prev) => prev.filter((c) => c.id !== id));
     }, 1100);
     const ch = reactionChannelRef.current;
     if (ch) {
       void ch.send({
         type: "broadcast",
         event: "confetti",
-        payload: { user_id: uid, facing: dir },
+        payload: { user_id: uid, facing: dir, x: cur.x, y: cur.y },
       });
     }
   }, []);
@@ -2525,13 +2506,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
                     glowColor={isMe ? profile.avatar_color : undefined}
                     spriteId={profile.sprite_id}
                   />
-                  {confettis[profile.id]?.map((c) => (
-                    <ConfettiBurst
-                      key={c.ts}
-                      facing={c.facing}
-                      burstKey={c.ts}
-                    />
-                  ))}
+                  {/* Confetti is rendered in a separate layer below so it stays at launch position */}
                   {/* Hover/click hit-area for remote avatars (sits over the sprite) */}
                   {!isMe && (
                     <AvatarHitArea
@@ -2581,6 +2556,26 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
             color={profiles[uid]?.avatar_color}
           />
         ))}
+
+        {/* Confetti bursts — anchored at the launch position, do NOT follow the avatar */}
+        {confettis.map((c) => (
+          <div
+            key={c.id}
+            className="absolute pointer-events-none"
+            style={{
+              left: `${c.x * 100}%`,
+              top: `${c.y * 100}%`,
+              // Match the avatar's vertical anchor (translate -50%, -90%) so the
+              // burst originates from the character's body, not their feet.
+              transform: "translate(-50%, -90%)",
+              zIndex: Math.round(c.y * 1000) + 1,
+            }}
+          >
+            <ConfettiBurst facing={c.facing} burstKey={c.ts} />
+          </div>
+        ))}
+
+
 
 
         {/* Desk notes (post-it gifts) sitting on workstations */}
