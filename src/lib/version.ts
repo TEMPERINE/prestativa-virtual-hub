@@ -4,8 +4,8 @@
 
 export type AppChannel = "beta" | "rc" | "stable";
 
-export const APP_VERSION = "0.1.0";
-export const APP_CHANNEL: AppChannel = "beta";
+export const APP_VERSION = "1.0.0";
+export const APP_CHANNEL: AppChannel = "stable";
 
 export const APP_VERSION_LABEL: string =
   (APP_CHANNEL as AppChannel) === "stable"
