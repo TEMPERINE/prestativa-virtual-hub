@@ -65,7 +65,7 @@ function DownloadPage() {
           <img
             src={logoAsset.url}
             alt="Virtual Office Logo"
-            className="mx-auto h-[240px] md:h-[300px] w-auto object-contain mb-2"
+            className="mx-auto h-[360px] md:h-[450px] w-auto object-contain mb-2"
           />
           <p className="text-sm text-muted-foreground">
             Seu espaço virtual. Presença, proximidade, colaboração.
