@@ -53,6 +53,7 @@ import { CamPreviewAndPicker } from "./CamPreviewAndPicker";
 import { DeviceMenu } from "./DeviceMenu";
 import prestativaIcon from "@/assets/prestativa-icon.png.asset.json";
 import { ScreenShareViewer } from "./ScreenShareViewer";
+import { ConfettiBurst } from "./ConfettiBurst";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
@@ -262,6 +263,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
   const [facing, setFacing] = useState<Facing>("down");
   const facingRef = useRef<Facing>("down");
   const [reactions, setReactions] = useState<Record<string, { emoji: string; ts: number }>>({});
+  const [confettis, setConfettis] = useState<Record<string, { facing: Facing; ts: number }>>({});
   // Active remote-user teleport effects (so others see the sparkle/fade like a game).
   const [remoteTeleports, setRemoteTeleports] = useState<
     Record<string, { from: Point; to: Point; phase: "out" | "in"; id: number }>
@@ -913,6 +915,21 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
             return next;
           });
         }, REACTION_DURATION_MS);
+      })
+      .on("broadcast", { event: "confetti" }, (payload) => {
+        const { user_id, facing: dir } = (payload.payload ?? {}) as { user_id?: string; facing?: Facing };
+        if (!user_id || !dir) return;
+        const ts = Date.now();
+        setConfettis((prev) => ({ ...prev, [user_id]: { facing: dir, ts } }));
+        setTimeout(() => {
+          setConfettis((prev) => {
+            const cur = prev[user_id];
+            if (!cur || cur.ts !== ts) return prev;
+            const next = { ...prev };
+            delete next[user_id];
+            return next;
+          });
+        }, 1100);
       });
     reactionChannelRef.current = reactionCh;
 
@@ -1860,6 +1877,31 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
     }
   }, []);
 
+  const sendConfetti = useCallback(() => {
+    const uid = meIdRef.current;
+    if (!uid) return;
+    const dir = facingRef.current;
+    const ts = Date.now();
+    setConfettis((prev) => ({ ...prev, [uid]: { facing: dir, ts } }));
+    setTimeout(() => {
+      setConfettis((prev) => {
+        const cur = prev[uid];
+        if (!cur || cur.ts !== ts) return prev;
+        const next = { ...prev };
+        delete next[uid];
+        return next;
+      });
+    }, 1100);
+    const ch = reactionChannelRef.current;
+    if (ch) {
+      void ch.send({
+        type: "broadcast",
+        event: "confetti",
+        payload: { user_id: uid, facing: dir },
+      });
+    }
+  }, []);
+
   // keyboard input — standard 2D game movement (hold to walk, release to idle)
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
@@ -1889,6 +1931,16 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
         if (tag !== "INPUT" && tag !== "TEXTAREA" && !target?.isContentEditable) {
           e.preventDefault();
           sendReaction(emoji);
+          return;
+        }
+      }
+      // F (sem modificadores) — joga confete na direção do personagem 🎉
+      if (key === "f" && !e.repeat && !e.metaKey && !e.ctrlKey && !e.altKey && !e.shiftKey) {
+        const target = e.target as HTMLElement | null;
+        const tag = target?.tagName;
+        if (tag !== "INPUT" && tag !== "TEXTAREA" && !target?.isContentEditable) {
+          e.preventDefault();
+          sendConfetti();
           return;
         }
       }
@@ -1937,7 +1989,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
       window.removeEventListener("keyup", up);
       window.removeEventListener("blur", blur);
     };
-  }, [setLocalFacing, sendReaction, teleportToMyClaim, sendPos]);
+  }, [setLocalFacing, sendReaction, sendConfetti, teleportToMyClaim, sendPos]);
 
   // movement + animation loop
   useEffect(() => {
@@ -2463,6 +2515,12 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
                     glowColor={isMe ? profile.avatar_color : undefined}
                     spriteId={profile.sprite_id}
                   />
+                  {confettis[profile.id] && (
+                    <ConfettiBurst
+                      facing={confettis[profile.id].facing}
+                      burstKey={confettis[profile.id].ts}
+                    />
+                  )}
                   {/* Hover/click hit-area for remote avatars (sits over the sprite) */}
                   {!isMe && (
                     <AvatarHitArea
