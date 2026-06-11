@@ -1934,6 +1934,16 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
           return;
         }
       }
+      // F (sem modificadores) — joga confete na direção do personagem 🎉
+      if (key === "f" && !e.repeat && !e.metaKey && !e.ctrlKey && !e.altKey && !e.shiftKey) {
+        const target = e.target as HTMLElement | null;
+        const tag = target?.tagName;
+        if (tag !== "INPUT" && tag !== "TEXTAREA" && !target?.isContentEditable) {
+          e.preventDefault();
+          sendConfetti();
+          return;
+        }
+      }
       const dir = dirFromKey(key);
       if (!dir) return;
       e.preventDefault();
