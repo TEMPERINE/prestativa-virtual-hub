@@ -46,7 +46,7 @@ function buildParticles(seed: number, facing: Facing) {
     const sin = Math.sin(spread);
     const dx = base.x * cos - base.y * sin;
     const dy = base.x * sin + base.y * cos;
-    const distance = 36 + rand() * 42; // px
+    const distance = (36 + rand() * 42) * 1.3; // px (+30% mais longe)
     const tx = dx * distance;
     const ty = dy * distance;
     const size = 4 + Math.floor(rand() * 4);
