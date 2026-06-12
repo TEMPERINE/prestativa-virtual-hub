@@ -609,23 +609,54 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
   // Remote avatar walk-cycle animation. Detect (x,y) changes per user and
   // step through frames 1..5 while moving; freeze on frame 0 when idle for
   // more than ~220ms. Runs on a single timer so all remotes stay in sync.
+  // Item 4: short-circuit cedo quando ninguém está animando — o caso comum
+  // num escritório parado é "todos no frame 0", e gastar JS+setState a cada
+  // 110 ms aí é desperdício puro. Só fazemos trabalho quando alguém moveu
+  // recentemente ou ainda há frame > 0 para zerar.
   useEffect(() => {
     const MOVE_DECAY_MS = 220;
     const TICK_MS = 110;
     const id = window.setInterval(() => {
       const now = performance.now();
       const tracker = remoteAnimRef.current;
+
+      // Fast path: descobrir se temos qualquer trabalho a fazer.
+      // - Algum remoto com lastMove recente → precisamos avançar frame.
+      // - Algum tracker com frame > 0 mas parado → precisamos zerar.
+      // - Qualquer posição nova ainda não rastreada → precisamos registrar.
+      let hasWork = false;
+      const myId = meIdRef.current;
+      const posList = Object.values(positions);
+      for (const p of posList) {
+        if (p.user_id === myId) continue;
+        const t = tracker.get(p.user_id);
+        if (!t) { hasWork = true; break; }
+        if (t.lastX !== p.x || t.lastY !== p.y) { hasWork = true; break; }
+        if (now - t.lastMove < MOVE_DECAY_MS) { hasWork = true; break; }
+        if (t.frame !== 0) { hasWork = true; break; }
+      }
+      if (!hasWork) {
+        // Ainda precisa limpar trackers órfãos? Verifica rápido.
+        if (tracker.size > 0) {
+          const live = new Set(posList.filter((p) => p.user_id !== myId).map((p) => p.user_id));
+          for (const key of tracker.keys()) {
+            if (!live.has(key)) { hasWork = true; break; }
+          }
+        }
+        if (!hasWork) return;
+      }
+
       let changed = false;
       const next: Record<string, number> = {};
 
       // Sync tracker with current positions (add/update entries).
-      Object.values(positions).forEach((p) => {
-        if (p.user_id === meIdRef.current) return;
+      for (const p of posList) {
+        if (p.user_id === myId) continue;
         const t = tracker.get(p.user_id);
         if (!t) {
           tracker.set(p.user_id, { frame: 0, lastMove: 0, lastX: p.x, lastY: p.y, lastTick: now });
           next[p.user_id] = 0;
-          return;
+          continue;
         }
         if (t.lastX !== p.x || t.lastY !== p.y) {
           t.lastX = p.x;
@@ -642,7 +673,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
         }
         t.lastTick = now;
         next[p.user_id] = newFrame;
-      });
+      }
 
       // Drop trackers for users no longer present.
       for (const key of Array.from(tracker.keys())) {
