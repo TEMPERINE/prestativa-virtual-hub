@@ -2106,6 +2106,69 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
       ? { ...currentZone, rect: painted }
       : currentZone;
   }, [currentZone]);
+  const focusedZoneRef = useRef(focusedZone);
+  focusedZoneRef.current = focusedZone;
+
+  // Smooth remote avatars between sparse broadcast samples (~120 ms apart).
+  // We lerp each peer's wrapper toward the latest target every animation
+  // frame and mutate `style` directly, so no React re-render is triggered.
+  useEffect(() => {
+    let raf = 0;
+    const ALPHA = 0.22; // approach factor per frame (~60fps)
+    const SNAP_DIST = 0.0005;
+    const loop = () => {
+      const positions = positionsRef.current;
+      const myId = meIdRef.current;
+      const focus = focusedZoneRef.current;
+      for (const uid in positions) {
+        if (uid === myId) continue;
+        const el = remoteWrapRefs.current.get(uid);
+        if (!el) continue;
+        const target = positions[uid];
+        if (!target) continue;
+        let s = remoteSmoothRef.current.get(uid);
+        if (!s) {
+          s = { x: target.x, y: target.y };
+          remoteSmoothRef.current.set(uid, s);
+        }
+        // While a teleport is animating, let React drive position/opacity.
+        if (remoteTeleportTimers.current.has(uid)) {
+          s.x = target.x;
+          s.y = target.y;
+          continue;
+        }
+        const dx = target.x - s.x;
+        const dy = target.y - s.y;
+        if (Math.abs(dx) < SNAP_DIST && Math.abs(dy) < SNAP_DIST) {
+          if (s.x !== target.x || s.y !== target.y) {
+            s.x = target.x;
+            s.y = target.y;
+          }
+        } else {
+          s.x += dx * ALPHA;
+          s.y += dy * ALPHA;
+        }
+        el.style.left = `${s.x * 100}%`;
+        el.style.top = `${s.y * 100}%`;
+        const inFocus =
+          !focus ||
+          (s.x >= focus.rect.x1 &&
+            s.x <= focus.rect.x2 &&
+            s.y >= focus.rect.y1 &&
+            s.y <= focus.rect.y2);
+        el.style.zIndex = String(
+          (focus ? (inFocus ? 60000 : 20000) : 0) + Math.round(s.y * 1000)
+        );
+      }
+      // Drop smoothed entries for peers that left.
+      for (const uid of Array.from(remoteSmoothRef.current.keys())) {
+        if (!(uid in positions)) remoteSmoothRef.current.delete(uid);
+      }
+      raf = requestAnimationFrame(loop);
+    };
+    raf = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(raf);
+  }, []);
 
   // Histórico "Minhas reuniões" — registra entrada/saída quando o usuário
   // está em QUALQUER zona privada (não-lobby) com pelo menos 1 outro peer.
