@@ -448,6 +448,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
   const lastDir = useRef<Facing | null>(null);
   const lastSent = useRef(0);
   const lastPersisted = useRef(0);
+  const lastPosCommit = useRef(0);
   const posRef = useRef(pos);
   posRef.current = pos;
 
@@ -549,38 +550,34 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
 
   const sendPos = useCallback((x: number, y: number, z: ZoneId, f: Facing, persistNow = false) => {
     if (!positionHydratedRef.current) return;
-    const knownId = meIdRef.current;
-    const write = (userId: string) => {
-      const payload = { user_id: userId, x, y, zone: z, facing: f, is_online: true, ts: Date.now() };
-      const updatedAt = new Date(payload.ts).toISOString();
-      writeLocalSavedPosition(userId, { x, y }, z, f);
-      const ch = positionBroadcastChannelRef.current;
-      if (ch && positionBroadcastReadyRef.current) {
-        void ch.send({ type: "broadcast", event: "position", payload });
-      }
-      const now = performance.now();
-      if (persistNow || now - lastPersisted.current > 300) {
-        lastPersisted.current = now;
-        const _ws = getCurrentWorkspaceId();
-        if (_ws) void supabase.from("positions").upsert({
-          workspace_id: _ws,
-          user_id: userId,
-          x,
-          y,
-          zone: z,
-          facing: f,
-          is_online: true,
-          updated_at: updatedAt,
-        }, { onConflict: "workspace_id,user_id" });
-      }
-    };
-    if (knownId) {
-      write(knownId);
-      return;
+    const userId = meIdRef.current;
+    // Without a known user id we drop the sample. The presence hydration
+    // effect guarantees meIdRef is set before movement is allowed; the old
+    // async getUser() fallback turned every step into a network round-trip
+    // when there was a boot race, which we want to avoid in the hot path.
+    if (!userId) return;
+    const payload = { user_id: userId, x, y, zone: z, facing: f, is_online: true, ts: Date.now() };
+    const updatedAt = new Date(payload.ts).toISOString();
+    writeLocalSavedPosition(userId, { x, y }, z, f);
+    const ch = positionBroadcastChannelRef.current;
+    if (ch && positionBroadcastReadyRef.current) {
+      void ch.send({ type: "broadcast", event: "position", payload });
     }
-    void supabase.auth.getUser().then(({ data }) => {
-      if (data.user) write(data.user.id);
-    });
+    const now = performance.now();
+    if (persistNow || now - lastPersisted.current > 300) {
+      lastPersisted.current = now;
+      const _ws = getCurrentWorkspaceId();
+      if (_ws) void supabase.from("positions").upsert({
+        workspace_id: _ws,
+        user_id: userId,
+        x,
+        y,
+        zone: z,
+        facing: f,
+        is_online: true,
+        updated_at: updatedAt,
+      }, { onConflict: "workspace_id,user_id" });
+    }
   }, []);
 
   // Preload all directional sprites so swapping facing never shows a blank frame
@@ -612,23 +609,54 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
   // Remote avatar walk-cycle animation. Detect (x,y) changes per user and
   // step through frames 1..5 while moving; freeze on frame 0 when idle for
   // more than ~220ms. Runs on a single timer so all remotes stay in sync.
+  // Item 4: short-circuit cedo quando ninguém está animando — o caso comum
+  // num escritório parado é "todos no frame 0", e gastar JS+setState a cada
+  // 110 ms aí é desperdício puro. Só fazemos trabalho quando alguém moveu
+  // recentemente ou ainda há frame > 0 para zerar.
   useEffect(() => {
     const MOVE_DECAY_MS = 220;
     const TICK_MS = 110;
     const id = window.setInterval(() => {
       const now = performance.now();
       const tracker = remoteAnimRef.current;
+
+      // Fast path: descobrir se temos qualquer trabalho a fazer.
+      // - Algum remoto com lastMove recente → precisamos avançar frame.
+      // - Algum tracker com frame > 0 mas parado → precisamos zerar.
+      // - Qualquer posição nova ainda não rastreada → precisamos registrar.
+      let hasWork = false;
+      const myId = meIdRef.current;
+      const posList = Object.values(positions);
+      for (const p of posList) {
+        if (p.user_id === myId) continue;
+        const t = tracker.get(p.user_id);
+        if (!t) { hasWork = true; break; }
+        if (t.lastX !== p.x || t.lastY !== p.y) { hasWork = true; break; }
+        if (now - t.lastMove < MOVE_DECAY_MS) { hasWork = true; break; }
+        if (t.frame !== 0) { hasWork = true; break; }
+      }
+      if (!hasWork) {
+        // Ainda precisa limpar trackers órfãos? Verifica rápido.
+        if (tracker.size > 0) {
+          const live = new Set(posList.filter((p) => p.user_id !== myId).map((p) => p.user_id));
+          for (const key of tracker.keys()) {
+            if (!live.has(key)) { hasWork = true; break; }
+          }
+        }
+        if (!hasWork) return;
+      }
+
       let changed = false;
       const next: Record<string, number> = {};
 
       // Sync tracker with current positions (add/update entries).
-      Object.values(positions).forEach((p) => {
-        if (p.user_id === meIdRef.current) return;
+      for (const p of posList) {
+        if (p.user_id === myId) continue;
         const t = tracker.get(p.user_id);
         if (!t) {
           tracker.set(p.user_id, { frame: 0, lastMove: 0, lastX: p.x, lastY: p.y, lastTick: now });
           next[p.user_id] = 0;
-          return;
+          continue;
         }
         if (t.lastX !== p.x || t.lastY !== p.y) {
           t.lastX = p.x;
@@ -645,7 +673,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
         }
         t.lastTick = now;
         next[p.user_id] = newFrame;
-      });
+      }
 
       // Drop trackers for users no longer present.
       for (const key of Array.from(tracker.keys())) {
@@ -688,12 +716,20 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
       return false;
     }
     posRef.current = np;
-    setPos(np);
     const z = { id: toZoneId };
+    const zoneChanged = fromZoneId !== toZoneId;
     const uid = meIdRef.current;
     if (uid) writeLocalSavedPosition(uid, np, z.id, dir);
     setZone((prev) => (prev !== z.id ? z.id : prev));
     const now = performance.now();
+    // Item 2: setPos dispara re-render do componente inteiro. Em vez de
+    // commitar a 60 Hz (1 por frame de movimento), comitamos no máx. ~30 Hz
+    // OU imediatamente quando trocamos de zona — assim câmera/proximidade
+    // continuam reagindo, mas o React faz metade do trabalho.
+    if (zoneChanged || now - lastPosCommit.current > 33) {
+      lastPosCommit.current = now;
+      setPos(np);
+    }
     if (now - lastSent.current > SEND_INTERVAL_MS) {
       lastSent.current = now;
       sendPos(np.x, np.y, z.id, dir);
@@ -2085,6 +2121,10 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
         frameRef.current = 0;
         setFrame(0);
         const cur = posRef.current;
+        // Item 2: garante o último commit de posição quando paramos —
+        // o throttle de 33 ms em tryMove pode ter "engolido" o frame final.
+        setPos((prev) => (prev.x === cur.x && prev.y === cur.y ? prev : cur));
+        lastPosCommit.current = t;
         const z = zoneAt(cur);
         sendPos(cur.x, cur.y, z.id, facingRef.current, true);
       }
