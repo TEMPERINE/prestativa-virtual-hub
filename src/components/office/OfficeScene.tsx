@@ -3918,25 +3918,37 @@ function ReactionBubble({ emoji }: { emoji: string | null }) {
     >
       {current && (
         <div
-          className="px-2.5 py-1 rounded-2xl bg-white shadow-soft border border-black/5 whitespace-nowrap flex items-center justify-center"
-          style={{ fontSize: "clamp(16px, 2.6vh, 28px)", lineHeight: 1 }}
+          className="px-2 py-1 rounded-2xl bg-white shadow-soft border border-black/5 flex items-center justify-center"
+          style={{ lineHeight: 1 }}
         >
           {(() => {
             const url = appleEmojiUrl(current);
+            const size = "clamp(18px, 2.8vh, 26px)";
             return url ? (
               <img
                 src={url}
                 alt={current}
                 draggable={false}
-                style={{ width: "1em", height: "1em", display: "block" }}
-                onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
+                style={{
+                  width: size,
+                  height: size,
+                  aspectRatio: "1 / 1",
+                  objectFit: "contain",
+                  flexShrink: 0,
+                  display: "block",
+                }}
+                onError={(e) => {
+                  const img = e.currentTarget as HTMLImageElement;
+                  img.style.display = "none";
+                }}
               />
             ) : (
-              <span>{current}</span>
+              <span style={{ fontSize: size, lineHeight: 1 }}>{current}</span>
             );
           })()}
         </div>
       )}
+
     </div>
   );
 }
