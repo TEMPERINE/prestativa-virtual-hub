@@ -230,6 +230,11 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
   const [positions, setPositions] = useState<Record<string, RemotePos>>({});
   const positionsRef = useRef<Record<string, RemotePos>>({});
   positionsRef.current = positions;
+  // Per-remote interpolation state. The rAF loop in this component lerps
+  // each remote avatar's wrapper toward the latest target position so they
+  // glide between ~120 ms broadcast samples instead of teleporting.
+  const remoteWrapRefs = useRef<Map<string, HTMLDivElement | null>>(new Map());
+  const remoteSmoothRef = useRef<Map<string, { x: number; y: number }>>(new Map());
   // Fast realtime presence signal. It accelerates discovery, but is NOT the
   // authority for visibility: the database `is_online` flag is the durable
   // game-state source, so idle players never disappear just because a presence
