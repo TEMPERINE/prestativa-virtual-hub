@@ -2531,6 +2531,11 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
           return (
             <div
               key={profile.id}
+              ref={(el) => {
+                if (isMe) return;
+                if (el) remoteWrapRefs.current.set(profile.id, el);
+                else remoteWrapRefs.current.delete(profile.id);
+              }}
               className="absolute pointer-events-none"
               style={{
                 left: `${renderPoint.x * 100}%`,
@@ -2538,9 +2543,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
                 transform: "translate(-50%, -90%)",
                 transition: teleporting
                   ? "opacity 420ms ease-in-out, filter 420ms ease-in-out"
-                  : isMe
-                  ? "none"
-                  : "left 120ms linear, top 120ms linear",
+                  : "none",
                 zIndex: (focusedZone ? (inFocus ? 60000 : 20000) : 0) + Math.round(renderPoint.y * 1000),
                 opacity: tpOpacity,
                 filter: tpData
