@@ -491,8 +491,9 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
   //    corredor") — pequeno raio com histerese.
   // A zona do peer é calculada LOCALMENTE via zoneAt({x,y}) para não depender
   // do campo p.zone (que vem com lag/staleness do broadcast de presença).
-  const PROXIMITY_CONNECT = 0.05;
-  const PROXIMITY_DISCONNECT = 0.06;
+  // Raio ~2–3 personagens. Histerese pequena evita flicker entrar/sair.
+  const PROXIMITY_CONNECT = 0.038;
+  const PROXIMITY_DISCONNECT = 0.052;
   const connectedPeersRef = useRef<Set<string>>(new Set());
   const desiredPeers = useMemo(() => {
     const meId = me?.id;
