@@ -2090,6 +2090,10 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
         frameRef.current = 0;
         setFrame(0);
         const cur = posRef.current;
+        // Item 2: garante o último commit de posição quando paramos —
+        // o throttle de 33 ms em tryMove pode ter "engolido" o frame final.
+        setPos((prev) => (prev.x === cur.x && prev.y === cur.y ? prev : cur));
+        lastPosCommit.current = t;
         const z = zoneAt(cur);
         sendPos(cur.x, cur.y, z.id, facingRef.current, true);
       }
