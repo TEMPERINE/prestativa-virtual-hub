@@ -3149,10 +3149,10 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
         localCamOn={rtc.camOn}
         localMicOn={rtc.micOn}
         selfSpeaking={rtc.selfSpeaking}
-        streams={rtc.remoteStreams}
+        streams={audibleStreams}
         profiles={profiles}
         speakingPeers={rtc.speakingPeers}
-        connectedPeers={rtc.connectedPeers}
+        connectedPeers={audibleConnectedPeers}
         raisedHands={raisedHands}
       />
 
