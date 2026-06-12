@@ -42,6 +42,25 @@ const EMOJI_MAP: Record<string, string> = {
   "9": "🤯",
   "0": "✅",
 };
+// Mapeia cada emoji do atalho 0-9 para o "unified" code-point usado pelo
+// dataset Apple (iamcal/emoji-data). Renderizamos o PNG do CDN em vez do
+// glyph nativo p/ ficar visualmente igual ao WhatsApp/iOS em qualquer SO.
+const EMOJI_UNIFIED: Record<string, string> = {
+  "❤️": "2764-fe0f",
+  "👏": "1f44f",
+  "🤣": "1f923",
+  "🙌": "1f64c",
+  "🤯": "1f92f",
+  "💩": "1f4a9",
+  "🔥": "1f525",
+  "🥹": "1f979",
+  "✅": "2705",
+};
+function appleEmojiUrl(emoji: string): string | null {
+  const code = EMOJI_UNIFIED[emoji];
+  if (!code) return null;
+  return `https://cdn.jsdelivr.net/gh/iamcal/emoji-data@master/img-apple-64/${code}.png`;
+}
 const REACTION_DURATION_MS = 3000;
 import { toast } from "sonner";
 import { LogOut, Mic, MicOff, Video, VideoOff, MonitorUp, Users, Pencil, User as UserIcon, MessageCircle, StickyNote, X as XIcon, Plus, Minus, Locate, ChevronLeft, ChevronRight, Footprints, UserPlus, Hand, Circle, Square, Loader2, Smile } from "lucide-react";
@@ -3899,10 +3918,23 @@ function ReactionBubble({ emoji }: { emoji: string | null }) {
     >
       {current && (
         <div
-          className="px-2.5 py-1 rounded-2xl bg-white shadow-soft border border-black/5 whitespace-nowrap"
+          className="px-2.5 py-1 rounded-2xl bg-white shadow-soft border border-black/5 whitespace-nowrap flex items-center justify-center"
           style={{ fontSize: "clamp(16px, 2.6vh, 28px)", lineHeight: 1 }}
         >
-          {current}
+          {(() => {
+            const url = appleEmojiUrl(current);
+            return url ? (
+              <img
+                src={url}
+                alt={current}
+                draggable={false}
+                style={{ width: "1em", height: "1em", display: "block" }}
+                onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
+              />
+            ) : (
+              <span>{current}</span>
+            );
+          })()}
         </div>
       )}
     </div>
