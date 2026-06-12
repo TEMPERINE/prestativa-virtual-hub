@@ -537,6 +537,24 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
     connectedPeersRef.current = new Set(desiredPeers);
   }, [desiredPeers]);
 
+  // Peers efetivamente audíveis: cruzamento entre quem está conectado no
+  // LiveKit (mesma zona = mesma sala) e quem passa no filtro de proximidade.
+  // No lobby/corredor, isso muta automaticamente quem ficou fora do raio,
+  // mesmo que a sala LiveKit ainda contenha todos.
+  const audiblePeerIds = useMemo(() => new Set(desiredPeers), [desiredPeers]);
+  const audibleConnectedPeers = useMemo(
+    () => rtc.connectedPeers.filter((id) => audiblePeerIds.has(id)),
+    [rtc.connectedPeers, audiblePeerIds],
+  );
+  const audibleStreams = useMemo(() => {
+    const out: Record<string, MediaStream> = {};
+    for (const id of audibleConnectedPeers) {
+      const s = rtc.remoteStreams[id];
+      if (s) out[id] = s;
+    }
+    return out;
+  }, [audibleConnectedPeers, rtc.remoteStreams]);
+
   // Warm-start mic the moment we know the user — getUserMedia runs once,
   // the track stays disabled until the user clicks unmute. This removes the
   // 1–3s permission/negotiation delay from the first unmute and ensures
