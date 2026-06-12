@@ -3916,12 +3916,12 @@ function ReactionBubble({ emoji }: { emoji: string | null }) {
     >
       {current && (
         <div
-          className="px-2 py-1 rounded-2xl bg-white shadow-soft border border-black/5 flex items-center justify-center"
+          className="px-3 py-1.5 rounded-2xl bg-white shadow-soft border border-black/5 flex items-center justify-center whitespace-nowrap"
           style={{ lineHeight: 1 }}
         >
           {(() => {
             const url = appleEmojiUrl(current);
-            const size = "clamp(18px, 2.8vh, 26px)";
+            const size = "clamp(28px, 4vh, 44px)";
             return url ? (
               <img
                 src={url}
