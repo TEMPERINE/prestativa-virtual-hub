@@ -685,12 +685,20 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
       return false;
     }
     posRef.current = np;
-    setPos(np);
     const z = { id: toZoneId };
+    const zoneChanged = fromZoneId !== toZoneId;
     const uid = meIdRef.current;
     if (uid) writeLocalSavedPosition(uid, np, z.id, dir);
     setZone((prev) => (prev !== z.id ? z.id : prev));
     const now = performance.now();
+    // Item 2: setPos dispara re-render do componente inteiro. Em vez de
+    // commitar a 60 Hz (1 por frame de movimento), comitamos no máx. ~30 Hz
+    // OU imediatamente quando trocamos de zona — assim câmera/proximidade
+    // continuam reagindo, mas o React faz metade do trabalho.
+    if (zoneChanged || now - lastPosCommit.current > 33) {
+      lastPosCommit.current = now;
+      setPos(np);
+    }
     if (now - lastSent.current > SEND_INTERVAL_MS) {
       lastSent.current = now;
       sendPos(np.x, np.y, z.id, dir);
