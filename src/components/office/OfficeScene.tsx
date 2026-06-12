@@ -3918,10 +3918,23 @@ function ReactionBubble({ emoji }: { emoji: string | null }) {
     >
       {current && (
         <div
-          className="px-2.5 py-1 rounded-2xl bg-white shadow-soft border border-black/5 whitespace-nowrap"
+          className="px-2.5 py-1 rounded-2xl bg-white shadow-soft border border-black/5 whitespace-nowrap flex items-center justify-center"
           style={{ fontSize: "clamp(16px, 2.6vh, 28px)", lineHeight: 1 }}
         >
-          {current}
+          {(() => {
+            const url = appleEmojiUrl(current);
+            return url ? (
+              <img
+                src={url}
+                alt={current}
+                draggable={false}
+                style={{ width: "1em", height: "1em", display: "block" }}
+                onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
+              />
+            ) : (
+              <span>{current}</span>
+            );
+          })()}
         </div>
       )}
     </div>
