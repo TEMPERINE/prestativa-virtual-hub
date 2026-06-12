@@ -448,6 +448,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
   const lastDir = useRef<Facing | null>(null);
   const lastSent = useRef(0);
   const lastPersisted = useRef(0);
+  const lastPosCommit = useRef(0);
   const posRef = useRef(pos);
   posRef.current = pos;
 
