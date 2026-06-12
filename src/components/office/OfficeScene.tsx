@@ -114,11 +114,12 @@ type DeskNote = {
   read_at: string | null;
 };
 
-const SPEED = 0.0042;            // tamanho do passo na cadência alvo de 60 fps
+const SPEED = 0.0042;            // tamanho do passo de referência (60 fps)
 const SPEED_PER_SEC = SPEED * 60; // velocidade real (frações de mapa por segundo)
-const MIN_STEP_FACTOR = 0.5;     // não deixa o passo ficar minúsculo em FPS alto
-const MAX_STEP_FACTOR = 3;       // evita pulos enormes quando a aba volta do background
+const MAX_DT_MS = 50;            // clamp do dt p/ evitar teleporte ao voltar do background
+const SUBSTEP_MAX = SPEED;       // passo máx. por iteração de colisão (sub-stepping)
 const SEND_INTERVAL_MS = 120;
+const PERSIST_INTERVAL_MS = 2000; // persistência no DB durante movimento (keyup ainda força)
 const POSITION_BROADCAST_CHANNEL = "positions-broadcast-v1";
 const POSITION_PRESENCE_CHANNEL = "positions-presence-v1";
 const REMOTE_TELEPORT_MIN_DISTANCE = 0.075;
