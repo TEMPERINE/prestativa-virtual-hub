@@ -3942,23 +3942,38 @@ function ReactionBubble({ emoji }: { emoji: string | null }) {
             const url = appleEmojiUrl(current);
             const size = "clamp(28px, 4vh, 44px)";
             return url ? (
-              <img
-                src={url}
-                alt={current}
-                draggable={false}
+              <span
                 style={{
                   width: size,
                   height: size,
-                  aspectRatio: "1 / 1",
-                  objectFit: "contain",
-                  flexShrink: 0,
-                  display: "block",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontSize: `calc(${size} * 0.9)`,
+                  lineHeight: 1,
+                  fontFamily:
+                    '"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji","Twemoji Mozilla",sans-serif',
                 }}
-                onError={(e) => {
-                  const img = e.currentTarget as HTMLImageElement;
-                  img.style.display = "none";
-                }}
-              />
+              >
+                <img
+                  src={url}
+                  alt={current}
+                  draggable={false}
+                  style={{
+                    width: "100%",
+                    height: "100%",
+                    objectFit: "contain",
+                    display: "block",
+                  }}
+                  onError={(e) => {
+                    // Fallback: esconde o <img> quebrado mas mantém o emoji nativo no <span>
+                    const img = e.currentTarget as HTMLImageElement;
+                    img.style.display = "none";
+                    const parent = img.parentElement;
+                    if (parent && !parent.textContent) parent.textContent = current;
+                  }}
+                />
+              </span>
             ) : (
               <span style={{ fontSize: size, lineHeight: 1 }}>{current}</span>
             );
