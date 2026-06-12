@@ -550,38 +550,34 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
 
   const sendPos = useCallback((x: number, y: number, z: ZoneId, f: Facing, persistNow = false) => {
     if (!positionHydratedRef.current) return;
-    const knownId = meIdRef.current;
-    const write = (userId: string) => {
-      const payload = { user_id: userId, x, y, zone: z, facing: f, is_online: true, ts: Date.now() };
-      const updatedAt = new Date(payload.ts).toISOString();
-      writeLocalSavedPosition(userId, { x, y }, z, f);
-      const ch = positionBroadcastChannelRef.current;
-      if (ch && positionBroadcastReadyRef.current) {
-        void ch.send({ type: "broadcast", event: "position", payload });
-      }
-      const now = performance.now();
-      if (persistNow || now - lastPersisted.current > 300) {
-        lastPersisted.current = now;
-        const _ws = getCurrentWorkspaceId();
-        if (_ws) void supabase.from("positions").upsert({
-          workspace_id: _ws,
-          user_id: userId,
-          x,
-          y,
-          zone: z,
-          facing: f,
-          is_online: true,
-          updated_at: updatedAt,
-        }, { onConflict: "workspace_id,user_id" });
-      }
-    };
-    if (knownId) {
-      write(knownId);
-      return;
+    const userId = meIdRef.current;
+    // Without a known user id we drop the sample. The presence hydration
+    // effect guarantees meIdRef is set before movement is allowed; the old
+    // async getUser() fallback turned every step into a network round-trip
+    // when there was a boot race, which we want to avoid in the hot path.
+    if (!userId) return;
+    const payload = { user_id: userId, x, y, zone: z, facing: f, is_online: true, ts: Date.now() };
+    const updatedAt = new Date(payload.ts).toISOString();
+    writeLocalSavedPosition(userId, { x, y }, z, f);
+    const ch = positionBroadcastChannelRef.current;
+    if (ch && positionBroadcastReadyRef.current) {
+      void ch.send({ type: "broadcast", event: "position", payload });
     }
-    void supabase.auth.getUser().then(({ data }) => {
-      if (data.user) write(data.user.id);
-    });
+    const now = performance.now();
+    if (persistNow || now - lastPersisted.current > 300) {
+      lastPersisted.current = now;
+      const _ws = getCurrentWorkspaceId();
+      if (_ws) void supabase.from("positions").upsert({
+        workspace_id: _ws,
+        user_id: userId,
+        x,
+        y,
+        zone: z,
+        facing: f,
+        is_online: true,
+        updated_at: updatedAt,
+      }, { onConflict: "workspace_id,user_id" });
+    }
   }, []);
 
   // Preload all directional sprites so swapping facing never shows a blank frame
