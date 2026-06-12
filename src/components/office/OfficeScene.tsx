@@ -560,7 +560,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
         void ch.send({ type: "broadcast", event: "position", payload });
       }
       const now = performance.now();
-      if (persistNow || now - lastPersisted.current > 300) {
+      if (persistNow || now - lastPersisted.current > PERSIST_INTERVAL_MS) {
         lastPersisted.current = now;
         const _ws = getCurrentWorkspaceId();
         if (_ws) void supabase.from("positions").upsert({
