@@ -3104,8 +3104,8 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
           <DialogHeader>
             <DialogTitle className="text-center">Deixar um recado</DialogTitle>
           </DialogHeader>
-          <div className="relative">
-            <div className="absolute -top-3 left-1/2 -translate-x-1/2 text-3xl">🎁</div>
+          <div className="relative pt-4">
+            <div className="absolute -top-4 left-1/2 -translate-x-1/2 text-4xl z-20 drop-shadow-md pointer-events-none select-none">🎁</div>
             <div
               className="rounded-lg p-4 shadow-soft relative"
               style={{
@@ -3190,7 +3190,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="text-center">
-              Recadinho de {openingNote ? profiles[openingNote.sender_id]?.display_name ?? "alguém" : ""}
+              Recadinho de {openingNote ? profiles[openingNote.sender_id]?.display_name ?? "alguém" : ""} para você
             </DialogTitle>
           </DialogHeader>
           <div
