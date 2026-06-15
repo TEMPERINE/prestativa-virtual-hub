@@ -1,6 +1,6 @@
 {
   "name": "prestativa-virtual-desktop",
-  "version": "1.0.4",
+  "version": "1.0.6",
   "description": "Virtual Office — desktop shell (Windows)",
   "main": "electron/main.cjs",
   "author": "Prestativa",
