@@ -2806,6 +2806,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
                           onClose={() => setAvatarMenuUid(null)}
                           onFollow={() => { startFollowing(profile.id); setAvatarMenuUid(null); }}
                           onLead={() => { requestLead(profile.id); setAvatarMenuUid(null); }}
+                          onJoin={() => { requestJoin(profile.id); setAvatarMenuUid(null); }}
                         />
                       }
                     />
