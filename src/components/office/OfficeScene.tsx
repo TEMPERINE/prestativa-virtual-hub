@@ -235,6 +235,23 @@ function randomPointInRect(
   return seatPointForRect(rect);
 }
 
+// Find a walkable point next to `anchor` (used by "Junte-se a mim" teleport
+// so the called user lands beside the caller, not on top of them).
+function nearbyWalkablePoint(anchor: Point, avoid: Point[] = []): Point {
+  const rings = [0.035, 0.05, 0.07, 0.09, 0.12, 0.16];
+  for (const r of rings) {
+    for (let i = 0; i < 16; i++) {
+      const a = (i / 16) * Math.PI * 2;
+      const p = { x: anchor.x + Math.cos(a) * r, y: anchor.y + Math.sin(a) * r };
+      if (p.x < 0.02 || p.x > 0.98 || p.y < 0.02 || p.y > 0.98) continue;
+      if (collides(p)) continue;
+      if (avoid.some((v) => Math.hypot(v.x - p.x, v.y - p.y) < 0.025)) continue;
+      return p;
+    }
+  }
+  return anchor;
+}
+
 export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
   const officeTheme = useOfficeTheme();
   // Capacidades por nível do espaço atual — controlam botões de gravar,
@@ -1872,6 +1889,81 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
     void ch.send({ type: "broadcast", event: "lead-decline", payload: { from: me, to: fromUid } });
   }, []);
 
+  // ===== Join ("Junte-se a mim") =====
+  // Caller asks target to teleport next to them; target accepts and lands beside caller.
+  const teleportToPoint = useCallback((target: Point, label?: string) => {
+    if (!tierCapsRef.current.canTeleport) {
+      toast.info("Teleporte está disponível a partir do Nível 2.");
+      return;
+    }
+    const from = { ...posRef.current };
+    autoWalkRef.current = null;
+    teleportTimers.current.forEach((t) => window.clearTimeout(t));
+    teleportTimers.current = [];
+    const id = Date.now();
+    setTeleport({ from, to: target, phase: "out", id });
+    const uid = meIdRef.current;
+    const ch = positionBroadcastChannelRef.current;
+    if (uid && ch && positionBroadcastReadyRef.current) {
+      void ch.send({
+        type: "broadcast",
+        event: "teleport",
+        payload: { user_id: uid, from, to: target },
+      });
+    }
+    teleportTimers.current.push(
+      window.setTimeout(() => {
+        posRef.current = target;
+        setPos(target);
+        const z2 = zoneAt(target);
+        setZone(z2.id);
+        sendPos(target.x, target.y, z2.id, facingRef.current, true);
+        setTeleport({ from, to: target, phase: "in", id });
+      }, 450)
+    );
+    teleportTimers.current.push(
+      window.setTimeout(() => {
+        setTeleport((cur) => (cur && cur.id === id ? null : cur));
+      }, 1100)
+    );
+    if (label) toast.success(`✨ Indo até ${label}...`);
+  }, [sendPos]);
+
+  const requestJoin = useCallback((uid: string) => {
+    const ch = leadChannelRef.current;
+    const from = meIdRef.current;
+    if (!ch || !from) { toast.error("Conexão indisponível."); return; }
+    const fromName = profilesRef.current[from]?.display_name ?? "Alguém";
+    const fromPos = { ...posRef.current };
+    void ch.send({
+      type: "broadcast",
+      event: "join-request",
+      payload: { from, to: uid, fromName, fromPos },
+    });
+    const target = profilesRef.current[uid]?.display_name ?? "personagem";
+    toast.info(`Convite enviado a ${target}.`);
+  }, []);
+
+  const acceptJoin = useCallback((fromUid: string, fromPos: Point) => {
+    const ch = leadChannelRef.current;
+    const me = meIdRef.current;
+    if (!ch || !me) return;
+    void ch.send({ type: "broadcast", event: "join-accept", payload: { from: me, to: fromUid } });
+    const occupied: Point[] = Object.entries(positionsRef.current)
+      .filter(([u]) => u !== me)
+      .map(([, p]) => ({ x: p.x, y: p.y }));
+    const target = nearbyWalkablePoint(fromPos, occupied);
+    const name = profilesRef.current[fromUid]?.display_name ?? "quem chamou";
+    teleportToPoint(target, name);
+  }, [teleportToPoint]);
+
+  const declineJoin = useCallback((fromUid: string) => {
+    const ch = leadChannelRef.current;
+    const me = meIdRef.current;
+    if (!ch || !me) return;
+    void ch.send({ type: "broadcast", event: "join-decline", payload: { from: me, to: fromUid } });
+  }, []);
+
   // Lead channel — separate from positions so we can subscribe independently
   // once we know our user id (the broadcast handlers need stable closures).
   useEffect(() => {
@@ -1907,13 +1999,36 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
         const name = profilesRef.current[p.from]?.display_name ?? "Alguém";
         toast.info(`${name} parou de te seguir.`);
       })
+      .on("broadcast", { event: "join-request" }, ({ payload }) => {
+        const p = payload as { from?: string; to?: string; fromName?: string; fromPos?: Point };
+        if (!p?.from || p.to !== uid || !p.fromPos) return;
+        const from = p.from;
+        const fromPos = p.fromPos;
+        toast(`${p.fromName ?? "Alguém"} quer que você se junte a ele(a)`, {
+          description: "Aceite para se teletransportar para o local dessa pessoa.",
+          duration: 20000,
+          action: { label: "Aceitar", onClick: () => acceptJoin(from, fromPos) },
+          cancel: { label: "Recusar", onClick: () => declineJoin(from) },
+        });
+      })
+      .on("broadcast", { event: "join-accept" }, ({ payload }) => {
+        const p = payload as { from?: string; to?: string };
+        if (!p?.from || p.to !== uid) return;
+        const name = profilesRef.current[p.from]?.display_name ?? "Alguém";
+        toast.success(`${name} aceitou o convite e está chegando!`);
+      })
+      .on("broadcast", { event: "join-decline" }, ({ payload }) => {
+        const p = payload as { from?: string; to?: string };
+        if (!p?.from || p.to !== uid) return;
+        toast.info("Convite recusado.");
+      })
       .subscribe();
     leadChannelRef.current = ch;
     return () => {
       supabase.removeChannel(ch);
       if (leadChannelRef.current === ch) leadChannelRef.current = null;
     };
-  }, [me?.id, acceptLead, declineLead]);
+  }, [me?.id, acceptLead, declineLead, acceptJoin, declineJoin]);
 
   // Close avatar menu on outside click / Esc
   useEffect(() => {
@@ -2691,6 +2806,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
                           onClose={() => setAvatarMenuUid(null)}
                           onFollow={() => { startFollowing(profile.id); setAvatarMenuUid(null); }}
                           onLead={() => { requestLead(profile.id); setAvatarMenuUid(null); }}
+                          onJoin={() => { requestJoin(profile.id); setAvatarMenuUid(null); }}
                         />
                       }
                     />
@@ -3831,11 +3947,13 @@ function AvatarInteractionMenu({
   onClose,
   onFollow,
   onLead,
+  onJoin,
 }: {
   profile: Profile;
   onClose: () => void;
   onFollow: () => void;
   onLead: () => void;
+  onJoin: () => void;
 }) {
   return (
     <div
@@ -3883,6 +4001,14 @@ function AvatarInteractionMenu({
           className="w-full flex items-center gap-2 px-2 py-2 text-sm rounded hover:bg-muted text-left"
         >
           <UserPlus className="w-4 h-4" /> Pedir para conduzir
+        </button>
+        <button
+          type="button"
+          onClick={onJoin}
+          className="w-full flex items-center gap-2 px-2 py-2 text-sm rounded hover:bg-muted text-left"
+          title={`Convidar ${profile.display_name} a se juntar a você`}
+        >
+          <Users className="w-4 h-4" /> Convidar {profile.display_name} a se juntar
         </button>
       </div>
     </div>
