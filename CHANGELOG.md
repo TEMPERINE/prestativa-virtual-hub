@@ -3,6 +3,11 @@
 Formato: [SemVer](https://semver.org/lang/pt-BR/) + canal (`-beta`, `-rc`, estável).
 Atualize `src/lib/version.ts` ao publicar uma nova versão.
 
+## v1.0.4 — 2026-06-15
+
+### Corrigido
+- Processo de release desktop simplificado: agora o workflow manual aceita a versão, cria a tag se precisar, gera o instalador Windows e anexa o `.exe` na release correspondente.
+
 ## v1.0.3 — 2026-06-15
 
 ### Corrigido
