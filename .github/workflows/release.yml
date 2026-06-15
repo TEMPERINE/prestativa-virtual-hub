@@ -34,7 +34,7 @@ jobs:
         run: |
           $tag = "${{ env.RELEASE_TAG }}"
           if ($tag -notmatch '^v\d+\.\d+\.\d+$') {
-            throw "Use uma versão no formato v1.0.4"
+            throw "Use uma versão no formato v1.0.6"
           }
 
           $version = $tag.TrimStart('v')
