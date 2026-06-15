@@ -111,10 +111,37 @@ export function useMeetingRecorder({ getLocalAudioTrack, remoteStreams }: Args) 
     let displayStream: MediaStream;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const desktop = (window as any).prestativaDesktop as
-      | { getScreenStream?: () => Promise<MediaStream> }
+      | {
+          getScreenSourceId?: () => Promise<string | null>;
+          // legado — versões antigas do preload retornavam MediaStream (não funciona via contextBridge)
+          getScreenStream?: () => Promise<MediaStream>;
+        }
       | undefined;
     try {
-      if (desktop?.getScreenStream) {
+      if (desktop?.getScreenSourceId) {
+        const sourceId = await desktop.getScreenSourceId();
+        if (!sourceId) throw new Error("no-screen-source");
+        displayStream = await navigator.mediaDevices.getUserMedia({
+          audio: {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            mandatory: { chromeMediaSource: "desktop" } as any,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          } as any,
+          video: {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            mandatory: {
+              chromeMediaSource: "desktop",
+              chromeMediaSourceId: sourceId,
+              maxFrameRate: 30,
+              maxWidth: 1920,
+              maxHeight: 1080,
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            } as any,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          } as any,
+        });
+      } else if (desktop?.getScreenStream) {
+        // Fallback para builds antigos do desktop (pode falhar silenciosamente).
         displayStream = await desktop.getScreenStream();
       } else {
         displayStream = await navigator.mediaDevices.getDisplayMedia({
