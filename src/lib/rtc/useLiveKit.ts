@@ -44,7 +44,21 @@ function makeStream(track: MediaStreamTrack): MediaStream {
   return s;
 }
 
-export function useLiveKit(myId: string | null, roomKey: string | null): RtcMeshState {
+export function useLiveKit(
+  myId: string | null,
+  roomKey: string | null,
+  /**
+   * Conjunto de userIds cujo vídeo de câmera DEVE ser assinado. Quando
+   * `null`/`undefined`, todos os vídeos são assinados (comportamento legado).
+   * Compartilhamento de tela ignora esse filtro (sempre assinado).
+   * Áudio também ignora esse filtro — a chamada permanece audível.
+   *
+   * Quando a aba fica oculta (`document.hidden`), todo vídeo é desinscrito
+   * automaticamente; ao voltar, re-aplica o filtro. Isso evita decodificação
+   * de N vídeos em background, principal causa de "computador lento".
+   */
+  videoVisibleIds?: ReadonlySet<string> | null,
+): RtcMeshState {
   const [micOn, setMicOn] = useState(false);
   const [camOn, setCamOn] = useState(false);
   const [screenOn, setScreenOn] = useState(false);
