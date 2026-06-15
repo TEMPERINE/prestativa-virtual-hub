@@ -8,7 +8,7 @@
   "private": true,
   "scripts": {
     "start": "electron .",
-    "pack:win": "electron-packager . VirtualOffice --platform=win32 --arch=x64 --icon=build/icon.ico --out=release --overwrite --asar",
+    "pack:win": "electron-packager . VirtualOffice --platform=win32 --arch=x64 --out=release --overwrite --asar",
     "dist:win": "electron-builder --win --x64 --publish never"
   },
   "build": {
