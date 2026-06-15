@@ -11,26 +11,9 @@ contextBridge.exposeInMainWorld("prestativaDesktop", {
     return await ipcRenderer.invoke("prestativa:get-app-version");
   },
 
-  // Usado por src/lib/meetings/useMeetingRecorder.ts — grava tela
-  // sem mostrar o diálogo "Compartilhar esta janela?" do navegador.
-  async getScreenStream() {
-    const sourceId = await ipcRenderer.invoke(
-      "prestativa:get-screen-source-id",
-    );
-    if (!sourceId) throw new Error("no-screen-source");
-    return await navigator.mediaDevices.getUserMedia({
-      audio: {
-        mandatory: { chromeMediaSource: "desktop" },
-      },
-      video: {
-        mandatory: {
-          chromeMediaSource: "desktop",
-          chromeMediaSourceId: sourceId,
-          maxFrameRate: 30,
-          maxWidth: 1920,
-          maxHeight: 1080,
-        },
-      },
-    });
+  // Devolve só o sourceId — o getUserMedia precisa rodar no renderer (main world),
+  // porque MediaStream não atravessa o contextBridge entre worlds isolados.
+  async getScreenSourceId() {
+    return await ipcRenderer.invoke("prestativa:get-screen-source-id");
   },
 });
