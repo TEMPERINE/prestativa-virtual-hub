@@ -1889,6 +1889,81 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
     void ch.send({ type: "broadcast", event: "lead-decline", payload: { from: me, to: fromUid } });
   }, []);
 
+  // ===== Join ("Junte-se a mim") =====
+  // Caller asks target to teleport next to them; target accepts and lands beside caller.
+  const teleportToPoint = useCallback((target: Point, label?: string) => {
+    if (!tierCapsRef.current.canTeleport) {
+      toast.info("Teleporte está disponível a partir do Nível 2.");
+      return;
+    }
+    const from = { ...posRef.current };
+    autoWalkRef.current = null;
+    teleportTimers.current.forEach((t) => window.clearTimeout(t));
+    teleportTimers.current = [];
+    const id = Date.now();
+    setTeleport({ from, to: target, phase: "out", id });
+    const uid = meIdRef.current;
+    const ch = positionBroadcastChannelRef.current;
+    if (uid && ch && positionBroadcastReadyRef.current) {
+      void ch.send({
+        type: "broadcast",
+        event: "teleport",
+        payload: { user_id: uid, from, to: target },
+      });
+    }
+    teleportTimers.current.push(
+      window.setTimeout(() => {
+        posRef.current = target;
+        setPos(target);
+        const z2 = zoneAt(target);
+        setZone(z2.id);
+        sendPos(target.x, target.y, z2.id, facingRef.current, true);
+        setTeleport({ from, to: target, phase: "in", id });
+      }, 450)
+    );
+    teleportTimers.current.push(
+      window.setTimeout(() => {
+        setTeleport((cur) => (cur && cur.id === id ? null : cur));
+      }, 1100)
+    );
+    if (label) toast.success(`✨ Indo até ${label}...`);
+  }, [sendPos]);
+
+  const requestJoin = useCallback((uid: string) => {
+    const ch = leadChannelRef.current;
+    const from = meIdRef.current;
+    if (!ch || !from) { toast.error("Conexão indisponível."); return; }
+    const fromName = profilesRef.current[from]?.display_name ?? "Alguém";
+    const fromPos = { ...posRef.current };
+    void ch.send({
+      type: "broadcast",
+      event: "join-request",
+      payload: { from, to: uid, fromName, fromPos },
+    });
+    const target = profilesRef.current[uid]?.display_name ?? "personagem";
+    toast.info(`Convite enviado a ${target}.`);
+  }, []);
+
+  const acceptJoin = useCallback((fromUid: string, fromPos: Point) => {
+    const ch = leadChannelRef.current;
+    const me = meIdRef.current;
+    if (!ch || !me) return;
+    void ch.send({ type: "broadcast", event: "join-accept", payload: { from: me, to: fromUid } });
+    const occupied: Point[] = Object.entries(positionsRef.current)
+      .filter(([u]) => u !== me)
+      .map(([, p]) => ({ x: p.x, y: p.y }));
+    const target = nearbyWalkablePoint(fromPos, occupied);
+    const name = profilesRef.current[fromUid]?.display_name ?? "quem chamou";
+    teleportToPoint(target, name);
+  }, [teleportToPoint]);
+
+  const declineJoin = useCallback((fromUid: string) => {
+    const ch = leadChannelRef.current;
+    const me = meIdRef.current;
+    if (!ch || !me) return;
+    void ch.send({ type: "broadcast", event: "join-decline", payload: { from: me, to: fromUid } });
+  }, []);
+
   // Lead channel — separate from positions so we can subscribe independently
   // once we know our user id (the broadcast handlers need stable closures).
   useEffect(() => {
