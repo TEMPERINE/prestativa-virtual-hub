@@ -32,7 +32,6 @@ function createWindow() {
     minHeight: 640,
     backgroundColor: "#0b0b12",
     title: "Virtual Office",
-    icon: path.join(__dirname, "..", "build", "icon.ico"),
     autoHideMenuBar: true,
     webPreferences: {
       preload: path.join(__dirname, "preload.cjs"),
