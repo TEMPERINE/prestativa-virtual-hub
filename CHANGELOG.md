@@ -3,6 +3,11 @@
 Formato: [SemVer](https://semver.org/lang/pt-BR/) + canal (`-beta`, `-rc`, estável).
 Atualize `src/lib/version.ts` ao publicar uma nova versão.
 
+## v1.0.3 — 2026-06-15
+
+### Corrigido
+- Gravação de reuniões no app desktop (Windows) ficava silenciosa ao clicar em **Gravar**. O `MediaStream` não atravessava o `contextBridge` do Electron; agora o preload devolve apenas o `sourceId` da tela e o renderer chama `getUserMedia` com `chromeMediaSource: "desktop"`.
+
 ## v1.0.2 — 2026-06-11
 
 ### Alterado
