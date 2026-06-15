@@ -3190,7 +3190,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="text-center">
-              Recadinho de {openingNote ? profiles[openingNote.sender_id]?.display_name ?? "alguém" : ""}
+              Recadinho de {openingNote ? profiles[openingNote.sender_id]?.display_name ?? "alguém" : ""} para você
             </DialogTitle>
           </DialogHeader>
           <div
