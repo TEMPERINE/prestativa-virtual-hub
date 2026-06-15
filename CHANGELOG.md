@@ -3,6 +3,14 @@
 Formato: [SemVer](https://semver.org/lang/pt-BR/) + canal (`-beta`, `-rc`, estável).
 Atualize `src/lib/version.ts` ao publicar uma nova versão.
 
+## v1.0.6 — 2026-06-15
+
+### Corrigido
+- Nova tentativa de release do instalador `.exe` (v1.0.5 falhou no runner sem gerar binário).
+
+### Adicionado
+- Otimização Onda 1: pausa de vídeo em aba oculta, vídeo sob demanda por proximidade e throttle de persistência de posição (300ms → 2s).
+
 ## v1.0.4 — 2026-06-15
 
 ### Corrigido
