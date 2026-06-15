@@ -1999,13 +1999,36 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
         const name = profilesRef.current[p.from]?.display_name ?? "Alguém";
         toast.info(`${name} parou de te seguir.`);
       })
+      .on("broadcast", { event: "join-request" }, ({ payload }) => {
+        const p = payload as { from?: string; to?: string; fromName?: string; fromPos?: Point };
+        if (!p?.from || p.to !== uid || !p.fromPos) return;
+        const from = p.from;
+        const fromPos = p.fromPos;
+        toast(`${p.fromName ?? "Alguém"} quer que você se junte a ele(a)`, {
+          description: "Aceite para se teletransportar para o local dessa pessoa.",
+          duration: 20000,
+          action: { label: "Aceitar", onClick: () => acceptJoin(from, fromPos) },
+          cancel: { label: "Recusar", onClick: () => declineJoin(from) },
+        });
+      })
+      .on("broadcast", { event: "join-accept" }, ({ payload }) => {
+        const p = payload as { from?: string; to?: string };
+        if (!p?.from || p.to !== uid) return;
+        const name = profilesRef.current[p.from]?.display_name ?? "Alguém";
+        toast.success(`${name} aceitou o convite e está chegando!`);
+      })
+      .on("broadcast", { event: "join-decline" }, ({ payload }) => {
+        const p = payload as { from?: string; to?: string };
+        if (!p?.from || p.to !== uid) return;
+        toast.info("Convite recusado.");
+      })
       .subscribe();
     leadChannelRef.current = ch;
     return () => {
       supabase.removeChannel(ch);
       if (leadChannelRef.current === ch) leadChannelRef.current = null;
     };
-  }, [me?.id, acceptLead, declineLead]);
+  }, [me?.id, acceptLead, declineLead, acceptJoin, declineJoin]);
 
   // Close avatar menu on outside click / Esc
   useEffect(() => {
