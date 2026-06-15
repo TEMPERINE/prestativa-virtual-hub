@@ -235,6 +235,23 @@ function randomPointInRect(
   return seatPointForRect(rect);
 }
 
+// Find a walkable point next to `anchor` (used by "Junte-se a mim" teleport
+// so the called user lands beside the caller, not on top of them).
+function nearbyWalkablePoint(anchor: Point, avoid: Point[] = []): Point {
+  const rings = [0.035, 0.05, 0.07, 0.09, 0.12, 0.16];
+  for (const r of rings) {
+    for (let i = 0; i < 16; i++) {
+      const a = (i / 16) * Math.PI * 2;
+      const p = { x: anchor.x + Math.cos(a) * r, y: anchor.y + Math.sin(a) * r };
+      if (p.x < 0.02 || p.x > 0.98 || p.y < 0.02 || p.y > 0.98) continue;
+      if (collides(p)) continue;
+      if (avoid.some((v) => Math.hypot(v.x - p.x, v.y - p.y) < 0.025)) continue;
+      return p;
+    }
+  }
+  return anchor;
+}
+
 export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
   const officeTheme = useOfficeTheme();
   // Capacidades por nível do espaço atual — controlam botões de gravar,
