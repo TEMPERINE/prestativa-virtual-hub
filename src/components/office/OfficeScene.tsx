@@ -4002,6 +4002,14 @@ function AvatarInteractionMenu({
         >
           <UserPlus className="w-4 h-4" /> Pedir para conduzir
         </button>
+        <button
+          type="button"
+          onClick={onJoin}
+          className="w-full flex items-center gap-2 px-2 py-2 text-sm rounded hover:bg-muted text-left"
+          title={`Convidar ${profile.display_name} a se juntar a você`}
+        >
+          <Users className="w-4 h-4" /> Convidar {profile.display_name} a se juntar
+        </button>
       </div>
     </div>
   );
