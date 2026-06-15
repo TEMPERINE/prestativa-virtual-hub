@@ -2495,6 +2495,8 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
           // Skip entirely when there's no function available here:
           // - empty zone but I already have a claim → can't claim, nothing to do
           if (!ownerId && iHaveAClaim) return null;
+          // - own claim → não mostramos card (a ação "Deixar mesa" agora vive no menu do perfil)
+          if (isMyClaim) return null;
           const showCompose = !!ownerId && !isMyClaim;
           return (
             <WorkspaceZoneHover
@@ -2522,14 +2524,6 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
                         }
                       : undefined
                   }
-                  onLeaveDesk={
-                    isMyClaim
-                      ? () => {
-                          releaseClaim();
-                          setHoveredZone(null);
-                        }
-                      : undefined
-                  }
                 />
               ) : (
                 <button
@@ -2543,6 +2537,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
           );
 
         })}
+
 
         {/* Bolhas de "conversa de corredor" — raio de alcance de voz/vídeo
             ao redor de cada personagem que NÃO está numa sala reivindicada.
@@ -3413,6 +3408,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
                 onSignOut={signOut}
                 onStatusChanged={refreshMe}
                 onOpenSavedNotes={() => setSavedNotesOpen(true)}
+                onLeaveDesk={releaseClaim}
               />
             )}
           </div>

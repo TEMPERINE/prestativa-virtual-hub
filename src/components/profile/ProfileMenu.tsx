@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { SpritePreview } from "./SpritePreview";
-import { LogOut, User as UserIcon, Shirt, Home, MapPin, RefreshCcw, StickyNote, Video } from "lucide-react";
+import { LogOut, User as UserIcon, Shirt, Home, MapPin, RefreshCcw, StickyNote, Video, DoorOpen } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 
 type Status = "available" | "busy" | "away";
@@ -37,6 +37,7 @@ type Props = {
   onSignOut: () => void;
   onStatusChanged: () => void;
   onOpenSavedNotes: () => void;
+  onLeaveDesk: () => void;
 };
 
 export function ProfileMenu(p: Props) {
@@ -100,6 +101,7 @@ export function ProfileMenu(p: Props) {
           <MenuItem icon={<Shirt className="w-4 h-4" />} label={p.canEditCharacter === false ? "Editar personagem (Nível 2+)" : "Editar personagem"} disabled={p.canEditCharacter === false} onClick={() => { setOpen(false); p.onEditCharacter(); }} />
           <MenuItem icon={<UserIcon className="w-4 h-4" />} label="Editar perfil" onClick={() => { setOpen(false); p.onEditProfile(); }} />
           <MenuItem icon={<MapPin className="w-4 h-4" />} label="Ir até minha mesa" hint="Ctrl+D" disabled={!p.hasClaim} onClick={() => { setOpen(false); p.onGoToMyDesk(); }} />
+          <MenuItem icon={<DoorOpen className="w-4 h-4" />} label="Deixar mesa" disabled={!p.hasClaim} onClick={() => { setOpen(false); p.onLeaveDesk(); }} />
           <MenuItem icon={<Home className="w-4 h-4" />} label="Me leve ao saguão" onClick={() => { setOpen(false); p.onGoToLobby(); }} />
           <MenuItem icon={<StickyNote className="w-4 h-4" />} label="Recadinhos guardados" onClick={() => { setOpen(false); p.onOpenSavedNotes(); }} />
           <Link
