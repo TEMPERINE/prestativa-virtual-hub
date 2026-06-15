@@ -606,7 +606,10 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
       void ch.send({ type: "broadcast", event: "position", payload });
     }
     const now = performance.now();
-    if (persistNow || now - lastPersisted.current > 300) {
+    // Persistência leve: broadcast já cobre tempo real, então salvamos no DB
+    // só de 2 em 2s enquanto anda. Snapshot final no keyup/pagehide já força
+    // persistNow=true, mantendo a posição correta ao desconectar.
+    if (persistNow || now - lastPersisted.current > 2000) {
       lastPersisted.current = now;
       const _ws = getCurrentWorkspaceId();
       if (_ws) void supabase.from("positions").upsert({
