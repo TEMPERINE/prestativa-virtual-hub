@@ -7,15 +7,17 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Tag para gerar a release (ex: v0.1.2)"
+        description: "Versão para gerar/publicar (ex: v1.0.4)"
         required: true
-        default: "v0.1.2"
+        default: "v1.0.4"
 
 jobs:
   release:
     runs-on: windows-latest
     permissions:
       contents: write
+    env:
+      RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
     defaults:
       run:
         working-directory: desktop
@@ -23,7 +25,31 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
+          ref: ${{ github.event_name == 'workflow_dispatch' && github.event.repository.default_branch || github.ref }}
+          fetch-depth: 0
+
+      - name: Prepare release version
+        shell: pwsh
+        working-directory: .
+        run: |
+          $tag = "${{ env.RELEASE_TAG }}"
+          if ($tag -notmatch '^v\d+\.\d+\.\d+$') {
+            throw "Use uma versão no formato v1.0.4"
+          }
+
+          $version = $tag.TrimStart('v')
+          npm version $version --prefix desktop --no-git-tag-version --allow-same-version
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git fetch --tags origin
+          if (git rev-parse "$tag" 2>$null) {
+            Write-Host "Tag $tag já existe. Vou anexar/atualizar os arquivos nessa release."
+          } else {
+            git tag -a $tag -m "Release $tag"
+            git push origin $tag
+          }
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -42,10 +68,21 @@ jobs:
           Write-Host "=== dist contents (cwd=desktop) ==="
           if (Test-Path dist) { Get-ChildItem -Path dist -Recurse | Select-Object FullName, Length } else { Write-Host "dist/ does not exist" }
 
+      - name: Check installer exists
+        shell: pwsh
+        run: |
+          $exe = Get-ChildItem -Path dist -Filter *.exe -File -ErrorAction SilentlyContinue
+          if (-not $exe) {
+            throw "O instalador .exe não foi gerado em desktop/dist. Veja o passo 'Build and publish Windows installer'."
+          }
+          $exe | Select-Object Name, Length
+
       - name: Attach installer to GitHub release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+          tag_name: ${{ env.RELEASE_TAG }}
+          name: Virtual Office ${{ env.RELEASE_TAG }}
+          generate_release_notes: true
           fail_on_unmatched_files: true
           files: |
             desktop/dist/*.exe
