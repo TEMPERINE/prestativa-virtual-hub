@@ -3947,11 +3947,13 @@ function AvatarInteractionMenu({
   onClose,
   onFollow,
   onLead,
+  onJoin,
 }: {
   profile: Profile;
   onClose: () => void;
   onFollow: () => void;
   onLead: () => void;
+  onJoin: () => void;
 }) {
   return (
     <div
