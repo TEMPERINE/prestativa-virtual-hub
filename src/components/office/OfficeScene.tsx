@@ -532,7 +532,11 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
     const zoneId = zoneAt(pos).id;
     return `ws-${wsId}::zone-${zoneId}`;
   }, [me?.id, pos]);
-  const rtc = useLiveKit(me?.id ?? null, roomKey);
+  // Vídeo sob demanda: só assina câmera de quem está perto/na mesma sala.
+  // `desiredPeers` já combina proximidade no lobby + mesma zona privada.
+  // Áudio continua disponível para todos da sala LiveKit (ver audiblePeerIds).
+  const videoVisibleIds = useMemo(() => new Set(desiredPeers), [desiredPeers]);
+  const rtc = useLiveKit(me?.id ?? null, roomKey, videoVisibleIds);
   useEffect(() => {
     connectedPeersRef.current = new Set(desiredPeers);
   }, [desiredPeers]);
@@ -602,7 +606,10 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
       void ch.send({ type: "broadcast", event: "position", payload });
     }
     const now = performance.now();
-    if (persistNow || now - lastPersisted.current > 300) {
+    // Persistência leve: broadcast já cobre tempo real, então salvamos no DB
+    // só de 2 em 2s enquanto anda. Snapshot final no keyup/pagehide já força
+    // persistNow=true, mantendo a posição correta ao desconectar.
+    if (persistNow || now - lastPersisted.current > 2000) {
       lastPersisted.current = now;
       const _ws = getCurrentWorkspaceId();
       if (_ws) void supabase.from("positions").upsert({

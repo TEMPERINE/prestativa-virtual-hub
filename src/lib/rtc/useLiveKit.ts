@@ -44,7 +44,21 @@ function makeStream(track: MediaStreamTrack): MediaStream {
   return s;
 }
 
-export function useLiveKit(myId: string | null, roomKey: string | null): RtcMeshState {
+export function useLiveKit(
+  myId: string | null,
+  roomKey: string | null,
+  /**
+   * Conjunto de userIds cujo vídeo de câmera DEVE ser assinado. Quando
+   * `null`/`undefined`, todos os vídeos são assinados (comportamento legado).
+   * Compartilhamento de tela ignora esse filtro (sempre assinado).
+   * Áudio também ignora esse filtro — a chamada permanece audível.
+   *
+   * Quando a aba fica oculta (`document.hidden`), todo vídeo é desinscrito
+   * automaticamente; ao voltar, re-aplica o filtro. Isso evita decodificação
+   * de N vídeos em background, principal causa de "computador lento".
+   */
+  videoVisibleIds?: ReadonlySet<string> | null,
+): RtcMeshState {
   const [micOn, setMicOn] = useState(false);
   const [camOn, setCamOn] = useState(false);
   const [screenOn, setScreenOn] = useState(false);
@@ -267,6 +281,77 @@ export function useLiveKit(myId: string | null, roomKey: string | null): RtcMesh
       if (r) { try { void r.disconnect(); } catch { /* noop */ } }
     };
   }, []);
+
+  // ---------- Video-on-demand: subscribe video only for visible peers ----------
+  // Mantém refs estáveis para o filtro e visibilidade da aba, e re-aplica a
+  // cada mudança (filtro, visibilidade, participante entrando, track publicada).
+  const videoFilterRef = useRef<ReadonlySet<string> | null | undefined>(videoVisibleIds);
+  videoFilterRef.current = videoVisibleIds;
+  const tabHiddenRef = useRef<boolean>(
+    typeof document !== "undefined" && document.visibilityState === "hidden",
+  );
+
+  const applyVideoSubscriptions = useCallback(() => {
+    const r = roomRef.current;
+    if (!r) return;
+    const filter = videoFilterRef.current;
+    const hidden = tabHiddenRef.current;
+    r.remoteParticipants.forEach((p) => {
+      p.trackPublications.forEach((pub) => {
+        // RemoteTrackPublication tem setSubscribed; ignoramos publicações locais.
+        const rpub = pub as RemoteTrackPublication;
+        if (typeof rpub.setSubscribed !== "function") return;
+        if (pub.kind !== Track.Kind.Video) return;
+        const isScreen =
+          pub.source === Track.Source.ScreenShare ||
+          pub.source === Track.Source.ScreenShareAudio;
+        // Tela compartilhada: pausa em aba oculta, mas ignora filtro de proximidade
+        // (geralmente é o foco da atenção quando alguém compartilha).
+        if (isScreen) {
+          try { rpub.setSubscribed(!hidden); } catch { /* noop */ }
+          return;
+        }
+        // Vídeo de câmera: pausa em aba oculta OU se peer não está no filtro.
+        const wantSub = !hidden && (filter == null || filter.has(p.identity));
+        try { rpub.setSubscribed(wantSub); } catch { /* noop */ }
+      });
+    });
+  }, []);
+
+  // Re-aplica quando o filtro muda.
+  useEffect(() => {
+    applyVideoSubscriptions();
+  }, [videoVisibleIds, applyVideoSubscriptions]);
+
+  // Re-aplica quando entram novos participantes / novas tracks.
+  useEffect(() => {
+    const r = roomRef.current;
+    if (!r) return;
+    const handler = () => applyVideoSubscriptions();
+    r.on(RoomEvent.ParticipantConnected, handler);
+    r.on(RoomEvent.TrackPublished, handler);
+    r.on(RoomEvent.TrackSubscribed, handler);
+    return () => {
+      try {
+        r.off(RoomEvent.ParticipantConnected, handler);
+        r.off(RoomEvent.TrackPublished, handler);
+        r.off(RoomEvent.TrackSubscribed, handler);
+      } catch { /* noop */ }
+    };
+    // re-bind quando a sala troca (roomKey muda)
+  }, [roomKey, applyVideoSubscriptions]);
+
+  // Pausa vídeo quando a aba fica oculta; retoma ao voltar.
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    const onVis = () => {
+      tabHiddenRef.current = document.visibilityState === "hidden";
+      applyVideoSubscriptions();
+    };
+    document.addEventListener("visibilitychange", onVis);
+    return () => document.removeEventListener("visibilitychange", onVis);
+  }, [applyVideoSubscriptions]);
+
 
   // ---------- Toggles ----------
   const toggleMic = useCallback(async () => {
