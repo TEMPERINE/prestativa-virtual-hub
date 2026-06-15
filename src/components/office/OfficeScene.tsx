@@ -532,7 +532,11 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
     const zoneId = zoneAt(pos).id;
     return `ws-${wsId}::zone-${zoneId}`;
   }, [me?.id, pos]);
-  const rtc = useLiveKit(me?.id ?? null, roomKey);
+  // Vídeo sob demanda: só assina câmera de quem está perto/na mesma sala.
+  // `desiredPeers` já combina proximidade no lobby + mesma zona privada.
+  // Áudio continua disponível para todos da sala LiveKit (ver audiblePeerIds).
+  const videoVisibleIds = useMemo(() => new Set(desiredPeers), [desiredPeers]);
+  const rtc = useLiveKit(me?.id ?? null, roomKey, videoVisibleIds);
   useEffect(() => {
     connectedPeersRef.current = new Set(desiredPeers);
   }, [desiredPeers]);
