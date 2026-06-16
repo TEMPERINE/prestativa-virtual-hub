@@ -2290,7 +2290,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
 
 
 
-  const currentZone = useMemo(() => findZoneById(zone) ?? ZONES[ZONES.length - 1], [zone]);
+  const currentZone = useMemo(() => findZoneById(localZoneId) ?? ZONES[ZONES.length - 1], [localZoneId]);
   // Prefer the painted bounding box (editor overrides) over the hardcoded rect
   // so the spotlight visually matches exactly what the user painted.
   const focusedZone = useMemo(() => {
@@ -2299,7 +2299,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
     return painted
       ? { ...currentZone, rect: painted }
       : currentZone;
-  }, [currentZone]);
+  }, [currentZone, mapVersion]);
   const focusedZoneRef = useRef(focusedZone);
   focusedZoneRef.current = focusedZone;
 
