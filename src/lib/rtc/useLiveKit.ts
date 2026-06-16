@@ -230,7 +230,14 @@ export function useLiveKit(
         const room = new Room({
           adaptiveStream: true,
           dynacast: true,
-          publishDefaults: { dtx: true, red: true },
+          audioCaptureDefaults: AUDIO_CAPTURE_OPTIONS,
+          videoCaptureDefaults: VIDEO_CAPTURE_OPTIONS,
+          publishDefaults: {
+            dtx: true,
+            red: true,
+            simulcast: false,
+            videoEncoding: { maxBitrate: 450_000, maxFramerate: 15 },
+          },
         });
         roomRef.current = room;
         currentRoomKeyRef.current = roomKey;
@@ -301,11 +308,13 @@ export function useLiveKit(
             const pending = pendingMicTrackRef.current;
             if (pending) {
               pendingMicTrackRef.current = null;
-              await room.localParticipant.publishTrack(pending);
+              await room.localParticipant.publishTrack(pending, { source: Track.Source.Microphone, dtx: true, red: true });
             } else {
               await room.localParticipant.setMicrophoneEnabled(
                 true,
-                selectedAudioInputDeviceId ? { deviceId: selectedAudioInputDeviceId } : undefined,
+                selectedAudioInputDeviceId
+                  ? { ...AUDIO_CAPTURE_OPTIONS, deviceId: { ideal: selectedAudioInputDeviceId } }
+                  : AUDIO_CAPTURE_OPTIONS,
               );
             }
             setMicOn(true);
@@ -316,9 +325,18 @@ export function useLiveKit(
             const pending = pendingCamTrackRef.current;
             if (pending) {
               pendingCamTrackRef.current = null;
-              await room.localParticipant.publishTrack(pending);
+              await room.localParticipant.publishTrack(pending, {
+                source: Track.Source.Camera,
+                simulcast: false,
+                videoEncoding: { maxBitrate: 450_000, maxFramerate: 15 },
+              });
             } else {
-              await room.localParticipant.setCameraEnabled(true, selectedVideoDeviceId ? { deviceId: selectedVideoDeviceId } : undefined);
+              await room.localParticipant.setCameraEnabled(
+                true,
+                selectedVideoDeviceId
+                  ? { ...VIDEO_CAPTURE_OPTIONS, deviceId: { ideal: selectedVideoDeviceId } }
+                  : VIDEO_CAPTURE_OPTIONS,
+              );
             }
             const pub = room.localParticipant.getTrackPublication(Track.Source.Camera);
             if (pub?.track?.mediaStreamTrack) setLocalVideoStream(makeStream(pub.track.mediaStreamTrack));
@@ -455,8 +473,13 @@ export function useLiveKit(
       if (want) {
         const track = pendingMicTrackRef.current;
         pendingMicTrackRef.current = null;
-        if (track) await r.localParticipant.publishTrack(track);
-        else await r.localParticipant.setMicrophoneEnabled(true, selectedAudioInputDeviceId ? { deviceId: selectedAudioInputDeviceId } : undefined);
+        if (track) await r.localParticipant.publishTrack(track, { source: Track.Source.Microphone, dtx: true, red: true });
+        else await r.localParticipant.setMicrophoneEnabled(
+          true,
+          selectedAudioInputDeviceId
+            ? { ...AUDIO_CAPTURE_OPTIONS, deviceId: { ideal: selectedAudioInputDeviceId } }
+            : AUDIO_CAPTURE_OPTIONS,
+        );
       } else {
         pendingMicTrackRef.current?.stop();
         pendingMicTrackRef.current = null;
@@ -495,8 +518,17 @@ export function useLiveKit(
       if (want) {
         const track = pendingCamTrackRef.current;
         pendingCamTrackRef.current = null;
-        if (track) await r.localParticipant.publishTrack(track);
-        else await r.localParticipant.setCameraEnabled(true, selectedVideoDeviceId ? { deviceId: selectedVideoDeviceId } : undefined);
+        if (track) await r.localParticipant.publishTrack(track, {
+          source: Track.Source.Camera,
+          simulcast: false,
+          videoEncoding: { maxBitrate: 450_000, maxFramerate: 15 },
+        });
+        else await r.localParticipant.setCameraEnabled(
+          true,
+          selectedVideoDeviceId
+            ? { ...VIDEO_CAPTURE_OPTIONS, deviceId: { ideal: selectedVideoDeviceId } }
+            : VIDEO_CAPTURE_OPTIONS,
+        );
         const pub = r.localParticipant.getTrackPublication(Track.Source.Camera);
         if (pub?.track?.mediaStreamTrack) setLocalVideoStream(makeStream(pub.track.mediaStreamTrack));
         setCamOn(true);
