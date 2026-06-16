@@ -354,25 +354,65 @@ export function useLiveKit(
 
 
   // ---------- Toggles ----------
+  // Quando ainda não há sala (entrando em zona privada, conectando…),
+  // dispara o getUserMedia DENTRO do gesto do clique para capturar a
+  // permissão; quando a sala conectar, o desejo "sticky" publica a track
+  // sem precisar de novo prompt. Isso evita o caso em que o botão fica
+  // rosa mas o microfone/câmera nunca abre.
   const toggleMic = useCallback(async () => {
     const r = roomRef.current;
     const want = !wantMicRef.current;
     wantMicRef.current = want;
-    if (!r) { setMicOn(want); return; }
+    if (!r) {
+      if (want) {
+        try {
+          const s = await navigator.mediaDevices.getUserMedia({
+            audio: selectedAudioInputDeviceId ? { deviceId: { exact: selectedAudioInputDeviceId } } : true,
+          });
+          s.getTracks().forEach((t) => t.stop());
+          setMicOn(true);
+        } catch (e) {
+          wantMicRef.current = false;
+          setMicOn(false);
+          throw e;
+        }
+      } else {
+        setMicOn(false);
+      }
+      return;
+    }
     try {
       await r.localParticipant.setMicrophoneEnabled(want);
       setMicOn(want);
     } catch (e) {
       wantMicRef.current = !want;
+      setMicOn(!want);
       throw e;
     }
-  }, []);
+  }, [selectedAudioInputDeviceId]);
 
   const toggleCam = useCallback(async () => {
     const r = roomRef.current;
     const want = !wantCamRef.current;
     wantCamRef.current = want;
-    if (!r) { setCamOn(want); return; }
+    if (!r) {
+      if (want) {
+        try {
+          const s = await navigator.mediaDevices.getUserMedia({
+            video: selectedVideoDeviceId ? { deviceId: { exact: selectedVideoDeviceId } } : true,
+          });
+          s.getTracks().forEach((t) => t.stop());
+          setCamOn(true);
+        } catch (e) {
+          wantCamRef.current = false;
+          setCamOn(false);
+          throw e;
+        }
+      } else {
+        setCamOn(false);
+      }
+      return;
+    }
     try {
       if (want) {
         await r.localParticipant.setCameraEnabled(true, selectedVideoDeviceId ? { deviceId: selectedVideoDeviceId } : undefined);
@@ -386,6 +426,7 @@ export function useLiveKit(
       }
     } catch (e) {
       wantCamRef.current = !want;
+      setCamOn(!want);
       throw e;
     }
   }, [selectedVideoDeviceId]);
