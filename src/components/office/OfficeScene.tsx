@@ -208,20 +208,30 @@ function describeMediaError(err: unknown, kind: "microfone" | "câmera"): string
 
 function callZoneAt(p: Point): ZoneId {
   const exact = zoneAt(p).id;
-  if (exact !== "lobby") return exact;
-
   const candidates: Array<{ id: ZoneId; area: number }> = [];
   const ids = new Set<string>([
+    exact,
     ...ZONES.filter((z) => z.id !== "lobby").map((z) => z.id),
     ...customZonesFromOverrides().map((z) => z.id),
   ]);
 
   for (const id of ids) {
     const rect = zoneRectFromOverrides(id as ZoneId);
-    if (!rect || !pointInsideRect(p, rect)) continue;
+    const fallbackRect = findZoneById(id)?.rect ?? null;
+    const effectiveRect = rect ?? (id === exact ? fallbackRect : null);
+    if (!effectiveRect || !pointInsideRect(p, effectiveRect)) continue;
     candidates.push({ id: id as ZoneId, area: (rect.x2 - rect.x1) * (rect.y2 - rect.y1) });
   }
 
+  // Se uma sala comum (reunião/feedback/descompressão/custom common) contém
+  // o avatar, ela é a sala de chamada — mesmo que o tile exato seja uma mesa
+  // ou cadeira pintada por baixo. Isso evita dividir a reunião em várias calls.
+  const common = candidates
+    .filter((c) => c.id !== "lobby" && getZoneKind(c.id) === "common")
+    .sort((a, b) => a.area - b.area)[0];
+  if (common) return common.id;
+
+  if (exact !== "lobby") return exact;
   return candidates.sort((a, b) => a.area - b.area)[0]?.id ?? exact;
 }
 
