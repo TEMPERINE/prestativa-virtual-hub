@@ -119,6 +119,7 @@ function setupMediaPermissions() {
   const wantsMediaDevice = (details) => {
     const mediaTypes = details?.mediaTypes ?? [];
     const mediaType = details?.mediaType;
+    if (!details || mediaType === "unknown") return true;
     return mediaTypes.includes("audio") || mediaTypes.includes("video") || mediaType === "audio" || mediaType === "video";
   };
 
