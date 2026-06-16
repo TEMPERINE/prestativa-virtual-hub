@@ -220,7 +220,10 @@ function callZoneAt(p: Point): ZoneId {
     const fallbackRect = findZoneById(id)?.rect ?? null;
     const effectiveRect = rect ?? (id === exact ? fallbackRect : null);
     if (!effectiveRect || !pointInsideRect(p, effectiveRect)) continue;
-    candidates.push({ id: id as ZoneId, area: (rect.x2 - rect.x1) * (rect.y2 - rect.y1) });
+    candidates.push({
+      id: id as ZoneId,
+      area: (effectiveRect.x2 - effectiveRect.x1) * (effectiveRect.y2 - effectiveRect.y1),
+    });
   }
 
   // Se uma sala comum (reunião/feedback/descompressão/custom common) contém
