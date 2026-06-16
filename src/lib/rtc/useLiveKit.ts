@@ -402,8 +402,14 @@ export function useLiveKit(
         setMicOn(false);
         throw e;
       }
+    } else {
+      pendingMicTrackRef.current?.stop();
+      pendingMicTrackRef.current = null;
     }
-    if (!r) { setMicOn(want); return; }
+    if (!r) {
+      setMicOn(want);
+      return;
+    }
     try {
       if (want) {
         const track = pendingMicTrackRef.current;
@@ -438,8 +444,14 @@ export function useLiveKit(
         setCamOn(false);
         throw e;
       }
+    } else {
+      pendingCamTrackRef.current?.stop();
+      pendingCamTrackRef.current = null;
     }
-    if (!r) { setCamOn(want); return; }
+    if (!r) {
+      setCamOn(want);
+      return;
+    }
     try {
       if (want) {
         const track = pendingCamTrackRef.current;
