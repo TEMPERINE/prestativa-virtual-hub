@@ -363,24 +363,23 @@ export function useLiveKit(
     const r = roomRef.current;
     const want = !wantMicRef.current;
     wantMicRef.current = want;
-    if (!r) {
-      if (want) {
-        try {
-          const s = await navigator.mediaDevices.getUserMedia({
-            audio: selectedAudioInputDeviceId ? { deviceId: { exact: selectedAudioInputDeviceId } } : true,
-          });
-          s.getTracks().forEach((t) => t.stop());
-          setMicOn(true);
-        } catch (e) {
-          wantMicRef.current = false;
-          setMicOn(false);
-          throw e;
-        }
-      } else {
+    // Sempre dispara getUserMedia dentro do gesto do clique quando quer ligar.
+    // Garante que a permissão seja capturada de forma síncrona com o clique
+    // (mesmo se a sala já existe), evitando o caso em que o botão fica rosa
+    // mas o microfone nunca abre.
+    if (want) {
+      try {
+        const s = await navigator.mediaDevices.getUserMedia({
+          audio: selectedAudioInputDeviceId ? { deviceId: { exact: selectedAudioInputDeviceId } } : true,
+        });
+        s.getTracks().forEach((t) => t.stop());
+      } catch (e) {
+        wantMicRef.current = false;
         setMicOn(false);
+        throw e;
       }
-      return;
     }
+    if (!r) { setMicOn(want); return; }
     try {
       await r.localParticipant.setMicrophoneEnabled(want);
       setMicOn(want);
@@ -395,24 +394,19 @@ export function useLiveKit(
     const r = roomRef.current;
     const want = !wantCamRef.current;
     wantCamRef.current = want;
-    if (!r) {
-      if (want) {
-        try {
-          const s = await navigator.mediaDevices.getUserMedia({
-            video: selectedVideoDeviceId ? { deviceId: { exact: selectedVideoDeviceId } } : true,
-          });
-          s.getTracks().forEach((t) => t.stop());
-          setCamOn(true);
-        } catch (e) {
-          wantCamRef.current = false;
-          setCamOn(false);
-          throw e;
-        }
-      } else {
+    if (want) {
+      try {
+        const s = await navigator.mediaDevices.getUserMedia({
+          video: selectedVideoDeviceId ? { deviceId: { exact: selectedVideoDeviceId } } : true,
+        });
+        s.getTracks().forEach((t) => t.stop());
+      } catch (e) {
+        wantCamRef.current = false;
         setCamOn(false);
+        throw e;
       }
-      return;
     }
+    if (!r) { setCamOn(want); return; }
     try {
       if (want) {
         await r.localParticipant.setCameraEnabled(true, selectedVideoDeviceId ? { deviceId: selectedVideoDeviceId } : undefined);
