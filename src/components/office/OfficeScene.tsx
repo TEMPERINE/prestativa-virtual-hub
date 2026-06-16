@@ -207,36 +207,13 @@ function describeMediaError(err: unknown, kind: "microfone" | "câmera"): string
 }
 
 function callZoneAt(p: Point): ZoneId {
-  const exact = zoneAt(p).id;
-  const candidates: Array<{ id: ZoneId; area: number }> = [];
-  const ids = new Set<string>([
-    exact,
-    ...ZONES.filter((z) => z.id !== "lobby").map((z) => z.id),
-    ...customZonesFromOverrides().map((z) => z.id),
-  ]);
-
-  for (const id of ids) {
-    const rect = zoneRectFromOverrides(id as ZoneId);
-    const fallbackRect = findZoneById(id)?.rect ?? null;
-    const isCommonZone = id !== "lobby" && getZoneKind(id) === "common";
-    const effectiveRect = rect ?? (id === exact || isCommonZone ? fallbackRect : null);
-    if (!effectiveRect || !pointInsideRect(p, effectiveRect)) continue;
-    candidates.push({
-      id: id as ZoneId,
-      area: (effectiveRect.x2 - effectiveRect.x1) * (effectiveRect.y2 - effectiveRect.y1),
-    });
-  }
-
-  // Se uma sala comum (reunião/feedback/descompressão/custom common) contém
-  // o avatar, ela é a sala de chamada — mesmo que o tile exato seja uma mesa
-  // ou cadeira pintada por baixo. Isso evita dividir a reunião em várias calls.
-  const common = candidates
-    .filter((c) => c.id !== "lobby" && getZoneKind(c.id) === "common")
-    .sort((a, b) => a.area - b.area)[0];
-  if (common) return common.id;
-
-  if (exact !== "lobby") return exact;
-  return candidates.sort((a, b) => a.area - b.area)[0]?.id ?? exact;
+  // Fonte única de verdade: a zona realmente pintada no editor de mapas.
+  // Assentos/mesas desenhados dentro de salas são apenas visuais — não
+  // existem como áreas no mapa, então não devem interferir aqui. Qualquer
+  // tentativa de "fundir" zonas legadas (atendente-*, diretoria, etc.) com
+  // o que foi pintado acabava colocando usuários no mesmo lugar em salas de
+  // chamada diferentes.
+  return zoneAtWithOverrides(p).id;
 }
 
 // "Seat" point of a zone rect — bottom-center, in front of the desk.
