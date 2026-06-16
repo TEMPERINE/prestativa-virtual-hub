@@ -80,6 +80,7 @@ export const adminCreateAccount = createServerFn({ method: "POST" })
     plan: Plan;
     workspaceId?: string | null;
     workspaceRole?: "owner" | "admin" | "member";
+    groupId?: string | null;
   }) => {
     if (!input.email || !/^\S+@\S+\.\S+$/.test(input.email)) throw new Error("Email inválido");
     if (!input.password || input.password.length < 6) throw new Error("Senha precisa ter ao menos 6 caracteres");
@@ -100,11 +101,13 @@ export const adminCreateAccount = createServerFn({ method: "POST" })
 
     const newId = created.user.id;
 
-    // Trigger handle_new_user já criou profile + role 'member'.
-    // Atualiza o display_name (caso difira) e o plano.
     await supabaseAdmin
       .from("profiles")
-      .update({ display_name: data.displayName || data.email.split("@")[0], plan: data.plan })
+      .update({
+        display_name: data.displayName || data.email.split("@")[0],
+        plan: data.plan,
+        group_id: data.groupId ?? null,
+      })
       .eq("id", newId);
 
     if (data.workspaceId) {
@@ -117,6 +120,62 @@ export const adminCreateAccount = createServerFn({ method: "POST" })
     }
 
     return { id: newId, email: data.email };
+  });
+
+export const adminSetAccountGroup = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { userId: string; groupId: string | null }) => input)
+  .handler(async ({ context, data }) => {
+    await ensureAdmin(context as any);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error } = await supabaseAdmin
+      .from("profiles")
+      .update({ group_id: data.groupId })
+      .eq("id", data.userId);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+export const adminListGroups = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await ensureAdmin(context as any);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data, error } = await supabaseAdmin
+      .from("account_groups")
+      .select("id, name, description")
+      .order("name");
+    if (error) throw new Error(error.message);
+    return { groups: data ?? [] };
+  });
+
+export const adminCreateGroup = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { name: string; description?: string | null }) => {
+    if (!input.name?.trim()) throw new Error("Nome do grupo é obrigatório");
+    return input;
+  })
+  .handler(async ({ context, data }) => {
+    await ensureAdmin(context as any);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: row, error } = await supabaseAdmin
+      .from("account_groups")
+      .insert({ name: data.name.trim(), description: data.description ?? null })
+      .select("id, name, description")
+      .single();
+    if (error) throw new Error(error.message);
+    return { group: row };
+  });
+
+export const adminDeleteGroup = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { groupId: string }) => input)
+  .handler(async ({ context, data }) => {
+    await ensureAdmin(context as any);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error } = await supabaseAdmin.from("account_groups").delete().eq("id", data.groupId);
+    if (error) throw new Error(error.message);
+    return { ok: true };
   });
 
 export const adminSetAccountPlan = createServerFn({ method: "POST" })
