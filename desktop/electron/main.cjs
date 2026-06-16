@@ -116,19 +116,24 @@ function setupMediaPermissions() {
     }
   };
 
+  const wantsMediaDevice = (details) => {
+    const mediaTypes = details?.mediaTypes ?? [];
+    const mediaType = details?.mediaType;
+    return mediaTypes.includes("audio") || mediaTypes.includes("video") || mediaType === "audio" || mediaType === "video";
+  };
+
   ses.setPermissionRequestHandler((webContents, permission, callback, details) => {
     if (permission === "media" && isAllowedAppUrl(webContents.getURL())) {
-      const mediaTypes = details?.mediaTypes ?? [];
-      callback(mediaTypes.includes("audio") || mediaTypes.includes("video"));
+      callback(wantsMediaDevice(details));
       return;
     }
     callback(false);
   });
 
   ses.setPermissionCheckHandler((_webContents, permission, requestingOrigin, details) => {
-    if (permission !== "media" || !isAllowedAppUrl(requestingOrigin)) return false;
-    const mediaTypes = details?.mediaTypes ?? [];
-    return mediaTypes.includes("audio") || mediaTypes.includes("video");
+    const origin = details?.securityOrigin || requestingOrigin;
+    if (permission !== "media" || !isAllowedAppUrl(origin)) return false;
+    return wantsMediaDevice(details);
   });
 }
 
