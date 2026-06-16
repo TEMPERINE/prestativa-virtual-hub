@@ -53,19 +53,25 @@ function isRoomReady(room: Room | null): room is Room {
   return !!room && room.state === ConnectionState.Connected;
 }
 
+// Mantemos apenas constraints amplamente suportadas em Chromium/Firefox/Safari.
+// `voiceIsolation` é Safari-only e em Chromium recentes pode disparar
+// OverconstrainedError, fazendo o createLocalAudioTrack falhar antes do prompt
+// de permissão — afetava usuários cujo browser/SO não suporta a constraint.
 const AUDIO_CAPTURE_OPTIONS = {
-  deviceId: { ideal: "default" },
-  echoCancellation: { ideal: true },
-  noiseSuppression: { ideal: true },
-  autoGainControl: { ideal: false },
-  voiceIsolation: { ideal: true },
-  channelCount: { ideal: 1 },
+  echoCancellation: true,
+  noiseSuppression: true,
+  autoGainControl: false,
+  channelCount: 1,
 } as const;
 
 const VIDEO_CAPTURE_OPTIONS = {
-  deviceId: { ideal: "default" },
   resolution: { width: 640, height: 360, frameRate: 15 },
 } as const;
+
+// Constraints mínimas — usadas como fallback quando o primeiro getUserMedia
+// rejeita por OverconstrainedError em hardware sem suporte às opções ricas.
+const AUDIO_FALLBACK_OPTIONS = {} as const;
+const VIDEO_FALLBACK_OPTIONS = {} as const;
 
 export function useLiveKit(
   myId: string | null,
