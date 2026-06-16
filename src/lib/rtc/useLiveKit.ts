@@ -414,9 +414,7 @@ export function useLiveKit(
     if (want) {
       try {
         pendingMicTrackRef.current?.stop();
-        pendingMicTrackRef.current = await createLocalAudioTrack(
-          selectedAudioInputDeviceId ? { deviceId: selectedAudioInputDeviceId } : undefined,
-        );
+        pendingMicTrackRef.current = await createMicTrack();
       } catch (e) {
         wantMicRef.current = false;
         setMicOn(false);
@@ -447,7 +445,7 @@ export function useLiveKit(
       setMicOn(!want);
       throw e;
     }
-  }, [selectedAudioInputDeviceId]);
+  }, [createMicTrack, selectedAudioInputDeviceId]);
 
   const toggleCam = useCallback(async () => {
     const r = roomRef.current;
@@ -456,9 +454,7 @@ export function useLiveKit(
     if (want) {
       try {
         pendingCamTrackRef.current?.stop();
-        pendingCamTrackRef.current = await createLocalVideoTrack(
-          selectedVideoDeviceId ? { deviceId: selectedVideoDeviceId } : undefined,
-        );
+        pendingCamTrackRef.current = await createCamTrack();
       } catch (e) {
         wantCamRef.current = false;
         setCamOn(false);
@@ -493,7 +489,7 @@ export function useLiveKit(
       setCamOn(!want);
       throw e;
     }
-  }, [selectedVideoDeviceId]);
+  }, [createCamTrack, selectedVideoDeviceId]);
 
   const toggleScreen = useCallback(async () => {
     const r = roomRef.current;
