@@ -239,6 +239,7 @@ export function useLiveKit(
 
     connectingRef.current = true;
     void (async () => {
+      let room: Room | null = null;
       try {
         await teardown();
         if (cancelled) return;
@@ -246,7 +247,7 @@ export function useLiveKit(
         const { url, token } = await getLiveKitAccess({ data: { roomName: roomKey } });
         if (cancelled) return;
 
-        const room = new Room({
+        room = new Room({
           adaptiveStream: true,
           dynacast: true,
           audioCaptureDefaults: AUDIO_CAPTURE_OPTIONS,
@@ -367,12 +368,22 @@ export function useLiveKit(
           console.error("[livekit] connect failed", err);
         }
       } finally {
+        if (cancelled && room) {
+          try { await room.disconnect(); } catch { /* noop */ }
+          if (roomRef.current === room) roomRef.current = null;
+        }
         connectingRef.current = false;
       }
     })();
 
     return () => {
       cancelled = true;
+      const r = roomRef.current;
+      if (r && currentRoomKeyRef.current === roomKey) {
+        roomRef.current = null;
+        currentRoomKeyRef.current = null;
+        try { void r.disconnect(); } catch { /* noop */ }
+      }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [myId, roomKey, rebuildRemotes, refreshDevices]);
