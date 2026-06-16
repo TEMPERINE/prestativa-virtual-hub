@@ -56,6 +56,7 @@ export const adminListAccounts = createServerFn({ method: "GET" })
       if (row) {
         row.display_name = p.display_name;
         row.plan = (p.plan ?? "essencial") as Plan;
+        row.group_id = p.group_id ?? null;
       }
     });
     (roles ?? []).forEach((r: any) => {
