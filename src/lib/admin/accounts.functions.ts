@@ -35,7 +35,7 @@ export const adminListAccounts = createServerFn({ method: "GET" })
 
     const ids = users.users.map((u) => u.id);
     const [{ data: profiles }, { data: roles }, { data: members }] = await Promise.all([
-      supabaseAdmin.from("profiles").select("id, display_name, plan").in("id", ids),
+      supabaseAdmin.from("profiles").select("id, display_name, plan, group_id").in("id", ids),
       supabaseAdmin.from("user_roles").select("user_id, role").in("user_id", ids),
       supabaseAdmin
         .from("workspace_members")
