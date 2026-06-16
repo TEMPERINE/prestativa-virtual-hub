@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   createLocalAudioTrack,
   createLocalVideoTrack,
+  ConnectionState,
   type LocalAudioTrack,
   type LocalVideoTrack,
   Room,
@@ -48,6 +49,10 @@ function makeStream(track: MediaStreamTrack): MediaStream {
   return s;
 }
 
+function isRoomReady(room: Room | null): room is Room {
+  return !!room && room.state === ConnectionState.Connected;
+}
+
 export function useLiveKit(
   myId: string | null,
   roomKey: string | null,
@@ -92,22 +97,22 @@ export function useLiveKit(
   const pendingCamTrackRef = useRef<LocalVideoTrack | null>(null);
 
   const createMicTrack = useCallback(async () => {
-    if (!selectedAudioInputDeviceId) return createLocalAudioTrack();
+    if (!selectedAudioInputDeviceId) return createLocalAudioTrack({ deviceId: { ideal: "default" } });
     try {
-      return await createLocalAudioTrack({ deviceId: selectedAudioInputDeviceId });
+      return await createLocalAudioTrack({ deviceId: { ideal: selectedAudioInputDeviceId } });
     } catch {
       setSelectedAudioInputDeviceId(null);
-      return createLocalAudioTrack();
+      return createLocalAudioTrack({ deviceId: { ideal: "default" } });
     }
   }, [selectedAudioInputDeviceId]);
 
   const createCamTrack = useCallback(async () => {
-    if (!selectedVideoDeviceId) return createLocalVideoTrack();
+    if (!selectedVideoDeviceId) return createLocalVideoTrack({ deviceId: { ideal: "default" } });
     try {
-      return await createLocalVideoTrack({ deviceId: selectedVideoDeviceId });
+      return await createLocalVideoTrack({ deviceId: { ideal: selectedVideoDeviceId } });
     } catch {
       setSelectedVideoDeviceId(null);
-      return createLocalVideoTrack();
+      return createLocalVideoTrack({ deviceId: { ideal: "default" } });
     }
   }, [selectedVideoDeviceId]);
 
@@ -424,7 +429,7 @@ export function useLiveKit(
       pendingMicTrackRef.current?.stop();
       pendingMicTrackRef.current = null;
     }
-    if (!r) {
+    if (!isRoomReady(r)) {
       setMicOn(want);
       return;
     }
@@ -464,7 +469,7 @@ export function useLiveKit(
       pendingCamTrackRef.current?.stop();
       pendingCamTrackRef.current = null;
     }
-    if (!r) {
+    if (!isRoomReady(r)) {
       setCamOn(want);
       return;
     }
