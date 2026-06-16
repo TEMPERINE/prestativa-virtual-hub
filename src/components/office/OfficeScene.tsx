@@ -218,7 +218,8 @@ function callZoneAt(p: Point): ZoneId {
   for (const id of ids) {
     const rect = zoneRectFromOverrides(id as ZoneId);
     const fallbackRect = findZoneById(id)?.rect ?? null;
-    const effectiveRect = rect ?? (id === exact ? fallbackRect : null);
+    const isCommonZone = id !== "lobby" && getZoneKind(id) === "common";
+    const effectiveRect = rect ?? (id === exact || isCommonZone ? fallbackRect : null);
     if (!effectiveRect || !pointInsideRect(p, effectiveRect)) continue;
     candidates.push({
       id: id as ZoneId,
