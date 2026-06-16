@@ -12,6 +12,7 @@ import {
 } from "@/lib/admin/workspaces.functions";
 import { adminListAccounts } from "@/lib/admin/accounts.functions";
 import { setCurrentWorkspaceId } from "@/lib/workspace/current";
+import { primeWorkspaceTierCache } from "@/lib/workspace/useWorkspaceTier";
 import { appPrompt, appConfirm } from "@/components/ui/app-dialogs";
 
 
@@ -107,6 +108,7 @@ function AdminEspacosPage() {
   };
 
   const openEditor = (ws: Ws) => {
+    primeWorkspaceTierCache(ws.id, ws.tier);
     setCurrentWorkspaceId(ws.id);
     try { localStorage.setItem("lastWorkspaceId", ws.id); } catch {}
     navigate({ to: "/office/editor" });
