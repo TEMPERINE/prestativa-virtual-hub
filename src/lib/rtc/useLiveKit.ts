@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   createLocalAudioTrack,
   createLocalVideoTrack,
+  ConnectionState,
   type LocalAudioTrack,
   type LocalVideoTrack,
   Room,
@@ -46,6 +47,10 @@ function makeStream(track: MediaStreamTrack): MediaStream {
   const s = new MediaStream();
   s.addTrack(track);
   return s;
+}
+
+function isRoomReady(room: Room | null): room is Room {
+  return !!room && room.state === ConnectionState.Connected;
 }
 
 export function useLiveKit(
@@ -424,7 +429,7 @@ export function useLiveKit(
       pendingMicTrackRef.current?.stop();
       pendingMicTrackRef.current = null;
     }
-    if (!r) {
+    if (!isRoomReady(r)) {
       setMicOn(want);
       return;
     }
@@ -464,7 +469,7 @@ export function useLiveKit(
       pendingCamTrackRef.current?.stop();
       pendingCamTrackRef.current = null;
     }
-    if (!r) {
+    if (!isRoomReady(r)) {
       setCamOn(want);
       return;
     }
