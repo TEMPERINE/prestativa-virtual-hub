@@ -1,9 +1,9 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { ArrowLeft, Plus, KeyRound, Trash2, UserPlus, X } from "lucide-react";
+import { ArrowLeft, Plus, KeyRound, Trash2, UserPlus, X, FolderPlus, Folder } from "lucide-react";
 import {
   adminListAccounts,
   adminCreateAccount,
@@ -13,6 +13,10 @@ import {
   adminAssignToWorkspace,
   adminRemoveFromWorkspace,
   adminListWorkspaces,
+  adminListGroups,
+  adminCreateGroup,
+  adminDeleteGroup,
+  adminSetAccountGroup,
 } from "@/lib/admin/accounts.functions";
 import { appPrompt, appConfirm } from "@/components/ui/app-dialogs";
 
@@ -30,6 +34,7 @@ type Account = {
   email: string;
   display_name?: string;
   plan?: Plan;
+  group_id?: string | null;
   roles?: string[];
   workspaces?: Array<{ id: string; name?: string; role: string }>;
   created_at: string;
@@ -37,6 +42,9 @@ type Account = {
 };
 
 type Workspace = { id: string; name: string; tier: number };
+type Group = { id: string; name: string; description?: string | null };
+
+const NO_GROUP = "__no_group__";
 
 function AdminContasPage() {
   const navigate = useNavigate();
@@ -48,10 +56,15 @@ function AdminContasPage() {
   const deleteFn = useServerFn(adminDeleteAccount);
   const assignFn = useServerFn(adminAssignToWorkspace);
   const unassignFn = useServerFn(adminRemoveFromWorkspace);
+  const listGroupsFn = useServerFn(adminListGroups);
+  const createGroupFn = useServerFn(adminCreateGroup);
+  const deleteGroupFn = useServerFn(adminDeleteGroup);
+  const setGroupFn = useServerFn(adminSetAccountGroup);
 
   const [allowed, setAllowed] = useState<boolean | null>(null);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
+  const [groups, setGroups] = useState<Group[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
 
@@ -62,6 +75,7 @@ function AdminContasPage() {
   const [plan, setPlan] = useState<Plan>("essencial");
   const [wsId, setWsId] = useState<string>("");
   const [wsRole, setWsRole] = useState<"owner" | "admin" | "member">("member");
+  const [groupId, setGroupId] = useState<string>("");
 
   const checkAdmin = async () => {
     const { data: u } = await supabase.auth.getUser();
@@ -81,9 +95,10 @@ function AdminContasPage() {
     setAllowed(ok);
     if (!ok) { setLoading(false); return; }
     try {
-      const [a, w] = await Promise.all([listFn(), wsListFn()]);
+      const [a, w, g] = await Promise.all([listFn(), wsListFn(), listGroupsFn()]);
       setAccounts((a as any).accounts);
       setWorkspaces((w as any).workspaces);
+      setGroups((g as any).groups);
     } catch (e: any) {
       toast.error(e?.message ?? "Erro ao carregar.");
     }
@@ -104,6 +119,7 @@ function AdminContasPage() {
           plan,
           workspaceId: wsId || null,
           workspaceRole: wsRole,
+          groupId: groupId || null,
         },
       });
       toast.success("Conta criada!");
@@ -121,6 +137,13 @@ function AdminContasPage() {
       await setPlanFn({ data: { userId, plan: newPlan } });
       toast.success("Plano atualizado.");
       setAccounts((prev) => prev.map((a) => a.id === userId ? { ...a, plan: newPlan } : a));
+    } catch (e: any) { toast.error(e?.message ?? "Erro."); }
+  };
+
+  const changeGroup = async (userId: string, newGroupId: string | null) => {
+    try {
+      await setGroupFn({ data: { userId, groupId: newGroupId } });
+      setAccounts((prev) => prev.map((a) => a.id === userId ? { ...a, group_id: newGroupId } : a));
     } catch (e: any) { toast.error(e?.message ?? "Erro."); }
   };
 
@@ -174,6 +197,49 @@ function AdminContasPage() {
     } catch (e: any) { toast.error(e?.message ?? "Erro."); }
   };
 
+  const newGroup = async () => {
+    const name = await appPrompt({
+      title: "Novo grupo",
+      description: "Crie um grupo (ex: empresa) para organizar as contas.",
+      placeholder: "Nome do grupo",
+      confirmLabel: "Criar",
+    });
+    if (!name?.trim()) return;
+    try {
+      const res: any = await createGroupFn({ data: { name: name.trim() } });
+      setGroups((prev) => [...prev, res.group].sort((a, b) => a.name.localeCompare(b.name)));
+      toast.success("Grupo criado.");
+    } catch (e: any) { toast.error(e?.message ?? "Erro."); }
+  };
+
+  const removeGroup = async (g: Group) => {
+    const ok = await appConfirm({
+      title: `Excluir grupo "${g.name}"?`,
+      description: "As contas deste grupo ficarão sem grupo. As contas em si não serão apagadas.",
+      confirmLabel: "Excluir",
+      destructive: true,
+    });
+    if (!ok) return;
+    try {
+      await deleteGroupFn({ data: { groupId: g.id } });
+      setGroups((prev) => prev.filter((x) => x.id !== g.id));
+      setAccounts((prev) => prev.map((a) => a.group_id === g.id ? { ...a, group_id: null } : a));
+      toast.success("Grupo excluído.");
+    } catch (e: any) { toast.error(e?.message ?? "Erro."); }
+  };
+
+  // Agrupa contas por grupo (+ "sem grupo" no final)
+  const grouped = useMemo(() => {
+    const buckets = new Map<string, Account[]>();
+    groups.forEach((g) => buckets.set(g.id, []));
+    buckets.set(NO_GROUP, []);
+    accounts.forEach((a) => {
+      const key = a.group_id && buckets.has(a.group_id) ? a.group_id : NO_GROUP;
+      buckets.get(key)!.push(a);
+    });
+    return buckets;
+  }, [accounts, groups]);
+
   if (loading) return <div className="min-h-screen flex items-center justify-center text-sm text-muted-foreground">Carregando…</div>;
   if (!allowed) return (
     <div className="min-h-screen flex items-center justify-center p-6">
@@ -193,9 +259,40 @@ function AdminContasPage() {
         </button>
         <h1 className="text-3xl font-semibold tracking-tight mb-2">Contas</h1>
         <p className="text-sm text-muted-foreground mb-8">
-          Crie contas, defina planos e atribua acesso a espaços. Não há cadastro público — só você gerencia o acesso.
+          Crie contas, defina planos, organize por grupo (ex: empresa) e atribua acesso a espaços.
         </p>
 
+        {/* Grupos */}
+        <div className="glass-panel rounded-2xl p-6 mb-6">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-sm font-medium uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+              <Folder size={14} /> Grupos ({groups.length})
+            </h2>
+            <button onClick={newGroup}
+              className="text-xs inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-primary/10 hover:bg-primary/20 text-primary">
+              <FolderPlus size={12} /> Novo grupo
+            </button>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {groups.length === 0 && (
+              <span className="text-xs text-muted-foreground italic">Nenhum grupo ainda. Crie um para organizar.</span>
+            )}
+            {groups.map((g) => {
+              const count = (grouped.get(g.id) ?? []).length;
+              return (
+                <span key={g.id} className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full bg-muted">
+                  <Folder size={11} /> {g.name}
+                  <span className="text-muted-foreground">· {count}</span>
+                  <button onClick={() => removeGroup(g)} className="hover:text-red-500 ml-0.5" title="Excluir grupo">
+                    <X size={10} />
+                  </button>
+                </span>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Nova conta */}
         <form onSubmit={create} className="glass-panel rounded-2xl p-6 mb-10 space-y-4">
           <h2 className="text-sm font-medium uppercase tracking-wider text-muted-foreground flex items-center gap-2">
             <UserPlus size={14} /> Nova conta
@@ -210,6 +307,8 @@ function AdminContasPage() {
                 { value: "pro", label: "Pro (níveis 1–2)" },
                 { value: "premium", label: "Premium (níveis 1–3)" },
               ]} />
+            <SelectField label="Grupo (empresa)" value={groupId} onChange={setGroupId}
+              options={[{ value: "", label: "— Sem grupo —" }, ...groups.map((g) => ({ value: g.id, label: g.name }))]} />
             <SelectField label="Adicionar ao espaço (opcional)" value={wsId} onChange={setWsId}
               options={[{ value: "", label: "— Nenhum —" }, ...workspaces.map((w) => ({ value: w.id, label: `${w.name} (N${w.tier})` }))]} />
             <SelectField label="Papel no espaço" value={wsRole} onChange={(v) => setWsRole(v as any)}
@@ -228,60 +327,90 @@ function AdminContasPage() {
         <h2 className="text-sm font-medium uppercase tracking-wider text-muted-foreground mb-3">
           Contas existentes ({accounts.length})
         </h2>
-        <div className="space-y-2">
-          {accounts.map((a) => (
-            <div key={a.id} className="glass-panel rounded-xl p-4">
-              <div className="flex items-start justify-between gap-3 flex-wrap">
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm font-medium flex items-center gap-2 flex-wrap">
-                    <span>{a.display_name ?? a.email}</span>
-                    {a.roles?.includes("admin") && (
-                      <span className="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-primary/15 text-primary">Admin</span>
-                    )}
-                  </div>
-                  <div className="text-xs text-muted-foreground truncate">
-                    {a.email} · último login: {a.last_sign_in_at ? new Date(a.last_sign_in_at).toLocaleString() : "nunca"}
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <select
-                    value={a.plan ?? "essencial"}
-                    onChange={(e) => changePlan(a.id, e.target.value as Plan)}
-                    className="rounded-lg border bg-background px-2 py-1 text-xs"
-                  >
-                    <option value="essencial">Essencial</option>
-                    <option value="pro">Pro</option>
-                    <option value="premium">Premium</option>
-                  </select>
-                  <button onClick={() => resetPw(a.id)} title="Redefinir senha"
-                    className="p-2 rounded-lg bg-muted hover:bg-muted/70"><KeyRound size={14} /></button>
-                  <button onClick={() => removeAccount(a)} title="Excluir conta"
-                    className="p-2 rounded-lg bg-muted hover:bg-red-500/10 hover:text-red-500"><Trash2 size={14} /></button>
-                </div>
-              </div>
 
-              <div className="mt-3 pl-1">
-                <div className="text-[11px] uppercase tracking-wider text-muted-foreground mb-1.5">Espaços</div>
-                <div className="flex flex-wrap gap-1.5 mb-2">
-                  {(a.workspaces ?? []).length === 0 && (
-                    <span className="text-xs text-muted-foreground italic">Sem acesso a nenhum espaço.</span>
-                  )}
-                  {(a.workspaces ?? []).map((w) => (
-                    <span key={w.id} className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-full bg-muted">
-                      {w.name ?? w.id.slice(0, 6)} · {w.role}
-                      <button onClick={() => unassign(a.id, w.id)} className="hover:text-red-500">
-                        <X size={10} />
-                      </button>
-                    </span>
-                  ))}
+        {/* Grupos com contas */}
+        <div className="space-y-6">
+          {[...groups, { id: NO_GROUP, name: "Sem grupo" } as Group].map((g) => {
+            const list = grouped.get(g.id) ?? [];
+            if (list.length === 0 && g.id === NO_GROUP) return null;
+            return (
+              <div key={g.id}>
+                <div className="flex items-center gap-2 mb-2 px-1">
+                  <Folder size={14} className="text-primary" />
+                  <h3 className="text-sm font-semibold">{g.name}</h3>
+                  <span className="text-xs text-muted-foreground">({list.length})</span>
                 </div>
-                <AssignControl
-                  workspaces={workspaces.filter((w) => !(a.workspaces ?? []).some((aw) => aw.id === w.id))}
-                  onAssign={(workspaceId, role) => assign(a.id, workspaceId, role)}
-                />
+                <div className="space-y-2 pl-2 border-l-2 border-primary/20">
+                  {list.length === 0 ? (
+                    <div className="text-xs text-muted-foreground italic px-3 py-2">Nenhuma conta neste grupo.</div>
+                  ) : (
+                    list.map((a) => (
+                      <div key={a.id} className="glass-panel rounded-xl p-4 ml-2">
+                        <div className="flex items-start justify-between gap-3 flex-wrap">
+                          <div className="flex-1 min-w-0">
+                            <div className="text-sm font-medium flex items-center gap-2 flex-wrap">
+                              <span>{a.display_name ?? a.email}</span>
+                              {a.roles?.includes("admin") && (
+                                <span className="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-primary/15 text-primary">Admin</span>
+                              )}
+                            </div>
+                            <div className="text-xs text-muted-foreground truncate">
+                              {a.email} · último login: {a.last_sign_in_at ? new Date(a.last_sign_in_at).toLocaleString() : "nunca"}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <select
+                              value={a.group_id ?? ""}
+                              onChange={(e) => changeGroup(a.id, e.target.value || null)}
+                              className="rounded-lg border bg-background px-2 py-1 text-xs"
+                              title="Grupo"
+                            >
+                              <option value="">— Sem grupo —</option>
+                              {groups.map((gg) => <option key={gg.id} value={gg.id}>{gg.name}</option>)}
+                            </select>
+                            <select
+                              value={a.plan ?? "essencial"}
+                              onChange={(e) => changePlan(a.id, e.target.value as Plan)}
+                              className="rounded-lg border bg-background px-2 py-1 text-xs"
+                            >
+                              <option value="essencial">Essencial</option>
+                              <option value="pro">Pro</option>
+                              <option value="premium">Premium</option>
+                            </select>
+                            <button onClick={() => resetPw(a.id)} title="Redefinir senha"
+                              className="p-2 rounded-lg bg-muted hover:bg-muted/70"><KeyRound size={14} /></button>
+                            <button onClick={() => removeAccount(a)} title="Excluir conta"
+                              className="p-2 rounded-lg bg-muted hover:bg-red-500/10 hover:text-red-500"><Trash2 size={14} /></button>
+                          </div>
+                        </div>
+
+                        <div className="mt-3 pl-1">
+                          <div className="text-[11px] uppercase tracking-wider text-muted-foreground mb-1.5">Espaços</div>
+                          <div className="flex flex-wrap gap-1.5 mb-2">
+                            {(a.workspaces ?? []).length === 0 && (
+                              <span className="text-xs text-muted-foreground italic">Sem acesso a nenhum espaço.</span>
+                            )}
+                            {(a.workspaces ?? []).map((w) => (
+                              <span key={w.id} className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-full bg-muted">
+                                {w.name ?? w.id.slice(0, 6)} · {w.role}
+                                <button onClick={() => unassign(a.id, w.id)} className="hover:text-red-500">
+                                  <X size={10} />
+                                </button>
+                              </span>
+                            ))}
+                          </div>
+                          <AssignControl
+                            workspaces={workspaces.filter((w) => !(a.workspaces ?? []).some((aw) => aw.id === w.id))}
+                            onAssign={(workspaceId, role) => assign(a.id, workspaceId, role)}
+                          />
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
     </div>
