@@ -1,5 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  createLocalAudioTrack,
+  createLocalVideoTrack,
+  type LocalAudioTrack,
+  type LocalVideoTrack,
   Room,
   RoomEvent,
   Track,
@@ -84,6 +88,8 @@ export function useLiveKit(
   const wantMicRef = useRef(false);
   const wantCamRef = useRef(false);
   const wantScreenRef = useRef(false);
+  const pendingMicTrackRef = useRef<LocalAudioTrack | null>(null);
+  const pendingCamTrackRef = useRef<LocalVideoTrack | null>(null);
 
   // ---------- Devices (independent of room) ----------
   const refreshDevices = useCallback(async () => {
@@ -248,11 +254,29 @@ export function useLiveKit(
 
         // Re-apply sticky desires for new room.
         if (wantMicRef.current) {
-          try { await room.localParticipant.setMicrophoneEnabled(true); setMicOn(true); } catch { /* noop */ }
+          try {
+            const pending = pendingMicTrackRef.current;
+            if (pending) {
+              pendingMicTrackRef.current = null;
+              await room.localParticipant.publishTrack(pending);
+            } else {
+              await room.localParticipant.setMicrophoneEnabled(
+                true,
+                selectedAudioInputDeviceId ? { deviceId: selectedAudioInputDeviceId } : undefined,
+              );
+            }
+            setMicOn(true);
+          } catch { /* noop */ }
         }
         if (wantCamRef.current) {
           try {
-            await room.localParticipant.setCameraEnabled(true, selectedVideoDeviceId ? { deviceId: selectedVideoDeviceId } : undefined);
+            const pending = pendingCamTrackRef.current;
+            if (pending) {
+              pendingCamTrackRef.current = null;
+              await room.localParticipant.publishTrack(pending);
+            } else {
+              await room.localParticipant.setCameraEnabled(true, selectedVideoDeviceId ? { deviceId: selectedVideoDeviceId } : undefined);
+            }
             const pub = room.localParticipant.getTrackPublication(Track.Source.Camera);
             if (pub?.track?.mediaStreamTrack) setLocalVideoStream(makeStream(pub.track.mediaStreamTrack));
             setCamOn(true);
@@ -276,6 +300,10 @@ export function useLiveKit(
   // Cleanup on unmount
   useEffect(() => {
     return () => {
+      try { pendingMicTrackRef.current?.stop(); } catch { /* noop */ }
+      try { pendingCamTrackRef.current?.stop(); } catch { /* noop */ }
+      pendingMicTrackRef.current = null;
+      pendingCamTrackRef.current = null;
       const r = roomRef.current;
       roomRef.current = null;
       if (r) { try { void r.disconnect(); } catch { /* noop */ } }
