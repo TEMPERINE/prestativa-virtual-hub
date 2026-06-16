@@ -8,13 +8,16 @@ import officeMapDefault from "@/assets/office-map.webp";
 import officeMapCopa from "@/assets/office-map-copa.jpg.asset.json";
 import officeMapJunino from "@/assets/office-map-junino.jpg.asset.json";
 import officeMapNivel1 from "@/assets/office-map-nivel1.jpg.asset.json";
-import officeMapNivel2 from "@/assets/office-map-nivel2.jpg.asset.json";
+import officeMapNivel2 from "@/assets/office-map-nivel2.png.asset.json";
 import {
   loadOverrides,
   newOverrides,
   saveOverrides,
   pushOverridesToCloud,
 } from "@/lib/map-overrides";
+import { getCurrentWorkspaceId } from "@/lib/workspace/current";
+import { getCachedTier } from "@/lib/workspace/useWorkspaceTier";
+import { getTierCaps } from "@/lib/workspace/tiers";
 
 export type OfficeTheme = {
   id: string;
@@ -66,8 +69,15 @@ export const DEFAULT_THEME_ID = "default";
 export const CUSTOM_THEME_ID = "custom";
 const EVENT = "office-theme-changed";
 
+function getDefaultThemeIdForCurrentWorkspace(): string {
+  const ws = getCurrentWorkspaceId();
+  const tier = getCachedTier(ws);
+  const tierDefault = tier != null ? getTierCaps(tier).defaultThemeId : null;
+  return tierDefault ?? DEFAULT_THEME_ID;
+}
+
 export function getCurrentThemeId(): string {
-  return loadOverrides()?.theme ?? DEFAULT_THEME_ID;
+  return loadOverrides()?.theme ?? getDefaultThemeIdForCurrentWorkspace();
 }
 
 export function getTheme(id: string): OfficeTheme {
@@ -76,7 +86,7 @@ export function getTheme(id: string): OfficeTheme {
 
 export function getCurrentTheme(): OfficeTheme {
   const o = loadOverrides();
-  const id = o?.theme ?? DEFAULT_THEME_ID;
+  const id = o?.theme ?? getDefaultThemeIdForCurrentWorkspace();
   if (id === CUSTOM_THEME_ID && o?.customTheme?.url) {
     return {
       id: CUSTOM_THEME_ID,
