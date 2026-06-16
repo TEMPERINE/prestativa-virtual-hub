@@ -3420,7 +3420,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
                 active={rtc.camOn}
                 onClick={() => {
                   void unlockAudioPlayback();
-                  rtc.toggleCam().catch(() => toast.error("Não foi possível acessar a câmera"));
+                  rtc.toggleCam().catch((e) => toast.error(describeMediaError(e, "câmera")));
                 }}
                 title={rtc.camOn ? "Desligar câmera (Alt+V)" : "Ligar câmera (Alt+V)"}
               >
