@@ -1,5 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  createLocalAudioTrack,
+  createLocalVideoTrack,
+  type LocalAudioTrack,
+  type LocalVideoTrack,
   Room,
   RoomEvent,
   Track,
@@ -84,6 +88,8 @@ export function useLiveKit(
   const wantMicRef = useRef(false);
   const wantCamRef = useRef(false);
   const wantScreenRef = useRef(false);
+  const pendingMicTrackRef = useRef<LocalAudioTrack | null>(null);
+  const pendingCamTrackRef = useRef<LocalVideoTrack | null>(null);
 
   // ---------- Devices (independent of room) ----------
   const refreshDevices = useCallback(async () => {
@@ -248,11 +254,29 @@ export function useLiveKit(
 
         // Re-apply sticky desires for new room.
         if (wantMicRef.current) {
-          try { await room.localParticipant.setMicrophoneEnabled(true); setMicOn(true); } catch { /* noop */ }
+          try {
+            const pending = pendingMicTrackRef.current;
+            if (pending) {
+              pendingMicTrackRef.current = null;
+              await room.localParticipant.publishTrack(pending);
+            } else {
+              await room.localParticipant.setMicrophoneEnabled(
+                true,
+                selectedAudioInputDeviceId ? { deviceId: selectedAudioInputDeviceId } : undefined,
+              );
+            }
+            setMicOn(true);
+          } catch { /* noop */ }
         }
         if (wantCamRef.current) {
           try {
-            await room.localParticipant.setCameraEnabled(true, selectedVideoDeviceId ? { deviceId: selectedVideoDeviceId } : undefined);
+            const pending = pendingCamTrackRef.current;
+            if (pending) {
+              pendingCamTrackRef.current = null;
+              await room.localParticipant.publishTrack(pending);
+            } else {
+              await room.localParticipant.setCameraEnabled(true, selectedVideoDeviceId ? { deviceId: selectedVideoDeviceId } : undefined);
+            }
             const pub = room.localParticipant.getTrackPublication(Track.Source.Camera);
             if (pub?.track?.mediaStreamTrack) setLocalVideoStream(makeStream(pub.track.mediaStreamTrack));
             setCamOn(true);
@@ -276,6 +300,10 @@ export function useLiveKit(
   // Cleanup on unmount
   useEffect(() => {
     return () => {
+      try { pendingMicTrackRef.current?.stop(); } catch { /* noop */ }
+      try { pendingCamTrackRef.current?.stop(); } catch { /* noop */ }
+      pendingMicTrackRef.current = null;
+      pendingCamTrackRef.current = null;
       const r = roomRef.current;
       roomRef.current = null;
       if (r) { try { void r.disconnect(); } catch { /* noop */ } }
@@ -363,25 +391,36 @@ export function useLiveKit(
     const r = roomRef.current;
     const want = !wantMicRef.current;
     wantMicRef.current = want;
-    // Sempre dispara getUserMedia dentro do gesto do clique quando quer ligar.
-    // Garante que a permissão seja capturada de forma síncrona com o clique
-    // (mesmo se a sala já existe), evitando o caso em que o botão fica rosa
-    // mas o microfone nunca abre.
     if (want) {
       try {
-        const s = await navigator.mediaDevices.getUserMedia({
-          audio: selectedAudioInputDeviceId ? { deviceId: { exact: selectedAudioInputDeviceId } } : true,
-        });
-        s.getTracks().forEach((t) => t.stop());
+        pendingMicTrackRef.current?.stop();
+        pendingMicTrackRef.current = await createLocalAudioTrack(
+          selectedAudioInputDeviceId ? { deviceId: selectedAudioInputDeviceId } : undefined,
+        );
       } catch (e) {
         wantMicRef.current = false;
         setMicOn(false);
         throw e;
       }
+    } else {
+      pendingMicTrackRef.current?.stop();
+      pendingMicTrackRef.current = null;
     }
-    if (!r) { setMicOn(want); return; }
+    if (!r) {
+      setMicOn(want);
+      return;
+    }
     try {
-      await r.localParticipant.setMicrophoneEnabled(want);
+      if (want) {
+        const track = pendingMicTrackRef.current;
+        pendingMicTrackRef.current = null;
+        if (track) await r.localParticipant.publishTrack(track);
+        else await r.localParticipant.setMicrophoneEnabled(true, selectedAudioInputDeviceId ? { deviceId: selectedAudioInputDeviceId } : undefined);
+      } else {
+        pendingMicTrackRef.current?.stop();
+        pendingMicTrackRef.current = null;
+        await r.localParticipant.setMicrophoneEnabled(false);
+      }
       setMicOn(want);
     } catch (e) {
       wantMicRef.current = !want;
@@ -396,24 +435,35 @@ export function useLiveKit(
     wantCamRef.current = want;
     if (want) {
       try {
-        const s = await navigator.mediaDevices.getUserMedia({
-          video: selectedVideoDeviceId ? { deviceId: { exact: selectedVideoDeviceId } } : true,
-        });
-        s.getTracks().forEach((t) => t.stop());
+        pendingCamTrackRef.current?.stop();
+        pendingCamTrackRef.current = await createLocalVideoTrack(
+          selectedVideoDeviceId ? { deviceId: selectedVideoDeviceId } : undefined,
+        );
       } catch (e) {
         wantCamRef.current = false;
         setCamOn(false);
         throw e;
       }
+    } else {
+      pendingCamTrackRef.current?.stop();
+      pendingCamTrackRef.current = null;
     }
-    if (!r) { setCamOn(want); return; }
+    if (!r) {
+      setCamOn(want);
+      return;
+    }
     try {
       if (want) {
-        await r.localParticipant.setCameraEnabled(true, selectedVideoDeviceId ? { deviceId: selectedVideoDeviceId } : undefined);
+        const track = pendingCamTrackRef.current;
+        pendingCamTrackRef.current = null;
+        if (track) await r.localParticipant.publishTrack(track);
+        else await r.localParticipant.setCameraEnabled(true, selectedVideoDeviceId ? { deviceId: selectedVideoDeviceId } : undefined);
         const pub = r.localParticipant.getTrackPublication(Track.Source.Camera);
         if (pub?.track?.mediaStreamTrack) setLocalVideoStream(makeStream(pub.track.mediaStreamTrack));
         setCamOn(true);
       } else {
+        pendingCamTrackRef.current?.stop();
+        pendingCamTrackRef.current = null;
         await r.localParticipant.setCameraEnabled(false);
         setLocalVideoStream(null);
         setCamOn(false);
