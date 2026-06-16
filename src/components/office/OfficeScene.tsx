@@ -653,7 +653,6 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
   // in the editor (and saved to the `map_overrides` table) is visible to
   // every user on every device. Subscribe to realtime updates and force a
   // re-render when overrides change.
-  const [, setMapVersion] = useState(0);
   useEffect(() => {
     const bump = () => setMapVersion((v) => v + 1);
     void pullOverridesFromCloud().then(bump);
