@@ -188,6 +188,24 @@ function pointInsideRect(p: Point, rect: { x1: number; y1: number; x2: number; y
   return p.x >= rect.x1 && p.x <= rect.x2 && p.y >= rect.y1 && p.y <= rect.y2;
 }
 
+function describeMediaError(err: unknown, kind: "microfone" | "câmera"): string {
+  const name = (err as { name?: string } | null)?.name ?? "";
+  const msg = (err as { message?: string } | null)?.message ?? "";
+  if (name === "NotAllowedError" || name === "SecurityError") {
+    return `Permissão para ${kind} foi negada. Libere o acesso nas configurações do navegador/sistema.`;
+  }
+  if (name === "NotFoundError" || name === "OverconstrainedError") {
+    return `Nenhum(a) ${kind} compatível encontrado(a) neste dispositivo.`;
+  }
+  if (name === "NotReadableError" || name === "TrackStartError") {
+    return `O(a) ${kind} está em uso por outro aplicativo. Feche-o e tente novamente.`;
+  }
+  if (name === "AbortError") {
+    return `Acesso ao(à) ${kind} foi interrompido. Tente novamente.`;
+  }
+  return msg ? `Não foi possível acessar o(a) ${kind}: ${msg}` : `Não foi possível acessar o(a) ${kind}.`;
+}
+
 function callZoneAt(p: Point): ZoneId {
   const exact = zoneAt(p).id;
   if (exact !== "lobby") return exact;
@@ -3369,7 +3387,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
                 active={rtc.micOn}
                 onClick={() => {
                   void unlockAudioPlayback();
-                  rtc.toggleMic().catch(() => toast.error("Não foi possível acessar o microfone"));
+                  rtc.toggleMic().catch((e) => toast.error(describeMediaError(e, "microfone")));
                 }}
                 title={rtc.micOn ? "Desligar microfone (Alt+M)" : "Ligar microfone (Alt+M)"}
               >
@@ -3402,7 +3420,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
                 active={rtc.camOn}
                 onClick={() => {
                   void unlockAudioPlayback();
-                  rtc.toggleCam().catch(() => toast.error("Não foi possível acessar a câmera"));
+                  rtc.toggleCam().catch((e) => toast.error(describeMediaError(e, "câmera")));
                 }}
                 title={rtc.camOn ? "Desligar câmera (Alt+V)" : "Ligar câmera (Alt+V)"}
               >
