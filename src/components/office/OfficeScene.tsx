@@ -576,16 +576,8 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
     return out;
   }, [audibleConnectedPeers, rtc.remoteStreams]);
 
-  // Warm-start mic the moment we know the user — getUserMedia runs once,
-  // the track stays disabled until the user clicks unmute. This removes the
-  // 1–3s permission/negotiation delay from the first unmute and ensures
-  // peers already have an audio sender attached when they connect.
-  // Also wires global audio unlock so remote <audio> tags can autoplay.
-  const prewarmMic = rtc.prewarmMic;
-  useEffect(() => {
-    if (!me?.id) return;
-    void prewarmMic();
-  }, [me?.id, prewarmMic]);
+  // Wires global audio unlock so remote <audio> tags can autoplay.
+  // Camera/mic access stays inside the user's click/keyboard gesture.
   useEffect(() => {
     const off = installAudioUnlockListeners();
     return off;
