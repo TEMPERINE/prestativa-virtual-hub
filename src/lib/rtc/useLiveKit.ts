@@ -91,6 +91,26 @@ export function useLiveKit(
   const pendingMicTrackRef = useRef<LocalAudioTrack | null>(null);
   const pendingCamTrackRef = useRef<LocalVideoTrack | null>(null);
 
+  const createMicTrack = useCallback(async () => {
+    if (!selectedAudioInputDeviceId) return createLocalAudioTrack();
+    try {
+      return await createLocalAudioTrack({ deviceId: selectedAudioInputDeviceId });
+    } catch {
+      setSelectedAudioInputDeviceId(null);
+      return createLocalAudioTrack();
+    }
+  }, [selectedAudioInputDeviceId]);
+
+  const createCamTrack = useCallback(async () => {
+    if (!selectedVideoDeviceId) return createLocalVideoTrack();
+    try {
+      return await createLocalVideoTrack({ deviceId: selectedVideoDeviceId });
+    } catch {
+      setSelectedVideoDeviceId(null);
+      return createLocalVideoTrack();
+    }
+  }, [selectedVideoDeviceId]);
+
   // ---------- Devices (independent of room) ----------
   const refreshDevices = useCallback(async () => {
     try {
