@@ -3434,7 +3434,23 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
             {isPrivateZone && tierCaps.canRecordMeetings && (
               <button
                 onClick={async () => {
-                  if (recorder.isUploading) return;
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                  const _desktop = (window as any).prestativaDesktop;
+                  console.log("[rec] click", {
+                    isUploading: recorder.isUploading,
+                    isRecording: recorder.isRecording,
+                    isPrivateZone,
+                    canRecord: tierCaps.canRecordMeetings,
+                    activeMeetingId,
+                    zone: currentZone.id,
+                    hasDesktop: !!_desktop,
+                    hasGetSourceId: !!_desktop?.getScreenSourceId,
+                  });
+                  toast.message("Preparando gravação…");
+                  if (recorder.isUploading) {
+                    toast.info("Aguarde, enviando gravação anterior…");
+                    return;
+                  }
                   if (recorder.isRecording) {
                     void recorder.stop();
                     return;
@@ -3442,9 +3458,10 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
                   let meetingId = activeMeetingId;
                   if (!meetingId) {
                     try {
-                      // eslint-disable-next-line @typescript-eslint/no-explicit-any
                       const _wsJoin = getCurrentWorkspaceId();
                       if (!_wsJoin) throw new Error("workspace não encontrado");
+                      console.log("[rec] meeting_join", { ws: _wsJoin, zone: currentZone.id });
+                      // eslint-disable-next-line @typescript-eslint/no-explicit-any
                       const { data, error } = await (supabase as any).rpc("meeting_join", {
                         _workspace_id: _wsJoin,
                         _zone_id: currentZone.id,
@@ -3458,6 +3475,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
                       return;
                     }
                   }
+                  console.log("[rec] starting recorder", { meetingId });
                   void recorder.start(meetingId);
                 }}
                 disabled={recorder.isUploading}
