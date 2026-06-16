@@ -3387,7 +3387,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
                 active={rtc.micOn}
                 onClick={() => {
                   void unlockAudioPlayback();
-                  rtc.toggleMic().catch(() => toast.error("Não foi possível acessar o microfone"));
+                  rtc.toggleMic().catch((e) => toast.error(describeMediaError(e, "microfone")));
                 }}
                 title={rtc.micOn ? "Desligar microfone (Alt+M)" : "Ligar microfone (Alt+M)"}
               >
