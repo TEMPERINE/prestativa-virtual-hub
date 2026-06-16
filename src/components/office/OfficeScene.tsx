@@ -288,6 +288,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
   // the user's real saved position has loaded.
   const positionHydratedRef = useRef(false);
   const [pos, setPos] = useState<Point>(SPAWN);
+  const [mapVersion, setMapVersion] = useState(0);
   const [zone, setZone] = useState<ZoneId>("lobby");
   const [showTeam, setShowTeam] = useState(true);
   const [isMasterAdmin, setIsMasterAdmin] = useState(false);
@@ -499,6 +500,8 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
     setFacing(nextFacing);
   }, []);
 
+  const localZoneId = useMemo(() => zoneAt(pos).id, [pos.x, pos.y, mapVersion]);
+
   // ---- WebRTC mesh: voice/video por sala privada OU por proximidade no lobby ----
   // Regra de produto:
   //  • Em QUALQUER zona privada (qualquer rect != lobby) todos os avatares
@@ -515,7 +518,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
   const desiredPeers = useMemo(() => {
     const meId = me?.id;
     if (!meId) return [] as string[];
-    const myZoneId = zoneAt(pos).id;
+    const myZoneId = localZoneId;
     const candidates: { uid: string; score: number }[] = [];
     for (const [uid, p] of Object.entries(positions)) {
       if (uid === meId) continue;
@@ -537,7 +540,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
     }
     // Cap em ~15 pra estabilidade do mesh; ordenação prioriza mesma sala.
     return candidates.sort((a, b) => a.score - b.score).slice(0, 14).map((c) => c.uid);
-  }, [me?.id, positions, presentPeerIds, pos, zone]);
+  }, [me?.id, positions, presentPeerIds, pos.x, pos.y, localZoneId]);
 
 
   // SFU LiveKit: one room per (workspace, zone). Lobby = single shared room
@@ -546,13 +549,15 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
     if (!me?.id) return null;
     const wsId = getCurrentWorkspaceId();
     if (!wsId) return null;
-    const zoneId = zoneAt(pos).id;
-    return `ws-${wsId}::zone-${zoneId}`;
-  }, [me?.id, pos]);
+    return `ws-${wsId}::zone-${localZoneId}`;
+  }, [me?.id, localZoneId]);
   // Vídeo sob demanda: só assina câmera de quem está perto/na mesma sala.
   // `desiredPeers` já combina proximidade no lobby + mesma zona privada.
   // Áudio continua disponível para todos da sala LiveKit (ver audiblePeerIds).
-  const videoVisibleIds = useMemo(() => new Set(desiredPeers), [desiredPeers]);
+  const videoVisibleIds = useMemo(
+    () => (localZoneId === "lobby" ? new Set(desiredPeers) : null),
+    [desiredPeers, localZoneId],
+  );
   const rtc = useLiveKit(me?.id ?? null, roomKey, videoVisibleIds);
   useEffect(() => {
     connectedPeersRef.current = new Set(desiredPeers);
@@ -564,8 +569,8 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
   // mesmo que a sala LiveKit ainda contenha todos.
   const audiblePeerIds = useMemo(() => new Set(desiredPeers), [desiredPeers]);
   const audibleConnectedPeers = useMemo(
-    () => rtc.connectedPeers.filter((id) => audiblePeerIds.has(id)),
-    [rtc.connectedPeers, audiblePeerIds],
+    () => (localZoneId === "lobby" ? rtc.connectedPeers.filter((id) => audiblePeerIds.has(id)) : rtc.connectedPeers),
+    [rtc.connectedPeers, audiblePeerIds, localZoneId],
   );
   const audibleStreams = useMemo(() => {
     const out: Record<string, MediaStream> = {};
@@ -648,7 +653,6 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
   // in the editor (and saved to the `map_overrides` table) is visible to
   // every user on every device. Subscribe to realtime updates and force a
   // re-render when overrides change.
-  const [, setMapVersion] = useState(0);
   useEffect(() => {
     const bump = () => setMapVersion((v) => v + 1);
     void pullOverridesFromCloud().then(bump);
@@ -2286,7 +2290,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
 
 
 
-  const currentZone = useMemo(() => findZoneById(zone) ?? ZONES[ZONES.length - 1], [zone]);
+  const currentZone = useMemo(() => findZoneById(localZoneId) ?? ZONES[ZONES.length - 1], [localZoneId]);
   // Prefer the painted bounding box (editor overrides) over the hardcoded rect
   // so the spotlight visually matches exactly what the user painted.
   const focusedZone = useMemo(() => {
@@ -2295,7 +2299,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
     return painted
       ? { ...currentZone, rect: painted }
       : currentZone;
-  }, [currentZone]);
+  }, [currentZone, mapVersion]);
   const focusedZoneRef = useRef(focusedZone);
   focusedZoneRef.current = focusedZone;
 
