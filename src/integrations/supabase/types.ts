@@ -14,6 +14,30 @@ export type Database = {
   }
   public: {
     Tables: {
+      account_groups: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       custom_props: {
         Row: {
           aspect_ratio: number
@@ -455,6 +479,7 @@ export type Database = {
           created_at: string
           display_name: string
           first_name: string | null
+          group_id: string | null
           id: string
           last_name: string | null
           onboarded_at: string | null
@@ -473,6 +498,7 @@ export type Database = {
           created_at?: string
           display_name: string
           first_name?: string | null
+          group_id?: string | null
           id: string
           last_name?: string | null
           onboarded_at?: string | null
@@ -491,6 +517,7 @@ export type Database = {
           created_at?: string
           display_name?: string
           first_name?: string | null
+          group_id?: string | null
           id?: string
           last_name?: string | null
           onboarded_at?: string | null
@@ -501,7 +528,15 @@ export type Database = {
           tagline?: string | null
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "profiles_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "account_groups"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       prop_states: {
         Row: {
