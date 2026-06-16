@@ -523,7 +523,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
     setFacing(nextFacing);
   }, []);
 
-  const localZoneId = useMemo(() => zoneAt(pos).id, [pos.x, pos.y, mapVersion]);
+  const localZoneId = useMemo(() => callZoneAt(pos), [pos.x, pos.y, mapVersion]);
 
   // ---- WebRTC mesh: voice/video por sala privada OU por proximidade no lobby ----
   // Regra de produto:
@@ -547,7 +547,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
       if (uid === meId) continue;
       if (!p.is_online && !presentPeerIds.has(uid)) continue;
       // Zona do peer calculada localmente — robusto contra p.zone defasado.
-      const peerZoneId = zoneAt({ x: p.x, y: p.y }).id;
+      const peerZoneId = callZoneAt({ x: p.x, y: p.y });
       const sameActiveRoom = myZoneId !== "lobby" && peerZoneId === myZoneId;
       // Proximidade só importa no lobby (e como fallback).
       const dx = p.x - pos.x;
