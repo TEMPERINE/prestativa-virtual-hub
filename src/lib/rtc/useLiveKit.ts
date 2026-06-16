@@ -53,6 +53,20 @@ function isRoomReady(room: Room | null): room is Room {
   return !!room && room.state === ConnectionState.Connected;
 }
 
+const AUDIO_CAPTURE_OPTIONS = {
+  deviceId: { ideal: "default" },
+  echoCancellation: { ideal: true },
+  noiseSuppression: { ideal: true },
+  autoGainControl: { ideal: false },
+  voiceIsolation: { ideal: true },
+  channelCount: { ideal: 1 },
+} as const;
+
+const VIDEO_CAPTURE_OPTIONS = {
+  deviceId: { ideal: "default" },
+  resolution: { width: 640, height: 360, frameRate: 15 },
+} as const;
+
 export function useLiveKit(
   myId: string | null,
   roomKey: string | null,
@@ -97,22 +111,26 @@ export function useLiveKit(
   const pendingCamTrackRef = useRef<LocalVideoTrack | null>(null);
 
   const createMicTrack = useCallback(async () => {
-    if (!selectedAudioInputDeviceId) return createLocalAudioTrack({ deviceId: { ideal: "default" } });
+    const options = selectedAudioInputDeviceId
+      ? { ...AUDIO_CAPTURE_OPTIONS, deviceId: { ideal: selectedAudioInputDeviceId } }
+      : AUDIO_CAPTURE_OPTIONS;
     try {
-      return await createLocalAudioTrack({ deviceId: { ideal: selectedAudioInputDeviceId } });
+      return await createLocalAudioTrack(options);
     } catch {
       setSelectedAudioInputDeviceId(null);
-      return createLocalAudioTrack({ deviceId: { ideal: "default" } });
+      return createLocalAudioTrack(AUDIO_CAPTURE_OPTIONS);
     }
   }, [selectedAudioInputDeviceId]);
 
   const createCamTrack = useCallback(async () => {
-    if (!selectedVideoDeviceId) return createLocalVideoTrack({ deviceId: { ideal: "default" } });
+    const options = selectedVideoDeviceId
+      ? { ...VIDEO_CAPTURE_OPTIONS, deviceId: { ideal: selectedVideoDeviceId } }
+      : VIDEO_CAPTURE_OPTIONS;
     try {
-      return await createLocalVideoTrack({ deviceId: { ideal: selectedVideoDeviceId } });
+      return await createLocalVideoTrack(options);
     } catch {
       setSelectedVideoDeviceId(null);
-      return createLocalVideoTrack({ deviceId: { ideal: "default" } });
+      return createLocalVideoTrack(VIDEO_CAPTURE_OPTIONS);
     }
   }, [selectedVideoDeviceId]);
 
