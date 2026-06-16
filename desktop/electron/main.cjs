@@ -104,6 +104,34 @@ function setupDisplayMediaHandler() {
   });
 }
 
+function setupMediaPermissions() {
+  const ses = session.defaultSession;
+  const allowedOrigin = new URL(APP_URL).origin;
+
+  const isAllowedAppUrl = (url) => {
+    try {
+      return new URL(url).origin === allowedOrigin;
+    } catch {
+      return false;
+    }
+  };
+
+  ses.setPermissionRequestHandler((webContents, permission, callback, details) => {
+    if (permission === "media" && isAllowedAppUrl(webContents.getURL())) {
+      const mediaTypes = details?.mediaTypes ?? [];
+      callback(mediaTypes.includes("audio") || mediaTypes.includes("video"));
+      return;
+    }
+    callback(false);
+  });
+
+  ses.setPermissionCheckHandler((_webContents, permission, requestingOrigin, details) => {
+    if (permission !== "media" || !isAllowedAppUrl(requestingOrigin)) return false;
+    const mediaTypes = details?.mediaTypes ?? [];
+    return mediaTypes.includes("audio") || mediaTypes.includes("video");
+  });
+}
+
 ipcMain.handle("prestativa:get-screen-source-id", async () => {
   const sources = await desktopCapturer.getSources({
     types: ["window", "screen"],
@@ -150,6 +178,7 @@ if (!gotLock) {
   });
 
   app.whenReady().then(() => {
+    setupMediaPermissions();
     setupDisplayMediaHandler();
     createWindow();
     setupAutoUpdate();
