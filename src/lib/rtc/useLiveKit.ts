@@ -117,26 +117,39 @@ export function useLiveKit(
   const pendingCamTrackRef = useRef<LocalVideoTrack | null>(null);
 
   const createMicTrack = useCallback(async () => {
-    const options = selectedAudioInputDeviceId
+    const withDevice = selectedAudioInputDeviceId
       ? { ...AUDIO_CAPTURE_OPTIONS, deviceId: { ideal: selectedAudioInputDeviceId } }
       : AUDIO_CAPTURE_OPTIONS;
     try {
-      return await createLocalAudioTrack(options);
-    } catch {
-      setSelectedAudioInputDeviceId(null);
-      return createLocalAudioTrack(AUDIO_CAPTURE_OPTIONS);
+      return await createLocalAudioTrack(withDevice);
+    } catch (e1) {
+      // Tenta com opções padrão (sem deviceId específico).
+      try {
+        setSelectedAudioInputDeviceId(null);
+        return await createLocalAudioTrack(AUDIO_CAPTURE_OPTIONS);
+      } catch (e2) {
+        // Último fallback: constraints mínimas — funciona em qualquer hardware
+        // que tenha pelo menos um microfone disponível com permissão concedida.
+        console.warn("[livekit] mic constraints failed, retrying minimal", e1, e2);
+        return await createLocalAudioTrack(AUDIO_FALLBACK_OPTIONS);
+      }
     }
   }, [selectedAudioInputDeviceId]);
 
   const createCamTrack = useCallback(async () => {
-    const options = selectedVideoDeviceId
+    const withDevice = selectedVideoDeviceId
       ? { ...VIDEO_CAPTURE_OPTIONS, deviceId: { ideal: selectedVideoDeviceId } }
       : VIDEO_CAPTURE_OPTIONS;
     try {
-      return await createLocalVideoTrack(options);
-    } catch {
-      setSelectedVideoDeviceId(null);
-      return createLocalVideoTrack(VIDEO_CAPTURE_OPTIONS);
+      return await createLocalVideoTrack(withDevice);
+    } catch (e1) {
+      try {
+        setSelectedVideoDeviceId(null);
+        return await createLocalVideoTrack(VIDEO_CAPTURE_OPTIONS);
+      } catch (e2) {
+        console.warn("[livekit] cam constraints failed, retrying minimal", e1, e2);
+        return await createLocalVideoTrack(VIDEO_FALLBACK_OPTIONS);
+      }
     }
   }, [selectedVideoDeviceId]);
 
