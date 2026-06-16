@@ -213,7 +213,7 @@ function callZoneAt(p: Point): ZoneId {
   // tentativa de "fundir" zonas legadas (atendente-*, diretoria, etc.) com
   // o que foi pintado acabava colocando usuários no mesmo lugar em salas de
   // chamada diferentes.
-  return zoneAtWithOverrides(p).id;
+  return zoneAt(p).id;
 }
 
 // "Seat" point of a zone rect — bottom-center, in front of the desk.
