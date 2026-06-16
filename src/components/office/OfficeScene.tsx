@@ -184,6 +184,29 @@ function writeLocalSavedPosition(userId: string, point: Point, zone: string, fac
   }
 }
 
+function pointInsideRect(p: Point, rect: { x1: number; y1: number; x2: number; y2: number }) {
+  return p.x >= rect.x1 && p.x <= rect.x2 && p.y >= rect.y1 && p.y <= rect.y2;
+}
+
+function callZoneAt(p: Point): ZoneId {
+  const exact = zoneAt(p).id;
+  if (exact !== "lobby") return exact;
+
+  const candidates: Array<{ id: ZoneId; area: number }> = [];
+  const ids = new Set<string>([
+    ...ZONES.filter((z) => z.id !== "lobby").map((z) => z.id),
+    ...customZonesFromOverrides().map((z) => z.id),
+  ]);
+
+  for (const id of ids) {
+    const rect = zoneRectFromOverrides(id as ZoneId);
+    if (!rect || !pointInsideRect(p, rect)) continue;
+    candidates.push({ id: id as ZoneId, area: (rect.x2 - rect.x1) * (rect.y2 - rect.y1) });
+  }
+
+  return candidates.sort((a, b) => a.area - b.area)[0]?.id ?? exact;
+}
+
 // "Seat" point of a zone rect — bottom-center, in front of the desk.
 // If that point collides with furniture, walk it upward until it's walkable.
 function seatPointForRect(rect: { x1: number; y1: number; x2: number; y2: number }): Point {
