@@ -1996,7 +1996,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
     const occupied: Point[] = Object.entries(positionsRef.current)
       .filter(([u]) => u !== me)
       .map(([, p]) => ({ x: p.x, y: p.y }));
-    const target = nearbyWalkablePoint(fromPos, occupied);
+    const target = nearbyWalkablePoint(fromPos, occupied, callZoneAt(fromPos));
     const name = profilesRef.current[fromUid]?.display_name ?? "quem chamou";
     teleportToPoint(target, name);
   }, [teleportToPoint]);
