@@ -645,6 +645,16 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
     });
     const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
       accessTokenRef.current = session?.access_token ?? null;
+      if (event === "SIGNED_OUT") {
+        window.location.href = "/auth";
+        return;
+      }
+      const nextUserId = session?.user?.id ?? null;
+      const currentUserId = meIdRef.current;
+      if (event === "SIGNED_IN" && nextUserId && currentUserId && nextUserId !== currentUserId) {
+        window.location.reload();
+        return;
+      }
       if ((event === "TOKEN_REFRESHED" || event === "SIGNED_IN") && session?.access_token) {
         try { void supabase.realtime.setAuth(session.access_token); } catch { /* noop */ }
       }
