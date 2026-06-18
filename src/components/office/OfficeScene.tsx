@@ -72,7 +72,7 @@ import { installAudioUnlockListeners, unlockAudioPlayback } from "@/lib/rtc/audi
 import { RemoteVideoTiles } from "./RemoteVideoTiles";
 import { CamPreviewAndPicker } from "./CamPreviewAndPicker";
 import { DeviceMenu } from "./DeviceMenu";
-import prestativaIcon from "@/assets/prestativa-icon.png.asset.json";
+import prestativaIcon from "@/assets/prestativa-logo-v2.jpg.asset.json";
 import { ScreenShareViewer } from "./ScreenShareViewer";
 import { ConfettiBurst } from "./ConfettiBurst";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -3378,15 +3378,11 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
           <div className="flex items-center gap-2 min-w-0">
             <img
               src={prestativaIcon.url}
-              alt="Prestativa"
-              className="w-6 h-6 rounded-md object-contain"
+              alt="Prestativa Vídeos"
+              className="h-8 w-auto object-contain"
               draggable={false}
             />
-            <div className="flex items-baseline gap-1.5 min-w-0">
-              <span className="text-[13px] font-semibold tracking-tight text-foreground">Prestativa</span>
-              <span className="text-[11px] text-muted-foreground font-medium hidden sm:inline">Virtual Office</span>
-            </div>
-            <span className="hidden md:inline mx-2 h-4 w-px bg-border/80" aria-hidden />
+            <span className="hidden md:inline mx-2 h-4 w-px bg-[color-mix(in_oklab,#e50914_45%,transparent)]" aria-hidden />
             <span className="hidden md:inline text-[11px] text-muted-foreground truncate">
               {currentZone.label}
             </span>
