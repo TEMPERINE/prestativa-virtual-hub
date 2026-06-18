@@ -207,13 +207,23 @@ function describeMediaError(err: unknown, kind: "microfone" | "câmera"): string
 }
 
 function callZoneAt(p: Point): ZoneId {
-  // Fonte única de verdade: a zona realmente pintada no editor de mapas.
-  // Assentos/mesas desenhados dentro de salas são apenas visuais — não
-  // existem como áreas no mapa, então não devem interferir aqui. Qualquer
-  // tentativa de "fundir" zonas legadas (atendente-*, diretoria, etc.) com
-  // o que foi pintado acabava colocando usuários no mesmo lugar em salas de
-  // chamada diferentes.
-  return zoneAt(p).id;
+  // Fonte principal: a zona pintada no editor. Se o ponto cair num pequeno
+  // buraco sem pintura dentro do envelope de uma sala comum (mesa/cadeira/
+  // detalhe visual), ainda conta como a mesma sala para a chamada. Isso não
+  // cria zonas internas nos assentos nem usa áreas legadas de atendimento.
+  const direct = zoneAt(p);
+  if (direct.id !== "lobby") return direct.id;
+
+  const commonZones = [
+    ...ZONES.filter((z) => z.id !== "lobby").map((z) => z.id),
+    ...customZonesFromOverrides().map((z) => z.id),
+  ];
+  for (const id of commonZones) {
+    if (getZoneKind(id) !== "common") continue;
+    const rect = zoneRectFromOverrides(id as ZoneId);
+    if (rect && pointInsideRect(p, rect)) return id as ZoneId;
+  }
+  return "lobby";
 }
 
 // "Seat" point of a zone rect — bottom-center, in front of the desk.
@@ -269,7 +279,7 @@ function randomPointInRect(
 
 // Find a walkable point next to `anchor` (used by "Junte-se a mim" teleport
 // so the called user lands beside the caller, not on top of them).
-function nearbyWalkablePoint(anchor: Point, avoid: Point[] = []): Point {
+function nearbyWalkablePoint(anchor: Point, avoid: Point[] = [], preferredZoneId?: ZoneId): Point {
   const rings = [0.035, 0.05, 0.07, 0.09, 0.12, 0.16];
   for (const r of rings) {
     for (let i = 0; i < 16; i++) {
@@ -277,9 +287,15 @@ function nearbyWalkablePoint(anchor: Point, avoid: Point[] = []): Point {
       const p = { x: anchor.x + Math.cos(a) * r, y: anchor.y + Math.sin(a) * r };
       if (p.x < 0.02 || p.x > 0.98 || p.y < 0.02 || p.y > 0.98) continue;
       if (collides(p)) continue;
+      if (preferredZoneId && preferredZoneId !== "lobby" && callZoneAt(p) !== preferredZoneId) continue;
       if (avoid.some((v) => Math.hypot(v.x - p.x, v.y - p.y) < 0.025)) continue;
       return p;
     }
+  }
+  if (preferredZoneId && preferredZoneId !== "lobby") {
+    const z = findZoneById(preferredZoneId);
+    const rect = zoneRectFromOverrides(preferredZoneId) ?? z?.rect;
+    if (rect) return randomPointInRect(rect, avoid, 0.04);
   }
   return anchor;
 }
