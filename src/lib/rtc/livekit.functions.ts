@@ -32,6 +32,8 @@ export const getLiveKitAccess = createServerFn({ method: "POST" })
     const at = new AccessToken(apiKey, apiSecret, {
       identity: context.userId,
       name: prof?.display_name ?? "Convidado",
+      metadata: JSON.stringify({ userId: context.userId }),
+      attributes: { userId: context.userId },
       ttl: "6h",
     });
     at.addGrant({
