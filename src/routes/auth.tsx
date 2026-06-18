@@ -3,6 +3,7 @@ import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import logoAsset from "@/assets/prestativa-logo-v2.jpg.asset.json";
+import bgAsset from "@/assets/auth-bg.jpg.asset.json";
 
 export const Route = createFileRoute("/auth")({
   head: () => ({
