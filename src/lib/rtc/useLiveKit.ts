@@ -244,7 +244,7 @@ export function useLiveKit(
         await teardown();
         if (cancelled) return;
 
-        const { url, token } = await getLiveKitAccess({ data: { roomName: roomKey } });
+        const { url, token } = await getLiveKitAccess({ data: { roomName: roomKey, userId: myId } });
         if (cancelled) return;
 
         room = new Room({
