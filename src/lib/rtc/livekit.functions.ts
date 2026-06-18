@@ -4,12 +4,17 @@ import { z } from "zod";
 
 const Input = z.object({
   roomName: z.string().min(1).max(200).regex(/^[a-zA-Z0-9_:.\-]+$/),
+  userId: z.string().uuid(),
 });
 
 export const getLiveKitAccess = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) => Input.parse(d))
   .handler(async ({ data, context }) => {
+    if (data.userId !== context.userId) {
+      throw new Error("Sessão da chamada não corresponde ao personagem atual. Recarregue o espaço.");
+    }
+
     const apiKey = process.env.LIVEKIT_API_KEY;
     const apiSecret = process.env.LIVEKIT_API_SECRET;
     const url = process.env.LIVEKIT_URL;
