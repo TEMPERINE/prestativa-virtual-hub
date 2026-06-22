@@ -3336,7 +3336,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
       />
 
       {/* HUD de atalhos de reunião — aparece ao entrar numa call e ao usar um atalho */}
-      {rtc.connectedPeers.length > 0 && (
+      {audibleConnectedPeers.length > 0 && (
         <div
           className={`absolute bottom-3 left-1/2 -translate-x-1/2 z-[110] pointer-events-none transition-all duration-300 ${
             shortcutsHudVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-2"
@@ -3396,10 +3396,10 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
           </div>
 
           <div className="flex items-center gap-1">
-            {rtc.connectedPeers.length > 0 && (
+            {audibleConnectedPeers.length > 0 && (
               <div className="text-[11px] text-muted-foreground px-2 hidden sm:flex items-center gap-1.5">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_8px_var(--color-emerald-500,#10b981)]" />
-                Em chamada com {rtc.connectedPeers.length}
+                Em chamada com {audibleConnectedPeers.length}
               </div>
             )}
             <div className="flex items-center">
