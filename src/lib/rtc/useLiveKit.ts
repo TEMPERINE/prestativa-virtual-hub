@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   createLocalAudioTrack,
   createLocalVideoTrack,
+  AudioPresets,
   ConnectionState,
   type LocalAudioTrack,
   type LocalVideoTrack,
