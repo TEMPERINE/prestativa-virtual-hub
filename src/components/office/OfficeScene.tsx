@@ -574,7 +574,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
     setFacing(nextFacing);
   }, []);
 
-  const localZoneId = useMemo(() => callZoneAt(pos), [pos.x, pos.y, mapVersion]);
+  const localZoneId = useMemo(() => callZoneAt({ x: pos.x, y: pos.y }), [pos.x, pos.y, mapVersion]);
 
   // ---- WebRTC mesh: voice/video por sala privada OU por proximidade no lobby ----
   // Regra de produto:
@@ -614,7 +614,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
     }
     // Cap em ~15 pra estabilidade do mesh; ordenação prioriza mesma sala.
     return candidates.sort((a, b) => a.score - b.score).slice(0, 14).map((c) => c.uid);
-  }, [me?.id, positions, presentPeerIds, pos.x, pos.y, localZoneId]);
+  }, [me?.id, positions, presentPeerIds, pos.x, pos.y, localZoneId, mapVersion]);
 
 
   // SFU LiveKit: one shared room per workspace. The actual “who is in the
