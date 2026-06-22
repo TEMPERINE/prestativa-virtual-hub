@@ -77,10 +77,10 @@ export function useLiveKit(
   myId: string | null,
   roomKey: string | null,
   /**
-   * Conjunto de userIds cujo vídeo de câmera DEVE ser assinado. Quando
-   * `null`/`undefined`, todos os vídeos são assinados (comportamento legado).
-   * Compartilhamento de tela ignora esse filtro (sempre assinado).
-   * Áudio também ignora esse filtro — a chamada permanece audível.
+   * Conjunto de userIds cuja mídia DEVE ser assinada. Quando `null`/`undefined`,
+   * toda mídia é assinada (comportamento legado). O OfficeScene usa isso como
+   * filtro de reunião instantânea: só quem está perto/na mesma área fica audível
+   * e visível, mesmo que todos estejam no mesmo SFU do workspace.
    *
    * Quando a aba fica oculta (`document.hidden`), todo vídeo é desinscrito
    * automaticamente; ao voltar, re-aplica o filtro. Isso evita decodificação
@@ -401,7 +401,7 @@ export function useLiveKit(
     };
   }, []);
 
-  // ---------- Video-on-demand: subscribe video only for visible peers ----------
+  // ---------- Media-on-demand: subscribe only peers in the instant meeting ----------
   // Mantém refs estáveis para o filtro e visibilidade da aba, e re-aplica a
   // cada mudança (filtro, visibilidade, participante entrando, track publicada).
   const videoFilterRef = useRef<ReadonlySet<string> | null | undefined>(videoVisibleIds);
@@ -420,18 +420,25 @@ export function useLiveKit(
         // RemoteTrackPublication tem setSubscribed; ignoramos publicações locais.
         const rpub = pub as RemoteTrackPublication;
         if (typeof rpub.setSubscribed !== "function") return;
-        if (pub.kind !== Track.Kind.Video) return;
+        if (pub.kind !== Track.Kind.Video && pub.kind !== Track.Kind.Audio) return;
         const isScreen =
           pub.source === Track.Source.ScreenShare ||
           pub.source === Track.Source.ScreenShareAudio;
-        // Tela compartilhada: pausa em aba oculta, mas ignora filtro de proximidade
-        // (geralmente é o foco da atenção quando alguém compartilha).
+        const inFilter = filter == null || filter.has(p.identity);
+        // Tela compartilhada: só assina de quem está na conversa atual, e pausa
+        // em aba oculta para não decodificar vídeo fora de foco.
         if (isScreen) {
-          try { rpub.setSubscribed(!hidden); } catch { /* noop */ }
+          try { rpub.setSubscribed(inFilter && !hidden); } catch { /* noop */ }
+          return;
+        }
+        // Áudio: continua ativo em aba oculta, mas nunca de quem está fora da
+        // conversa instantânea (privacidade + custo/banda).
+        if (pub.kind === Track.Kind.Audio) {
+          try { rpub.setSubscribed(inFilter); } catch { /* noop */ }
           return;
         }
         // Vídeo de câmera: pausa em aba oculta OU se peer não está no filtro.
-        const wantSub = !hidden && (filter == null || filter.has(p.identity));
+        const wantSub = !hidden && inFilter;
         try { rpub.setSubscribed(wantSub); } catch { /* noop */ }
       });
     });
