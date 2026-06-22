@@ -854,8 +854,8 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
     const np = { x: nx, y: ny };
     // Bloqueio por porta/elemento: se o passo cruza a fronteira de uma zona
     // trancada (por ex. porta fechada), reverte o movimento.
-    const fromZoneId = zoneAt(cur).id;
-    const toZoneId = zoneAt(np).id;
+    const fromZoneId = callZoneAt(cur);
+    const toZoneId = callZoneAt(np);
     if (isMoveGated(fromZoneId, toZoneId)) {
       const now = performance.now();
       if (now - lastGatedToastRef.current > 1500) {
@@ -999,7 +999,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
       const safeStart = hasSavedPos ? startPoint : (collides(startPoint) ? SPAWN : startPoint);
       posRef.current = safeStart;
       setPos(safeStart);
-      const startZone = zoneAt(safeStart).id;
+      const startZone = callZoneAt(safeStart);
       setZone(startZone);
       const startFacing = (localWins ? localSaved?.facing : undefined) ?? (existing?.facing as Facing | undefined) ?? facingRef.current;
       facingRef.current = startFacing;
@@ -1139,7 +1139,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
         const uid = meIdRef.current;
         if (!uid || !requester_id || requester_id === uid || !positionHydratedRef.current) return;
         const cur = posRef.current;
-        const curZone = zoneAt(cur).id;
+        const curZone = callZoneAt(cur);
         const ts = Date.now();
         void positionBroadcastCh.send({
           type: "broadcast",
@@ -1194,7 +1194,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
               user_id,
               x: to.x,
               y: to.y,
-              zone: zoneAt(to).id,
+              zone: callZoneAt(to),
               facing: cur?.facing ?? "down",
               is_online: true,
               ts,
