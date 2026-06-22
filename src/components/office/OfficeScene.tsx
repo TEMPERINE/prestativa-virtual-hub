@@ -219,7 +219,6 @@ function callZoneAt(p: Point): ZoneId {
     ...customZonesFromOverrides().map((z) => z.id),
   ];
   for (const id of commonZones) {
-    if (getZoneKind(id) !== "common") continue;
     const rect = zoneRectFromOverrides(id as ZoneId);
     if (rect && pointInsideRect(p, rect)) return id as ZoneId;
   }
