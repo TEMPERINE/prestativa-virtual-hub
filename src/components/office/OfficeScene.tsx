@@ -85,7 +85,7 @@ import { EditProfileModal } from "@/components/profile/EditProfileModal";
 import { OnboardingWizard } from "@/components/onboarding/OnboardingWizard";
 import { useMeetingTracker } from "@/lib/meetings/useMeetingTracker";
 import { useMeetingRecorder } from "@/lib/meetings/useMeetingRecorder";
-import { getCurrentWorkspaceId } from "@/lib/workspace/current";
+import { getCurrentWorkspaceId, subscribeCurrentWorkspaceId } from "@/lib/workspace/current";
 import { useWorkspaceTier } from "@/lib/workspace/useWorkspaceTier";
 
 type Profile = {
@@ -621,12 +621,20 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
   // instant meeting” set is `desiredPeers` below (same room area or close
   // enough), which avoids splitting people who are visually together but fall
   // on adjacent painted zones.
+  // Workspace id reativo: re-renderiza quando setCurrentWorkspaceId muda,
+  // evitando que o roomKey trave em null se o me.id resolver antes do ws.
+  const [currentWsId, setCurrentWsId] = useState<string | null>(() => getCurrentWorkspaceId());
+  useEffect(() => {
+    const unsub = subscribeCurrentWorkspaceId((id) => setCurrentWsId(id));
+    // sincroniza caso tenha mudado entre o useState inicial e o subscribe
+    setCurrentWsId(getCurrentWorkspaceId());
+    return () => { unsub(); };
+  }, []);
   const roomKey = useMemo(() => {
     if (!me?.id) return null;
-    const wsId = getCurrentWorkspaceId();
-    if (!wsId) return null;
-    return `ws-${wsId}::office`;
-  }, [me?.id]);
+    if (!currentWsId) return null;
+    return `ws-${currentWsId}::office`;
+  }, [me?.id, currentWsId]);
   // Vídeo sob demanda: só assina câmera de quem está perto/na mesma sala.
   // `desiredPeers` já combina proximidade no lobby + mesma zona privada.
   // Áudio continua disponível para todos da sala LiveKit (ver audiblePeerIds).
