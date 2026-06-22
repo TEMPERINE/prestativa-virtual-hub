@@ -276,8 +276,8 @@ function randomCorridorPoint(): Point {
     const p = { x, y };
     if (collides(p)) continue;
     // Must be in the lobby (corridor) — not inside any built-in zone rect.
-    const z = zoneAt(p);
-    if (z.id !== "lobby") continue;
+    const z = callZoneAt(p);
+    if (z !== "lobby") continue;
     return p;
   }
   return SPAWN;
@@ -583,7 +583,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
   //    sem câmera/mic ligados, INDEPENDENTE da distância entre eles.
   //  • No lobby/corredor a chamada só rola por proximidade ("conversa de
   //    corredor") — pequeno raio com histerese.
-  // A zona do peer é calculada LOCALMENTE via zoneAt({x,y}) para não depender
+  // A zona do peer é calculada LOCALMENTE via callZoneAt({x,y}) para não depender
   // do campo p.zone (que vem com lag/staleness do broadcast de presença).
   // Raio ~2–3 personagens. Histerese pequena evita flicker entrar/sair.
   const PROXIMITY_CONNECT = 0.038;
