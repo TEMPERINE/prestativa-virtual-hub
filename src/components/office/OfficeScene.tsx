@@ -219,11 +219,37 @@ function callZoneAt(p: Point): ZoneId {
     ...customZonesFromOverrides().map((z) => z.id),
   ];
   for (const id of commonZones) {
-    if (getZoneKind(id) !== "common") continue;
     const rect = zoneRectFromOverrides(id as ZoneId);
     if (rect && pointInsideRect(p, rect)) return id as ZoneId;
   }
   return "lobby";
+}
+
+const MEETING_AREA_RECT_PADDING = 0.018;
+
+function effectiveZoneRect(id: string): { x1: number; y1: number; x2: number; y2: number } | null {
+  const z = findZoneById(id);
+  return zoneRectFromOverrides(id as ZoneId) ?? z?.rect ?? null;
+}
+
+function zonesShareMeetingArea(a: string, b: string): boolean {
+  if (a === b) return a !== "lobby";
+  if (a === "lobby" || b === "lobby") return false;
+  const ar = effectiveZoneRect(a);
+  const br = effectiveZoneRect(b);
+  if (!ar || !br) return false;
+  const pad = MEETING_AREA_RECT_PADDING;
+  const separated =
+    ar.x2 + pad < br.x1 ||
+    br.x2 + pad < ar.x1 ||
+    ar.y2 + pad < br.y1 ||
+    br.y2 + pad < ar.y1;
+  if (separated) return false;
+  const overlapX = Math.min(ar.x2, br.x2) - Math.max(ar.x1, br.x1);
+  const overlapY = Math.min(ar.y2, br.y2) - Math.max(ar.y1, br.y1);
+  const minW = Math.min(ar.x2 - ar.x1, br.x2 - br.x1);
+  const minH = Math.min(ar.y2 - ar.y1, br.y2 - br.y1);
+  return overlapX / Math.max(minW, 0.001) > 0.35 || overlapY / Math.max(minH, 0.001) > 0.35;
 }
 
 // "Seat" point of a zone rect — bottom-center, in front of the desk.
@@ -250,8 +276,8 @@ function randomCorridorPoint(): Point {
     const p = { x, y };
     if (collides(p)) continue;
     // Must be in the lobby (corridor) — not inside any built-in zone rect.
-    const z = zoneAt(p);
-    if (z.id !== "lobby") continue;
+    const z = callZoneAt(p);
+    if (z !== "lobby") continue;
     return p;
   }
   return SPAWN;
@@ -548,7 +574,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
     setFacing(nextFacing);
   }, []);
 
-  const localZoneId = useMemo(() => callZoneAt(pos), [pos.x, pos.y, mapVersion]);
+  const localZoneId = useMemo(() => callZoneAt({ x: pos.x, y: pos.y }), [pos.x, pos.y, mapVersion]);
 
   // ---- WebRTC mesh: voice/video por sala privada OU por proximidade no lobby ----
   // Regra de produto:
@@ -557,7 +583,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
   //    sem câmera/mic ligados, INDEPENDENTE da distância entre eles.
   //  • No lobby/corredor a chamada só rola por proximidade ("conversa de
   //    corredor") — pequeno raio com histerese.
-  // A zona do peer é calculada LOCALMENTE via zoneAt({x,y}) para não depender
+  // A zona do peer é calculada LOCALMENTE via callZoneAt({x,y}) para não depender
   // do campo p.zone (que vem com lag/staleness do broadcast de presença).
   // Raio ~2–3 personagens. Histerese pequena evita flicker entrar/sair.
   const PROXIMITY_CONNECT = 0.038;
@@ -573,7 +599,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
       if (!p.is_online && !presentPeerIds.has(uid)) continue;
       // Zona do peer calculada localmente — robusto contra p.zone defasado.
       const peerZoneId = callZoneAt({ x: p.x, y: p.y });
-      const sameActiveRoom = myZoneId !== "lobby" && peerZoneId === myZoneId;
+      const sameActiveRoom = zonesShareMeetingArea(myZoneId, peerZoneId);
       // Proximidade só importa no lobby (e como fallback).
       const dx = p.x - pos.x;
       const dy = p.y - pos.y;
@@ -588,24 +614,23 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
     }
     // Cap em ~15 pra estabilidade do mesh; ordenação prioriza mesma sala.
     return candidates.sort((a, b) => a.score - b.score).slice(0, 14).map((c) => c.uid);
-  }, [me?.id, positions, presentPeerIds, pos.x, pos.y, localZoneId]);
+  }, [me?.id, positions, presentPeerIds, pos.x, pos.y, localZoneId, mapVersion]);
 
 
-  // SFU LiveKit: one room per (workspace, zone). Lobby = single shared room
-  // per workspace; private zones isolate naturally. Replaces the P2P mesh.
+  // SFU LiveKit: one shared room per workspace. The actual “who is in the
+  // instant meeting” set is `desiredPeers` below (same room area or close
+  // enough), which avoids splitting people who are visually together but fall
+  // on adjacent painted zones.
   const roomKey = useMemo(() => {
     if (!me?.id) return null;
     const wsId = getCurrentWorkspaceId();
     if (!wsId) return null;
-    return `ws-${wsId}::zone-${localZoneId}`;
-  }, [me?.id, localZoneId]);
+    return `ws-${wsId}::office`;
+  }, [me?.id]);
   // Vídeo sob demanda: só assina câmera de quem está perto/na mesma sala.
   // `desiredPeers` já combina proximidade no lobby + mesma zona privada.
   // Áudio continua disponível para todos da sala LiveKit (ver audiblePeerIds).
-  const videoVisibleIds = useMemo(
-    () => (localZoneId === "lobby" ? new Set(desiredPeers) : null),
-    [desiredPeers, localZoneId],
-  );
+  const videoVisibleIds = useMemo(() => new Set(desiredPeers), [desiredPeers]);
   const rtc = useLiveKit(me?.id ?? null, roomKey, videoVisibleIds);
   useEffect(() => {
     connectedPeersRef.current = new Set(desiredPeers);
@@ -617,8 +642,8 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
   // mesmo que a sala LiveKit ainda contenha todos.
   const audiblePeerIds = useMemo(() => new Set(desiredPeers), [desiredPeers]);
   const audibleConnectedPeers = useMemo(
-    () => (localZoneId === "lobby" ? rtc.connectedPeers.filter((id) => audiblePeerIds.has(id)) : rtc.connectedPeers),
-    [rtc.connectedPeers, audiblePeerIds, localZoneId],
+    () => rtc.connectedPeers.filter((id) => audiblePeerIds.has(id)),
+    [rtc.connectedPeers, audiblePeerIds],
   );
   const audibleStreams = useMemo(() => {
     const out: Record<string, MediaStream> = {};
@@ -628,6 +653,14 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
     }
     return out;
   }, [audibleConnectedPeers, rtc.remoteStreams]);
+  const audibleScreenStreams = useMemo(() => {
+    const out: Record<string, MediaStream> = {};
+    for (const id of audibleConnectedPeers) {
+      const s = rtc.remoteScreenStreams[id];
+      if (s) out[id] = s;
+    }
+    return out;
+  }, [audibleConnectedPeers, rtc.remoteScreenStreams]);
 
   // Wires global audio unlock so remote <audio> tags can autoplay.
   // Camera/mic access stays inside the user's click/keyboard gesture.
@@ -821,8 +854,8 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
     const np = { x: nx, y: ny };
     // Bloqueio por porta/elemento: se o passo cruza a fronteira de uma zona
     // trancada (por ex. porta fechada), reverte o movimento.
-    const fromZoneId = zoneAt(cur).id;
-    const toZoneId = zoneAt(np).id;
+    const fromZoneId = callZoneAt(cur);
+    const toZoneId = callZoneAt(np);
     if (isMoveGated(fromZoneId, toZoneId)) {
       const now = performance.now();
       if (now - lastGatedToastRef.current > 1500) {
@@ -966,7 +999,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
       const safeStart = hasSavedPos ? startPoint : (collides(startPoint) ? SPAWN : startPoint);
       posRef.current = safeStart;
       setPos(safeStart);
-      const startZone = zoneAt(safeStart).id;
+      const startZone = callZoneAt(safeStart);
       setZone(startZone);
       const startFacing = (localWins ? localSaved?.facing : undefined) ?? (existing?.facing as Facing | undefined) ?? facingRef.current;
       facingRef.current = startFacing;
@@ -1106,7 +1139,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
         const uid = meIdRef.current;
         if (!uid || !requester_id || requester_id === uid || !positionHydratedRef.current) return;
         const cur = posRef.current;
-        const curZone = zoneAt(cur).id;
+        const curZone = callZoneAt(cur);
         const ts = Date.now();
         void positionBroadcastCh.send({
           type: "broadcast",
@@ -1161,7 +1194,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
               user_id,
               x: to.x,
               y: to.y,
-              zone: zoneAt(to).id,
+              zone: callZoneAt(to),
               facing: cur?.facing ?? "down",
               is_online: true,
               ts,
@@ -1281,7 +1314,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
         try {
           await presenceCh.track({
             user_id: uid, x: cur.x, y: cur.y,
-            zone: zoneAt(cur).id, facing: facingRef.current, ts: Date.now(),
+            zone: callZoneAt(cur), facing: facingRef.current, ts: Date.now(),
           });
         } catch { /* noop */ }
       });
@@ -1296,7 +1329,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
       const cur = posRef.current;
       void presenceCh.track({
         user_id: uid, x: cur.x, y: cur.y,
-        zone: zoneAt(cur).id, facing: facingRef.current, ts: Date.now(),
+        zone: callZoneAt(cur), facing: facingRef.current, ts: Date.now(),
       }).catch(() => { /* noop */ });
     }, 1000);
 
@@ -1310,7 +1343,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
       const uid = meIdRef.current;
       if (!uid || !positionHydratedRef.current) return;
       const cur = posRef.current;
-      const curZone = zoneAt(cur).id;
+      const curZone = callZoneAt(cur);
       // 1) Re-attach the latest JWT to the realtime socket
       void supabase.auth.getSession().then(({ data }) => {
         const token = data.session?.access_token;
@@ -1364,7 +1397,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
           if (rect) spawn = seatPointForRect(rect);
         }
       }
-      const spawnZone = zoneAt(spawn).id;
+      const spawnZone = callZoneAt(spawn);
       try { window.localStorage.removeItem(`${LAST_POSITION_KEY_PREFIX}${uid}`); } catch { /* noop */ }
       const payload = {
         workspace_id: wsId,
@@ -1430,7 +1463,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
         });
         if (uid) {
           const cur = posRef.current;
-          const curZone = zoneAt(cur).id;
+          const curZone = callZoneAt(cur);
           next[uid] = {
             ...(next[uid] ?? { user_id: uid, x: cur.x, y: cur.y, zone: curZone, is_online: true }),
             x: cur.x,
@@ -1458,14 +1491,15 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
       // the init effect hasn't hydrated the saved position yet, and writing
       // SPAWN here would clobber the real DB row and snap us back for peers.
       if (cur.x === SPAWN.x && cur.y === SPAWN.y) return;
-      writeLocalSavedPosition(uid, cur, zoneAt(cur).id, facingRef.current);
+      const curZone = callZoneAt(cur);
+      writeLocalSavedPosition(uid, cur, curZone, facingRef.current);
       const _wsHb = getCurrentWorkspaceId();
       if (_wsHb) void supabase.from("positions").upsert({
         workspace_id: _wsHb,
         user_id: uid,
         x: cur.x,
         y: cur.y,
-        zone: zoneAt(cur).id,
+        zone: curZone,
         facing: facingRef.current,
         is_online: true,
         updated_at: new Date().toISOString(),
@@ -1646,7 +1680,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
   const prevConnectedRef = useRef<string[]>([]);
   useEffect(() => {
     const prev = prevConnectedRef.current;
-    const cur = rtc.connectedPeers;
+    const cur = audibleConnectedPeers;
     const entered = cur.filter((p) => !prev.includes(p));
     const left = prev.filter((p) => !cur.includes(p));
     for (const id of entered) {
@@ -1665,7 +1699,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
       });
     }
     prevConnectedRef.current = cur;
-  }, [rtc.connectedPeers, profiles]);
+  }, [audibleConnectedPeers, profiles]);
 
   // -------- HUD de atalhos da reunião --------
   // Mostra o HUD por alguns segundos quando o usuário entra numa call ou usa
@@ -1683,12 +1717,12 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
   // Mostra o HUD ao entrar numa chamada
   const inCallRef = useRef(false);
   useEffect(() => {
-    const inCall = rtc.connectedPeers.length > 0;
+    const inCall = audibleConnectedPeers.length > 0;
     if (inCall && !inCallRef.current) {
       pingShortcutsHud(6000);
     }
     inCallRef.current = inCall;
-  }, [rtc.connectedPeers.length, pingShortcutsHud]);
+  }, [audibleConnectedPeers.length, pingShortcutsHud]);
   useEffect(() => () => {
     if (shortcutsHudTimerRef.current) window.clearTimeout(shortcutsHudTimerRef.current);
   }, []);
@@ -1800,8 +1834,8 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
     const z = findZoneById(zoneId);
     if (!z) return;
     // If already inside the target zone, do nothing.
-    const currentZone = zoneAt(posRef.current);
-    if (currentZone.id === zoneId) {
+    const currentZone = callZoneAt(posRef.current);
+    if (currentZone === zoneId) {
       toast.info(`Você já está em ${label ?? z.label}.`);
       return;
     }
@@ -1848,9 +1882,9 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
         // Snap to destination
         posRef.current = target;
         setPos(target);
-        const z2 = zoneAt(target);
-        setZone(z2.id);
-        sendPos(target.x, target.y, z2.id, facingRef.current, true);
+        const z2 = callZoneAt(target);
+        setZone(z2);
+        sendPos(target.x, target.y, z2, facingRef.current, true);
         setTeleport({ from, to: target, phase: "in", id });
       }, 450)
     );
@@ -1969,9 +2003,9 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
       window.setTimeout(() => {
         posRef.current = target;
         setPos(target);
-        const z2 = zoneAt(target);
-        setZone(z2.id);
-        sendPos(target.x, target.y, z2.id, facingRef.current, true);
+        const z2 = callZoneAt(target);
+        setZone(z2);
+        sendPos(target.x, target.y, z2, facingRef.current, true);
         setTeleport({ from, to: target, phase: "in", id });
       }, 450)
     );
@@ -2231,7 +2265,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
       // a página o personagem volte exatamente onde parou — sem cair no spawn.
       if (keysDown.current.size === 0) {
         const cur = posRef.current;
-        sendPos(cur.x, cur.y, zoneAt(cur).id, facingRef.current, true);
+        sendPos(cur.x, cur.y, callZoneAt(cur), facingRef.current, true);
       }
     };
     const blur = () => {
@@ -2288,8 +2322,8 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
         if (adx < SPEED && ady < SPEED) {
           // Arrived
           autoWalkRef.current = null;
-          const z = zoneAt(cur);
-          sendPos(cur.x, cur.y, z.id, facingRef.current, true);
+          const z = callZoneAt(cur);
+          sendPos(cur.x, cur.y, z, facingRef.current, true);
         } else {
           // Prefer the larger axis; if blocked, fall back to the other.
           const primary: Facing = adx >= ady
@@ -2337,8 +2371,8 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
         // o throttle de 33 ms em tryMove pode ter "engolido" o frame final.
         setPos((prev) => (prev.x === cur.x && prev.y === cur.y ? prev : cur));
         lastPosCommit.current = t;
-        const z = zoneAt(cur);
-        sendPos(cur.x, cur.y, z.id, facingRef.current, true);
+        const z = callZoneAt(cur);
+        sendPos(cur.x, cur.y, z, facingRef.current, true);
       }
       raf = requestAnimationFrame(tick);
     };
@@ -2423,21 +2457,21 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
   }, []);
 
   // Histórico "Minhas reuniões" — registra entrada/saída quando o usuário
-  // está em QUALQUER zona privada (não-lobby) com pelo menos 1 outro peer.
-  // Toda zona privada conta como reunião automática (com ou sem câmera).
+  // está efetivamente em uma conversa automática com pelo menos 1 outro peer
+  // próximo/na mesma área, não apenas conectado ao SFU global do workspace.
   const isPrivateZone = currentZone.id !== "lobby";
   const { activeMeetingId } = useMeetingTracker({
     zoneId: currentZone.id,
     zoneLabel: currentZone.label,
     isMeetingZone: isPrivateZone,
-    peerCount: rtc.connectedPeers.length,
+    peerCount: audibleConnectedPeers.length,
     enabled: !!me?.id,
   });
 
   // Gravação manual (botão). Mixa mic + áudio dos peers e envia ao storage.
   const recorder = useMeetingRecorder({
     getLocalAudioTrack: rtc.getLocalAudioTrack,
-    remoteStreams: rtc.remoteStreams,
+    remoteStreams: audibleStreams,
   });
 
 
@@ -2608,7 +2642,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
           const d = dragRef.current;
           dragRef.current = null;
           wasDragRef.current = !!d?.moved;
-          try { (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId); } catch {}
+          try { (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId); } catch { /* pointer may already be released */ }
         }}
         onClickCapture={(e) => {
           if (placing) {
@@ -3039,7 +3073,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
 
         <ScreenShareViewer
           localStream={rtc.localScreenStream}
-          remoteStreams={rtc.remoteScreenStreams}
+          remoteStreams={audibleScreenStreams}
           profiles={profiles}
           onStopLocal={() => { rtc.toggleScreen().catch(() => {}); }}
           participants={(() => {
@@ -3065,9 +3099,9 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
                 isSelf: true,
               });
             }
-            for (const peerId of rtc.connectedPeers) {
+            for (const peerId of audibleConnectedPeers) {
               const p = profiles[peerId] ?? { id: peerId, display_name: "Convidado", avatar_color: "#475569" };
-              const stream = rtc.remoteStreams[peerId] ?? null;
+              const stream = audibleStreams[peerId] ?? null;
               list.push({
                 id: peerId,
                 profile: p,
@@ -3329,7 +3363,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
       />
 
       {/* HUD de atalhos de reunião — aparece ao entrar numa call e ao usar um atalho */}
-      {rtc.connectedPeers.length > 0 && (
+      {audibleConnectedPeers.length > 0 && (
         <div
           className={`absolute bottom-3 left-1/2 -translate-x-1/2 z-[110] pointer-events-none transition-all duration-300 ${
             shortcutsHudVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-2"
@@ -3389,10 +3423,10 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
           </div>
 
           <div className="flex items-center gap-1">
-            {rtc.connectedPeers.length > 0 && (
+            {audibleConnectedPeers.length > 0 && (
               <div className="text-[11px] text-muted-foreground px-2 hidden sm:flex items-center gap-1.5">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_8px_var(--color-emerald-500,#10b981)]" />
-                Em chamada com {rtc.connectedPeers.length}
+                Em chamada com {audibleConnectedPeers.length}
               </div>
             )}
             <div className="flex items-center">
@@ -3587,7 +3621,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
                 onEditProfile={() => setEditProfOpen(true)}
                 onGoToMyDesk={teleportToMyClaim}
                 onGoToLobby={() => {
-                  if (zoneAt(posRef.current).id === "lobby") { toast.info("Você já está no saguão."); return; }
+                  if (callZoneAt(posRef.current) === "lobby") { toast.info("Você já está no saguão."); return; }
                   const target = randomCorridorPoint();
                   posRef.current = target;
                   setPos(target);
