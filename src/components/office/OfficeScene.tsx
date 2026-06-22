@@ -600,7 +600,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
       if (!p.is_online && !presentPeerIds.has(uid)) continue;
       // Zona do peer calculada localmente — robusto contra p.zone defasado.
       const peerZoneId = callZoneAt({ x: p.x, y: p.y });
-      const sameActiveRoom = myZoneId !== "lobby" && peerZoneId === myZoneId;
+      const sameActiveRoom = zonesShareMeetingArea(myZoneId, peerZoneId);
       // Proximidade só importa no lobby (e como fallback).
       const dx = p.x - pos.x;
       const dy = p.y - pos.y;
