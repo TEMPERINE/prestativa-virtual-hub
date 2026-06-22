@@ -2430,21 +2430,21 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
   }, []);
 
   // Histórico "Minhas reuniões" — registra entrada/saída quando o usuário
-  // está em QUALQUER zona privada (não-lobby) com pelo menos 1 outro peer.
-  // Toda zona privada conta como reunião automática (com ou sem câmera).
+  // está efetivamente em uma conversa automática com pelo menos 1 outro peer
+  // próximo/na mesma área, não apenas conectado ao SFU global do workspace.
   const isPrivateZone = currentZone.id !== "lobby";
   const { activeMeetingId } = useMeetingTracker({
     zoneId: currentZone.id,
     zoneLabel: currentZone.label,
     isMeetingZone: isPrivateZone,
-    peerCount: rtc.connectedPeers.length,
+    peerCount: audibleConnectedPeers.length,
     enabled: !!me?.id,
   });
 
   // Gravação manual (botão). Mixa mic + áudio dos peers e envia ao storage.
   const recorder = useMeetingRecorder({
     getLocalAudioTrack: rtc.getLocalAudioTrack,
-    remoteStreams: rtc.remoteStreams,
+    remoteStreams: audibleStreams,
   });
 
 
