@@ -14,8 +14,9 @@ export const Route = createFileRoute("/auth")({
   }),
   beforeLoad: async () => {
     if (typeof window !== "undefined") {
-      const { data } = await supabase.auth.getSession();
-      if (data.session) throw redirect({ to: "/workspaces" });
+      const { data, error } = await supabase.auth.getUser();
+      if (error) await supabase.auth.signOut({ scope: "local" });
+      if (data.user && !error) throw redirect({ to: "/workspaces" });
     }
   },
   component: AuthPage,
