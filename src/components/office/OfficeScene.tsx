@@ -3046,7 +3046,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
 
         <ScreenShareViewer
           localStream={rtc.localScreenStream}
-          remoteStreams={rtc.remoteScreenStreams}
+          remoteStreams={audibleScreenStreams}
           profiles={profiles}
           onStopLocal={() => { rtc.toggleScreen().catch(() => {}); }}
           participants={(() => {
@@ -3072,9 +3072,9 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
                 isSelf: true,
               });
             }
-            for (const peerId of rtc.connectedPeers) {
+            for (const peerId of audibleConnectedPeers) {
               const p = profiles[peerId] ?? { id: peerId, display_name: "Convidado", avatar_color: "#475569" };
-              const stream = rtc.remoteStreams[peerId] ?? null;
+              const stream = audibleStreams[peerId] ?? null;
               list.push({
                 id: peerId,
                 profile: p,
