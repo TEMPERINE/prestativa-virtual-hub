@@ -1463,7 +1463,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
         });
         if (uid) {
           const cur = posRef.current;
-          const curZone = zoneAt(cur).id;
+          const curZone = callZoneAt(cur);
           next[uid] = {
             ...(next[uid] ?? { user_id: uid, x: cur.x, y: cur.y, zone: curZone, is_online: true }),
             x: cur.x,
@@ -1491,14 +1491,15 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
       // the init effect hasn't hydrated the saved position yet, and writing
       // SPAWN here would clobber the real DB row and snap us back for peers.
       if (cur.x === SPAWN.x && cur.y === SPAWN.y) return;
-      writeLocalSavedPosition(uid, cur, zoneAt(cur).id, facingRef.current);
+      const curZone = callZoneAt(cur);
+      writeLocalSavedPosition(uid, cur, curZone, facingRef.current);
       const _wsHb = getCurrentWorkspaceId();
       if (_wsHb) void supabase.from("positions").upsert({
         workspace_id: _wsHb,
         user_id: uid,
         x: cur.x,
         y: cur.y,
-        zone: zoneAt(cur).id,
+        zone: curZone,
         facing: facingRef.current,
         is_online: true,
         updated_at: new Date().toISOString(),
@@ -1833,8 +1834,8 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
     const z = findZoneById(zoneId);
     if (!z) return;
     // If already inside the target zone, do nothing.
-    const currentZone = zoneAt(posRef.current);
-    if (currentZone.id === zoneId) {
+    const currentZone = callZoneAt(posRef.current);
+    if (currentZone === zoneId) {
       toast.info(`Você já está em ${label ?? z.label}.`);
       return;
     }
