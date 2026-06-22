@@ -2615,7 +2615,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
           const d = dragRef.current;
           dragRef.current = null;
           wasDragRef.current = !!d?.moved;
-          try { (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId); } catch {}
+          try { (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId); } catch { /* pointer may already be released */ }
         }}
         onClickCapture={(e) => {
           if (placing) {
