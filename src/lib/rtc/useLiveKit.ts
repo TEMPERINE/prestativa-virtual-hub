@@ -53,15 +53,20 @@ function isRoomReady(room: Room | null): room is Room {
   return !!room && room.state === ConnectionState.Connected;
 }
 
-// Mantemos apenas constraints amplamente suportadas em Chromium/Firefox/Safari.
-// `voiceIsolation` é Safari-only e em Chromium recentes pode disparar
-// OverconstrainedError, fazendo o createLocalAudioTrack falhar antes do prompt
-// de permissão — afetava usuários cujo browser/SO não suporta a constraint.
+// Pipeline de áudio estilo Zoom / Google Meet:
+// - AGC ligado para normalizar o volume do mic (sem AGC, vozes próximas
+//   ficam muito mais baixas que sons do sistema, ex.: campainha).
+// - EC + NS ligados para conferência.
+// - 48 kHz mono é o padrão Opus usado pelos meetings comerciais.
+// `voiceIsolation` é Safari-only e em Chromium pode disparar
+// OverconstrainedError, então não usamos.
 const AUDIO_CAPTURE_OPTIONS = {
   echoCancellation: true,
   noiseSuppression: true,
-  autoGainControl: false,
+  autoGainControl: true,
   channelCount: 1,
+  sampleRate: 48000,
+  sampleSize: 16,
 } as const;
 
 const VIDEO_CAPTURE_OPTIONS = {
