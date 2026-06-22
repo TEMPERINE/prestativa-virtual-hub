@@ -226,6 +226,33 @@ function callZoneAt(p: Point): ZoneId {
   return "lobby";
 }
 
+const MEETING_AREA_RECT_PADDING = 0.018;
+
+function effectiveZoneRect(id: string): { x1: number; y1: number; x2: number; y2: number } | null {
+  const z = findZoneById(id);
+  return zoneRectFromOverrides(id as ZoneId) ?? z?.rect ?? null;
+}
+
+function zonesShareMeetingArea(a: string, b: string): boolean {
+  if (a === b) return a !== "lobby";
+  if (a === "lobby" || b === "lobby") return false;
+  const ar = effectiveZoneRect(a);
+  const br = effectiveZoneRect(b);
+  if (!ar || !br) return false;
+  const pad = MEETING_AREA_RECT_PADDING;
+  const separated =
+    ar.x2 + pad < br.x1 ||
+    br.x2 + pad < ar.x1 ||
+    ar.y2 + pad < br.y1 ||
+    br.y2 + pad < ar.y1;
+  if (separated) return false;
+  const overlapX = Math.min(ar.x2, br.x2) - Math.max(ar.x1, br.x1);
+  const overlapY = Math.min(ar.y2, br.y2) - Math.max(ar.y1, br.y1);
+  const minW = Math.min(ar.x2 - ar.x1, br.x2 - br.x1);
+  const minH = Math.min(ar.y2 - ar.y1, br.y2 - br.y1);
+  return overlapX / Math.max(minW, 0.001) > 0.35 || overlapY / Math.max(minH, 0.001) > 0.35;
+}
+
 // "Seat" point of a zone rect — bottom-center, in front of the desk.
 // If that point collides with furniture, walk it upward until it's walkable.
 function seatPointForRect(rect: { x1: number; y1: number; x2: number; y2: number }): Point {
