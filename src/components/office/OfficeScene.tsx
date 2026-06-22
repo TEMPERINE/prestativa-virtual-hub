@@ -591,21 +591,20 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
   }, [me?.id, positions, presentPeerIds, pos.x, pos.y, localZoneId]);
 
 
-  // SFU LiveKit: one room per (workspace, zone). Lobby = single shared room
-  // per workspace; private zones isolate naturally. Replaces the P2P mesh.
+  // SFU LiveKit: one shared room per workspace. The actual “who is in the
+  // instant meeting” set is `desiredPeers` below (same room area or close
+  // enough), which avoids splitting people who are visually together but fall
+  // on adjacent painted zones.
   const roomKey = useMemo(() => {
     if (!me?.id) return null;
     const wsId = getCurrentWorkspaceId();
     if (!wsId) return null;
-    return `ws-${wsId}::zone-${localZoneId}`;
-  }, [me?.id, localZoneId]);
+    return `ws-${wsId}::office`;
+  }, [me?.id]);
   // Vídeo sob demanda: só assina câmera de quem está perto/na mesma sala.
   // `desiredPeers` já combina proximidade no lobby + mesma zona privada.
   // Áudio continua disponível para todos da sala LiveKit (ver audiblePeerIds).
-  const videoVisibleIds = useMemo(
-    () => (localZoneId === "lobby" ? new Set(desiredPeers) : null),
-    [desiredPeers, localZoneId],
-  );
+  const videoVisibleIds = useMemo(() => new Set(desiredPeers), [desiredPeers]);
   const rtc = useLiveKit(me?.id ?? null, roomKey, videoVisibleIds);
   useEffect(() => {
     connectedPeersRef.current = new Set(desiredPeers);
@@ -617,8 +616,8 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
   // mesmo que a sala LiveKit ainda contenha todos.
   const audiblePeerIds = useMemo(() => new Set(desiredPeers), [desiredPeers]);
   const audibleConnectedPeers = useMemo(
-    () => (localZoneId === "lobby" ? rtc.connectedPeers.filter((id) => audiblePeerIds.has(id)) : rtc.connectedPeers),
-    [rtc.connectedPeers, audiblePeerIds, localZoneId],
+    () => rtc.connectedPeers.filter((id) => audiblePeerIds.has(id)),
+    [rtc.connectedPeers, audiblePeerIds],
   );
   const audibleStreams = useMemo(() => {
     const out: Record<string, MediaStream> = {};
@@ -628,6 +627,14 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
     }
     return out;
   }, [audibleConnectedPeers, rtc.remoteStreams]);
+  const audibleScreenStreams = useMemo(() => {
+    const out: Record<string, MediaStream> = {};
+    for (const id of audibleConnectedPeers) {
+      const s = rtc.remoteScreenStreams[id];
+      if (s) out[id] = s;
+    }
+    return out;
+  }, [audibleConnectedPeers, rtc.remoteScreenStreams]);
 
   // Wires global audio unlock so remote <audio> tags can autoplay.
   // Camera/mic access stays inside the user's click/keyboard gesture.
