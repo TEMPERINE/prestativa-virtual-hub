@@ -16,6 +16,7 @@ import {
   type Participant,
 } from "livekit-client";
 import { getLiveKitAccess } from "./livekit.functions";
+import { getIceServers } from "./ice.functions";
 
 export type RtcMeshState = {
   micOn: boolean;
@@ -48,6 +49,32 @@ function makeStream(track: MediaStreamTrack): MediaStream {
   const s = new MediaStream();
   s.addTrack(track);
   return s;
+}
+
+function makeClientId(): string {
+  try {
+    const existing = window.sessionStorage.getItem("office:livekit-client-id");
+    if (existing) return existing;
+    const id = crypto.randomUUID().replace(/-/g, "").slice(0, 18);
+    window.sessionStorage.setItem("office:livekit-client-id", id);
+    return id;
+  } catch {
+    return `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 12)}`;
+  }
+}
+
+function ownerIdOf(identity: string): string {
+  return identity.split(":", 1)[0] || identity;
+}
+
+function participantOwnerId(p: Pick<Participant, "identity" | "attributes" | "metadata">): string {
+  const attrUserId = p.attributes?.userId;
+  if (attrUserId) return attrUserId;
+  try {
+    const meta = p.metadata ? JSON.parse(p.metadata) as { userId?: string } : null;
+    if (meta?.userId) return meta.userId;
+  } catch { /* noop */ }
+  return ownerIdOf(p.identity);
 }
 
 function isRoomReady(room: Room | null): room is Room {
@@ -114,6 +141,7 @@ export function useLiveKit(
 
   const roomRef = useRef<Room | null>(null);
   const currentRoomKeyRef = useRef<string | null>(null);
+  const clientIdRef = useRef<string>(typeof window === "undefined" ? "server" : makeClientId());
   const connectingRef = useRef(false);
   // Sticky desire flags: persist mic/cam state across room hops.
   const wantMicRef = useRef(false);
@@ -191,26 +219,27 @@ export function useLiveKit(
     const screens: Record<string, MediaStream> = {};
     const peers: string[] = [];
     r.remoteParticipants.forEach((p) => {
-      peers.push(p.identity);
+      const ownerId = participantOwnerId(p);
+      peers.push(ownerId);
       const avStream = new MediaStream();
       let hasAv = false;
       p.trackPublications.forEach((pub) => {
         const track = pub.track;
         if (!track || !track.mediaStreamTrack) return;
         if (track.source === Track.Source.ScreenShare || track.source === Track.Source.ScreenShareAudio) {
-          let s = screens[p.identity];
-          if (!s) { s = new MediaStream(); screens[p.identity] = s; }
+          let s = screens[ownerId];
+          if (!s) { s = new MediaStream(); screens[ownerId] = s; }
           s.addTrack(track.mediaStreamTrack);
         } else {
           avStream.addTrack(track.mediaStreamTrack);
           hasAv = true;
         }
       });
-      if (hasAv) av[p.identity] = avStream;
+      if (hasAv) av[ownerId] = avStream;
     });
     setRemoteStreams(av);
     setRemoteScreenStreams(screens);
-    setConnectedPeers(peers);
+    setConnectedPeers(Array.from(new Set(peers)));
   }, []);
 
   // ---------- Connect / disconnect on room key change ----------
@@ -250,7 +279,9 @@ export function useLiveKit(
         await teardown();
         if (cancelled) return;
 
-        const { url, token } = await getLiveKitAccess({ data: { roomName: roomKey, userId: myId } });
+        const { url, token } = await getLiveKitAccess({
+          data: { roomName: roomKey, userId: myId, clientId: clientIdRef.current },
+        });
         if (cancelled) return;
 
         room = new Room({
@@ -304,8 +335,9 @@ export function useLiveKit(
           const next: Record<string, boolean> = {};
           let selfActive = false;
           for (const s of speakers) {
-            if (s.identity === myId) selfActive = true;
-            else next[s.identity] = true;
+            const ownerId = participantOwnerId(s);
+            if (ownerId === myId) selfActive = true;
+            else next[ownerId] = true;
           }
           setSpeakingPeers(next);
           setSelfSpeaking(selfActive);
@@ -319,7 +351,16 @@ export function useLiveKit(
           }
         });
 
-        await room.connect(url, token);
+        let iceServers: RTCIceServer[] | undefined;
+        try {
+          iceServers = (await getIceServers()) as RTCIceServer[];
+        } catch { /* LiveKit defaults still work when TURN config is unavailable. */ }
+
+        await room.connect(url, token, {
+          rtcConfig: iceServers?.length
+            ? { iceServers, iceTransportPolicy: "all" }
+            : undefined,
+        });
         if (cancelled) {
           try { await room.disconnect(); } catch { /* noop */ }
           return;
@@ -430,7 +471,8 @@ export function useLiveKit(
         const isScreen =
           pub.source === Track.Source.ScreenShare ||
           pub.source === Track.Source.ScreenShareAudio;
-        const inFilter = filter == null || filter.has(p.identity);
+        const ownerId = participantOwnerId(p);
+        const inFilter = filter == null || filter.has(ownerId);
         // Tela compartilhada: só assina de quem está na conversa atual, e pausa
         // em aba oculta para não decodificar vídeo fora de foco.
         if (isScreen) {

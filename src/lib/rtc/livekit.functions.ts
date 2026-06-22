@@ -5,6 +5,7 @@ import { z } from "zod";
 const Input = z.object({
   roomName: z.string().min(1).max(200).regex(/^[a-zA-Z0-9_:.\-]+$/),
   userId: z.string().uuid(),
+  clientId: z.string().min(8).max(80).regex(/^[a-zA-Z0-9_-]+$/).optional(),
 });
 
 export const getLiveKitAccess = createServerFn({ method: "POST" })
@@ -28,12 +29,14 @@ export const getLiveKitAccess = createServerFn({ method: "POST" })
       .eq("id", context.userId)
       .maybeSingle();
 
+    const participantIdentity = data.clientId ? `${context.userId}:${data.clientId}` : context.userId;
+
     const { AccessToken } = await import("livekit-server-sdk");
     const at = new AccessToken(apiKey, apiSecret, {
-      identity: context.userId,
+      identity: participantIdentity,
       name: prof?.display_name ?? "Convidado",
-      metadata: JSON.stringify({ userId: context.userId }),
-      attributes: { userId: context.userId },
+      metadata: JSON.stringify({ userId: context.userId, clientId: data.clientId ?? "primary" }),
+      attributes: { userId: context.userId, clientId: data.clientId ?? "primary" },
       ttl: "6h",
     });
     at.addGrant({
@@ -44,5 +47,5 @@ export const getLiveKitAccess = createServerFn({ method: "POST" })
       canPublishData: true,
     });
     const token = await at.toJwt();
-    return { url, token };
+    return { url, token, identity: participantIdentity };
   });
