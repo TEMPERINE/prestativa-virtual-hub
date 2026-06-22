@@ -2265,7 +2265,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
       // a página o personagem volte exatamente onde parou — sem cair no spawn.
       if (keysDown.current.size === 0) {
         const cur = posRef.current;
-        sendPos(cur.x, cur.y, zoneAt(cur).id, facingRef.current, true);
+        sendPos(cur.x, cur.y, callZoneAt(cur), facingRef.current, true);
       }
     };
     const blur = () => {
@@ -2322,8 +2322,8 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
         if (adx < SPEED && ady < SPEED) {
           // Arrived
           autoWalkRef.current = null;
-          const z = zoneAt(cur);
-          sendPos(cur.x, cur.y, z.id, facingRef.current, true);
+          const z = callZoneAt(cur);
+          sendPos(cur.x, cur.y, z, facingRef.current, true);
         } else {
           // Prefer the larger axis; if blocked, fall back to the other.
           const primary: Facing = adx >= ady
@@ -2371,8 +2371,8 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
         // o throttle de 33 ms em tryMove pode ter "engolido" o frame final.
         setPos((prev) => (prev.x === cur.x && prev.y === cur.y ? prev : cur));
         lastPosCommit.current = t;
-        const z = zoneAt(cur);
-        sendPos(cur.x, cur.y, z.id, facingRef.current, true);
+        const z = callZoneAt(cur);
+        sendPos(cur.x, cur.y, z, facingRef.current, true);
       }
       raf = requestAnimationFrame(tick);
     };
@@ -3621,7 +3621,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
                 onEditProfile={() => setEditProfOpen(true)}
                 onGoToMyDesk={teleportToMyClaim}
                 onGoToLobby={() => {
-                  if (zoneAt(posRef.current).id === "lobby") { toast.info("Você já está no saguão."); return; }
+                  if (callZoneAt(posRef.current) === "lobby") { toast.info("Você já está no saguão."); return; }
                   const target = randomCorridorPoint();
                   posRef.current = target;
                   setPos(target);
