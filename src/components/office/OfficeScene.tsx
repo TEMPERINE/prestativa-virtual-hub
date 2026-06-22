@@ -1314,7 +1314,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
         try {
           await presenceCh.track({
             user_id: uid, x: cur.x, y: cur.y,
-            zone: zoneAt(cur).id, facing: facingRef.current, ts: Date.now(),
+            zone: callZoneAt(cur), facing: facingRef.current, ts: Date.now(),
           });
         } catch { /* noop */ }
       });
@@ -1329,7 +1329,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
       const cur = posRef.current;
       void presenceCh.track({
         user_id: uid, x: cur.x, y: cur.y,
-        zone: zoneAt(cur).id, facing: facingRef.current, ts: Date.now(),
+        zone: callZoneAt(cur), facing: facingRef.current, ts: Date.now(),
       }).catch(() => { /* noop */ });
     }, 1000);
 
@@ -1343,7 +1343,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
       const uid = meIdRef.current;
       if (!uid || !positionHydratedRef.current) return;
       const cur = posRef.current;
-      const curZone = zoneAt(cur).id;
+      const curZone = callZoneAt(cur);
       // 1) Re-attach the latest JWT to the realtime socket
       void supabase.auth.getSession().then(({ data }) => {
         const token = data.session?.access_token;
@@ -1397,7 +1397,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
           if (rect) spawn = seatPointForRect(rect);
         }
       }
-      const spawnZone = zoneAt(spawn).id;
+      const spawnZone = callZoneAt(spawn);
       try { window.localStorage.removeItem(`${LAST_POSITION_KEY_PREFIX}${uid}`); } catch { /* noop */ }
       const payload = {
         workspace_id: wsId,
