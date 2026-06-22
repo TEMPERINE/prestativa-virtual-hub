@@ -334,7 +334,7 @@ export function useLiveKit(
             const pending = pendingMicTrackRef.current;
             if (pending) {
               pendingMicTrackRef.current = null;
-              await room.localParticipant.publishTrack(pending, { source: Track.Source.Microphone, dtx: true, red: true });
+              await room.localParticipant.publishTrack(pending, { source: Track.Source.Microphone, dtx: true, red: true, audioPreset: AudioPresets.speech });
             } else {
               await room.localParticipant.setMicrophoneEnabled(
                 true,
@@ -516,7 +516,7 @@ export function useLiveKit(
       if (want) {
         const track = pendingMicTrackRef.current;
         pendingMicTrackRef.current = null;
-        if (track) await r.localParticipant.publishTrack(track, { source: Track.Source.Microphone, dtx: true, red: true });
+        if (track) await r.localParticipant.publishTrack(track, { source: Track.Source.Microphone, dtx: true, red: true, audioPreset: AudioPresets.speech });
         else await r.localParticipant.setMicrophoneEnabled(
           true,
           selectedAudioInputDeviceId
