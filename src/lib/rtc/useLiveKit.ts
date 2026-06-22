@@ -16,6 +16,7 @@ import {
   type Participant,
 } from "livekit-client";
 import { getLiveKitAccess } from "./livekit.functions";
+import { getIceServers } from "./ice.functions";
 
 export type RtcMeshState = {
   micOn: boolean;
@@ -350,7 +351,16 @@ export function useLiveKit(
           }
         });
 
-        await room.connect(url, token);
+        let iceServers: RTCIceServer[] | undefined;
+        try {
+          iceServers = (await getIceServers()) as RTCIceServer[];
+        } catch { /* LiveKit defaults still work when TURN config is unavailable. */ }
+
+        await room.connect(url, token, {
+          rtcConfig: iceServers?.length
+            ? { iceServers, iceTransportPolicy: "all" }
+            : undefined,
+        });
         if (cancelled) {
           try { await room.disconnect(); } catch { /* noop */ }
           return;
