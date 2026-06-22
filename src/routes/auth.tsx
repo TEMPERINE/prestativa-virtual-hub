@@ -2,7 +2,7 @@ import { createFileRoute, Link, redirect } from "@tanstack/react-router";
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import logoAsset from "@/assets/prestativa-logo-v2.jpg.asset.json";
+import logoAsset from "@/assets/virtual-office-logo.png.asset.json";
 import bgAsset from "@/assets/auth-bg.jpg.asset.json";
 
 export const Route = createFileRoute("/auth")({
@@ -47,7 +47,7 @@ function AuthPage() {
         <div className="text-center mb-8">
           <img
             src={logoAsset.url}
-            alt="Prestativa Vídeos"
+            alt="Virtual Office"
             className="mx-auto h-40 w-auto object-contain mb-4 drop-shadow-[0_8px_24px_rgba(229,9,20,0.18)]"
           />
           <p className="text-sm text-muted-foreground mt-2">
