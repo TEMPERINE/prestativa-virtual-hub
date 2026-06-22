@@ -1882,9 +1882,9 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
         // Snap to destination
         posRef.current = target;
         setPos(target);
-        const z2 = zoneAt(target);
-        setZone(z2.id);
-        sendPos(target.x, target.y, z2.id, facingRef.current, true);
+        const z2 = callZoneAt(target);
+        setZone(z2);
+        sendPos(target.x, target.y, z2, facingRef.current, true);
         setTeleport({ from, to: target, phase: "in", id });
       }, 450)
     );
@@ -2003,9 +2003,9 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
       window.setTimeout(() => {
         posRef.current = target;
         setPos(target);
-        const z2 = zoneAt(target);
-        setZone(z2.id);
-        sendPos(target.x, target.y, z2.id, facingRef.current, true);
+        const z2 = callZoneAt(target);
+        setZone(z2);
+        sendPos(target.x, target.y, z2, facingRef.current, true);
         setTeleport({ from, to: target, phase: "in", id });
       }, 450)
     );
