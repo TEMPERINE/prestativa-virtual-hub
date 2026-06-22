@@ -1653,7 +1653,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
   const prevConnectedRef = useRef<string[]>([]);
   useEffect(() => {
     const prev = prevConnectedRef.current;
-    const cur = rtc.connectedPeers;
+    const cur = audibleConnectedPeers;
     const entered = cur.filter((p) => !prev.includes(p));
     const left = prev.filter((p) => !cur.includes(p));
     for (const id of entered) {
@@ -1672,7 +1672,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
       });
     }
     prevConnectedRef.current = cur;
-  }, [rtc.connectedPeers, profiles]);
+  }, [audibleConnectedPeers, profiles]);
 
   // -------- HUD de atalhos da reunião --------
   // Mostra o HUD por alguns segundos quando o usuário entra numa call ou usa
@@ -1690,12 +1690,12 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
   // Mostra o HUD ao entrar numa chamada
   const inCallRef = useRef(false);
   useEffect(() => {
-    const inCall = rtc.connectedPeers.length > 0;
+    const inCall = audibleConnectedPeers.length > 0;
     if (inCall && !inCallRef.current) {
       pingShortcutsHud(6000);
     }
     inCallRef.current = inCall;
-  }, [rtc.connectedPeers.length, pingShortcutsHud]);
+  }, [audibleConnectedPeers.length, pingShortcutsHud]);
   useEffect(() => () => {
     if (shortcutsHudTimerRef.current) window.clearTimeout(shortcutsHudTimerRef.current);
   }, []);
