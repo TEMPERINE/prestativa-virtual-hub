@@ -72,7 +72,7 @@ import { installAudioUnlockListeners, unlockAudioPlayback } from "@/lib/rtc/audi
 import { RemoteVideoTiles } from "./RemoteVideoTiles";
 import { CamPreviewAndPicker } from "./CamPreviewAndPicker";
 import { DeviceMenu } from "./DeviceMenu";
-import prestativaIcon from "@/assets/prestativa-logo-v2.jpg.asset.json";
+import prestativaIcon from "@/assets/virtual-office-logo.png.asset.json";
 import { ScreenShareViewer } from "./ScreenShareViewer";
 import { ConfettiBurst } from "./ConfettiBurst";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -3420,7 +3420,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
           <div className="flex items-center gap-2 min-w-0">
             <img
               src={prestativaIcon.url}
-              alt="Prestativa Vídeos"
+              alt="Virtual Office"
               className="h-8 w-auto object-contain"
               draggable={false}
             />

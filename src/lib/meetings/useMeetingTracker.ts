@@ -50,11 +50,16 @@ export function useMeetingTracker({
     setActiveMeetingId(id);
   };
 
-  // Debounce: evita criar reunião por flutuação rápida de peers (ICE bouncing).
+  // Debounce: evita criar reunião por flutuação rápida de zona.
   useEffect(() => {
     if (!enabled) return;
 
-    const shouldBeIn = isMeetingZone && peerCount >= 1;
+    // Em zona de reunião o usuário SEMPRE entra na reunião (mesmo sozinho).
+    // Assim quando outro chega depois, ele já é adicionado como participante
+    // pelo RPC (que faz get-or-create + insert idempotente em meeting_participants).
+    // peerCount fica como sinal informativo, não bloqueante.
+    void peerCount;
+    const shouldBeIn = isMeetingZone;
     const sameZone = activeZoneRef.current === zoneId;
 
     // Caso 1: deveria estar numa reunião e ainda não está (ou trocou de zona).
@@ -70,24 +75,31 @@ export function useMeetingTracker({
             await rpc("meeting_leave", { _meeting_id: prev });
           }
           const ws = getCurrentWorkspaceId();
-          if (!ws) return;
+          if (!ws) {
+            console.warn("[meeting] workspace ainda não setado; tentando depois");
+            return;
+          }
           const { data, error } = await rpc("meeting_join", {
             _workspace_id: ws,
             _zone_id: zoneId,
             _zone_label: zoneLabel,
           });
-          if (!error && data) {
+          if (error) {
+            console.error("[meeting] meeting_join falhou:", error);
+            return;
+          }
+          if (data) {
             setActive(data as string);
             activeZoneRef.current = zoneId;
           }
         } finally {
           inFlightRef.current = false;
         }
-      }, 1500);
+      }, 800);
       return () => window.clearTimeout(timer);
     }
 
-    // Caso 2: já está registrado mas não deveria mais estar.
+    // Caso 2: já está registrado mas não deveria mais estar (saiu da zona).
     if (!shouldBeIn && activeMeetingRef.current) {
       const timer = window.setTimeout(async () => {
         const id = activeMeetingRef.current;
@@ -95,7 +107,7 @@ export function useMeetingTracker({
         setActive(null);
         activeZoneRef.current = null;
         await rpc("meeting_leave", { _meeting_id: id });
-      }, 4000); // tolera quedas rápidas de peer / reconexão
+      }, 4000); // tolera quedas rápidas de zona / reconexão
       return () => window.clearTimeout(timer);
     }
   }, [enabled, isMeetingZone, peerCount, zoneId, zoneLabel]);
