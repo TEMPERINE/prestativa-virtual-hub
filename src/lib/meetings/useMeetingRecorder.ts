@@ -101,25 +101,33 @@ export function useMeetingRecorder({ getLocalAudioTrack, remoteStreams }: Args) 
   }, []);
 
   const start = useCallback(async (meetingId: string) => {
-    if (isRecording) return;
+    console.log("[recorder] start() called", { meetingId, isRecording });
+    if (isRecording) {
+      console.warn("[recorder] already recording, abort start()");
+      return;
+    }
 
     // 1) Captura de tela.
-    //    - No app desktop (Electron), usamos `window.prestativaDesktop.getScreenStream()`
-    //      exposto via preload — captura a janela do app sem nenhum diálogo.
-    //    - No navegador, caímos no `getDisplayMedia` com `preferCurrentTab` (o próprio
-    //      diálogo "Compartilhar esta aba?" funciona como confirmação de gravação).
     let displayStream: MediaStream;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const desktop = (window as any).prestativaDesktop as
       | {
           getScreenSourceId?: () => Promise<string | null>;
-          // legado — versões antigas do preload retornavam MediaStream (não funciona via contextBridge)
           getScreenStream?: () => Promise<MediaStream>;
         }
       | undefined;
+    console.log("[recorder] capture path", {
+      hasDesktop: !!desktop,
+      hasGetSourceId: !!desktop?.getScreenSourceId,
+      hasGetStream: !!desktop?.getScreenStream,
+      hasGetDisplayMedia: !!navigator.mediaDevices?.getDisplayMedia,
+      inIframe: window.self !== window.top,
+    });
     try {
       if (desktop?.getScreenSourceId) {
+        console.log("[recorder] requesting desktop source id…");
         const sourceId = await desktop.getScreenSourceId();
+        console.log("[recorder] desktop sourceId:", sourceId);
         if (!sourceId) throw new Error("no-screen-source");
         displayStream = await navigator.mediaDevices.getUserMedia({
           audio: {
@@ -140,14 +148,15 @@ export function useMeetingRecorder({ getLocalAudioTrack, remoteStreams }: Args) 
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           } as any,
         });
+        console.log("[recorder] desktop stream ok");
       } else if (desktop?.getScreenStream) {
-        // Fallback para builds antigos do desktop (pode falhar silenciosamente).
+        console.log("[recorder] using legacy getScreenStream…");
         displayStream = await desktop.getScreenStream();
       } else {
-        // Opções enxutas — combinar `preferCurrentTab` com `selfBrowserSurface`
-        // dispara TypeError no Chromium ("Picking specific surface types is
-        // not supported in combination with preferCurrentTab"), travando o
-        // start sem feedback visível ao usuário.
+        if (!navigator.mediaDevices?.getDisplayMedia) {
+          throw new Error("getDisplayMedia indisponível neste ambiente");
+        }
+        console.log("[recorder] calling getDisplayMedia…");
         try {
           displayStream = await navigator.mediaDevices.getDisplayMedia({
             video: { frameRate: 15 },
@@ -159,6 +168,7 @@ export function useMeetingRecorder({ getLocalAudioTrack, remoteStreams }: Args) 
           });
         } catch (innerErr) {
           const innerName = (innerErr as { name?: string })?.name;
+          console.warn("[recorder] getDisplayMedia first attempt failed:", innerName, innerErr);
           if (innerName === "TypeError" || innerName === "NotSupportedError") {
             displayStream = await navigator.mediaDevices.getDisplayMedia({
               video: true,
@@ -168,14 +178,16 @@ export function useMeetingRecorder({ getLocalAudioTrack, remoteStreams }: Args) 
             throw innerErr;
           }
         }
+        console.log("[recorder] getDisplayMedia ok", {
+          videoTracks: displayStream.getVideoTracks().length,
+          audioTracks: displayStream.getAudioTracks().length,
+        });
       }
     } catch (err) {
       const name = (err as { name?: string })?.name;
       const msg = (err as { message?: string })?.message ?? "";
       console.error("[recorder] getDisplayMedia error:", name, msg, err);
       if (name === "NotAllowedError") {
-        // Em iframe de preview, "display-capture" pode estar bloqueado por
-        // permissions-policy — o erro também chega como NotAllowedError.
         toast.error(
           msg.includes("permissions policy") || msg.includes("display-capture")
             ? "Gravação bloqueada pelo navegador neste preview. Abra o app publicado para gravar."
