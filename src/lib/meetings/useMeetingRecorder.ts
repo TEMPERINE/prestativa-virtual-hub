@@ -144,26 +144,47 @@ export function useMeetingRecorder({ getLocalAudioTrack, remoteStreams }: Args) 
         // Fallback para builds antigos do desktop (pode falhar silenciosamente).
         displayStream = await desktop.getScreenStream();
       } else {
-        displayStream = await navigator.mediaDevices.getDisplayMedia({
-          video: { frameRate: 15 },
-          audio: {
-            echoCancellation: false,
-            noiseSuppression: false,
-            autoGainControl: false,
-          },
-          preferCurrentTab: true,
-          systemAudio: "include",
-          selfBrowserSurface: "include",
-          surfaceSwitching: "exclude",
-        } as unknown as DisplayMediaStreamOptions);
+        // Opções enxutas — combinar `preferCurrentTab` com `selfBrowserSurface`
+        // dispara TypeError no Chromium ("Picking specific surface types is
+        // not supported in combination with preferCurrentTab"), travando o
+        // start sem feedback visível ao usuário.
+        try {
+          displayStream = await navigator.mediaDevices.getDisplayMedia({
+            video: { frameRate: 15 },
+            audio: {
+              echoCancellation: false,
+              noiseSuppression: false,
+              autoGainControl: false,
+            },
+          });
+        } catch (innerErr) {
+          const innerName = (innerErr as { name?: string })?.name;
+          if (innerName === "TypeError" || innerName === "NotSupportedError") {
+            displayStream = await navigator.mediaDevices.getDisplayMedia({
+              video: true,
+              audio: true,
+            });
+          } else {
+            throw innerErr;
+          }
+        }
       }
     } catch (err) {
       const name = (err as { name?: string })?.name;
+      const msg = (err as { message?: string })?.message ?? "";
+      console.error("[recorder] getDisplayMedia error:", name, msg, err);
       if (name === "NotAllowedError") {
-        toast.error("Você precisa confirmar para gravar a reunião.");
+        // Em iframe de preview, "display-capture" pode estar bloqueado por
+        // permissions-policy — o erro também chega como NotAllowedError.
+        toast.error(
+          msg.includes("permissions policy") || msg.includes("display-capture")
+            ? "Gravação bloqueada pelo navegador neste preview. Abra o app publicado para gravar."
+            : "Você precisa confirmar para gravar a reunião.",
+        );
+      } else if (name === "NotFoundError") {
+        toast.error("Nenhuma tela disponível para gravar.");
       } else {
-        console.error("[recorder] getDisplayMedia error:", err);
-        toast.error("Não foi possível capturar a tela.");
+        toast.error(`Não foi possível capturar a tela: ${msg || name || "erro desconhecido"}`);
       }
       return;
     }
