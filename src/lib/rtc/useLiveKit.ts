@@ -255,10 +255,11 @@ export function useLiveKit(
       setConnectedPeers([]);
       setSpeakingPeers({});
       setSelfSpeaking(false);
-      setLocalVideoStream(null);
       setLocalScreenStream(null);
-      setMicOn(false);
-      setCamOn(false);
+      const pendingCamTrack = pendingCamTrackRef.current?.mediaStreamTrack ?? null;
+      setLocalVideoStream(wantCamRef.current && pendingCamTrack ? makeStream(pendingCamTrack) : null);
+      setMicOn(wantMicRef.current);
+      setCamOn(wantCamRef.current && !!pendingCamTrack);
       setScreenOn(false);
       if (r) {
         try { await r.disconnect(); } catch { /* noop */ }

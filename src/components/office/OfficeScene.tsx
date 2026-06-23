@@ -630,11 +630,22 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
     setCurrentWsId(getCurrentWorkspaceId());
     return () => { unsub(); };
   }, []);
-  const roomKey = useMemo(() => {
+  const activeCallAreaKey = useMemo(() => {
     if (!me?.id) return null;
     if (!currentWsId) return null;
-    return `ws-${currentWsId}::office`;
-  }, [me?.id, currentWsId]);
+    if (desiredPeers.length === 0) return null;
+    const zones = [localZoneId];
+    for (const peerId of desiredPeers) {
+      const peer = positions[peerId];
+      if (peer) zones.push(callZoneAt({ x: peer.x, y: peer.y }));
+    }
+    const privateZones = zones.filter((z) => z !== "lobby").sort();
+    return privateZones[0] ?? "lobby";
+  }, [me?.id, currentWsId, desiredPeers, positions, localZoneId, mapVersion]);
+  const roomKey = useMemo(() => {
+    if (!currentWsId || !activeCallAreaKey) return null;
+    return `ws-${currentWsId}::call-${activeCallAreaKey}`;
+  }, [currentWsId, activeCallAreaKey]);
   // Vídeo sob demanda: só assina câmera de quem está perto/na mesma sala.
   // `desiredPeers` já combina proximidade no lobby + mesma zona privada.
   // Áudio continua disponível para todos da sala LiveKit (ver audiblePeerIds).
@@ -2472,7 +2483,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
     zoneId: currentZone.id,
     zoneLabel: currentZone.label,
     isMeetingZone: isPrivateZone,
-    peerCount: audibleConnectedPeers.length,
+    peerCount: desiredPeers.length,
     enabled: !!me?.id,
   });
 
