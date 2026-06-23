@@ -28,7 +28,7 @@ function initials(name: string): string {
 
 function hasLiveVideo(stream: MediaStream | null | undefined): boolean {
   if (!stream) return false;
-  return stream.getVideoTracks().some((t) => t.enabled && !t.muted && t.readyState === "live");
+  return stream.getVideoTracks().some((t) => t.enabled && t.readyState === "live");
 }
 
 export function RemoteVideoTiles({
