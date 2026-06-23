@@ -3425,12 +3425,29 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
           </div>
 
           <div className="flex items-center gap-1">
-            {audibleConnectedPeers.length > 0 && (
-              <div className="text-[11px] text-muted-foreground px-2 hidden sm:flex items-center gap-1.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_8px_var(--color-emerald-500,#10b981)]" />
-                Em chamada com {audibleConnectedPeers.length}
-              </div>
-            )}
+            {(() => {
+              const s = rtc.connectionStatus;
+              const peers = audibleConnectedPeers.length;
+              let dot = "bg-slate-400";
+              let label = "Desconectado";
+              let title = rtc.lastError ?? "";
+              if (s === "connecting") { dot = "bg-amber-400 animate-pulse"; label = "Conectando…"; }
+              else if (s === "reconnecting") { dot = "bg-amber-400 animate-pulse"; label = "Reconectando…"; }
+              else if (s === "error") { dot = "bg-red-500"; label = "Erro de conexão"; title = rtc.lastError ?? "Falha no LiveKit"; }
+              else if (s === "connected") {
+                dot = "bg-emerald-500 shadow-[0_0_8px_var(--color-emerald-500,#10b981)]";
+                label = peers > 0 ? `Em chamada com ${peers}` : "Conectado · sozinho";
+              }
+              return (
+                <div
+                  className="text-[11px] text-muted-foreground px-2 hidden sm:flex items-center gap-1.5"
+                  title={title}
+                >
+                  <span className={`w-1.5 h-1.5 rounded-full ${dot}`} />
+                  {label}
+                </div>
+              );
+            })()}
             <div className="flex items-center">
               <IconButton
                 active={rtc.micOn}
