@@ -557,7 +557,15 @@ export function useRtcMesh(myId: string | null, desiredPeers: string[]): RtcMesh
         window.clearTimeout(pending);
         disconnectTimersRef.current.delete(peerId);
       }
-      if (peersRef.current.has(peerId)) continue;
+      const existing = peersRef.current.get(peerId);
+      if (existing) {
+        const st = existing.pc.connectionState;
+        if (st === "failed" || st === "closed") {
+          destroyPeer(peerId);
+        } else {
+          continue;
+        }
+      }
       // Send hello — and if our id wins, create offer immediately
       sendSignal({ to: peerId, type: "hello" });
       if (myId > peerId) createPeer(peerId, true);
