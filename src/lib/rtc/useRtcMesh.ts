@@ -325,11 +325,32 @@ export function useRtcMesh(myId: string | null, desiredPeers: string[]): RtcMesh
       }
     };
 
+    let zombieTimer: number | null = null;
+    const scheduleZombieKill = (delay: number) => {
+      if (zombieTimer != null) return;
+      zombieTimer = window.setTimeout(() => {
+        zombieTimer = null;
+        const st = pc.connectionState;
+        if (st === "failed" || st === "disconnected" || st === "closed") {
+          // Só mata se ainda for desejado — o reconcile vai recriar limpo.
+          if (desiredRef.current.has(peerId)) {
+            destroyPeer(peerId);
+          }
+        }
+      }, delay);
+    };
     pc.onconnectionstatechange = () => {
       const st = pc.connectionState;
       if (st === "connected") {
+        if (zombieTimer != null) { window.clearTimeout(zombieTimer); zombieTimer = null; }
         setConnectedPeers((prev) => (prev.includes(peerId) ? prev : [...prev, peerId]));
-      } else if (st === "failed" || st === "closed" || st === "disconnected") {
+      } else if (st === "failed") {
+        setConnectedPeers((prev) => prev.filter((p) => p !== peerId));
+        scheduleZombieKill(0);
+      } else if (st === "disconnected") {
+        setConnectedPeers((prev) => prev.filter((p) => p !== peerId));
+        scheduleZombieKill(8000);
+      } else if (st === "closed") {
         setConnectedPeers((prev) => prev.filter((p) => p !== peerId));
       }
     };
