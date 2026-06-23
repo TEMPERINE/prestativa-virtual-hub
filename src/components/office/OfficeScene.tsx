@@ -575,29 +575,31 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
   }, []);
 
   const localZoneId = useMemo(() => callZoneAt({ x: pos.x, y: pos.y }), [pos.x, pos.y, mapVersion]);
+  const localZoneSupportsVideo = useMemo(
+    () => findZoneById(localZoneId)?.supportsVideo ?? getZoneKind(localZoneId) === "common",
+    [localZoneId, mapVersion],
+  );
 
-  // ---- ARQUITETURA: LiveKit como única fonte da verdade para mídia ----
-  // 1) Uma ÚNICA Room LiveKit por workspace (`prestativa-office:{wsId}`).
-  //    Todos os usuários do escritório ficam conectados nessa sala o tempo
-  //    inteiro. Andar pelo mapa NÃO desconecta nem reconecta o LiveKit.
-  // 2) A zona do avatar só altera a POLÍTICA DE MÍDIA (quem é assinado).
-  //    Em qualquer zona privada (qualquer rect != lobby), todos os avatares
-  //    fisicamente dentro do rect se veem/ouvem — simétrico por construção,
-  //    porque cada cliente classifica `positions` (broadcast Supabase) com a
-  //    MESMA função local `callZoneAt`. Sem roster próprio por sala, sem
-  //    janela onde A vê B mas B não vê A.
-  // 3) No lobby a regra é proximidade espacial (conversa de corredor).
+  // ---- ARQUITETURA: LiveKit centralizado por área de mídia ----
+  // 1) A mídia entra em uma Room LiveKit da zona atual (`workspace:zone`).
+  //    Isso evita manter todo o escritório conectado em um único room global,
+  //    que gerava 429/limite de sinalização antes mesmo da reunião começar.
+  // 2) A zona do avatar segue controlando a política de mídia: em uma sala,
+  //    todos que estão fisicamente no mesmo rect entram no mesmo room SFU.
+  // 3) Fora de salas com vídeo, não abrimos room de mídia — o mapa e a
+  //    presença visual continuam funcionando sem consumir sinalização.
   const PROXIMITY_CONNECT = 0.038;
   const PROXIMITY_DISCONNECT = 0.052;
   const connectedPeersRef = useRef<Set<string>>(new Set());
 
-  // Room LiveKit estável por workspace — não muda quando o avatar troca de zona.
+  // Room LiveKit estável enquanto o avatar permanece na mesma área de mídia.
   const roomKey = useMemo(() => {
     if (!me?.id) return null;
     const ws = getCurrentWorkspaceId();
     if (!ws) return null;
-    return `prestativa-office:${ws}`;
-  }, [me?.id]);
+    if (localZoneId === "lobby" || !localZoneSupportsVideo) return null;
+    return `prestativa-office:${ws}:${localZoneId}`;
+  }, [me?.id, localZoneId, localZoneSupportsVideo]);
 
   // Política de mídia: quem o LiveKit deve subscrever para mim agora.
   // Calculado puramente de `positions` (broadcast Supabase) + classificação
@@ -606,6 +608,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
     const meId = me?.id;
     if (!meId) return [] as string[];
     const myZoneId = localZoneId;
+    if (!localZoneSupportsVideo) return [] as string[];
 
     // Zona privada: TODOS os peers cuja posição cai no mesmo rect entram.
     if (myZoneId !== "lobby") {
@@ -632,11 +635,11 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
       if (closeEnough) candidates.push({ uid, score: dist });
     }
     return candidates.sort((a, b) => a.score - b.score).slice(0, 14).map((c) => c.uid);
-  }, [me?.id, positions, presentPeerIds, pos.x, pos.y, localZoneId, mapVersion]);
+  }, [me?.id, positions, presentPeerIds, pos.x, pos.y, localZoneId, localZoneSupportsVideo, mapVersion]);
 
   const audiblePeerIds = useMemo(() => new Set(desiredPeers), [desiredPeers]);
-  // Conexão LiveKit estável por workspace; `audiblePeerIds` apenas controla
-  // setSubscribed nas tracks remotas — entrar/sair de zona NÃO derruba conexão.
+  // Conexão LiveKit por zona; `audiblePeerIds` controla setSubscribed nas
+  // tracks remotas e mantém a experiência simétrica dentro da sala.
   const rtc = useLiveKit(me?.id ?? null, roomKey, audiblePeerIds);
   useEffect(() => {
     connectedPeersRef.current = new Set(desiredPeers);
