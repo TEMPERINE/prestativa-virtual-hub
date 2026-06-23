@@ -274,12 +274,16 @@ export function useLiveKit(
     };
 
     if (!myId || !roomKey) {
+      setConnectionStatus("idle");
+      setLastError(null);
       void teardown();
       return;
     }
 
     if (currentRoomKeyRef.current === roomKey && roomRef.current) return;
 
+    setConnectionStatus("connecting");
+    setLastError(null);
     connectingRef.current = true;
     void (async () => {
       let room: Room | null = null;
