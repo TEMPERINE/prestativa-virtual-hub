@@ -360,8 +360,11 @@ export function useLiveKit(
             setRemoteScreenStreams({});
             setConnectedPeers([]);
             setSpeakingPeers({});
+            setConnectionStatus("disconnected");
           }
         });
+        room.on(RoomEvent.Reconnecting, () => setConnectionStatus("reconnecting"));
+        room.on(RoomEvent.Reconnected, () => setConnectionStatus("connected"));
 
         let iceServers: RTCIceServer[] | undefined;
         try {
