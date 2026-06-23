@@ -742,6 +742,9 @@ export function useLiveKit(
       setAudioOutputDevice,
       prewarmMic,
       getLocalAudioTrack,
+      connectionStatus,
+      lastError,
+      roomKey,
     }),
     [
       micOn, camOn, screenOn, toggleMic, toggleCam, toggleScreen,
@@ -751,6 +754,7 @@ export function useLiveKit(
       audioInputDevices, selectedAudioInputDeviceId, setAudioInputDevice,
       audioOutputDevices, selectedAudioOutputDeviceId, setAudioOutputDevice,
       prewarmMic, getLocalAudioTrack,
+      connectionStatus, lastError, roomKey,
     ],
   );
 }
