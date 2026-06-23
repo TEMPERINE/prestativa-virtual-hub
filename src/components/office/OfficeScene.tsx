@@ -67,7 +67,7 @@ import { LogOut, Mic, MicOff, Video, VideoOff, MonitorUp, Users, Pencil, User as
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import EmojiPicker, { EmojiStyle, Theme as EmojiTheme } from "emoji-picker-react";
 import { Link } from "@tanstack/react-router";
-import { useRtcMesh } from "@/lib/rtc/useRtcMesh";
+import { useLiveKit } from "@/lib/rtc/useLiveKit";
 import { useRoomRoster } from "@/lib/rtc/useRoomRoster";
 import { installAudioUnlockListeners, unlockAudioPlayback } from "@/lib/rtc/audio-unlock";
 import { RemoteVideoTiles } from "./RemoteVideoTiles";
@@ -577,7 +577,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
 
   const localZoneId = useMemo(() => callZoneAt({ x: pos.x, y: pos.y }), [pos.x, pos.y, mapVersion]);
 
-  // ---- WebRTC mesh: voice/video por sala privada OU por proximidade no lobby ----
+  // ---- Reunião por sala via SFU (LiveKit) ----
   // Regra de produto:
   //  • Em QUALQUER zona privada (qualquer rect != lobby) todos os avatares
   //    fisicamente dentro do rect entram automaticamente na chamada, com ou
@@ -612,7 +612,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
     // Em sala de reunião: roster autoritativo do canal de presença. Simétrico
     // por construção — todo mundo na sala se vê. Sem proximidade local.
     if (roomKey) {
-      return roomRoster.slice(0, 14);
+      return roomRoster.slice(0, 24);
     }
     // No lobby/corredor: mantém proximidade espacial (não é "reunião", é áudio
     // ambiente de quem está perto). Histerese pequena evita flicker.
@@ -635,10 +635,11 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
   }, [me?.id, positions, presentPeerIds, pos.x, pos.y, localZoneId, mapVersion, roomKey, roomRoster]);
 
 
-  // Reunião automática P2P: conecta somente quem está na mesma sala/área ou
-  // suficientemente perto. Não depende do provedor SFU externo, então evita
-  // falhas de conexão/limite que deixavam o botão ligado mas sem chamada.
-  const rtc = useRtcMesh(me?.id ?? null, desiredPeers);
+  // Reunião automática via SFU: cada pessoa publica áudio/vídeo uma vez no
+  // servidor de mídia, e todos assinam o mesmo roster da sala. Isso remove a
+  // assimetria do mesh P2P e suporta reuniões maiores (até 20 pessoas).
+  const audiblePeerIds = useMemo(() => new Set(desiredPeers), [desiredPeers]);
+  const rtc = useLiveKit(me?.id ?? null, roomKey, audiblePeerIds);
   useEffect(() => {
     connectedPeersRef.current = new Set(desiredPeers);
   }, [desiredPeers]);
@@ -647,7 +648,6 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
   // LiveKit (mesma zona = mesma sala) e quem passa no filtro de proximidade.
   // No lobby/corredor, isso muta automaticamente quem ficou fora do raio,
   // mesmo que a sala LiveKit ainda contenha todos.
-  const audiblePeerIds = useMemo(() => new Set(desiredPeers), [desiredPeers]);
   const audibleConnectedPeers = useMemo(
     () => rtc.connectedPeers.filter((id) => audiblePeerIds.has(id)),
     [rtc.connectedPeers, audiblePeerIds],
