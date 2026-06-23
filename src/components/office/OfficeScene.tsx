@@ -68,7 +68,6 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import EmojiPicker, { EmojiStyle, Theme as EmojiTheme } from "emoji-picker-react";
 import { Link } from "@tanstack/react-router";
 import { useLiveKit } from "@/lib/rtc/useLiveKit";
-import { useRoomRoster } from "@/lib/rtc/useRoomRoster";
 import { installAudioUnlockListeners, unlockAudioPlayback } from "@/lib/rtc/audio-unlock";
 import { RemoteVideoTiles } from "./RemoteVideoTiles";
 import { CamPreviewAndPicker } from "./CamPreviewAndPicker";
