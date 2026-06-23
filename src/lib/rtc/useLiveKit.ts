@@ -480,6 +480,8 @@ export function useLiveKit(
   // Cleanup on unmount
   useEffect(() => {
     return () => {
+      if (retryTimerRef.current) window.clearTimeout(retryTimerRef.current);
+      retryTimerRef.current = null;
       try { pendingMicTrackRef.current?.stop(); } catch { /* noop */ }
       try { pendingCamTrackRef.current?.stop(); } catch { /* noop */ }
       pendingMicTrackRef.current = null;
