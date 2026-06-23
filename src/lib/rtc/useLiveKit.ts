@@ -430,6 +430,8 @@ export function useLiveKit(
       } catch (err) {
         if (!cancelled) {
           console.error("[livekit] connect failed", err);
+          setConnectionStatus("error");
+          setLastError(err instanceof Error ? err.message : String(err));
         }
       } finally {
         if (cancelled && room) {
