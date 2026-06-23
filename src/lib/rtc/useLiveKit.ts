@@ -136,6 +136,8 @@ export function useLiveKit(
   const [selfSpeaking, setSelfSpeaking] = useState(false);
   const [localVideoStream, setLocalVideoStream] = useState<MediaStream | null>(null);
   const [localScreenStream, setLocalScreenStream] = useState<MediaStream | null>(null);
+  const [connectionStatus, setConnectionStatus] = useState<RtcConnectionStatus>("idle");
+  const [lastError, setLastError] = useState<string | null>(null);
 
   const [videoDevices, setVideoDevices] = useState<MediaDeviceInfo[]>([]);
   const [selectedVideoDeviceId, setSelectedVideoDeviceId] = useState<string | null>(null);
