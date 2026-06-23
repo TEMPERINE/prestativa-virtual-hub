@@ -67,7 +67,7 @@ import { LogOut, Mic, MicOff, Video, VideoOff, MonitorUp, Users, Pencil, User as
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import EmojiPicker, { EmojiStyle, Theme as EmojiTheme } from "emoji-picker-react";
 import { Link } from "@tanstack/react-router";
-import { useLiveKit } from "@/lib/rtc/useLiveKit";
+import { useRtcMesh } from "@/lib/rtc/useRtcMesh";
 import { installAudioUnlockListeners, unlockAudioPlayback } from "@/lib/rtc/audio-unlock";
 import { RemoteVideoTiles } from "./RemoteVideoTiles";
 import { CamPreviewAndPicker } from "./CamPreviewAndPicker";
@@ -85,7 +85,7 @@ import { EditProfileModal } from "@/components/profile/EditProfileModal";
 import { OnboardingWizard } from "@/components/onboarding/OnboardingWizard";
 import { useMeetingTracker } from "@/lib/meetings/useMeetingTracker";
 import { useMeetingRecorder } from "@/lib/meetings/useMeetingRecorder";
-import { getCurrentWorkspaceId, subscribeCurrentWorkspaceId } from "@/lib/workspace/current";
+import { getCurrentWorkspaceId } from "@/lib/workspace/current";
 import { useWorkspaceTier } from "@/lib/workspace/useWorkspaceTier";
 
 type Profile = {
@@ -617,40 +617,10 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
   }, [me?.id, positions, presentPeerIds, pos.x, pos.y, localZoneId, mapVersion]);
 
 
-  // SFU LiveKit: one shared room per workspace. The actual “who is in the
-  // instant meeting” set is `desiredPeers` below (same room area or close
-  // enough), which avoids splitting people who are visually together but fall
-  // on adjacent painted zones.
-  // Workspace id reativo: re-renderiza quando setCurrentWorkspaceId muda,
-  // evitando que o roomKey trave em null se o me.id resolver antes do ws.
-  const [currentWsId, setCurrentWsId] = useState<string | null>(() => getCurrentWorkspaceId());
-  useEffect(() => {
-    const unsub = subscribeCurrentWorkspaceId((id) => setCurrentWsId(id));
-    // sincroniza caso tenha mudado entre o useState inicial e o subscribe
-    setCurrentWsId(getCurrentWorkspaceId());
-    return () => { unsub(); };
-  }, []);
-  const activeCallAreaKey = useMemo(() => {
-    if (!me?.id) return null;
-    if (!currentWsId) return null;
-    if (desiredPeers.length === 0) return null;
-    const zones = [localZoneId];
-    for (const peerId of desiredPeers) {
-      const peer = positions[peerId];
-      if (peer) zones.push(callZoneAt({ x: peer.x, y: peer.y }));
-    }
-    const privateZones = zones.filter((z) => z !== "lobby").sort();
-    return privateZones[0] ?? "lobby";
-  }, [me?.id, currentWsId, desiredPeers, positions, localZoneId, mapVersion]);
-  const roomKey = useMemo(() => {
-    if (!currentWsId || !activeCallAreaKey) return null;
-    return `ws-${currentWsId}::call-${activeCallAreaKey}`;
-  }, [currentWsId, activeCallAreaKey]);
-  // Vídeo sob demanda: só assina câmera de quem está perto/na mesma sala.
-  // `desiredPeers` já combina proximidade no lobby + mesma zona privada.
-  // Áudio continua disponível para todos da sala LiveKit (ver audiblePeerIds).
-  const videoVisibleIds = useMemo(() => new Set(desiredPeers), [desiredPeers]);
-  const rtc = useLiveKit(me?.id ?? null, roomKey, videoVisibleIds);
+  // Reunião automática P2P: conecta somente quem está na mesma sala/área ou
+  // suficientemente perto. Não depende do provedor SFU externo, então evita
+  // falhas de conexão/limite que deixavam o botão ligado mas sem chamada.
+  const rtc = useRtcMesh(me?.id ?? null, desiredPeers);
   useEffect(() => {
     connectedPeersRef.current = new Set(desiredPeers);
   }, [desiredPeers]);
