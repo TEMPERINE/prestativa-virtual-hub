@@ -3095,7 +3095,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
               isSelf?: boolean;
             }> = [];
             const hasLive = (s: MediaStream | null) =>
-              !!s && s.getVideoTracks().some((t) => t.enabled && t.readyState === "live");
+              !!s && s.getVideoTracks().some((t) => t.enabled && !t.muted && t.readyState === "live");
             if (me) {
               list.push({
                 id: me.id,
