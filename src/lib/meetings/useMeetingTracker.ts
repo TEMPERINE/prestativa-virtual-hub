@@ -54,12 +54,9 @@ export function useMeetingTracker({
   useEffect(() => {
     if (!enabled) return;
 
-    // Em zona de reunião o usuário SEMPRE entra na reunião (mesmo sozinho).
-    // Assim quando outro chega depois, ele já é adicionado como participante
-    // pelo RPC (que faz get-or-create + insert idempotente em meeting_participants).
-    // peerCount fica como sinal informativo, não bloqueante.
-    void peerCount;
-    const shouldBeIn = isMeetingZone;
+    // Só consideramos "em reunião" quando estamos numa sala de reunião
+    // E há pelo menos 1 outro peer conectado via RTC.
+    const shouldBeIn = isMeetingZone && peerCount >= 1;
     const sameZone = activeZoneRef.current === zoneId;
 
     // Caso 1: deveria estar numa reunião e ainda não está (ou trocou de zona).
