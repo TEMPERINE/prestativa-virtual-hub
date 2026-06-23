@@ -16,7 +16,6 @@ import {
   type Participant,
 } from "livekit-client";
 import { getLiveKitAccess } from "./livekit.functions";
-import { getIceServers } from "./ice.functions";
 
 export type RtcConnectionStatus = "idle" | "connecting" | "connected" | "reconnecting" | "error" | "disconnected";
 
@@ -150,6 +149,9 @@ export function useLiveKit(
   const currentRoomKeyRef = useRef<string | null>(null);
   const clientIdRef = useRef<string>(typeof window === "undefined" ? "server" : makeClientId());
   const connectingRef = useRef(false);
+  const [connectAttempt, setConnectAttempt] = useState(0);
+  const retryTimerRef = useRef<number | null>(null);
+  const retryAttemptRef = useRef(0);
   // Sticky desire flags: persist mic/cam state across room hops.
   const wantMicRef = useRef(false);
   const wantCamRef = useRef(false);
@@ -274,6 +276,9 @@ export function useLiveKit(
     };
 
     if (!myId || !roomKey) {
+      retryAttemptRef.current = 0;
+      if (retryTimerRef.current) window.clearTimeout(retryTimerRef.current);
+      retryTimerRef.current = null;
       setConnectionStatus("idle");
       setLastError(null);
       void teardown();
@@ -366,22 +371,17 @@ export function useLiveKit(
         room.on(RoomEvent.Reconnecting, () => setConnectionStatus("reconnecting"));
         room.on(RoomEvent.Reconnected, () => setConnectionStatus("connected"));
 
-        let iceServers: RTCIceServer[] | undefined;
-        try {
-          iceServers = (await getIceServers()) as RTCIceServer[];
-        } catch { /* LiveKit defaults still work when TURN config is unavailable. */ }
-
-        await room.connect(url, token, {
-          rtcConfig: iceServers?.length
-            ? { iceServers, iceTransportPolicy: "all" }
-            : undefined,
-        });
+        // LiveKit Cloud already returns the correct regional ICE/TURN config
+        // during join. Supplying our own RTC config here overrides that server
+        // config and can make the signal connect but the peer connection fail.
+        await room.connect(url, token);
         if (cancelled) {
           try { await room.disconnect(); } catch { /* noop */ }
           return;
         }
         setConnectionStatus("connected");
         setLastError(null);
+        retryAttemptRef.current = 0;
 
         rebuildRemotes();
         void refreshDevices();
@@ -430,8 +430,27 @@ export function useLiveKit(
       } catch (err) {
         if (!cancelled) {
           console.error("[livekit] connect failed", err);
+          if (roomRef.current === room) {
+            roomRef.current = null;
+            currentRoomKeyRef.current = null;
+          }
+          if (room) {
+            try { await room.disconnect(); } catch { /* noop */ }
+          }
+          setRemoteStreams({});
+          setRemoteScreenStreams({});
+          setConnectedPeers([]);
+          setSpeakingPeers({});
           setConnectionStatus("error");
           setLastError(err instanceof Error ? err.message : String(err));
+          const attempt = Math.min(retryAttemptRef.current + 1, 4);
+          retryAttemptRef.current = attempt;
+          const delay = [4000, 8000, 16000, 30000][attempt - 1] ?? 30000;
+          if (retryTimerRef.current) window.clearTimeout(retryTimerRef.current);
+          retryTimerRef.current = window.setTimeout(() => {
+            retryTimerRef.current = null;
+            if (!cancelled) setConnectAttempt((n) => n + 1);
+          }, delay);
         }
       } finally {
         if (cancelled && room) {
@@ -444,6 +463,10 @@ export function useLiveKit(
 
     return () => {
       cancelled = true;
+      if (retryTimerRef.current) {
+        window.clearTimeout(retryTimerRef.current);
+        retryTimerRef.current = null;
+      }
       const r = roomRef.current;
       if (r && currentRoomKeyRef.current === roomKey) {
         roomRef.current = null;
@@ -452,7 +475,7 @@ export function useLiveKit(
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [myId, roomKey, rebuildRemotes, refreshDevices]);
+  }, [myId, roomKey, connectAttempt, rebuildRemotes, refreshDevices]);
 
   // Cleanup on unmount
   useEffect(() => {
