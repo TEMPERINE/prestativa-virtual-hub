@@ -590,32 +590,49 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
   const PROXIMITY_CONNECT = 0.038;
   const PROXIMITY_DISCONNECT = 0.052;
   const connectedPeersRef = useRef<Set<string>>(new Set());
+
+  // ROSTER POR SALA (fonte simétrica da verdade)
+  // Quando estou numa zona de reunião, entro num canal Supabase exclusivo da
+  // sala. Todos os clientes na mesma sala recebem o MESMO `presence sync` —
+  // não há janela onde A me vê e B não me vê. Isso elimina o bug onde Tracy
+  // entrava na sala e Marcio nunca abria conexão (cada cliente decidia sozinho
+  // com base em posições defasadas, e a decisão saía assimétrica).
+  const roomKey = useMemo(() => {
+    if (!me?.id) return null;
+    if (localZoneId === "lobby") return null;
+    const ws = getCurrentWorkspaceId();
+    if (!ws) return null;
+    return `${ws}:${localZoneId}`;
+  }, [me?.id, localZoneId]);
+  const roomRoster = useRoomRoster(roomKey, me?.id ?? null);
+
   const desiredPeers = useMemo(() => {
     const meId = me?.id;
     if (!meId) return [] as string[];
+    // Em sala de reunião: roster autoritativo do canal de presença. Simétrico
+    // por construção — todo mundo na sala se vê. Sem proximidade local.
+    if (roomKey) {
+      return roomRoster.slice(0, 14);
+    }
+    // No lobby/corredor: mantém proximidade espacial (não é "reunião", é áudio
+    // ambiente de quem está perto). Histerese pequena evita flicker.
     const myZoneId = localZoneId;
     const candidates: { uid: string; score: number }[] = [];
     for (const [uid, p] of Object.entries(positions)) {
       if (uid === meId) continue;
       if (!p.is_online && !presentPeerIds.has(uid)) continue;
-      // Zona do peer calculada localmente — robusto contra p.zone defasado.
-      const peerZoneId = callZoneAt({ x: p.x, y: p.y });
-      const sameActiveRoom = zonesShareMeetingArea(myZoneId, peerZoneId);
-      // Proximidade só importa no lobby (e como fallback).
       const dx = p.x - pos.x;
       const dy = p.y - pos.y;
       const dist = Math.hypot(dx, dy);
       const already = connectedPeersRef.current.has(uid);
       const closeEnough = already ? dist <= PROXIMITY_DISCONNECT : dist <= PROXIMITY_CONNECT;
-      if (sameActiveRoom || closeEnough) {
-        // Mesma sala privada vence: score 0 + dist (sempre antes dos de corredor).
-        const score = (sameActiveRoom ? 0 : 1) + dist;
-        candidates.push({ uid, score });
-      }
+      if (closeEnough) candidates.push({ uid, score: dist });
     }
-    // Cap em ~15 pra estabilidade do mesh; ordenação prioriza mesma sala.
     return candidates.sort((a, b) => a.score - b.score).slice(0, 14).map((c) => c.uid);
-  }, [me?.id, positions, presentPeerIds, pos.x, pos.y, localZoneId, mapVersion]);
+    // myZoneId só consultado pra clareza — proximidade no lobby não precisa
+    // checar a zona, mas mantemos a referência pra futura distinção.
+    void myZoneId;
+  }, [me?.id, positions, presentPeerIds, pos.x, pos.y, localZoneId, mapVersion, roomKey, roomRoster]);
 
 
   // Reunião automática P2P: conecta somente quem está na mesma sala/área ou
