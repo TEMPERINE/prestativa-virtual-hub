@@ -18,6 +18,8 @@ import {
 import { getLiveKitAccess } from "./livekit.functions";
 import { getIceServers } from "./ice.functions";
 
+export type RtcConnectionStatus = "idle" | "connecting" | "connected" | "reconnecting" | "error" | "disconnected";
+
 export type RtcMeshState = {
   micOn: boolean;
   camOn: boolean;
@@ -43,6 +45,9 @@ export type RtcMeshState = {
   setAudioOutputDevice: (deviceId: string) => Promise<void>;
   prewarmMic: () => Promise<void>;
   getLocalAudioTrack: () => MediaStreamTrack | null;
+  connectionStatus: RtcConnectionStatus;
+  lastError: string | null;
+  roomKey: string | null;
 };
 
 function makeStream(track: MediaStreamTrack): MediaStream {
