@@ -588,11 +588,22 @@ export function useRtcMesh(myId: string | null, desiredPeers: string[]): RtcMesh
         if (peerId === myId) continue;
         sendSignal({ to: peerId, type: "hello" });
         const entry = peersRef.current.get(peerId);
-        if (!entry && myId > peerId) createPeer(peerId, true);
+        // Entry "zumbi" (failed/closed/disconnected) → destrói pra liberar
+        // a recriação abaixo. Sem isso, o offerer ficava preso a uma PC morta
+        // e nunca tentava de novo (causa do "Tracy não conecta após sair/voltar").
+        if (entry) {
+          const st = entry.pc.connectionState;
+          if (st === "failed" || st === "closed") {
+            destroyPeer(peerId);
+          } else {
+            continue;
+          }
+        }
+        if (myId > peerId) createPeer(peerId, true);
       }
     }, 2500);
     return () => window.clearInterval(timer);
-  }, [myId, createPeer, sendSignal]);
+  }, [myId, createPeer, destroyPeer, sendSignal]);
 
   // Speaking detection (analyse remote audio levels — RMS time-domain + EMA).
   // Time-domain RMS é mais estável que frequência média (que oscila bastante
