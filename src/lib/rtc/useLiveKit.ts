@@ -18,6 +18,8 @@ import {
 import { getLiveKitAccess } from "./livekit.functions";
 import { getIceServers } from "./ice.functions";
 
+export type RtcConnectionStatus = "idle" | "connecting" | "connected" | "reconnecting" | "error" | "disconnected";
+
 export type RtcMeshState = {
   micOn: boolean;
   camOn: boolean;
@@ -43,6 +45,9 @@ export type RtcMeshState = {
   setAudioOutputDevice: (deviceId: string) => Promise<void>;
   prewarmMic: () => Promise<void>;
   getLocalAudioTrack: () => MediaStreamTrack | null;
+  connectionStatus: RtcConnectionStatus;
+  lastError: string | null;
+  roomKey: string | null;
 };
 
 function makeStream(track: MediaStreamTrack): MediaStream {
@@ -131,6 +136,8 @@ export function useLiveKit(
   const [selfSpeaking, setSelfSpeaking] = useState(false);
   const [localVideoStream, setLocalVideoStream] = useState<MediaStream | null>(null);
   const [localScreenStream, setLocalScreenStream] = useState<MediaStream | null>(null);
+  const [connectionStatus, setConnectionStatus] = useState<RtcConnectionStatus>("idle");
+  const [lastError, setLastError] = useState<string | null>(null);
 
   const [videoDevices, setVideoDevices] = useState<MediaDeviceInfo[]>([]);
   const [selectedVideoDeviceId, setSelectedVideoDeviceId] = useState<string | null>(null);
@@ -267,12 +274,16 @@ export function useLiveKit(
     };
 
     if (!myId || !roomKey) {
+      setConnectionStatus("idle");
+      setLastError(null);
       void teardown();
       return;
     }
 
     if (currentRoomKeyRef.current === roomKey && roomRef.current) return;
 
+    setConnectionStatus("connecting");
+    setLastError(null);
     connectingRef.current = true;
     void (async () => {
       let room: Room | null = null;
@@ -349,8 +360,11 @@ export function useLiveKit(
             setRemoteScreenStreams({});
             setConnectedPeers([]);
             setSpeakingPeers({});
+            setConnectionStatus("disconnected");
           }
         });
+        room.on(RoomEvent.Reconnecting, () => setConnectionStatus("reconnecting"));
+        room.on(RoomEvent.Reconnected, () => setConnectionStatus("connected"));
 
         let iceServers: RTCIceServer[] | undefined;
         try {
@@ -366,6 +380,8 @@ export function useLiveKit(
           try { await room.disconnect(); } catch { /* noop */ }
           return;
         }
+        setConnectionStatus("connected");
+        setLastError(null);
 
         rebuildRemotes();
         void refreshDevices();
@@ -414,6 +430,8 @@ export function useLiveKit(
       } catch (err) {
         if (!cancelled) {
           console.error("[livekit] connect failed", err);
+          setConnectionStatus("error");
+          setLastError(err instanceof Error ? err.message : String(err));
         }
       } finally {
         if (cancelled && room) {
@@ -724,6 +742,9 @@ export function useLiveKit(
       setAudioOutputDevice,
       prewarmMic,
       getLocalAudioTrack,
+      connectionStatus,
+      lastError,
+      roomKey,
     }),
     [
       micOn, camOn, screenOn, toggleMic, toggleCam, toggleScreen,
@@ -733,6 +754,7 @@ export function useLiveKit(
       audioInputDevices, selectedAudioInputDeviceId, setAudioInputDevice,
       audioOutputDevices, selectedAudioOutputDeviceId, setAudioOutputDevice,
       prewarmMic, getLocalAudioTrack,
+      connectionStatus, lastError, roomKey,
     ],
   );
 }
