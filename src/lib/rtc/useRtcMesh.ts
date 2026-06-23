@@ -410,14 +410,11 @@ export function useRtcMesh(myId: string | null, desiredPeers: string[]): RtcMesh
       return;
     }
 
-    // Never accept a media negotiation from someone who is not currently in
-    // our proximity/room set. This prevents stale peers from pulling the user
-    // into a call after they already left the area.
-    if (!desiredRef.current.has(peerId)) {
-      sendSignal({ to: peerId, type: "bye" });
-      destroyPeer(peerId);
-      return;
-    }
+    // NÃO rejeitamos sinalização de quem ainda não está em `desired`. O roster
+    // de presença é eventualmente consistente; recusar aqui criava PCs zumbis
+    // num lado e nenhum no outro (bug do "Tracy entra mas não conecta").
+    // Se o peer realmente não pertence à sala, o loop de reconcile vai fechar
+    // a PC abaixo com um `bye` programado — sem corrida.
 
     if (msg.type === "renegotiate") {
       // The other side asked us to renegotiate (because they changed a track
