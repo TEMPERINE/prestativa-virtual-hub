@@ -1,70 +1,104 @@
-# Onda 1 — Aliviar a máquina do usuário sem mudar a experiência
+## O diagnóstico (por que está aleatório hoje)
 
-Três mudanças focadas, baixo risco, alto impacto. Nada de refatoração estrutural agora.
+O que parece "sorte" tem causa única: **cada cliente decide sozinho com quem deveria conversar**, e essa decisão é assimétrica.
 
-## 1. Pausar vídeo quando a aba fica oculta
+Hoje, em `useRtcMesh` + `OfficeScene`:
 
-**Problema:** com a aba do Prestativa em segundo plano, o navegador continua decodificando todos os vídeos remotos. É a maior queixa de "computador lento" para quem deixa o app aberto o dia todo.
+1. Cada navegador calcula `desiredPeers` localmente, a partir da posição que recebeu por broadcast (`positions`, `presentPeerIds`, proximidade). Esse cálculo é **independente** em cada cliente e chega em momentos diferentes.
+2. Quando Marcio tem Tracy em `desired` mas Tracy **ainda não** tem Marcio (broadcast de posição da Tracy atrasou 1–2s), Marcio manda `offer` → Tracy executa esta linha:
 
-**O que muda para o usuário:**
-- Trocar de aba → vídeos remotos somem (placeholder com avatar/nome).
-- Áudio continua normal (não perde conversa).
-- Voltar para a aba → vídeos voltam em ~1 segundo.
+   ```ts
+   if (!desiredRef.current.has(peerId)) {
+     sendSignal({ to: peerId, type: "bye" });
+     destroyPeer(peerId);
+     return;
+   }
+   ```
 
-**Onde mexer:**
-- `src/lib/rtc/useLiveKit.ts` (e/ou `useRtcMesh.ts`, dependendo de qual está ativo): adicionar listener de `document.visibilitychange`.
-- Quando `hidden`: chamar `setSubscribed(false)` nos `RemoteTrackPublication` de vídeo (LiveKit suporta nativo). Áudio permanece subscrito.
-- Quando `visible`: re-subscrever.
-- Cobrir também tela compartilhada (mesma lógica).
+   Tracy responde `bye` e descarta. Marcio mantém o `RTCPeerConnection` aberto. O loop de recovery só recria peer se `myId > peerId` **e** não houver entry — como Marcio ainda tem entry "zumbi", **nunca recria**. Stuck para sempre, até alguém sair e voltar.
 
-## 2. Vídeo sob demanda por proximidade no mapa
+3. O mesmo acontece com áudio: o sender de áudio está anexado à PC, mas se a PC nunca completou ICE de um dos lados, o outro recebe `ontrack` mas o track fica `muted`. Resultado: "vejo mas não escuto".
 
-**Problema:** hoje todos recebem vídeo de todos. Sala com 8 pessoas = 7 decodes simultâneos sempre. Maior ofensor de CPU/GPU.
+4. Tudo isso roda em **um canal global `rtc-mesh-v1`** com filtro client-side. Funciona, mas mistura sinalização de N reuniões simultâneas e ainda piora corridas.
 
-**O que muda para o usuário:**
-- Só vê vídeo de quem está **perto no mapa** (raio configurável, ex.: 6 tiles) ou de quem está na **mesma zona de reunião**.
-- Quem está longe aparece como avatar parado, sem vídeo (igual hoje quando câmera desligada).
-- Áudio espacial continua de todos no alcance auditivo (mais amplo que o de vídeo).
+Conclusão: o problema **não é** o WebRTC nem o navegador. É o **modelo de descoberta de pares** — sem fonte única da verdade, alguém sempre fica fora.
 
-**Onde mexer:**
-- `src/components/office/OfficeScene.tsx`: já existe `positions` e `zoneAt()`. Calcular a cada ~500 ms o conjunto de `userId`s "visíveis" (distância ≤ N **ou** mesma zona de reunião).
-- Passar esse `Set<string>` para `RemoteVideoTiles.tsx` / camada RTC.
-- Na camada RTC: subscrever vídeo só dos IDs do set; `setSubscribed(false)` no resto.
-- Debounce: só mudar subscrição se entrou/saiu do set por mais de 1,5 s (evita liga/desliga ao passar perto).
+## Como Zoom / Google Meet resolvem
 
-**Constantes propostas (ajustáveis depois):**
-- Raio de vídeo: 6 tiles.
-- Janela de debounce: 1500 ms.
-- Em zona de reunião: todos da zona sempre visíveis, ignora raio.
+Os dois compartilham a mesma regra: **um "room" é uma entidade do servidor; participar do room é simétrico por construção**. Ninguém calcula sozinho "estou na reunião com fulano" — o servidor diz quem está. As diferenças importantes:
 
-## 3. Throttle de persistência de posição
+- **Sala como recurso**: você entra/sai de um `roomId`. O servidor mantém a lista de participantes em tempo real e empurra para todos.
+- **Mídia via SFU**, não mesh. Cada cliente envia **uma vez** para o servidor; o servidor reencaminha. Isso é o que permite 12, 50, 200 pessoas. Mesh P2P (o que temos) **não escala** acima de ~5–6 — o uplink do usuário explode com N² conexões.
+- **Sinalização separada por sala**, não global.
+- **Estado "join" é confirmado pelo servidor** antes do cliente exibir a UI de "estou na reunião".
 
-**Problema:** `upsert` em `positions` a cada 300 ms enquanto o avatar anda = ~3 writes/s/usuário. Custo de Cloud + rede do cliente sem ganho perceptível (broadcast já cobre tempo real).
+## Plano em duas ondas
 
-**O que muda para o usuário:** nada visível. Reduz tráfego de upload e custo de banco.
+### Onda A — Consistência (resolve o "aleatório" hoje, sem trocar de stack)
 
-**Onde mexer:**
-- `OfficeScene.tsx` por volta da linha 557: subir o limiar de `lastPersisted` de 300 ms para 2000 ms.
-- Manter o `persistNow=true` que já existe no `keyup` (linha ~1981) e no `pagehide` — garante snapshot final correto.
+Mantém mesh P2P (adequado para até ~5 pessoas por sala), mas elimina a assimetria.
 
-## Como vou validar antes de entregar
+**Mudança 1 — Fonte da verdade simétrica via presença por sala**
 
-1. **Aba oculta:** abrir DevTools → Performance, trocar de aba por 30 s, conferir queda de CPU e que áudio continua.
-2. **Proximidade:** simular 2 usuários distantes no mapa, confirmar que vídeo não é decodificado (LiveKit stats mostram `subscribed: false`).
-3. **Persistência:** monitor de rede mostrando ≤1 request a `positions` durante caminhada contínua, e 1 request no `keyup`.
-4. **Regressão:** sala com 3 pessoas próximas continua com vídeo + áudio normais.
+Em vez de cada cliente calcular `desiredPeers` por proximidade local:
 
-## Fora do escopo desta onda
+- Cada sala (`zoneId` de meeting) vira um **canal Supabase próprio**, ex.: `room:{workspaceId}:{zoneId}`.
+- Ao entrar numa zona de reunião, o cliente faz `channel.track({ userId })` (presença Supabase nativa).
+- `desiredPeers` da sala = lista de `userId` presentes no channel da sala, **idêntica em todos os participantes**, atualizada pelo evento `presence sync`.
+- Lobby/corredor mantém a lógica de proximidade atual para áudio espacial, **mas em um canal separado** (`proximity:{workspaceId}`) e sem entrar em "reunião".
 
-- Mutação direta de `transform` no avatar local (Onda 2).
-- Interpolação de avatares remotos (Onda 2).
-- Quebrar `OfficeScene` em hooks (Onda 3).
-- Modo leve adaptativo por hardware (Onda 4).
+Resultado: quando Tracy entra na sala, o servidor confirma a presença e **todos** os clientes recebem o mesmo `presence sync` no mesmo evento. Não há janela de assimetria. A rejeição "bye-por-não-desired" desaparece porque o `desired` é o próprio roster do canal.
 
-## Estimativa
+**Mudança 2 — Sinalização por sala, não global**
 
-1 a 2 dias de implementação + 0,5 dia de teste com sala cheia real. Risco baixo: nenhuma mudança de schema, nenhuma quebra de protocolo de presence/broadcast.
+- Sinalização (`offer`/`answer`/`ice`/`hello`/`bye`/`renegotiate`) viaja no canal da sala em que os dois peers estão.
+- Mensagens fora do canal são impossíveis por construção — corrida de stale signal acabou.
 
----
+**Mudança 3 — Recovery saudável**
 
-**Confirma que sigo por aqui?** Se quiser ajustar o raio de proximidade (6 tiles) ou o intervalo de persistência (2 s) antes, me diz agora.
+- Tirar a guarda `if (peersRef.current.has(peerId)) continue` do loop de reconcile e do hello-loop.
+- Adicionar watchdog explícito: se uma PC fica em `failed`/`disconnected` por >8s, **destruir e recriar** com a regra `myId > peerId`. Nenhum peer fica "zumbi".
+- "Polite peer" pattern formal: o de `myId` menor é polite, ignora oferta conflitante; o de `myId` maior é impolite, sempre prevalece. Isso já está parcialmente implementado mas não para o caso de PC zumbi.
+
+**Mudança 4 — Estado "entrou na reunião" vem do servidor**
+
+- O badge "Em reunião" e o `useMeetingTracker` deixam de depender de `peerCount >= 1` (que pode mentir enquanto o ICE não completou).
+- Passam a depender do roster do canal da sala: >=2 pessoas no roster ⇒ reunião.
+
+Esperado após a Onda A: comportamento determinístico para 2–5 pessoas. Quem entra na sala **sempre** entra na reunião; quem sai, sai. Áudio liga para todos ou para ninguém (não mais "Marcio fala e ninguém ouve").
+
+### Onda B — Escala (necessária para 6+ na mesma sala)
+
+Mesh é inadequado acima de 5–6. Para 12+, **precisa SFU**. Opções:
+
+- **Reabilitar LiveKit** só para salas grandes, com o nosso roteamento por sala (canal da Onda A continua sendo a fonte da verdade). O 429 anterior veio de criar tokens em loop — corrigir gerando token uma vez por sessão/sala.
+- Alternativa: SFU self-hosted (Mediasoup) — mais trabalho, sem custo de provedor.
+
+Onda B é opcional agora; se as salas hoje são ≤4 pessoas, a Onda A já resolve o problema relatado. Anoto isso explicitamente no plano para você decidir.
+
+## Arquivos afetados (Onda A)
+
+- `src/lib/rtc/useRtcMesh.ts` — sinalização passa a aceitar `roomChannel`; `desiredPeers` vira derivado de presença; recovery do peer zumbi; polite/impolite formal.
+- `src/components/office/OfficeScene.tsx` — `desiredPeers` por sala vem do hook de presença da sala, não do cálculo local de posições. Proximidade no lobby fica num caminho separado.
+- Novo: `src/lib/rtc/useRoomPresence.ts` — hook fino sobre `supabase.channel(...).track()` que devolve `{ roster, channel }` para a sala atual.
+- `src/lib/meetings/useMeetingTracker.ts` — gatilho passa de `peerCount` para `rosterSize >= 2`.
+
+## Detalhes técnicos (para referência)
+
+- Canal por sala: `supabase.channel(\`room:${ws}:${zoneId}\`, { config: { presence: { key: userId }, broadcast: { self: false } } })`.
+- `presence sync` define o roster; `presence join`/`leave` apenas gatilham logs.
+- Sinalização vai no mesmo channel via `broadcast` — sem custo extra de conexão.
+- Cleanup garantido: ao sair da zona, `channel.untrack()` + `removeChannel()`. Refresh/pagehide → mesma rotina.
+- Reuso de mídia: ao trocar de sala, **não** recriamos tracks de mídia (mic/cam continuam); só recriamos as PCs com os novos peers.
+
+## Fora deste plano (intencionalmente)
+
+- Não troco UI, mapas, sprites, gravação, props.
+- Não refaço autenticação nem permissões.
+- Não removo o cálculo de proximidade do lobby — ele continua útil para áudio espacial.
+- Onda B (SFU) fica para depois, se você confirmar que precisa de salas grandes.
+
+## O que preciso de você antes de codar
+
+1. **Tamanho típico das salas**: a maior reunião tem quantas pessoas? Se for ≤5, Onda A basta. Se for 6+, faço Onda A agora e Onda B na sequência.
+2. Confirma que posso refatorar `useRtcMesh.ts` (é o arquivo central da chamada) e introduzir o novo hook `useRoomPresence`?

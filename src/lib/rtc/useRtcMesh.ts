@@ -325,11 +325,32 @@ export function useRtcMesh(myId: string | null, desiredPeers: string[]): RtcMesh
       }
     };
 
+    let zombieTimer: number | null = null;
+    const scheduleZombieKill = (delay: number) => {
+      if (zombieTimer != null) return;
+      zombieTimer = window.setTimeout(() => {
+        zombieTimer = null;
+        const st = pc.connectionState;
+        if (st === "failed" || st === "disconnected" || st === "closed") {
+          // Só mata se ainda for desejado — o reconcile vai recriar limpo.
+          if (desiredRef.current.has(peerId)) {
+            destroyPeer(peerId);
+          }
+        }
+      }, delay);
+    };
     pc.onconnectionstatechange = () => {
       const st = pc.connectionState;
       if (st === "connected") {
+        if (zombieTimer != null) { window.clearTimeout(zombieTimer); zombieTimer = null; }
         setConnectedPeers((prev) => (prev.includes(peerId) ? prev : [...prev, peerId]));
-      } else if (st === "failed" || st === "closed" || st === "disconnected") {
+      } else if (st === "failed") {
+        setConnectedPeers((prev) => prev.filter((p) => p !== peerId));
+        scheduleZombieKill(0);
+      } else if (st === "disconnected") {
+        setConnectedPeers((prev) => prev.filter((p) => p !== peerId));
+        scheduleZombieKill(8000);
+      } else if (st === "closed") {
         setConnectedPeers((prev) => prev.filter((p) => p !== peerId));
       }
     };
@@ -410,14 +431,11 @@ export function useRtcMesh(myId: string | null, desiredPeers: string[]): RtcMesh
       return;
     }
 
-    // Never accept a media negotiation from someone who is not currently in
-    // our proximity/room set. This prevents stale peers from pulling the user
-    // into a call after they already left the area.
-    if (!desiredRef.current.has(peerId)) {
-      sendSignal({ to: peerId, type: "bye" });
-      destroyPeer(peerId);
-      return;
-    }
+    // NÃO rejeitamos sinalização de quem ainda não está em `desired`. O roster
+    // de presença é eventualmente consistente; recusar aqui criava PCs zumbis
+    // num lado e nenhum no outro (bug do "Tracy entra mas não conecta").
+    // Se o peer realmente não pertence à sala, o loop de reconcile vai fechar
+    // a PC abaixo com um `bye` programado — sem corrida.
 
     if (msg.type === "renegotiate") {
       // The other side asked us to renegotiate (because they changed a track
@@ -539,7 +557,15 @@ export function useRtcMesh(myId: string | null, desiredPeers: string[]): RtcMesh
         window.clearTimeout(pending);
         disconnectTimersRef.current.delete(peerId);
       }
-      if (peersRef.current.has(peerId)) continue;
+      const existing = peersRef.current.get(peerId);
+      if (existing) {
+        const st = existing.pc.connectionState;
+        if (st === "failed" || st === "closed") {
+          destroyPeer(peerId);
+        } else {
+          continue;
+        }
+      }
       // Send hello — and if our id wins, create offer immediately
       sendSignal({ to: peerId, type: "hello" });
       if (myId > peerId) createPeer(peerId, true);
@@ -570,11 +596,22 @@ export function useRtcMesh(myId: string | null, desiredPeers: string[]): RtcMesh
         if (peerId === myId) continue;
         sendSignal({ to: peerId, type: "hello" });
         const entry = peersRef.current.get(peerId);
-        if (!entry && myId > peerId) createPeer(peerId, true);
+        // Entry "zumbi" (failed/closed/disconnected) → destrói pra liberar
+        // a recriação abaixo. Sem isso, o offerer ficava preso a uma PC morta
+        // e nunca tentava de novo (causa do "Tracy não conecta após sair/voltar").
+        if (entry) {
+          const st = entry.pc.connectionState;
+          if (st === "failed" || st === "closed") {
+            destroyPeer(peerId);
+          } else {
+            continue;
+          }
+        }
+        if (myId > peerId) createPeer(peerId, true);
       }
     }, 2500);
     return () => window.clearInterval(timer);
-  }, [myId, createPeer, sendSignal]);
+  }, [myId, createPeer, destroyPeer, sendSignal]);
 
   // Speaking detection (analyse remote audio levels — RMS time-domain + EMA).
   // Time-domain RMS é mais estável que frequência média (que oscila bastante
