@@ -577,46 +577,50 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
 
   const localZoneId = useMemo(() => callZoneAt({ x: pos.x, y: pos.y }), [pos.x, pos.y, mapVersion]);
 
-  // ---- Reunião por sala via SFU (LiveKit) ----
-  // Regra de produto:
-  //  • Em QUALQUER zona privada (qualquer rect != lobby) todos os avatares
-  //    fisicamente dentro do rect entram automaticamente na chamada, com ou
-  //    sem câmera/mic ligados, INDEPENDENTE da distância entre eles.
-  //  • No lobby/corredor a chamada só rola por proximidade ("conversa de
-  //    corredor") — pequeno raio com histerese.
-  // A zona do peer é calculada LOCALMENTE via callZoneAt({x,y}) para não depender
-  // do campo p.zone (que vem com lag/staleness do broadcast de presença).
-  // Raio ~2–3 personagens. Histerese pequena evita flicker entrar/sair.
+  // ---- ARQUITETURA: LiveKit como única fonte da verdade para mídia ----
+  // 1) Uma ÚNICA Room LiveKit por workspace (`prestativa-office:{wsId}`).
+  //    Todos os usuários do escritório ficam conectados nessa sala o tempo
+  //    inteiro. Andar pelo mapa NÃO desconecta nem reconecta o LiveKit.
+  // 2) A zona do avatar só altera a POLÍTICA DE MÍDIA (quem é assinado).
+  //    Em qualquer zona privada (qualquer rect != lobby), todos os avatares
+  //    fisicamente dentro do rect se veem/ouvem — simétrico por construção,
+  //    porque cada cliente classifica `positions` (broadcast Supabase) com a
+  //    MESMA função local `callZoneAt`. Sem roster próprio por sala, sem
+  //    janela onde A vê B mas B não vê A.
+  // 3) No lobby a regra é proximidade espacial (conversa de corredor).
   const PROXIMITY_CONNECT = 0.038;
   const PROXIMITY_DISCONNECT = 0.052;
   const connectedPeersRef = useRef<Set<string>>(new Set());
 
-  // ROSTER POR SALA (fonte simétrica da verdade)
-  // Quando estou numa zona de reunião, entro num canal Supabase exclusivo da
-  // sala. Todos os clientes na mesma sala recebem o MESMO `presence sync` —
-  // não há janela onde A me vê e B não me vê. Isso elimina o bug onde Tracy
-  // entrava na sala e Marcio nunca abria conexão (cada cliente decidia sozinho
-  // com base em posições defasadas, e a decisão saía assimétrica).
+  // Room LiveKit estável por workspace — não muda quando o avatar troca de zona.
   const roomKey = useMemo(() => {
     if (!me?.id) return null;
-    if (localZoneId === "lobby") return null;
     const ws = getCurrentWorkspaceId();
     if (!ws) return null;
-    return `${ws}:${localZoneId}`;
-  }, [me?.id, localZoneId]);
-  const roomRoster = useRoomRoster(roomKey, me?.id ?? null);
+    return `prestativa-office:${ws}`;
+  }, [me?.id]);
 
+  // Política de mídia: quem o LiveKit deve subscrever para mim agora.
+  // Calculado puramente de `positions` (broadcast Supabase) + classificação
+  // local de zona. Todos os clientes chegam à mesma resposta → simétrico.
   const desiredPeers = useMemo(() => {
     const meId = me?.id;
     if (!meId) return [] as string[];
-    // Em sala de reunião: roster autoritativo do canal de presença. Simétrico
-    // por construção — todo mundo na sala se vê. Sem proximidade local.
-    if (roomKey) {
-      return roomRoster.slice(0, 24);
-    }
-    // No lobby/corredor: mantém proximidade espacial (não é "reunião", é áudio
-    // ambiente de quem está perto). Histerese pequena evita flicker.
     const myZoneId = localZoneId;
+
+    // Zona privada: TODOS os peers cuja posição cai no mesmo rect entram.
+    if (myZoneId !== "lobby") {
+      const out: string[] = [];
+      for (const [uid, p] of Object.entries(positions)) {
+        if (uid === meId) continue;
+        if (!p.is_online && !presentPeerIds.has(uid)) continue;
+        if (callZoneAt({ x: p.x, y: p.y }) !== myZoneId) continue;
+        out.push(uid);
+      }
+      return out.slice(0, 24);
+    }
+
+    // Lobby/corredor: proximidade com histerese pequena.
     const candidates: { uid: string; score: number }[] = [];
     for (const [uid, p] of Object.entries(positions)) {
       if (uid === meId) continue;
@@ -629,25 +633,17 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
       if (closeEnough) candidates.push({ uid, score: dist });
     }
     return candidates.sort((a, b) => a.score - b.score).slice(0, 14).map((c) => c.uid);
-    // myZoneId só consultado pra clareza — proximidade no lobby não precisa
-    // checar a zona, mas mantemos a referência pra futura distinção.
-    void myZoneId;
-  }, [me?.id, positions, presentPeerIds, pos.x, pos.y, localZoneId, mapVersion, roomKey, roomRoster]);
+  }, [me?.id, positions, presentPeerIds, pos.x, pos.y, localZoneId, mapVersion]);
 
-
-  // Reunião automática via SFU: cada pessoa publica áudio/vídeo uma vez no
-  // servidor de mídia, e todos assinam o mesmo roster da sala. Isso remove a
-  // assimetria do mesh P2P e suporta reuniões maiores (até 20 pessoas).
   const audiblePeerIds = useMemo(() => new Set(desiredPeers), [desiredPeers]);
+  // Conexão LiveKit estável por workspace; `audiblePeerIds` apenas controla
+  // setSubscribed nas tracks remotas — entrar/sair de zona NÃO derruba conexão.
   const rtc = useLiveKit(me?.id ?? null, roomKey, audiblePeerIds);
   useEffect(() => {
     connectedPeersRef.current = new Set(desiredPeers);
   }, [desiredPeers]);
 
-  // Peers efetivamente audíveis: cruzamento entre quem está conectado no
-  // LiveKit (mesma zona = mesma sala) e quem passa no filtro de proximidade.
-  // No lobby/corredor, isso muta automaticamente quem ficou fora do raio,
-  // mesmo que a sala LiveKit ainda contenha todos.
+  // Peers audíveis = quem está conectado no LiveKit ∩ política de mídia atual.
   const audibleConnectedPeers = useMemo(
     () => rtc.connectedPeers.filter((id) => audiblePeerIds.has(id)),
     [rtc.connectedPeers, audiblePeerIds],
