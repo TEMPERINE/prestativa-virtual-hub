@@ -28,10 +28,7 @@ function initials(name: string): string {
 
 function hasLiveVideo(stream: MediaStream | null | undefined): boolean {
   if (!stream) return false;
-  // Nota: não checar `t.muted` — quando o LiveKit pausa a publicação por
-  // dynacast (ninguém inscrito), o track local fica "muted" mas a captura
-  // continua rolando; ignorar isso garante que o auto-preview não suma.
-  return stream.getVideoTracks().some((t) => t.enabled && t.readyState === "live");
+  return stream.getVideoTracks().some((t) => t.enabled && !t.muted && t.readyState === "live");
 }
 
 export function RemoteVideoTiles({
