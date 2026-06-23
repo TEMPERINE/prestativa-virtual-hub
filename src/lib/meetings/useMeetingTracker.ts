@@ -92,7 +92,7 @@ export function useMeetingTracker({
         } finally {
           inFlightRef.current = false;
         }
-      }, 800);
+      }, 1500);
       return () => window.clearTimeout(timer);
     }
 
