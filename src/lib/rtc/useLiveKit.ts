@@ -380,6 +380,8 @@ export function useLiveKit(
           try { await room.disconnect(); } catch { /* noop */ }
           return;
         }
+        setConnectionStatus("connected");
+        setLastError(null);
 
         rebuildRemotes();
         void refreshDevices();
