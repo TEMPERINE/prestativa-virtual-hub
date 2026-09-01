@@ -3,7 +3,6 @@ import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import logoAsset from "@/assets/virtual-office-logo.png.asset.json";
-import bgAsset from "@/assets/auth-bg.jpg.asset.json";
 
 export const Route = createFileRoute("/auth")({
   head: () => ({
@@ -38,10 +37,7 @@ function AuthPage() {
   };
 
   return (
-    <div
-      className="min-h-screen flex items-center justify-center p-6 bg-[#faf9f8] bg-cover bg-center bg-no-repeat relative"
-      style={{ backgroundImage: `url(${bgAsset.url})` }}
-    >
+    <div className="min-h-screen flex items-center justify-center p-6 bg-[#faf9f8] relative">
       <div className="absolute inset-0 bg-black/45" aria-hidden />
       <div className="w-full max-w-md relative z-10">
         <div className="text-center mb-8">
