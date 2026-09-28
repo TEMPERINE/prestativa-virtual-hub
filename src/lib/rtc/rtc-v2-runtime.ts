@@ -10,7 +10,7 @@
  *  - não faz claim de sessão (usa a sessão ACTIVE já existente);
  *  - contexto derivado só de sessão + posição própria + mapa canônico/versão;
  *  - PRIVATE_ROOM: roster = room.remoteParticipants (RemoteMedia), autoSubscribe;
- *    nada de desiredPeers/videoVisibleIds/posição de terceiros;
+ *    nada de peers desejados legados, visibilidade de vídeo ou posição de terceiros;
  *  - LOBBY: SpatialSubscriptions decide setSubscribed com posições do Movement V2;
  *  - MAP_VERSION_STALE: MAP_STALE → recarrega mapa → espera READY → recalcula
  *    contexto → UMA nova reconciliação; stale de novo = erro recuperável.
