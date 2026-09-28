@@ -71,6 +71,17 @@ function mediaError(code: string | null): Error {
   return e;
 }
 
+/**
+ * Identidade do runtime: muda (→ dispose + novo runtime) em troca de usuário,
+ * workspace, sessão ou generation; null quando a sessão não está ACTIVE
+ * (takeover/logout) → runtime desmontado.
+ */
+export function runtimeKey(myId: string | null, cfg: RtcV2HookConfig | null | undefined): string | null {
+  return myId && cfg?.active && cfg.workspaceId && cfg.sessionId
+    ? `${myId}|${cfg.workspaceId}|${cfg.sessionId}|${cfg.generation}`
+    : null;
+}
+
 const noopSubscribe = () => () => {};
 const nullSnapshot = () => null;
 const makeStream = (tracks: MediaStreamTrack[]) => new MediaStream(tracks);
@@ -122,10 +133,7 @@ export function useLiveKitV2(
   }, [refreshDevices]);
 
   // ---------- montagem do runtime ----------
-  const key =
-    myId && v2Config?.active && v2Config.workspaceId && v2Config.sessionId
-      ? `${myId}|${v2Config.workspaceId}|${v2Config.sessionId}|${v2Config.generation}`
-      : null;
+  const key = runtimeKey(myId, v2Config);
   const cfgRef = useRef(v2Config);
   cfgRef.current = v2Config;
 
