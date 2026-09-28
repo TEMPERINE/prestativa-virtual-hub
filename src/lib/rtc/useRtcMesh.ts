@@ -59,14 +59,14 @@ export type RtcMeshState = {
   getLocalAudioTrack: () => MediaStreamTrack | null;
 };
 
-
 // Apply codec preferences so the SDP offers Opus first (with DTX/FEC) for
 // audio and VP8 first for video — best cross-browser stability for a mesh.
 function preferCodecs(tx: RTCRtpTransceiver, kind: "audio" | "video") {
   try {
     type Caps = { codecs: { mimeType: string }[] } | null;
     type GetCapabilities = (k: string) => Caps;
-    const getCaps = (RTCRtpSender as unknown as { getCapabilities?: GetCapabilities }).getCapabilities;
+    const getCaps = (RTCRtpSender as unknown as { getCapabilities?: GetCapabilities })
+      .getCapabilities;
     if (!getCaps) return;
     const caps = getCaps(kind);
     if (!caps?.codecs?.length) return;
@@ -75,9 +75,12 @@ function preferCodecs(tx: RTCRtpTransceiver, kind: "audio" | "video") {
     const others = caps.codecs.filter((c) => c.mimeType.toLowerCase() !== want.toLowerCase());
     if (!preferred.length) return;
     type Codec = { mimeType: string };
-    const setPrefs = (tx as unknown as { setCodecPreferences?: (cs: Codec[]) => void }).setCodecPreferences;
+    const setPrefs = (tx as unknown as { setCodecPreferences?: (cs: Codec[]) => void })
+      .setCodecPreferences;
     setPrefs?.([...preferred, ...others] as Codec[]);
-  } catch { /* noop */ }
+  } catch {
+    /* noop */
+  }
 }
 
 export function useRtcMesh(myId: string | null, desiredPeers: string[]): RtcMeshState {
@@ -97,7 +100,9 @@ export function useRtcMesh(myId: string | null, desiredPeers: string[]): RtcMesh
   const [audioInputDevices, setAudioInputDevices] = useState<MediaDeviceInfo[]>([]);
   const [selectedAudioInputDeviceId, setSelectedAudioInputDeviceId] = useState<string | null>(null);
   const [audioOutputDevices, setAudioOutputDevices] = useState<MediaDeviceInfo[]>([]);
-  const [selectedAudioOutputDeviceId, setSelectedAudioOutputDeviceId] = useState<string | null>(null);
+  const [selectedAudioOutputDeviceId, setSelectedAudioOutputDeviceId] = useState<string | null>(
+    null,
+  );
 
   const peersRef = useRef<Map<string, PeerEntry>>(new Map());
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
@@ -122,31 +127,38 @@ export function useRtcMesh(myId: string | null, desiredPeers: string[]): RtcMesh
           iceServersRef.current = servers;
         }
       })
-      .catch(() => { /* keep defaults */ });
-    return () => { cancelled = true; };
+      .catch(() => {
+        /* keep defaults */
+      });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
-  const sendSignal = useCallback((msg: Omit<SignalMsg, "from" | "sessionId" | "targetSessionId">) => {
-    const ch = channelRef.current;
-    if (!ch || !myId) {
-      pendingSignalsRef.current.push(msg);
-      return;
-    }
-    if (!channelReadyRef.current) {
-      pendingSignalsRef.current.push(msg);
-      return;
-    }
-    void ch.send({
-      type: "broadcast",
-      event: "rtc",
-      payload: {
-        ...msg,
-        from: myId,
-        sessionId: localSessionIdRef.current,
-        targetSessionId: remoteSessionsRef.current.get(msg.to),
-      },
-    });
-  }, [myId]);
+  const sendSignal = useCallback(
+    (msg: Omit<SignalMsg, "from" | "sessionId" | "targetSessionId">) => {
+      const ch = channelRef.current;
+      if (!ch || !myId) {
+        pendingSignalsRef.current.push(msg);
+        return;
+      }
+      if (!channelReadyRef.current) {
+        pendingSignalsRef.current.push(msg);
+        return;
+      }
+      void ch.send({
+        type: "broadcast",
+        event: "rtc",
+        payload: {
+          ...msg,
+          from: myId,
+          sessionId: localSessionIdRef.current,
+          targetSessionId: remoteSessionsRef.current.get(msg.to),
+        },
+      });
+    },
+    [myId],
+  );
 
   const flushSignals = useCallback(() => {
     const ch = channelRef.current;
@@ -167,217 +179,262 @@ export function useRtcMesh(myId: string | null, desiredPeers: string[]): RtcMesh
   }, [myId]);
 
   // Create a PC for a peer
-  const createPeer = useCallback((peerId: string, initiator: boolean) => {
-    if (!myId) return null;
-    if (peersRef.current.has(peerId)) return peersRef.current.get(peerId)!;
+  const createPeer = useCallback(
+    (peerId: string, initiator: boolean) => {
+      if (!myId) return null;
+      if (peersRef.current.has(peerId)) return peersRef.current.get(peerId)!;
 
-    const pc = new RTCPeerConnection({
-      iceServers: iceServersRef.current as RTCIceServer[],
-      iceTransportPolicy: "all",
-    });
-    const remoteStream = new MediaStream();
-    const remoteScreenStream = new MediaStream();
+      const pc = new RTCPeerConnection({
+        iceServers: iceServersRef.current as RTCIceServer[],
+        iceTransportPolicy: "all",
+      });
+      const remoteStream = new MediaStream();
+      const remoteScreenStream = new MediaStream();
 
-    // Always add transceivers so we can both send/recv without renegotiation later
-    const audioTx = pc.addTransceiver("audio", { direction: "sendrecv" });
-    const videoTx = pc.addTransceiver("video", { direction: "sendrecv" });
-    const screenTx = pc.addTransceiver("video", { direction: "sendrecv" });
+      // Always add transceivers so we can both send/recv without renegotiation later
+      const audioTx = pc.addTransceiver("audio", { direction: "sendrecv" });
+      const videoTx = pc.addTransceiver("video", { direction: "sendrecv" });
+      const screenTx = pc.addTransceiver("video", { direction: "sendrecv" });
 
-    // Prefer Opus / VP8 for cross-browser stability.
-    preferCodecs(audioTx, "audio");
-    preferCodecs(videoTx, "video");
-    preferCodecs(screenTx, "video");
+      // Prefer Opus / VP8 for cross-browser stability.
+      preferCodecs(audioTx, "audio");
+      preferCodecs(videoTx, "video");
+      preferCodecs(screenTx, "video");
 
-    // Reduce playout latency where supported (Chromium).
-    // playoutDelayHint baixa = menos buffer no receptor → menos delay.
-    // jitterBufferTarget=0 pede ao buffer pra ficar o mais raso possível.
-    try {
-      const ar = audioTx.receiver as unknown as { playoutDelayHint?: number; jitterBufferTarget?: number };
-      ar.playoutDelayHint = 0;
-      ar.jitterBufferTarget = 0;
-    } catch { /* noop */ }
-    try {
-      const vr = videoTx.receiver as unknown as { playoutDelayHint?: number; jitterBufferTarget?: number };
-      vr.playoutDelayHint = 0;
-      vr.jitterBufferTarget = 0;
-    } catch { /* noop */ }
-    // Screen share pode tolerar um pouco mais de buffer (qualidade > latência),
-    // então deixamos o default do navegador.
-
-    // Hint de prioridade de rede pra que mídia tenha precedência no socket.
-    const bumpPriority = (sender: RTCRtpSender, isVideo: boolean) => {
+      // Reduce playout latency where supported (Chromium).
+      // playoutDelayHint baixa = menos buffer no receptor → menos delay.
+      // jitterBufferTarget=0 pede ao buffer pra ficar o mais raso possível.
       try {
-        const params = sender.getParameters();
-        if (!params.encodings || params.encodings.length === 0) params.encodings = [{}];
-        for (const enc of params.encodings) {
-          (enc as RTCRtpEncodingParameters & { priority?: string; networkPriority?: string }).priority = "high";
-          (enc as RTCRtpEncodingParameters & { priority?: string; networkPriority?: string }).networkPriority = "high";
-          if (isVideo) {
-            enc.maxBitrate = 800_000; // 800 kbps — suficiente pra 320x240 fluido
-            enc.maxFramerate = 30;
-          } else {
-            enc.maxBitrate = 64_000; // Opus voice
-          }
-        }
-        void sender.setParameters(params);
-      } catch { /* noop */ }
-    };
-    bumpPriority(audioTx.sender, false);
-    bumpPriority(videoTx.sender, true);
-
-    // If we already have local tracks, attach now
-    if (audioTrackRef.current) void audioTx.sender.replaceTrack(audioTrackRef.current);
-    if (videoTrackRef.current) void videoTx.sender.replaceTrack(videoTrackRef.current);
-    if (screenTrackRef.current) void screenTx.sender.replaceTrack(screenTrackRef.current);
-
-
-    const entry: PeerEntry = {
-      pc,
-      audioSender: audioTx.sender,
-      videoSender: videoTx.sender,
-      screenTransceiver: screenTx,
-      screenSender: screenTx.sender,
-      makingOffer: false,
-      isOfferer: initiator,
-      pendingIce: [],
-      remoteStream,
-      remoteScreenStream,
-    };
-
-    pc.onicecandidate = (e) => {
-      sendSignal({ to: peerId, type: "ice", candidate: e.candidate ? e.candidate.toJSON() : null });
-    };
-
-    // Identifica se um transceiver é o de SCREEN (2ª trilha de vídeo do PC).
-    // Por convenção fixa, criamos sempre na ordem: audio, cam-video, screen-video.
-    // Identificar por POSIÇÃO entre os transceivers de vídeo do PC funciona
-    // simetricamente no offerer (refs locais) e no answerer (refs criados pelo
-    // setRemoteDescription a partir das m-lines remotas), enquanto a comparação
-    // por referência (`e.transceiver === entry.screenTransceiver`) falha no
-    // answerer porque os transceivers efetivos podem não ser os pré-criados.
-    const isScreenTransceiver = (tx: RTCRtpTransceiver) => {
-      const videoTxs = pc.getTransceivers().filter(
-        (t) => t.receiver.track?.kind === "video" || t.sender.track?.kind === "video",
-      );
-      // Fallback: se nem 2 transceivers de vídeo existem ainda, considera cam.
-      if (videoTxs.length < 2) return false;
-      return tx === videoTxs[1];
-    };
-
-    pc.ontrack = (e) => {
-      const isScreen = e.track.kind === "video" && isScreenTransceiver(e.transceiver);
-      const target = isScreen ? remoteScreenStream : remoteStream;
-      if (!target.getTracks().find((rt) => rt.id === e.track.id)) target.addTrack(e.track);
-      if (isScreen) {
-        setRemoteScreenStreams((prev) => ({ ...prev, [peerId]: remoteScreenStream }));
-        e.track.onunmute = () => {
-          setRemoteScreenStreams((prev) => ({ ...prev, [peerId]: remoteScreenStream }));
+        const ar = audioTx.receiver as unknown as {
+          playoutDelayHint?: number;
+          jitterBufferTarget?: number;
         };
-        e.track.onmute = () => { /* viewer filtra por readyState */ };
-        e.track.onended = () => {
-          try { target.removeTrack(e.track); } catch { /* noop */ }
-          setRemoteScreenStreams((prev) => {
-            if (target.getVideoTracks().length === 0) {
-              const next = { ...prev };
-              delete next[peerId];
-              return next;
+        ar.playoutDelayHint = 0;
+        ar.jitterBufferTarget = 0;
+      } catch {
+        /* noop */
+      }
+      try {
+        const vr = videoTx.receiver as unknown as {
+          playoutDelayHint?: number;
+          jitterBufferTarget?: number;
+        };
+        vr.playoutDelayHint = 0;
+        vr.jitterBufferTarget = 0;
+      } catch {
+        /* noop */
+      }
+      // Screen share pode tolerar um pouco mais de buffer (qualidade > latência),
+      // então deixamos o default do navegador.
+
+      // Hint de prioridade de rede pra que mídia tenha precedência no socket.
+      const bumpPriority = (sender: RTCRtpSender, isVideo: boolean) => {
+        try {
+          const params = sender.getParameters();
+          if (!params.encodings || params.encodings.length === 0) params.encodings = [{}];
+          for (const enc of params.encodings) {
+            (
+              enc as RTCRtpEncodingParameters & { priority?: string; networkPriority?: string }
+            ).priority = "high";
+            (
+              enc as RTCRtpEncodingParameters & { priority?: string; networkPriority?: string }
+            ).networkPriority = "high";
+            if (isVideo) {
+              enc.maxBitrate = 800_000; // 800 kbps — suficiente pra 320x240 fluido
+              enc.maxFramerate = 30;
+            } else {
+              enc.maxBitrate = 64_000; // Opus voice
             }
-            return { ...prev, [peerId]: target };
-          });
-        };
-      } else {
-        setRemoteStreams((prev) => ({ ...prev, [peerId]: remoteStream }));
-        // Forçamos re-render trocando a referência do MediaStream nos eventos
-        // muted/unmuted pra que <video>/<audio> reavaliem hasLiveVideo.
-        const bump = () => {
-          setRemoteStreams((prev) => ({ ...prev, [peerId]: new MediaStream(remoteStream.getTracks()) }));
-        };
-        e.track.onunmute = bump;
-        e.track.onmute = bump;
-        e.track.onended = () => {
-          try { remoteStream.removeTrack(e.track); } catch { /* noop */ }
-          bump();
-        };
-      }
-    };
+          }
+          void sender.setParameters(params);
+        } catch {
+          /* noop */
+        }
+      };
+      bumpPriority(audioTx.sender, false);
+      bumpPriority(videoTx.sender, true);
 
+      // If we already have local tracks, attach now
+      if (audioTrackRef.current) void audioTx.sender.replaceTrack(audioTrackRef.current);
+      if (videoTrackRef.current) void videoTx.sender.replaceTrack(videoTrackRef.current);
+      if (screenTrackRef.current) void screenTx.sender.replaceTrack(screenTrackRef.current);
 
-    // ICE restart watchdog: keep media alive across transient network blips.
-    // We DO NOT destroy the PC — restartIce() renegotiates without touching the
-    // attached local tracks, so the user's camera/mic LED stays on.
-    let iceRestartTimer: number | null = null;
-    const scheduleIceRestart = (delay: number) => {
-      if (iceRestartTimer != null) return;
-      iceRestartTimer = window.setTimeout(() => {
-        iceRestartTimer = null;
-        if (pc.connectionState === "closed") return;
-        if (pc.iceConnectionState === "connected" || pc.iceConnectionState === "completed") return;
-        if (!entry.isOfferer) return; // the offerer drives the restart
-        try { pc.restartIce(); } catch { /* noop */ }
-      }, delay);
-    };
-    pc.oniceconnectionstatechange = () => {
-      const st = pc.iceConnectionState;
-      if (st === "failed") scheduleIceRestart(0);
-      else if (st === "disconnected") scheduleIceRestart(5000);
-      else if (st === "connected" || st === "completed") {
-        if (iceRestartTimer != null) { window.clearTimeout(iceRestartTimer); iceRestartTimer = null; }
-      }
-    };
+      const entry: PeerEntry = {
+        pc,
+        audioSender: audioTx.sender,
+        videoSender: videoTx.sender,
+        screenTransceiver: screenTx,
+        screenSender: screenTx.sender,
+        makingOffer: false,
+        isOfferer: initiator,
+        pendingIce: [],
+        remoteStream,
+        remoteScreenStream,
+      };
 
-    let zombieTimer: number | null = null;
-    const scheduleZombieKill = (delay: number) => {
-      if (zombieTimer != null) return;
-      zombieTimer = window.setTimeout(() => {
-        zombieTimer = null;
-        const st = pc.connectionState;
-        if (st === "failed" || st === "disconnected" || st === "closed") {
-          // Só mata se ainda for desejado — o reconcile vai recriar limpo.
-          if (desiredRef.current.has(peerId)) {
-            destroyPeer(peerId);
+      pc.onicecandidate = (e) => {
+        sendSignal({
+          to: peerId,
+          type: "ice",
+          candidate: e.candidate ? e.candidate.toJSON() : null,
+        });
+      };
+
+      // Identifica se um transceiver é o de SCREEN (2ª trilha de vídeo do PC).
+      // Por convenção fixa, criamos sempre na ordem: audio, cam-video, screen-video.
+      // Identificar por POSIÇÃO entre os transceivers de vídeo do PC funciona
+      // simetricamente no offerer (refs locais) e no answerer (refs criados pelo
+      // setRemoteDescription a partir das m-lines remotas), enquanto a comparação
+      // por referência (`e.transceiver === entry.screenTransceiver`) falha no
+      // answerer porque os transceivers efetivos podem não ser os pré-criados.
+      const isScreenTransceiver = (tx: RTCRtpTransceiver) => {
+        const videoTxs = pc
+          .getTransceivers()
+          .filter((t) => t.receiver.track?.kind === "video" || t.sender.track?.kind === "video");
+        // Fallback: se nem 2 transceivers de vídeo existem ainda, considera cam.
+        if (videoTxs.length < 2) return false;
+        return tx === videoTxs[1];
+      };
+
+      pc.ontrack = (e) => {
+        const isScreen = e.track.kind === "video" && isScreenTransceiver(e.transceiver);
+        const target = isScreen ? remoteScreenStream : remoteStream;
+        if (!target.getTracks().find((rt) => rt.id === e.track.id)) target.addTrack(e.track);
+        if (isScreen) {
+          setRemoteScreenStreams((prev) => ({ ...prev, [peerId]: remoteScreenStream }));
+          e.track.onunmute = () => {
+            setRemoteScreenStreams((prev) => ({ ...prev, [peerId]: remoteScreenStream }));
+          };
+          e.track.onmute = () => {
+            /* viewer filtra por readyState */
+          };
+          e.track.onended = () => {
+            try {
+              target.removeTrack(e.track);
+            } catch {
+              /* noop */
+            }
+            setRemoteScreenStreams((prev) => {
+              if (target.getVideoTracks().length === 0) {
+                const next = { ...prev };
+                delete next[peerId];
+                return next;
+              }
+              return { ...prev, [peerId]: target };
+            });
+          };
+        } else {
+          setRemoteStreams((prev) => ({ ...prev, [peerId]: remoteStream }));
+          // Forçamos re-render trocando a referência do MediaStream nos eventos
+          // muted/unmuted pra que <video>/<audio> reavaliem hasLiveVideo.
+          const bump = () => {
+            setRemoteStreams((prev) => ({
+              ...prev,
+              [peerId]: new MediaStream(remoteStream.getTracks()),
+            }));
+          };
+          e.track.onunmute = bump;
+          e.track.onmute = bump;
+          e.track.onended = () => {
+            try {
+              remoteStream.removeTrack(e.track);
+            } catch {
+              /* noop */
+            }
+            bump();
+          };
+        }
+      };
+
+      // ICE restart watchdog: keep media alive across transient network blips.
+      // We DO NOT destroy the PC — restartIce() renegotiates without touching the
+      // attached local tracks, so the user's camera/mic LED stays on.
+      let iceRestartTimer: number | null = null;
+      const scheduleIceRestart = (delay: number) => {
+        if (iceRestartTimer != null) return;
+        iceRestartTimer = window.setTimeout(() => {
+          iceRestartTimer = null;
+          if (pc.connectionState === "closed") return;
+          if (pc.iceConnectionState === "connected" || pc.iceConnectionState === "completed")
+            return;
+          if (!entry.isOfferer) return; // the offerer drives the restart
+          try {
+            pc.restartIce();
+          } catch {
+            /* noop */
+          }
+        }, delay);
+      };
+      pc.oniceconnectionstatechange = () => {
+        const st = pc.iceConnectionState;
+        if (st === "failed") scheduleIceRestart(0);
+        else if (st === "disconnected") scheduleIceRestart(5000);
+        else if (st === "connected" || st === "completed") {
+          if (iceRestartTimer != null) {
+            window.clearTimeout(iceRestartTimer);
+            iceRestartTimer = null;
           }
         }
-      }, delay);
-    };
-    pc.onconnectionstatechange = () => {
-      const st = pc.connectionState;
-      if (st === "connected") {
-        if (zombieTimer != null) { window.clearTimeout(zombieTimer); zombieTimer = null; }
-        setConnectedPeers((prev) => (prev.includes(peerId) ? prev : [...prev, peerId]));
-      } else if (st === "failed") {
-        setConnectedPeers((prev) => prev.filter((p) => p !== peerId));
-        scheduleZombieKill(0);
-      } else if (st === "disconnected") {
-        setConnectedPeers((prev) => prev.filter((p) => p !== peerId));
-        scheduleZombieKill(8000);
-      } else if (st === "closed") {
-        setConnectedPeers((prev) => prev.filter((p) => p !== peerId));
+      };
+
+      let zombieTimer: number | null = null;
+      const scheduleZombieKill = (delay: number) => {
+        if (zombieTimer != null) return;
+        zombieTimer = window.setTimeout(() => {
+          zombieTimer = null;
+          const st = pc.connectionState;
+          if (st === "failed" || st === "disconnected" || st === "closed") {
+            // Só mata se ainda for desejado — o reconcile vai recriar limpo.
+            if (desiredRef.current.has(peerId)) {
+              destroyPeer(peerId);
+            }
+          }
+        }, delay);
+      };
+      pc.onconnectionstatechange = () => {
+        const st = pc.connectionState;
+        if (st === "connected") {
+          if (zombieTimer != null) {
+            window.clearTimeout(zombieTimer);
+            zombieTimer = null;
+          }
+          setConnectedPeers((prev) => (prev.includes(peerId) ? prev : [...prev, peerId]));
+        } else if (st === "failed") {
+          setConnectedPeers((prev) => prev.filter((p) => p !== peerId));
+          scheduleZombieKill(0);
+        } else if (st === "disconnected") {
+          setConnectedPeers((prev) => prev.filter((p) => p !== peerId));
+          scheduleZombieKill(8000);
+        } else if (st === "closed") {
+          setConnectedPeers((prev) => prev.filter((p) => p !== peerId));
+        }
+      };
+
+      pc.onnegotiationneeded = async () => {
+        if (!entry.isOfferer || pc.signalingState !== "stable") return;
+        try {
+          entry.makingOffer = true;
+          const offer = await pc.createOffer();
+          if (pc.signalingState !== "stable") return;
+          await pc.setLocalDescription(offer);
+          sendSignal({ to: peerId, type: "offer", sdp: pc.localDescription! });
+        } catch (err) {
+          console.error("negotiationneeded failed", err);
+        } finally {
+          entry.makingOffer = false;
+        }
+      };
+
+      peersRef.current.set(peerId, entry);
+
+      // If we're the initiator, kick off offer immediately
+      if (initiator) {
+        // negotiationneeded will fire from the transceivers; nothing more to do
       }
-    };
-
-    pc.onnegotiationneeded = async () => {
-      if (!entry.isOfferer || pc.signalingState !== "stable") return;
-      try {
-        entry.makingOffer = true;
-        const offer = await pc.createOffer();
-        if (pc.signalingState !== "stable") return;
-        await pc.setLocalDescription(offer);
-        sendSignal({ to: peerId, type: "offer", sdp: pc.localDescription! });
-      } catch (err) {
-        console.error("negotiationneeded failed", err);
-      } finally {
-        entry.makingOffer = false;
-      }
-    };
-
-    peersRef.current.set(peerId, entry);
-
-    // If we're the initiator, kick off offer immediately
-    if (initiator) {
-      // negotiationneeded will fire from the transceivers; nothing more to do
-    }
-    return entry;
-  }, [myId, sendSignal]);
+      return entry;
+    },
+    [myId, sendSignal],
+  );
 
   const destroyPeer = useCallback((peerId: string) => {
     const pending = disconnectTimersRef.current.get(peerId);
@@ -387,7 +444,11 @@ export function useRtcMesh(myId: string | null, desiredPeers: string[]): RtcMesh
     }
     const entry = peersRef.current.get(peerId);
     if (!entry) return;
-    try { entry.pc.close(); } catch { /* noop */ }
+    try {
+      entry.pc.close();
+    } catch {
+      /* noop */
+    }
     peersRef.current.delete(peerId);
     remoteSessionsRef.current.delete(peerId);
     setRemoteStreams((prev) => {
@@ -409,103 +470,114 @@ export function useRtcMesh(myId: string | null, desiredPeers: string[]): RtcMesh
   }, []);
 
   // Handle incoming signaling
-  const handleSignal = useCallback(async (msg: SignalMsg) => {
-    if (!myId || msg.to !== myId || msg.from === myId) return;
-    if (msg.targetSessionId && msg.targetSessionId !== localSessionIdRef.current) return;
-    const peerId = msg.from;
-    const knownSessionId = remoteSessionsRef.current.get(peerId);
-    const sessionChanged = !!msg.sessionId && !!knownSessionId && msg.sessionId !== knownSessionId;
-    if (sessionChanged) destroyPeer(peerId);
-    if (msg.sessionId) remoteSessionsRef.current.set(peerId, msg.sessionId);
+  const handleSignal = useCallback(
+    async (msg: SignalMsg) => {
+      if (!myId || msg.to !== myId || msg.from === myId) return;
+      if (msg.targetSessionId && msg.targetSessionId !== localSessionIdRef.current) return;
+      const peerId = msg.from;
+      const knownSessionId = remoteSessionsRef.current.get(peerId);
+      const sessionChanged =
+        !!msg.sessionId && !!knownSessionId && msg.sessionId !== knownSessionId;
+      if (sessionChanged) destroyPeer(peerId);
+      if (msg.sessionId) remoteSessionsRef.current.set(peerId, msg.sessionId);
 
-    if (msg.type === "bye") {
-      destroyPeer(peerId);
-      return;
-    }
-
-    if (msg.type === "hello") {
-      // Other side announces presence; if we should connect and our id wins, create offer
-      if (desiredRef.current.has(peerId) && myId > peerId) {
-        createPeer(peerId, true);
+      if (msg.type === "bye") {
+        destroyPeer(peerId);
+        return;
       }
-      return;
-    }
 
-    // NÃO rejeitamos sinalização de quem ainda não está em `desired`. O roster
-    // de presença é eventualmente consistente; recusar aqui criava PCs zumbis
-    // num lado e nenhum no outro (bug do "Tracy entra mas não conecta").
-    // Se o peer realmente não pertence à sala, o loop de reconcile vai fechar
-    // a PC abaixo com um `bye` programado — sem corrida.
+      if (msg.type === "hello") {
+        // Other side announces presence; if we should connect and our id wins, create offer
+        if (desiredRef.current.has(peerId) && myId > peerId) {
+          createPeer(peerId, true);
+        }
+        return;
+      }
 
-    if (msg.type === "renegotiate") {
-      // The other side asked us to renegotiate (because they changed a track
-      // and they are not the offerer). Only act if we are the offerer.
-      const e = peersRef.current.get(peerId);
-      if (!e || !e.isOfferer) return;
-      if (e.pc.signalingState !== "stable") return;
-      try {
-        e.makingOffer = true;
-        const offer = await e.pc.createOffer();
+      // NÃO rejeitamos sinalização de quem ainda não está em `desired`. O roster
+      // de presença é eventualmente consistente; recusar aqui criava PCs zumbis
+      // num lado e nenhum no outro (bug do "Tracy entra mas não conecta").
+      // Se o peer realmente não pertence à sala, o loop de reconcile vai fechar
+      // a PC abaixo com um `bye` programado — sem corrida.
+
+      if (msg.type === "renegotiate") {
+        // The other side asked us to renegotiate (because they changed a track
+        // and they are not the offerer). Only act if we are the offerer.
+        const e = peersRef.current.get(peerId);
+        if (!e || !e.isOfferer) return;
         if (e.pc.signalingState !== "stable") return;
-        await e.pc.setLocalDescription(offer);
-        sendSignal({ to: peerId, type: "offer", sdp: e.pc.localDescription! });
-      } catch (err) {
-        console.error("renegotiate failed", err);
-      } finally {
-        e.makingOffer = false;
-      }
-      return;
-    }
-
-
-    // Make sure peer exists for incoming offer/answer/ice
-    let entry = peersRef.current.get(peerId);
-    if (!entry) {
-      if (msg.type === "offer") {
-        entry = createPeer(peerId, false) ?? undefined;
-      } else {
-        return; // ignore stray ice/answer
-      }
-    }
-    if (!entry) return;
-    const pc = entry.pc;
-
-    try {
-      if (msg.type === "offer" && msg.sdp) {
-        if (entry.isOfferer || pc.signalingState !== "stable") {
-          destroyPeer(peerId);
-          const fresh = createPeer(peerId, false);
-          if (!fresh) return;
-          entry = fresh;
-        }
-        await entry.pc.setRemoteDescription(msg.sdp);
-        for (const candidate of entry.pendingIce.splice(0)) {
-          try { await entry.pc.addIceCandidate(candidate); } catch { /* noop */ }
-        }
-        const answer = await entry.pc.createAnswer();
-        await entry.pc.setLocalDescription(answer);
-        sendSignal({ to: peerId, type: "answer", sdp: entry.pc.localDescription! });
-      } else if (msg.type === "answer" && msg.sdp) {
-        if (entry.isOfferer && pc.signalingState === "have-local-offer") {
-          await pc.setRemoteDescription(msg.sdp);
-          for (const candidate of entry.pendingIce.splice(0)) {
-            try { await pc.addIceCandidate(candidate); } catch { /* noop */ }
-          }
-        }
-      } else if (msg.type === "ice") {
         try {
-          if (msg.candidate) {
-            if (pc.remoteDescription) await pc.addIceCandidate(msg.candidate);
-            else entry.pendingIce.push(msg.candidate);
-          }
+          e.makingOffer = true;
+          const offer = await e.pc.createOffer();
+          if (e.pc.signalingState !== "stable") return;
+          await e.pc.setLocalDescription(offer);
+          sendSignal({ to: peerId, type: "offer", sdp: e.pc.localDescription! });
         } catch (err) {
-          console.warn("addIceCandidate failed", err);
+          console.error("renegotiate failed", err);
+        } finally {
+          e.makingOffer = false;
+        }
+        return;
+      }
+
+      // Make sure peer exists for incoming offer/answer/ice
+      let entry = peersRef.current.get(peerId);
+      if (!entry) {
+        if (msg.type === "offer") {
+          entry = createPeer(peerId, false) ?? undefined;
+        } else {
+          return; // ignore stray ice/answer
         }
       }
-    } catch (err) {
-      console.error("signal handle error", err);
-    }
-  }, [myId, createPeer, destroyPeer, sendSignal]);
+      if (!entry) return;
+      const pc = entry.pc;
+
+      try {
+        if (msg.type === "offer" && msg.sdp) {
+          if (entry.isOfferer || pc.signalingState !== "stable") {
+            destroyPeer(peerId);
+            const fresh = createPeer(peerId, false);
+            if (!fresh) return;
+            entry = fresh;
+          }
+          await entry.pc.setRemoteDescription(msg.sdp);
+          for (const candidate of entry.pendingIce.splice(0)) {
+            try {
+              await entry.pc.addIceCandidate(candidate);
+            } catch {
+              /* noop */
+            }
+          }
+          const answer = await entry.pc.createAnswer();
+          await entry.pc.setLocalDescription(answer);
+          sendSignal({ to: peerId, type: "answer", sdp: entry.pc.localDescription! });
+        } else if (msg.type === "answer" && msg.sdp) {
+          if (entry.isOfferer && pc.signalingState === "have-local-offer") {
+            await pc.setRemoteDescription(msg.sdp);
+            for (const candidate of entry.pendingIce.splice(0)) {
+              try {
+                await pc.addIceCandidate(candidate);
+              } catch {
+                /* noop */
+              }
+            }
+          }
+        } else if (msg.type === "ice") {
+          try {
+            if (msg.candidate) {
+              if (pc.remoteDescription) await pc.addIceCandidate(msg.candidate);
+              else entry.pendingIce.push(msg.candidate);
+            }
+          } catch (err) {
+            console.warn("addIceCandidate failed", err);
+          }
+        }
+      } catch (err) {
+        console.error("signal handle error", err);
+      }
+    },
+    [myId, createPeer, destroyPeer, sendSignal],
+  );
 
   // Subscribe to signaling channel
   useEffect(() => {
@@ -618,10 +690,16 @@ export function useRtcMesh(myId: string | null, desiredPeers: string[]): RtcMesh
   // com sons consonantais), e o EMA elimina o piscar entre "fala/silêncio".
   useEffect(() => {
     const ctxRef: { ctx?: AudioContext } = {};
-    const analysers: { peerId: string; analyser: AnalyserNode; data: Uint8Array<ArrayBuffer> }[] = [];
+    const analysers: { peerId: string; analyser: AnalyserNode; data: Uint8Array<ArrayBuffer> }[] =
+      [];
     try {
-      ctxRef.ctx = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
-    } catch { /* noop */ }
+      ctxRef.ctx = new (
+        window.AudioContext ||
+        (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext
+      )();
+    } catch {
+      /* noop */
+    }
 
     Object.entries(remoteStreams).forEach(([peerId, stream]) => {
       const audioTracks = stream.getAudioTracks();
@@ -632,8 +710,14 @@ export function useRtcMesh(myId: string | null, desiredPeers: string[]): RtcMesh
         analyser.fftSize = 1024;
         analyser.smoothingTimeConstant = 0.2;
         src.connect(analyser);
-        analysers.push({ peerId, analyser, data: new Uint8Array(new ArrayBuffer(analyser.fftSize)) });
-      } catch { /* noop */ }
+        analysers.push({
+          peerId,
+          analyser,
+          data: new Uint8Array(new ArrayBuffer(analyser.fftSize)),
+        });
+      } catch {
+        /* noop */
+      }
     });
 
     if (!analysers.length) return;
@@ -642,12 +726,15 @@ export function useRtcMesh(myId: string | null, desiredPeers: string[]): RtcMesh
     //  - SPEAK_ON ~0.03 (~-30dBFS) cobre voz baixa sem disparar com ruído
     //  - SPEAK_OFF ~0.012 (~-38dBFS) — janela de histerese ampla
     //  - ON/OFF_HOLD evitam pisca-pisca; OFF maior pra suavizar pausas naturais
-    const SPEAK_ON = 0.030;
+    const SPEAK_ON = 0.03;
     const SPEAK_OFF = 0.012;
     const ON_HOLD_MS = 120;
     const OFF_HOLD_MS = 700;
     const EMA = 0.35; // peso do sample novo vs histórico
-    const state: Record<string, { speaking: boolean; aboveSince: number; belowSince: number; ema: number }> = {};
+    const state: Record<
+      string,
+      { speaking: boolean; aboveSince: number; belowSince: number; ema: number }
+    > = {};
     const tick = () => {
       const now = performance.now();
       const next: Record<string, boolean> = {};
@@ -660,7 +747,9 @@ export function useRtcMesh(myId: string | null, desiredPeers: string[]): RtcMesh
           sumSq += v * v;
         }
         const rms = Math.sqrt(sumSq / a.data.length);
-        const s = state[a.peerId] ?? (state[a.peerId] = { speaking: false, aboveSince: 0, belowSince: now, ema: 0 });
+        const s =
+          state[a.peerId] ??
+          (state[a.peerId] = { speaking: false, aboveSince: 0, belowSince: now, ema: 0 });
         s.ema = s.ema * (1 - EMA) + rms * EMA;
         const level = s.ema;
         if (level >= SPEAK_ON) {
@@ -686,28 +775,44 @@ export function useRtcMesh(myId: string | null, desiredPeers: string[]): RtcMesh
     raf = requestAnimationFrame(tick);
     return () => {
       cancelAnimationFrame(raf);
-      try { void ctxRef.ctx?.close(); } catch { /* noop */ }
+      try {
+        void ctxRef.ctx?.close();
+      } catch {
+        /* noop */
+      }
     };
   }, [remoteStreams]);
 
-
   // Self speaking detection — RMS + EMA + histerese (mesmo algoritmo do remoto).
   useEffect(() => {
-    if (!micOn) { setSelfSpeaking(false); return; }
+    if (!micOn) {
+      setSelfSpeaking(false);
+      return;
+    }
     const track = audioTrackRef.current;
     if (!track) return;
     let ctx: AudioContext | null = null;
     let raf = 0;
     try {
-      ctx = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
+      ctx = new (
+        window.AudioContext ||
+        (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext
+      )();
       const src = ctx.createMediaStreamSource(new MediaStream([track]));
       const analyser = ctx.createAnalyser();
       analyser.fftSize = 1024;
       analyser.smoothingTimeConstant = 0.2;
       src.connect(analyser);
       const data = new Uint8Array(new ArrayBuffer(analyser.fftSize));
-      const SPEAK_ON = 0.030, SPEAK_OFF = 0.012, ON_HOLD_MS = 120, OFF_HOLD_MS = 700, EMA = 0.35;
-      let ema = 0, aboveSince = 0, belowSince = performance.now(), speaking = false;
+      const SPEAK_ON = 0.03,
+        SPEAK_OFF = 0.012,
+        ON_HOLD_MS = 120,
+        OFF_HOLD_MS = 700,
+        EMA = 0.35;
+      let ema = 0,
+        aboveSince = 0,
+        belowSince = performance.now(),
+        speaking = false;
       const tick = () => {
         analyser.getByteTimeDomainData(data);
         let sumSq = 0;
@@ -721,24 +826,34 @@ export function useRtcMesh(myId: string | null, desiredPeers: string[]): RtcMesh
         if (ema >= SPEAK_ON) {
           if (!aboveSince) aboveSince = now;
           belowSince = 0;
-          if (!speaking && now - aboveSince >= ON_HOLD_MS) { speaking = true; setSelfSpeaking(true); }
+          if (!speaking && now - aboveSince >= ON_HOLD_MS) {
+            speaking = true;
+            setSelfSpeaking(true);
+          }
         } else if (ema <= SPEAK_OFF) {
           if (!belowSince) belowSince = now;
           aboveSince = 0;
-          if (speaking && now - belowSince >= OFF_HOLD_MS) { speaking = false; setSelfSpeaking(false); }
+          if (speaking && now - belowSince >= OFF_HOLD_MS) {
+            speaking = false;
+            setSelfSpeaking(false);
+          }
         }
         raf = requestAnimationFrame(tick);
       };
       raf = requestAnimationFrame(tick);
-    } catch { /* noop */ }
+    } catch {
+      /* noop */
+    }
     return () => {
       cancelAnimationFrame(raf);
-      try { void ctx?.close(); } catch { /* noop */ }
+      try {
+        void ctx?.close();
+      } catch {
+        /* noop */
+      }
       setSelfSpeaking(false);
     };
   }, [micOn]);
-
-
 
   const acquireMic = useCallback(async (deviceId?: string): Promise<MediaStreamTrack | null> => {
     const audioConstraints: MediaTrackConstraints & { latency?: number } = {
@@ -752,12 +867,21 @@ export function useRtcMesh(myId: string | null, desiredPeers: string[]): RtcMesh
     const track = stream.getAudioTracks()[0];
     if (!track) return null;
     // contentHint="speech" → encoder Opus prioriza latência sobre qualidade musical.
-    try { (track as MediaStreamTrack & { contentHint?: string }).contentHint = "speech"; } catch { /* noop */ }
+    try {
+      (track as MediaStreamTrack & { contentHint?: string }).contentHint = "speech";
+    } catch {
+      /* noop */
+    }
     if (audioTrackRef.current) {
-
-      try { audioTrackRef.current.stop(); } catch { /* noop */ }
+      try {
+        audioTrackRef.current.stop();
+      } catch {
+        /* noop */
+      }
       if (localStreamRef.current) {
-        localStreamRef.current.getAudioTracks().forEach((t) => localStreamRef.current!.removeTrack(t));
+        localStreamRef.current
+          .getAudioTracks()
+          .forEach((t) => localStreamRef.current!.removeTrack(t));
       }
     }
     audioTrackRef.current = track;
@@ -795,7 +919,9 @@ export function useRtcMesh(myId: string | null, desiredPeers: string[]): RtcMesh
         const all = await navigator.mediaDevices.enumerateDevices();
         setAudioInputDevices(all.filter((d) => d.kind === "audioinput"));
         setAudioOutputDevices(all.filter((d) => d.kind === "audiooutput"));
-      } catch { /* noop */ }
+      } catch {
+        /* noop */
+      }
     } catch (err) {
       console.error("mic access denied", err);
       throw err;
@@ -809,16 +935,21 @@ export function useRtcMesh(myId: string | null, desiredPeers: string[]): RtcMesh
     setMicOn(false);
   }, []);
 
-  const setAudioInputDevice = useCallback(async (deviceId: string) => {
-    setSelectedAudioInputDeviceId(deviceId);
-    if (audioTrackRef.current) {
-      const wasEnabled = audioTrackRef.current.enabled;
-      try {
-        const track = await acquireMic(deviceId);
-        if (track) track.enabled = wasEnabled;
-      } catch (err) { console.error("change mic failed", err); }
-    }
-  }, [acquireMic]);
+  const setAudioInputDevice = useCallback(
+    async (deviceId: string) => {
+      setSelectedAudioInputDeviceId(deviceId);
+      if (audioTrackRef.current) {
+        const wasEnabled = audioTrackRef.current.enabled;
+        try {
+          const track = await acquireMic(deviceId);
+          if (track) track.enabled = wasEnabled;
+        } catch (err) {
+          console.error("change mic failed", err);
+        }
+      }
+    },
+    [acquireMic],
+  );
 
   const setAudioOutputDevice = useCallback(async (deviceId: string) => {
     setSelectedAudioOutputDeviceId(deviceId);
@@ -828,7 +959,11 @@ export function useRtcMesh(myId: string | null, desiredPeers: string[]): RtcMesh
     for (const el of Array.from(els)) {
       const s = el as Sinkable;
       if (typeof s.setSinkId === "function") {
-        try { await s.setSinkId(deviceId); } catch { /* noop */ }
+        try {
+          await s.setSinkId(deviceId);
+        } catch {
+          /* noop */
+        }
       }
     }
   }, []);
@@ -844,42 +979,57 @@ export function useRtcMesh(myId: string | null, desiredPeers: string[]): RtcMesh
       setVideoDevices(all.filter((d) => d.kind === "videoinput"));
       setAudioInputDevices(all.filter((d) => d.kind === "audioinput"));
       setAudioOutputDevices(all.filter((d) => d.kind === "audiooutput"));
-    } catch { /* noop */ }
+    } catch {
+      /* noop */
+    }
   }, []);
 
-  const acquireCam = useCallback(async (deviceId?: string) => {
-    // frameRate alto + resolução baixa = encoder não acumula frames pra comprimir.
-    const videoBase: MediaTrackConstraints = {
-      width: { ideal: 320 },
-      height: { ideal: 240 },
-      frameRate: { ideal: 30, max: 30 },
-    };
-    const constraints: MediaStreamConstraints = {
-      video: deviceId ? { ...videoBase, deviceId: { exact: deviceId } } : videoBase,
-    };
-    const stream = await navigator.mediaDevices.getUserMedia(constraints);
-    const track = stream.getVideoTracks()[0];
-    // contentHint="motion" → encoder VP8 reduz B-frames/buffer pra latência.
-    try { (track as MediaStreamTrack & { contentHint?: string }).contentHint = "motion"; } catch { /* noop */ }
-
-    // Tear down any previous video track
-    if (videoTrackRef.current) {
-      try { videoTrackRef.current.stop(); } catch { /* noop */ }
-      if (localStreamRef.current) {
-        localStreamRef.current.getVideoTracks().forEach((t) => localStreamRef.current!.removeTrack(t));
+  const acquireCam = useCallback(
+    async (deviceId?: string) => {
+      // frameRate alto + resolução baixa = encoder não acumula frames pra comprimir.
+      const videoBase: MediaTrackConstraints = {
+        width: { ideal: 320 },
+        height: { ideal: 240 },
+        frameRate: { ideal: 30, max: 30 },
+      };
+      const constraints: MediaStreamConstraints = {
+        video: deviceId ? { ...videoBase, deviceId: { exact: deviceId } } : videoBase,
+      };
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      const track = stream.getVideoTracks()[0];
+      // contentHint="motion" → encoder VP8 reduz B-frames/buffer pra latência.
+      try {
+        (track as MediaStreamTrack & { contentHint?: string }).contentHint = "motion";
+      } catch {
+        /* noop */
       }
-    }
-    videoTrackRef.current = track;
-    if (!localStreamRef.current) localStreamRef.current = new MediaStream();
-    localStreamRef.current.addTrack(track);
-    setLocalVideoStream(new MediaStream([track]));
-    setSelectedVideoDeviceId(track.getSettings().deviceId ?? deviceId ?? null);
-    for (const entry of peersRef.current.values()) {
-      if (entry.videoSender) await entry.videoSender.replaceTrack(track);
-    }
-    // Now labels are available
-    void refreshDevices();
-  }, [refreshDevices]);
+
+      // Tear down any previous video track
+      if (videoTrackRef.current) {
+        try {
+          videoTrackRef.current.stop();
+        } catch {
+          /* noop */
+        }
+        if (localStreamRef.current) {
+          localStreamRef.current
+            .getVideoTracks()
+            .forEach((t) => localStreamRef.current!.removeTrack(t));
+        }
+      }
+      videoTrackRef.current = track;
+      if (!localStreamRef.current) localStreamRef.current = new MediaStream();
+      localStreamRef.current.addTrack(track);
+      setLocalVideoStream(new MediaStream([track]));
+      setSelectedVideoDeviceId(track.getSettings().deviceId ?? deviceId ?? null);
+      for (const entry of peersRef.current.values()) {
+        if (entry.videoSender) await entry.videoSender.replaceTrack(track);
+      }
+      // Now labels are available
+      void refreshDevices();
+    },
+    [refreshDevices],
+  );
 
   // Force every existing peer to renegotiate so that newly-added/removed
   // tracks (in particular screen share) propagate correctly. replaceTrack
@@ -892,7 +1042,10 @@ export function useRtcMesh(myId: string | null, desiredPeers: string[]): RtcMesh
           if (entry.pc.signalingState !== "stable") continue;
           entry.makingOffer = true;
           const offer = await entry.pc.createOffer();
-          if (entry.pc.signalingState !== "stable") { entry.makingOffer = false; continue; }
+          if (entry.pc.signalingState !== "stable") {
+            entry.makingOffer = false;
+            continue;
+          }
           await entry.pc.setLocalDescription(offer);
           sendSignal({ to: peerId, type: "offer", sdp: entry.pc.localDescription! });
           entry.makingOffer = false;
@@ -945,25 +1098,39 @@ export function useRtcMesh(myId: string | null, desiredPeers: string[]): RtcMesh
     else await enableCam();
   }, [camOn, enableCam, disableCam]);
 
-  const setVideoDevice = useCallback(async (deviceId: string) => {
-    setSelectedVideoDeviceId(deviceId);
-    if (camOn) {
-      try {
-        await acquireCam(deviceId);
-        void renegotiateAll();
-      } catch (err) { console.error(err); }
-    }
-  }, [camOn, acquireCam, renegotiateAll]);
-
+  const setVideoDevice = useCallback(
+    async (deviceId: string) => {
+      setSelectedVideoDeviceId(deviceId);
+      if (camOn) {
+        try {
+          await acquireCam(deviceId);
+          void renegotiateAll();
+        } catch (err) {
+          console.error(err);
+        }
+      }
+    },
+    [camOn, acquireCam, renegotiateAll],
+  );
 
   // ---------- Screen share ----------
   const stopScreenInternal = useCallback(() => {
     const track = screenTrackRef.current;
     if (track) {
-      try { track.stop(); } catch { /* noop */ }
+      try {
+        track.stop();
+      } catch {
+        /* noop */
+      }
     }
     if (localScreenStream) {
-      localScreenStream.getTracks().forEach((t) => { try { t.stop(); } catch { /* noop */ } });
+      localScreenStream.getTracks().forEach((t) => {
+        try {
+          t.stop();
+        } catch {
+          /* noop */
+        }
+      });
     }
     screenTrackRef.current = null;
     for (const entry of peersRef.current.values()) {
@@ -988,7 +1155,9 @@ export function useRtcMesh(myId: string | null, desiredPeers: string[]): RtcMesh
       for (const entry of peersRef.current.values()) {
         if (entry.screenSender) await entry.screenSender.replaceTrack(track);
       }
-      track.onended = () => { stopScreenInternal(); };
+      track.onended = () => {
+        stopScreenInternal();
+      };
       setScreenOn(true);
       void renegotiateAll();
     } catch (err) {
@@ -996,7 +1165,6 @@ export function useRtcMesh(myId: string | null, desiredPeers: string[]): RtcMesh
       throw err;
     }
   }, [stopScreenInternal, renegotiateAll]);
-
 
   const toggleScreen = useCallback(async () => {
     if (screenOn) stopScreenInternal();
@@ -1006,7 +1174,9 @@ export function useRtcMesh(myId: string | null, desiredPeers: string[]): RtcMesh
   // Initial device list (labels are blank until permission granted)
   useEffect(() => {
     void refreshDevices();
-    const handler = () => { void refreshDevices(); };
+    const handler = () => {
+      void refreshDevices();
+    };
     navigator.mediaDevices?.addEventListener?.("devicechange", handler);
     return () => navigator.mediaDevices?.removeEventListener?.("devicechange", handler);
   }, [refreshDevices]);

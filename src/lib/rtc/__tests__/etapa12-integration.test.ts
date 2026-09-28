@@ -109,3 +109,61 @@ describe("mapRoomStatus", () => {
     expect(mapRoomStatus("DISCONNECTED", { kind: "LOBBY" } as never)).toBe("connecting");
   });
 });
+
+// ---- Etapa 12B: guardas estáticas + identidade do runtime ----
+import { readFileSync } from "node:fs";
+import { runtimeKey } from "../useLiveKit-v2";
+
+const src = (p: string) => readFileSync(new URL(`../../../${p}`, import.meta.url), "utf8");
+
+describe("runtimeKey (takeover/StrictMode)", () => {
+  const cfg = { workspaceId: "w", sessionId: "s", generation: 2, active: true };
+  it("null quando sessão não ACTIVE (takeover → dispose)", () => {
+    expect(runtimeKey("u", { ...cfg, active: false })).toBeNull();
+    expect(runtimeKey(null, cfg)).toBeNull();
+  });
+  it("muda com generation/sessão (novo runtime), estável caso contrário", () => {
+    expect(runtimeKey("u", cfg)).toBe(runtimeKey("u", { ...cfg }));
+    expect(runtimeKey("u", cfg)).not.toBe(runtimeKey("u", { ...cfg, generation: 3 }));
+  });
+});
+
+describe("guardas estáticas do path v2", () => {
+  const v2 = src("lib/rtc/useLiveKit-v2.ts") + src("lib/rtc/rtc-v2-runtime.ts");
+  const scene = src("components/office/OfficeScene.tsx");
+  it("V2 não usa desiredPeers/videoVisibleIds/audiblePeerIds/clientId/participantOwnerId", () => {
+    for (const w of [
+      "desiredPeers",
+      "audiblePeerIds",
+      "participantOwnerId",
+      "clientId",
+      "sessionStorage",
+    ])
+      expect(v2).not.toContain(w);
+    // parâmetros legados recebidos pela assinatura são ignorados
+    expect(v2).toMatch(/_legacyRoomKey/);
+    expect(v2).toMatch(/_legacyVisibleIds/);
+  });
+  it("OfficeScene em v2 não passa roomKey/videoVisibleIds e não abre transports legados", () => {
+    expect(scene).toMatch(/IS_RTC_V2 \? null : roomKey/);
+    expect(scene).toMatch(/IS_RTC_V2 \? null : audiblePeerIds/);
+    expect(scene).toMatch(/if \(!IS_RTC_V2\) ch\.subscribe\(\)/);
+    expect(scene).toMatch(/if \(!IS_RTC_V2\) positionBroadcastCh\.subscribe/);
+    expect(scene).toMatch(/if \(!IS_RTC_V2\) presenceCh\.subscribe/);
+    expect(scene).toMatch(/presenceHeartbeat = IS_RTC_V2 \? 0/);
+    expect(scene).toMatch(/positionsPoll = IS_RTC_V2 \? 0/);
+    expect(scene).toMatch(/persistHeartbeat = IS_RTC_V2 \? 0/);
+    expect(scene).toMatch(/IS_RTC_V2 \? rtc\.connectedPeers/);
+    expect(scene).toMatch(/if \(IS_RTC_V2\) return rtc\.remoteStreams/);
+  });
+  it("zona do path v2 usa a regra canônica compartilhada com o Token V2", () => {
+    expect(scene).toMatch(/IS_RTC_V2 \? \(zoneIdAtPoint\(loadOverrides\(\), p\)/);
+    expect(src("lib/rtc/livekit-token-v2.ts")).toMatch(/from "\.\/canonical-zones"/);
+    expect(src("lib/rtc/rtc-v2-runtime.ts")).toMatch(/from "\.\/canonical-zones"/);
+  });
+  it("fachada chama um único hook por execução", () => {
+    const f = src("lib/rtc/useLiveKit.ts");
+    expect(f).toMatch(/export const useLiveKit: Hook = selectLiveKitHook\(ACTIVE_RTC_ENGINE\)/);
+    expect(src("lib/rtc/rtc-engine.ts")).toMatch(/v1/);
+  });
+});

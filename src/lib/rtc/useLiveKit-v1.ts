@@ -17,7 +17,13 @@ import {
 } from "livekit-client";
 import { getLiveKitAccess } from "./livekit.functions";
 
-export type RtcConnectionStatus = "idle" | "connecting" | "connected" | "reconnecting" | "error" | "disconnected";
+export type RtcConnectionStatus =
+  | "idle"
+  | "connecting"
+  | "connected"
+  | "reconnecting"
+  | "error"
+  | "disconnected";
 
 export type RtcMeshState = {
   micOn: boolean;
@@ -75,9 +81,11 @@ function participantOwnerId(p: Pick<Participant, "identity" | "attributes" | "me
   const attrUserId = p.attributes?.userId;
   if (attrUserId) return attrUserId;
   try {
-    const meta = p.metadata ? JSON.parse(p.metadata) as { userId?: string } : null;
+    const meta = p.metadata ? (JSON.parse(p.metadata) as { userId?: string }) : null;
     if (meta?.userId) return meta.userId;
-  } catch { /* noop */ }
+  } catch {
+    /* noop */
+  }
   return ownerIdOf(p.identity);
 }
 
@@ -147,7 +155,9 @@ export function useLiveKitV1(
   const [audioInputDevices, setAudioInputDevices] = useState<MediaDeviceInfo[]>([]);
   const [selectedAudioInputDeviceId, setSelectedAudioInputDeviceId] = useState<string | null>(null);
   const [audioOutputDevices, setAudioOutputDevices] = useState<MediaDeviceInfo[]>([]);
-  const [selectedAudioOutputDeviceId, setSelectedAudioOutputDeviceId] = useState<string | null>(null);
+  const [selectedAudioOutputDeviceId, setSelectedAudioOutputDeviceId] = useState<string | null>(
+    null,
+  );
 
   const roomRef = useRef<Room | null>(null);
   const currentRoomKeyRef = useRef<string | null>(null);
@@ -207,15 +217,25 @@ export function useLiveKitV1(
       setVideoDevices(list.filter((d) => d.kind === "videoinput"));
       setAudioInputDevices(list.filter((d) => d.kind === "audioinput"));
       setAudioOutputDevices(list.filter((d) => d.kind === "audiooutput"));
-    } catch { /* noop */ }
+    } catch {
+      /* noop */
+    }
   }, []);
 
   useEffect(() => {
     void refreshDevices();
     const handler = () => void refreshDevices();
-    try { navigator.mediaDevices.addEventListener?.("devicechange", handler); } catch { /* noop */ }
+    try {
+      navigator.mediaDevices.addEventListener?.("devicechange", handler);
+    } catch {
+      /* noop */
+    }
     return () => {
-      try { navigator.mediaDevices.removeEventListener?.("devicechange", handler); } catch { /* noop */ }
+      try {
+        navigator.mediaDevices.removeEventListener?.("devicechange", handler);
+      } catch {
+        /* noop */
+      }
     };
   }, [refreshDevices]);
 
@@ -239,9 +259,15 @@ export function useLiveKitV1(
       p.trackPublications.forEach((pub) => {
         const track = pub.track;
         if (!track || !track.mediaStreamTrack) return;
-        if (track.source === Track.Source.ScreenShare || track.source === Track.Source.ScreenShareAudio) {
+        if (
+          track.source === Track.Source.ScreenShare ||
+          track.source === Track.Source.ScreenShareAudio
+        ) {
           let s = screens[ownerId];
-          if (!s) { s = new MediaStream(); screens[ownerId] = s; }
+          if (!s) {
+            s = new MediaStream();
+            screens[ownerId] = s;
+          }
           s.addTrack(track.mediaStreamTrack);
         } else {
           avStream.addTrack(track.mediaStreamTrack);
@@ -270,12 +296,18 @@ export function useLiveKitV1(
       setSelfSpeaking(false);
       setLocalScreenStream(null);
       const pendingCamTrack = pendingCamTrackRef.current?.mediaStreamTrack ?? null;
-      setLocalVideoStream(wantCamRef.current && pendingCamTrack ? makeStream(pendingCamTrack) : null);
+      setLocalVideoStream(
+        wantCamRef.current && pendingCamTrack ? makeStream(pendingCamTrack) : null,
+      );
       setMicOn(wantMicRef.current);
       setCamOn(wantCamRef.current && !!pendingCamTrack);
       setScreenOn(false);
       if (r) {
-        try { await r.disconnect(); } catch { /* noop */ }
+        try {
+          await r.disconnect();
+        } catch {
+          /* noop */
+        }
       }
     };
 
@@ -323,9 +355,12 @@ export function useLiveKitV1(
         const onParticipants = () => rebuildRemotes();
         room.on(RoomEvent.ParticipantConnected, onParticipants);
         room.on(RoomEvent.ParticipantDisconnected, onParticipants);
-        room.on(RoomEvent.TrackSubscribed, (_t: RemoteTrack, _p: RemoteTrackPublication, _rp: RemoteParticipant) => {
-          rebuildRemotes();
-        });
+        room.on(
+          RoomEvent.TrackSubscribed,
+          (_t: RemoteTrack, _p: RemoteTrackPublication, _rp: RemoteParticipant) => {
+            rebuildRemotes();
+          },
+        );
         room.on(RoomEvent.TrackUnsubscribed, () => rebuildRemotes());
         room.on(RoomEvent.TrackMuted, () => rebuildRemotes());
         room.on(RoomEvent.TrackUnmuted, () => rebuildRemotes());
@@ -380,7 +415,11 @@ export function useLiveKitV1(
         // config and can make the signal connect but the peer connection fail.
         await room.connect(url, token);
         if (cancelled) {
-          try { await room.disconnect(); } catch { /* noop */ }
+          try {
+            await room.disconnect();
+          } catch {
+            /* noop */
+          }
           return;
         }
         setConnectionStatus("connected");
@@ -396,7 +435,12 @@ export function useLiveKitV1(
             const pending = pendingMicTrackRef.current;
             if (pending) {
               pendingMicTrackRef.current = null;
-              await room.localParticipant.publishTrack(pending, { source: Track.Source.Microphone, dtx: true, red: true, audioPreset: AudioPresets.speech });
+              await room.localParticipant.publishTrack(pending, {
+                source: Track.Source.Microphone,
+                dtx: true,
+                red: true,
+                audioPreset: AudioPresets.speech,
+              });
             } else {
               await room.localParticipant.setMicrophoneEnabled(
                 true,
@@ -406,7 +450,9 @@ export function useLiveKitV1(
               );
             }
             setMicOn(true);
-          } catch { /* noop */ }
+          } catch {
+            /* noop */
+          }
         }
         if (wantCamRef.current) {
           try {
@@ -427,9 +473,12 @@ export function useLiveKitV1(
               );
             }
             const pub = room.localParticipant.getTrackPublication(Track.Source.Camera);
-            if (pub?.track?.mediaStreamTrack) setLocalVideoStream(makeStream(pub.track.mediaStreamTrack));
+            if (pub?.track?.mediaStreamTrack)
+              setLocalVideoStream(makeStream(pub.track.mediaStreamTrack));
             setCamOn(true);
-          } catch { /* noop */ }
+          } catch {
+            /* noop */
+          }
         }
       } catch (err) {
         if (!cancelled) {
@@ -439,7 +488,11 @@ export function useLiveKitV1(
             currentRoomKeyRef.current = null;
           }
           if (room) {
-            try { await room.disconnect(); } catch { /* noop */ }
+            try {
+              await room.disconnect();
+            } catch {
+              /* noop */
+            }
           }
           setRemoteStreams({});
           setRemoteScreenStreams({});
@@ -458,7 +511,11 @@ export function useLiveKitV1(
         }
       } finally {
         if (cancelled && room) {
-          try { await room.disconnect(); } catch { /* noop */ }
+          try {
+            await room.disconnect();
+          } catch {
+            /* noop */
+          }
           if (roomRef.current === room) roomRef.current = null;
         }
         connectingRef.current = false;
@@ -475,7 +532,11 @@ export function useLiveKitV1(
       if (r && currentRoomKeyRef.current === roomKey) {
         roomRef.current = null;
         currentRoomKeyRef.current = null;
-        try { void r.disconnect(); } catch { /* noop */ }
+        try {
+          void r.disconnect();
+        } catch {
+          /* noop */
+        }
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -486,13 +547,27 @@ export function useLiveKitV1(
     return () => {
       if (retryTimerRef.current) window.clearTimeout(retryTimerRef.current);
       retryTimerRef.current = null;
-      try { pendingMicTrackRef.current?.stop(); } catch { /* noop */ }
-      try { pendingCamTrackRef.current?.stop(); } catch { /* noop */ }
+      try {
+        pendingMicTrackRef.current?.stop();
+      } catch {
+        /* noop */
+      }
+      try {
+        pendingCamTrackRef.current?.stop();
+      } catch {
+        /* noop */
+      }
       pendingMicTrackRef.current = null;
       pendingCamTrackRef.current = null;
       const r = roomRef.current;
       roomRef.current = null;
-      if (r) { try { void r.disconnect(); } catch { /* noop */ } }
+      if (r) {
+        try {
+          void r.disconnect();
+        } catch {
+          /* noop */
+        }
+      }
     };
   }, []);
 
@@ -517,25 +592,36 @@ export function useLiveKitV1(
         if (typeof rpub.setSubscribed !== "function") return;
         if (pub.kind !== Track.Kind.Video && pub.kind !== Track.Kind.Audio) return;
         const isScreen =
-          pub.source === Track.Source.ScreenShare ||
-          pub.source === Track.Source.ScreenShareAudio;
+          pub.source === Track.Source.ScreenShare || pub.source === Track.Source.ScreenShareAudio;
         const ownerId = participantOwnerId(p);
         const inFilter = filter == null || filter.has(ownerId);
         // Tela compartilhada: só assina de quem está na conversa atual, e pausa
         // em aba oculta para não decodificar vídeo fora de foco.
         if (isScreen) {
-          try { rpub.setSubscribed(inFilter && !hidden); } catch { /* noop */ }
+          try {
+            rpub.setSubscribed(inFilter && !hidden);
+          } catch {
+            /* noop */
+          }
           return;
         }
         // Áudio: continua ativo em aba oculta, mas nunca de quem está fora da
         // conversa instantânea (privacidade + custo/banda).
         if (pub.kind === Track.Kind.Audio) {
-          try { rpub.setSubscribed(inFilter); } catch { /* noop */ }
+          try {
+            rpub.setSubscribed(inFilter);
+          } catch {
+            /* noop */
+          }
           return;
         }
         // Vídeo de câmera: pausa em aba oculta OU se peer não está no filtro.
         const wantSub = !hidden && inFilter;
-        try { rpub.setSubscribed(wantSub); } catch { /* noop */ }
+        try {
+          rpub.setSubscribed(wantSub);
+        } catch {
+          /* noop */
+        }
       });
     });
   }, []);
@@ -558,7 +644,9 @@ export function useLiveKitV1(
         r.off(RoomEvent.ParticipantConnected, handler);
         r.off(RoomEvent.TrackPublished, handler);
         r.off(RoomEvent.TrackSubscribed, handler);
-      } catch { /* noop */ }
+      } catch {
+        /* noop */
+      }
     };
     // re-bind quando a sala troca (roomKey muda)
   }, [roomKey, applyVideoSubscriptions]);
@@ -573,7 +661,6 @@ export function useLiveKitV1(
     document.addEventListener("visibilitychange", onVis);
     return () => document.removeEventListener("visibilitychange", onVis);
   }, [applyVideoSubscriptions]);
-
 
   // ---------- Toggles ----------
   // Quando ainda não há sala (entrando em zona privada, conectando…),
@@ -606,13 +693,20 @@ export function useLiveKitV1(
       if (want) {
         const track = pendingMicTrackRef.current;
         pendingMicTrackRef.current = null;
-        if (track) await r.localParticipant.publishTrack(track, { source: Track.Source.Microphone, dtx: true, red: true, audioPreset: AudioPresets.speech });
-        else await r.localParticipant.setMicrophoneEnabled(
-          true,
-          selectedAudioInputDeviceId
-            ? { ...AUDIO_CAPTURE_OPTIONS, deviceId: { ideal: selectedAudioInputDeviceId } }
-            : AUDIO_CAPTURE_OPTIONS,
-        );
+        if (track)
+          await r.localParticipant.publishTrack(track, {
+            source: Track.Source.Microphone,
+            dtx: true,
+            red: true,
+            audioPreset: AudioPresets.speech,
+          });
+        else
+          await r.localParticipant.setMicrophoneEnabled(
+            true,
+            selectedAudioInputDeviceId
+              ? { ...AUDIO_CAPTURE_OPTIONS, deviceId: { ideal: selectedAudioInputDeviceId } }
+              : AUDIO_CAPTURE_OPTIONS,
+          );
       } else {
         pendingMicTrackRef.current?.stop();
         pendingMicTrackRef.current = null;
@@ -656,19 +750,22 @@ export function useLiveKitV1(
       if (want) {
         const track = pendingCamTrackRef.current;
         pendingCamTrackRef.current = null;
-        if (track) await r.localParticipant.publishTrack(track, {
-          source: Track.Source.Camera,
-          simulcast: false,
-          videoEncoding: { maxBitrate: 450_000, maxFramerate: 15 },
-        });
-        else await r.localParticipant.setCameraEnabled(
-          true,
-          selectedVideoDeviceId
-            ? { ...VIDEO_CAPTURE_OPTIONS, deviceId: { ideal: selectedVideoDeviceId } }
-            : VIDEO_CAPTURE_OPTIONS,
-        );
+        if (track)
+          await r.localParticipant.publishTrack(track, {
+            source: Track.Source.Camera,
+            simulcast: false,
+            videoEncoding: { maxBitrate: 450_000, maxFramerate: 15 },
+          });
+        else
+          await r.localParticipant.setCameraEnabled(
+            true,
+            selectedVideoDeviceId
+              ? { ...VIDEO_CAPTURE_OPTIONS, deviceId: { ideal: selectedVideoDeviceId } }
+              : VIDEO_CAPTURE_OPTIONS,
+          );
         const pub = r.localParticipant.getTrackPublication(Track.Source.Camera);
-        if (pub?.track?.mediaStreamTrack) setLocalVideoStream(makeStream(pub.track.mediaStreamTrack));
+        if (pub?.track?.mediaStreamTrack)
+          setLocalVideoStream(makeStream(pub.track.mediaStreamTrack));
         setCamOn(true);
       } else {
         pendingCamTrackRef.current?.stop();
@@ -688,12 +785,16 @@ export function useLiveKitV1(
     const r = roomRef.current;
     const want = !wantScreenRef.current;
     wantScreenRef.current = want;
-    if (!r) { setScreenOn(false); return; }
+    if (!r) {
+      setScreenOn(false);
+      return;
+    }
     try {
       if (want) {
         await r.localParticipant.setScreenShareEnabled(true, { audio: true });
         const pub = r.localParticipant.getTrackPublication(Track.Source.ScreenShare);
-        if (pub?.track?.mediaStreamTrack) setLocalScreenStream(makeStream(pub.track.mediaStreamTrack));
+        if (pub?.track?.mediaStreamTrack)
+          setLocalScreenStream(makeStream(pub.track.mediaStreamTrack));
         setScreenOn(true);
       } else {
         await r.localParticipant.setScreenShareEnabled(false);
@@ -711,7 +812,11 @@ export function useLiveKitV1(
     setSelectedVideoDeviceId(deviceId);
     const r = roomRef.current;
     if (!r) return;
-    try { await r.switchActiveDevice("videoinput", deviceId); } catch { /* noop */ }
+    try {
+      await r.switchActiveDevice("videoinput", deviceId);
+    } catch {
+      /* noop */
+    }
     const pub = r.localParticipant.getTrackPublication(Track.Source.Camera);
     if (pub?.track?.mediaStreamTrack) setLocalVideoStream(makeStream(pub.track.mediaStreamTrack));
   }, []);
@@ -720,14 +825,22 @@ export function useLiveKitV1(
     setSelectedAudioInputDeviceId(deviceId);
     const r = roomRef.current;
     if (!r) return;
-    try { await r.switchActiveDevice("audioinput", deviceId); } catch { /* noop */ }
+    try {
+      await r.switchActiveDevice("audioinput", deviceId);
+    } catch {
+      /* noop */
+    }
   }, []);
 
   const setAudioOutputDevice = useCallback(async (deviceId: string) => {
     setSelectedAudioOutputDeviceId(deviceId);
     const r = roomRef.current;
     if (!r) return;
-    try { await r.switchActiveDevice("audiooutput", deviceId); } catch { /* noop */ }
+    try {
+      await r.switchActiveDevice("audiooutput", deviceId);
+    } catch {
+      /* noop */
+    }
   }, []);
 
   const prewarmMic = useCallback(async () => {
@@ -735,7 +848,9 @@ export function useLiveKitV1(
       const s = await navigator.mediaDevices.getUserMedia({ audio: true });
       s.getTracks().forEach((t) => t.stop());
       void refreshDevices();
-    } catch { /* noop — user can grant later */ }
+    } catch {
+      /* noop — user can grant later */
+    }
   }, [refreshDevices]);
 
   const getLocalAudioTrack = useCallback((): MediaStreamTrack | null => {
@@ -776,14 +891,33 @@ export function useLiveKitV1(
       roomKey,
     }),
     [
-      micOn, camOn, screenOn, toggleMic, toggleCam, toggleScreen,
-      remoteStreams, remoteScreenStreams, connectedPeers, speakingPeers, selfSpeaking,
-      localVideoStream, localScreenStream,
-      videoDevices, selectedVideoDeviceId, setVideoDevice,
-      audioInputDevices, selectedAudioInputDeviceId, setAudioInputDevice,
-      audioOutputDevices, selectedAudioOutputDeviceId, setAudioOutputDevice,
-      prewarmMic, getLocalAudioTrack,
-      connectionStatus, lastError, roomKey,
+      micOn,
+      camOn,
+      screenOn,
+      toggleMic,
+      toggleCam,
+      toggleScreen,
+      remoteStreams,
+      remoteScreenStreams,
+      connectedPeers,
+      speakingPeers,
+      selfSpeaking,
+      localVideoStream,
+      localScreenStream,
+      videoDevices,
+      selectedVideoDeviceId,
+      setVideoDevice,
+      audioInputDevices,
+      selectedAudioInputDeviceId,
+      setAudioInputDevice,
+      audioOutputDevices,
+      selectedAudioOutputDeviceId,
+      setAudioOutputDevice,
+      prewarmMic,
+      getLocalAudioTrack,
+      connectionStatus,
+      lastError,
+      roomKey,
     ],
   );
 }

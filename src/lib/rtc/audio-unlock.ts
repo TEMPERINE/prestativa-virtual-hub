@@ -11,12 +11,17 @@ export function unlockAudioPlayback(): Promise<void> {
   unlockPromise = (async () => {
     try {
       // 1) Resume a shared AudioContext (unlocks Web Audio nodes used for VU meters).
-      const Ctx = (window.AudioContext ||
-        (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext);
+      const Ctx =
+        window.AudioContext ||
+        (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
       if (Ctx) {
         const ctx = new Ctx();
         if (ctx.state === "suspended") {
-          try { await ctx.resume(); } catch { /* noop */ }
+          try {
+            await ctx.resume();
+          } catch {
+            /* noop */
+          }
         }
         // Play a silent buffer to fully unlock playback on iOS/Safari.
         try {
@@ -25,7 +30,9 @@ export function unlockAudioPlayback(): Promise<void> {
           src.buffer = buffer;
           src.connect(ctx.destination);
           src.start(0);
-        } catch { /* noop */ }
+        } catch {
+          /* noop */
+        }
       }
       // 2) Play a silent <audio> to satisfy <audio>-based autoplay policy.
       const a = document.createElement("audio");
@@ -33,9 +40,12 @@ export function unlockAudioPlayback(): Promise<void> {
       a.muted = false;
       a.volume = 0;
       // 1-frame silent wav
-      a.src =
-        "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=";
-      try { await a.play(); } catch { /* still ok — context resume is the main path */ }
+      a.src = "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=";
+      try {
+        await a.play();
+      } catch {
+        /* still ok — context resume is the main path */
+      }
       a.pause();
       unlocked = true;
     } finally {
