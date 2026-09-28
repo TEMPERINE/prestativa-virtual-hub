@@ -131,18 +131,21 @@ export type Database = {
           data: Json
           updated_at: string
           updated_by: string | null
+          version: number
           workspace_id: string
         }
         Insert: {
           data: Json
           updated_at?: string
           updated_by?: string | null
+          version?: number
           workspace_id: string
         }
         Update: {
           data?: Json
           updated_at?: string
           updated_by?: string | null
+          version?: number
           workspace_id?: string
         }
         Relationships: [
@@ -429,6 +432,44 @@ export type Database = {
           },
         ]
       }
+      office_sessions: {
+        Row: {
+          active: boolean
+          claimed_at: string
+          generation: number
+          session_id: string
+          updated_at: string
+          user_id: string
+          workspace_id: string
+        }
+        Insert: {
+          active?: boolean
+          claimed_at?: string
+          generation?: number
+          session_id: string
+          updated_at?: string
+          user_id: string
+          workspace_id: string
+        }
+        Update: {
+          active?: boolean
+          claimed_at?: string
+          generation?: number
+          session_id?: string
+          updated_at?: string
+          user_id?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "office_sessions_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       positions: {
         Row: {
           facing: string
@@ -563,6 +604,65 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "prop_states_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      rtc_events: {
+        Row: {
+          connection_state: string | null
+          context: string | null
+          created_at: string
+          details: Json
+          disconnect_reason: string | null
+          event_type: string
+          generation: number | null
+          id: number
+          map_version: number | null
+          room_name: string | null
+          session_id: string | null
+          user_id: string
+          workspace_id: string | null
+          zone_id: string | null
+        }
+        Insert: {
+          connection_state?: string | null
+          context?: string | null
+          created_at?: string
+          details?: Json
+          disconnect_reason?: string | null
+          event_type: string
+          generation?: number | null
+          id?: never
+          map_version?: number | null
+          room_name?: string | null
+          session_id?: string | null
+          user_id?: string
+          workspace_id?: string | null
+          zone_id?: string | null
+        }
+        Update: {
+          connection_state?: string | null
+          context?: string | null
+          created_at?: string
+          details?: Json
+          disconnect_reason?: string | null
+          event_type?: string
+          generation?: number | null
+          id?: never
+          map_version?: number | null
+          room_name?: string | null
+          session_id?: string | null
+          user_id?: string
+          workspace_id?: string | null
+          zone_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rtc_events_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspaces"
@@ -828,6 +928,13 @@ export type Database = {
         Args: { _plan: Database["public"]["Enums"]["account_plan"] }
         Returns: number
       }
+      claim_office_session: {
+        Args: { _session_id: string; _workspace_id: string }
+        Returns: {
+          generation: number
+          session_id: string
+        }[]
+      }
       current_user_email: { Args: never; Returns: string }
       has_role: {
         Args: {
@@ -882,6 +989,11 @@ export type Database = {
         Args: { _meeting_id: string; _recipient_id: string }
         Returns: undefined
       }
+      release_office_session: {
+        Args: { _generation: number; _session_id: string }
+        Returns: boolean
+      }
+      rtc_can_access_topic: { Args: { _topic: string }; Returns: boolean }
       workspace_accept_invite: { Args: { _token: string }; Returns: string }
     }
     Enums: {
