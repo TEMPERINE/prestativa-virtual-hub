@@ -9,6 +9,8 @@ import {
   type MapSnapshot,
 } from "./map-sync";
 
+import { getCurrentWorkspaceId } from "./workspace/current";
+
 export { normalizeMapOverrides };
 
 export const GRID_COLS = 128;
@@ -96,7 +98,7 @@ export function setZoneKind(id: string, kind: ZoneKind) {
 // Única estrutura consumida por loadOverrides()/zoneFromOverrides()/callZoneAt.
 // Só é escrita pelo MapSyncController, que normaliza toda entrada.
 
-type CacheEnvelope = { version: number; data: unknown };
+type CacheEnvelope = { version: number; data: unknown; workspaceId?: string | null };
 
 function readCacheEnvelope(): CacheEnvelope | null {
   if (typeof window === "undefined") return null;
@@ -106,7 +108,7 @@ function readCacheEnvelope(): CacheEnvelope | null {
     const parsed = JSON.parse(raw) as unknown;
     if (parsed && typeof parsed === "object" && "data" in parsed && "version" in parsed) {
       const env = parsed as CacheEnvelope;
-      return { version: Number(env.version) || 0, data: env.data };
+      return { version: Number(env.version) || 0, data: env.data, workspaceId: env.workspaceId };
     }
     return { version: 0, data: parsed }; // formato legado sem versão
   } catch (e) {
@@ -119,7 +121,7 @@ function persist(s: MapSnapshot) {
   if (typeof window === "undefined") return;
   try {
     if (s.map) {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ version: s.version, data: s.map }));
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ version: s.version, data: s.map, workspaceId: controllerWs }));
     } else {
       window.localStorage.removeItem(STORAGE_KEY);
     }
@@ -144,16 +146,24 @@ async function fetchCanonicalRow(): Promise<CanonicalMapRow> {
 }
 
 let controller: MapSyncController | null = null;
+let controllerWs: string | null = null;
 let restored = false;
 
+// Um controller por workspace ativo: version de um espaço nunca vaza para outro.
 export function getMapSync(): MapSyncController {
-  if (!controller) {
+  const ws = getCurrentWorkspaceId();
+  if (!controller || ws !== controllerWs) {
     controller = new MapSyncController({ fetchCanonical: fetchCanonicalRow, onChange: persist });
+    controllerWs = ws;
+    restored = false;
   }
   if (!restored && typeof window !== "undefined") {
     restored = true;
     const env = readCacheEnvelope();
-    if (env) controller.restoreCache(env.data, env.version);
+    // Cache de outro workspace é descartado; legado (sem workspaceId) vira versão 0.
+    if (env && (env.workspaceId == null || env.workspaceId === ws)) {
+      controller.restoreCache(env.data, env.workspaceId ? env.version : 0);
+    }
   }
   return controller;
 }
@@ -161,6 +171,7 @@ export function getMapSync(): MapSyncController {
 /** Apenas para testes. */
 export function __resetMapSyncForTests() {
   controller = null;
+  controllerWs = null;
   restored = false;
 }
 
