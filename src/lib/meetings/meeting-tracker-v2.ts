@@ -178,7 +178,12 @@ export class MeetingTrackerV2 {
         } else {
           this.joinAttempts++;
           const final = this.joinAttempts > RETRY_DELAYS_MS.length;
-          this.deps.onError?.("join", err ?? new Error("meeting_join sem id"), this.joinAttempts, final);
+          this.deps.onError?.(
+            "join",
+            err ?? new Error("meeting_join sem id"),
+            this.joinAttempts,
+            final,
+          );
           if (final) this.failedZone = d;
         }
         continue;

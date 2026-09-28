@@ -172,7 +172,9 @@ describe("MeetingTrackerV2 (Etapa 13)", () => {
 
   it("19. entrada não depende de posição de outros usuários (API não recebe posições)", () => {
     const src = readFileSync("src/lib/meetings/meeting-tracker-v2.ts", "utf8");
-    expect(src.replace(/^\s*\/\/.*$/gm, "")).not.toMatch(/desiredPeers|positions|presence\.|peerCount/);
+    expect(src.replace(/^\s*\/\/.*$/gm, "")).not.toMatch(
+      /desiredPeers|positions|presence\.|peerCount/,
+    );
   });
 
   it("20. fachada mantém V1 legado e V2 escolhido pelo engine", () => {
@@ -225,9 +227,16 @@ describe("MeetingTrackerV2 (Etapa 13)", () => {
       };
       const live = () => timers.filter((x) => !x.dead).map((x) => x.ms);
       return {
-        t, log, flush, fire, live,
+        t,
+        log,
+        flush,
+        fire,
+        live,
         gate: () => (gateJoins = true),
-        release: async () => { joinGates.shift()?.(); await flush(); },
+        release: async () => {
+          joinGates.shift()?.();
+          await flush();
+        },
       };
     }
 
