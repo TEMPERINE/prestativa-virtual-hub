@@ -61,7 +61,10 @@ function makeEnv() {
   let t = 0;
   const timeouts = new Map<number, () => void>();
   const intervals = new Map<number, () => void>();
-  const listeners: Record<string, Set<() => void>> = { online: new Set(), visibilitychange: new Set() };
+  const listeners: Record<string, Set<() => void>> = {
+    online: new Set(),
+    visibilitychange: new Set(),
+  };
   let visible = true;
   let id = 0;
   const env: BindingEnv = {
