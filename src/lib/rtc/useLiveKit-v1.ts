@@ -110,7 +110,11 @@ const VIDEO_CAPTURE_OPTIONS = {
 const AUDIO_FALLBACK_OPTIONS = {} as const;
 const VIDEO_FALLBACK_OPTIONS = {} as const;
 
-export function useLiveKit(
+/**
+ * RTC v1 (legado) — extraído sem alteração de comportamento na Etapa 12.
+ * Rollback: VITE_RTC_ENGINE ausente/v1 usa exatamente este hook.
+ */
+export function useLiveKitV1(
   myId: string | null,
   roomKey: string | null,
   /**

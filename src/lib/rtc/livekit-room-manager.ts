@@ -137,6 +137,13 @@ export class LiveKitRoomManager {
     return () => this.listeners.delete(fn);
   }
 
+  /** Room atual somente quando CONNECTED/RECONNECTING (para anexar mídia). */
+  getActiveRoom(): RoomLike | null {
+    const s = this.snap.status;
+    if (!this.active || this.active.closing) return null;
+    return s === "CONNECTED" || s === "RECONNECTING" ? this.active.room : null;
+  }
+
   /** Promise que resolve quando o loop atual termina (útil em testes). */
   whenIdle(): Promise<void> {
     return this.idle;
