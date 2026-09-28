@@ -100,9 +100,9 @@ function setup(ids = ["a"]) {
 }
 
 describe("SpatialSubscriptions", () => {
-  it("constantes: CONNECT < DISCONNECT = CONNECT*1.15", () => {
+  it("constantes: CONNECT=0.038, DISCONNECT=0.052, CONNECT < DISCONNECT", () => {
     expect(CONNECT_RADIUS).toBe(0.038);
-    expect(DISCONNECT_RADIUS).toBeCloseTo(0.038 * 1.15, 12);
+    expect(DISCONNECT_RADIUS).toBe(0.052);
     expect(CONNECT_RADIUS).toBeLessThan(DISCONNECT_RADIUS);
   });
 
@@ -151,6 +151,33 @@ describe("SpatialSubscriptions", () => {
     expect(ps[0].all().every((p) => p.calls.join() === "true,false")).toBe(true);
     ss.setRemotePosition("a", at(IN));
     expect(ps[0].all().every((p) => p.calls.join() === "true,false,true")).toBe(true);
+  });
+
+  it("fronteira de histerese: 0.038 entra, 0.038<d<=0.052 mantém, >0.052 sai, re-entrada exige <=0.038", () => {
+    const { ps, ss } = setup();
+    const calls = () => ps[0].all().map((p) => p.calls.join());
+
+    // exatamente 0.038 entra
+    ss.setRemotePosition("a", at(CONNECT_RADIUS));
+    expect(calls().every((c) => c.endsWith("true"))).toBe(true);
+
+    // entre 0.038 e 0.052: permanece no estado atual (subscribed)
+    ss.setRemotePosition("a", at((CONNECT_RADIUS + DISCONNECT_RADIUS) / 2));
+    expect(calls().every((c) => c.endsWith("true"))).toBe(true);
+
+    // exatamente 0.052 ainda permanece dentro
+    ss.setRemotePosition("a", at(DISCONNECT_RADIUS));
+    expect(calls().every((c) => c.endsWith("true"))).toBe(true);
+
+    // somente > 0.052 desconecta
+    ss.setRemotePosition("a", at(DISCONNECT_RADIUS + 0.0001));
+    expect(calls().every((c) => c.endsWith("true,false"))).toBe(true);
+
+    // voltar para dentro exige novamente <= 0.038
+    ss.setRemotePosition("a", at(DISCONNECT_RADIUS - 0.0001));
+    expect(calls().every((c) => c.endsWith("true,false"))).toBe(true);
+    ss.setRemotePosition("a", at(CONNECT_RADIUS));
+    expect(calls().every((c) => c.endsWith("true,false,true"))).toBe(true);
   });
 
   it("6/29. oscilar entre os raios não gera thrashing", () => {
