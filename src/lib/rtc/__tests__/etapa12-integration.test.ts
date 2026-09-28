@@ -31,7 +31,8 @@ describe("fachada useLiveKit", () => {
 describe("mountDeferred (StrictMode)", () => {
   it("setup→cleanup→setup cria exatamente um runtime", async () => {
     const t = manualTimers();
-    const created: Array<{ start: ReturnType<typeof vi.fn>; dispose: ReturnType<typeof vi.fn> }> = [];
+    const created: Array<{ start: ReturnType<typeof vi.fn>; dispose: ReturnType<typeof vi.fn> }> =
+      [];
     const make = () => {
       const r = { start: vi.fn(), dispose: vi.fn() };
       created.push(r);
@@ -53,7 +54,11 @@ describe("mountDeferred (StrictMode)", () => {
     const t = manualTimers();
     const r = { start: vi.fn(), dispose: vi.fn() };
     let resolve!: (v: typeof r) => void;
-    const cancel = mountDeferred(() => new Promise<typeof r>((res) => (resolve = res)), () => {}, t);
+    const cancel = mountDeferred(
+      () => new Promise<typeof r>((res) => (resolve = res)),
+      () => {},
+      t,
+    );
     await t.flush();
     cancel();
     resolve(r);
@@ -71,8 +76,20 @@ describe("streams", () => {
     const sc = new StreamCache((ts) => ({ ts }));
     const snap = {
       participants: [
-        { identity: "a", microphone: info("m1"), camera: null, screenShare: null, screenShareAudio: null },
-        { identity: "b", microphone: info("m2"), camera: null, screenShare: null, screenShareAudio: null },
+        {
+          identity: "a",
+          microphone: info("m1"),
+          camera: null,
+          screenShare: null,
+          screenShareAudio: null,
+        },
+        {
+          identity: "b",
+          microphone: info("m2"),
+          camera: null,
+          screenShare: null,
+          screenShareAudio: null,
+        },
       ],
     } as never;
     const r1 = buildRemoteStreams(snap, new Set(["a"]), av, sc);

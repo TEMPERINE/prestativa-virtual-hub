@@ -60,7 +60,9 @@ export function createV2CaptureAdapter(getSelection: () => DeviceSelection): Cap
       const id = getSelection().audioInput;
       try {
         return wrap(
-          await lk.createLocalAudioTrack(id ? { ...V2_AUDIO_CAPTURE, deviceId: { ideal: id } } : V2_AUDIO_CAPTURE),
+          await lk.createLocalAudioTrack(
+            id ? { ...V2_AUDIO_CAPTURE, deviceId: { ideal: id } } : V2_AUDIO_CAPTURE,
+          ),
           "microphone",
         );
       } catch (e) {
@@ -75,7 +77,9 @@ export function createV2CaptureAdapter(getSelection: () => DeviceSelection): Cap
       const id = getSelection().videoInput;
       try {
         return wrap(
-          await lk.createLocalVideoTrack(id ? { ...V2_VIDEO_CAPTURE, deviceId: { ideal: id } } : V2_VIDEO_CAPTURE),
+          await lk.createLocalVideoTrack(
+            id ? { ...V2_VIDEO_CAPTURE, deviceId: { ideal: id } } : V2_VIDEO_CAPTURE,
+          ),
           "camera",
         );
       } catch (e) {

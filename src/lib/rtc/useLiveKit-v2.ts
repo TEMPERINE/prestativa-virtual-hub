@@ -8,7 +8,12 @@ import type { RtcConnectionStatus, RtcMeshState } from "./useLiveKit-v1";
 import { RtcV2Runtime, createV2RoomFactory, type RtcV2Snapshot } from "./rtc-v2-runtime";
 import { mountDeferred } from "./rtc-v2-mount";
 import { StreamCache, buildRemoteStreams } from "./rtc-v2-streams";
-import { createV2CaptureAdapter, enumerateV2Devices, isV2LocalTrack, type DeviceSelection } from "./rtc-v2-devices";
+import {
+  createV2CaptureAdapter,
+  enumerateV2Devices,
+  isV2LocalTrack,
+  type DeviceSelection,
+} from "./rtc-v2-devices";
 import type { RemoteAvatarState } from "./movement-realtime";
 import type { PresencePayload } from "./office-presence";
 import type { MediaContext } from "./media-context";
@@ -132,23 +137,36 @@ export function useLiveKitV2(
     const cfg = cfgRef.current;
     const cancel = mountDeferred(
       async () => {
-        const [{ supabase }, tokenMod, movementMod, presenceMod, telemetryMod, mapMod, factory] = await Promise.all([
-          import("@/integrations/supabase/client"),
-          import("./livekit-token-v2.functions"),
-          import("./movement-realtime"),
-          import("./office-presence"),
-          import("./rtc-telemetry"),
-          import("@/lib/map-overrides"),
-          createV2RoomFactory(),
-        ]);
+        const [{ supabase }, tokenMod, movementMod, presenceMod, telemetryMod, mapMod, factory] =
+          await Promise.all([
+            import("@/integrations/supabase/client"),
+            import("./livekit-token-v2.functions"),
+            import("./movement-realtime"),
+            import("./office-presence"),
+            import("./rtc-telemetry"),
+            import("@/lib/map-overrides"),
+            createV2RoomFactory(),
+          ]);
         const rt = new RtcV2Runtime(
-          { userId: myId, workspaceId: cfg.workspaceId, sessionId: cfg.sessionId, generation: cfg.generation },
+          {
+            userId: myId,
+            workspaceId: cfg.workspaceId,
+            sessionId: cfg.sessionId,
+            generation: cfg.generation,
+          },
           {
             fetchToken: (req) => tokenMod.getLiveKitTokenV2({ data: req }),
             roomFactory: factory,
             capture: createV2CaptureAdapter(() => selectionRef.current),
-            movementTransport: movementMod.createSupabaseMovementTransport(supabase, cfg.workspaceId),
-            presenceTransport: presenceMod.createSupabasePresenceTransport(supabase, cfg.workspaceId, myId),
+            movementTransport: movementMod.createSupabaseMovementTransport(
+              supabase,
+              cfg.workspaceId,
+            ),
+            presenceTransport: presenceMod.createSupabasePresenceTransport(
+              supabase,
+              cfg.workspaceId,
+              myId,
+            ),
             telemetryAdapter: telemetryMod.createSupabaseTelemetryAdapter(supabase),
             refreshMap: () => void mapMod.getMapSync().load(),
           },
@@ -202,8 +220,11 @@ export function useLiveKitV2(
   const connectedPeers = useMemo(() => snap?.mediaPeers ?? [], [snap?.mediaPeers]);
 
   const camTrack = snap?.local.camera.status === "on" ? runtime?.local.getTrack("camera") : null;
-  const screenTrack = snap?.local.screenShare.status === "on" ? runtime?.local.getTrack("screen_share") : null;
-  const localVideoStream = isV2LocalTrack(camTrack) ? localCache.get("cam", [camTrack.mediaStreamTrack]) : null;
+  const screenTrack =
+    snap?.local.screenShare.status === "on" ? runtime?.local.getTrack("screen_share") : null;
+  const localVideoStream = isV2LocalTrack(camTrack)
+    ? localCache.get("cam", [camTrack.mediaStreamTrack])
+    : null;
   const localScreenStream = isV2LocalTrack(screenTrack)
     ? localCache.get("screen", [screenTrack.mediaStreamTrack])
     : null;
@@ -324,10 +345,26 @@ export function useLiveKitV2(
       v2,
     }),
     [
-      snap, toggleMic, toggleCam, toggleScreen, remoteStreams, remoteScreenStreams, connectedPeers,
-      localVideoStream, localScreenStream, videoDevices, audioInputDevices, audioOutputDevices, selection,
-      setVideoDevice, setAudioInputDevice, setAudioOutputDevice, prewarmMic, getLocalAudioTrack,
-      connectionStatus, v2,
+      snap,
+      toggleMic,
+      toggleCam,
+      toggleScreen,
+      remoteStreams,
+      remoteScreenStreams,
+      connectedPeers,
+      localVideoStream,
+      localScreenStream,
+      videoDevices,
+      audioInputDevices,
+      audioOutputDevices,
+      selection,
+      setVideoDevice,
+      setAudioInputDevice,
+      setAudioOutputDevice,
+      prewarmMic,
+      getLocalAudioTrack,
+      connectionStatus,
+      v2,
     ],
   );
 }

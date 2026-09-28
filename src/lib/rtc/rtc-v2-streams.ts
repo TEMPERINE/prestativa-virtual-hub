@@ -57,7 +57,10 @@ export function buildRemoteStreams<S>(
   for (const p of snap.participants) {
     if (!allowed.has(p.identity)) continue;
     keys.add(p.identity);
-    const a = av.get(p.identity, [mst(p.microphone), mst(p.camera)].filter((t): t is MediaStreamTrack => !!t));
+    const a = av.get(
+      p.identity,
+      [mst(p.microphone), mst(p.camera)].filter((t): t is MediaStreamTrack => !!t),
+    );
     if (a) remoteStreams[p.identity] = a;
     const s = screens.get(
       p.identity,

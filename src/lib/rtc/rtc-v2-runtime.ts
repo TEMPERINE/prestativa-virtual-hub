@@ -18,10 +18,23 @@
 import type { MapOverrides } from "@/lib/map-overrides";
 import type { MapSyncState } from "@/lib/map-sync";
 import { meetingZoneAtPoint } from "./canonical-zones";
-import { LiveKitRoomManager, type RoomLike, type RoomManagerSnapshot } from "./livekit-room-manager";
-import { LocalMedia, type CaptureAdapter, type LocalMediaSnapshot, type PublishTargetLike } from "./local-media";
+import {
+  LiveKitRoomManager,
+  type RoomLike,
+  type RoomManagerSnapshot,
+} from "./livekit-room-manager";
+import {
+  LocalMedia,
+  type CaptureAdapter,
+  type LocalMediaSnapshot,
+  type PublishTargetLike,
+} from "./local-media";
 import { MediaContextController, type MediaContext, type TimerApi } from "./media-context";
-import { MovementRealtime, type MovementTransport, type RemoteAvatarState } from "./movement-realtime";
+import {
+  MovementRealtime,
+  type MovementTransport,
+  type RemoteAvatarState,
+} from "./movement-realtime";
 import { OfficePresence, type PresencePayload, type PresenceTransport } from "./office-presence";
 import { RemoteMedia, type RemoteMediaSnapshot, type RemoteRoomLike } from "./remote-media";
 import { RtcTelemetry, type TelemetryAdapter } from "./rtc-telemetry";
@@ -30,7 +43,8 @@ import { SpatialSubscriptions, type SpatialRoomLike } from "./spatial-subscripti
 
 /** Room composta usada pelo V2 (uma única Room LiveKit por trás). */
 export interface V2Room extends RoomLike, PublishTargetLike {
-  readonly remoteParticipants: RemoteRoomLike["remoteParticipants"] & SpatialRoomLike["remoteParticipants"];
+  readonly remoteParticipants: RemoteRoomLike["remoteParticipants"] &
+    SpatialRoomLike["remoteParticipants"];
   on(event: string, fn: (...args: unknown[]) => void): void;
   off(event: string, fn: (...args: unknown[]) => void): void;
   setAudioOutput?(deviceId: string): Promise<void>;
@@ -44,7 +58,13 @@ export interface RtcV2Config {
 }
 
 export type TokenV2Request =
-  | { context: "LOBBY"; workspaceId: string; sessionId: string; generation: number; mapVersion: number }
+  | {
+      context: "LOBBY";
+      workspaceId: string;
+      sessionId: string;
+      generation: number;
+      mapVersion: number;
+    }
   | {
       context: "PRIVATE_ROOM";
       workspaceId: string;
@@ -292,7 +312,9 @@ export class RtcV2Runtime {
   }
   toggleScreen(): Promise<void> {
     const s = this.local.getSnapshot().screenShare.status;
-    return s === "on" || s === "starting" ? this.local.stopScreenShare() : this.local.startScreenShare();
+    return s === "on" || s === "starting"
+      ? this.local.stopScreenShare()
+      : this.local.startScreenShare();
   }
   retry(): void {
     this.rooms.retry();
@@ -445,7 +467,12 @@ export async function createV2RoomFactory(): Promise<() => V2Room> {
     const publishOpts = (source: string) => {
       switch (source) {
         case "microphone":
-          return { source: lk.Track.Source.Microphone, dtx: true, red: true, audioPreset: lk.AudioPresets.speech };
+          return {
+            source: lk.Track.Source.Microphone,
+            dtx: true,
+            red: true,
+            audioPreset: lk.AudioPresets.speech,
+          };
         case "camera":
           return { source: lk.Track.Source.Camera, simulcast: false };
         case "screen_share":
@@ -455,7 +482,8 @@ export async function createV2RoomFactory(): Promise<() => V2Room> {
       }
     };
     const v2: V2Room = {
-      connect: (url, token, opts) => room.connect(url, token, { autoSubscribe: opts.autoSubscribe }),
+      connect: (url, token, opts) =>
+        room.connect(url, token, { autoSubscribe: opts.autoSubscribe }),
       disconnect: () => room.disconnect(false),
       // Nomes de evento idênticos aos valores de RoomEvent do livekit-client.
       on: (e, fn) => void room.on(e as never, fn as never),
@@ -465,7 +493,10 @@ export async function createV2RoomFactory(): Promise<() => V2Room> {
       },
       async publishTrack(track) {
         if (!isV2LocalTrack(track)) throw new Error("track inválida");
-        await room.localParticipant.publishTrack(track.lk as never, publishOpts(track.source) as never);
+        await room.localParticipant.publishTrack(
+          track.lk as never,
+          publishOpts(track.source) as never,
+        );
       },
       async unpublishTrack(track) {
         if (!isV2LocalTrack(track)) return;
