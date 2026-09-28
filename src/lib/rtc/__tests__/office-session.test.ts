@@ -37,7 +37,7 @@ function makeBackend() {
       const ch = { handlers, closed: false, sent: [] as unknown[] };
       channels.push(ch);
       return {
-        broadcastReplaced: async (ev) => {
+        broadcastReplaced: async (ev: unknown) => {
           ch.sent.push(ev);
         },
         unsubscribe: async () => {
