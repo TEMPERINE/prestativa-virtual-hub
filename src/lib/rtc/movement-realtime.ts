@@ -170,7 +170,14 @@ export class MovementRealtime {
         // workspace também descubra o recém-chegado sem esperar movimento.
         this.emit(
           this.local
-            ? { type: "SNAPSHOT_REQUEST", x: this.local.x, y: this.local.y, vx: 0, vy: 0, moving: false }
+            ? {
+                type: "SNAPSHOT_REQUEST",
+                x: this.local.x,
+                y: this.local.y,
+                vx: 0,
+                vy: 0,
+                moving: false,
+              }
             : { type: "SNAPSHOT_REQUEST" },
         );
       },

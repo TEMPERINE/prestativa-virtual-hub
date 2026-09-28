@@ -38,7 +38,13 @@ export interface ZoneClassification {
 
 export function classifyZone(map: MapOverrides | null, zoneId: string): ZoneClassification {
   if (!zoneId || zoneId === "lobby") {
-    return { zoneId: "lobby", exists: true, kind: "common", supportsVideo: false, isPrivateRoom: false };
+    return {
+      zoneId: "lobby",
+      exists: true,
+      kind: "common",
+      supportsVideo: false,
+      isPrivateRoom: false,
+    };
   }
   const builtin = ZONES.find((z) => z.id === zoneId && z.id !== "lobby");
   let exists: boolean;
@@ -51,7 +57,13 @@ export function classifyZone(map: MapOverrides | null, zoneId: string): ZoneClas
   }
   const kind = kindOf(map, zoneId);
   const supportsVideo = builtin?.supportsVideo ?? false;
-  return { zoneId, exists, kind, supportsVideo, isPrivateRoom: exists && (supportsVideo || kind === "common") };
+  return {
+    zoneId,
+    exists,
+    kind,
+    supportsVideo,
+    isPrivateRoom: exists && (supportsVideo || kind === "common"),
+  };
 }
 
 export function resolveMeetingZone(map: MapOverrides | null, zoneId: string): ZoneResolution {
@@ -70,15 +82,20 @@ export function resolveMeetingZone(map: MapOverrides | null, zoneId: string): Zo
 // Retorna "lobby" quando nenhuma zona se aplica.
 
 function knownZone(map: MapOverrides, id: string): boolean {
-  return ZONES.some((z) => z.id === id && z.id !== "lobby") ||
-    !!map.customZones?.some((c) => c.id === id);
+  return (
+    ZONES.some((z) => z.id === id && z.id !== "lobby") ||
+    !!map.customZones?.some((c) => c.id === id)
+  );
 }
 
 export function paintedRect(
   map: MapOverrides,
   id: string,
 ): { x1: number; y1: number; x2: number; y2: number } | null {
-  let minC = Infinity, minR = Infinity, maxC = -Infinity, maxR = -Infinity;
+  let minC = Infinity,
+    minR = Infinity,
+    maxC = -Infinity,
+    maxR = -Infinity;
   for (let r = 0; r < map.rows; r++) {
     for (let c = 0; c < map.cols; c++) {
       if (map.zones[cellIndex(c, r, map.cols)] === id) {
@@ -90,7 +107,12 @@ export function paintedRect(
     }
   }
   if (!Number.isFinite(minC)) return null;
-  return { x1: minC / map.cols, y1: minR / map.rows, x2: (maxC + 1) / map.cols, y2: (maxR + 1) / map.rows };
+  return {
+    x1: minC / map.cols,
+    y1: minR / map.rows,
+    x2: (maxC + 1) / map.cols,
+    y2: (maxR + 1) / map.rows,
+  };
 }
 
 export function zoneIdAtPoint(map: MapOverrides | null, p: Point): string {

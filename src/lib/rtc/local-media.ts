@@ -133,7 +133,8 @@ export class LocalMedia {
 
   /** Leitura da track local já capturada (nunca captura). */
   getTrack(kind: "microphone" | "camera" | "screen_share"): LocalTrackLike | null {
-    if (kind === "screen_share") return this.screen.tracks.find((t) => t.source === "screen_share") ?? null;
+    if (kind === "screen_share")
+      return this.screen.tracks.find((t) => t.source === "screen_share") ?? null;
     return this.slots[kind].track;
   }
 

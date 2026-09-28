@@ -16,7 +16,10 @@ class FakeRoom {
   static live = 0;
   static maxLive = 0;
   handlers = new Map<string, Set<(...a: unknown[]) => void>>();
-  remoteParticipants = new Map<string, { identity: string; trackPublications: Map<string, never> }>();
+  remoteParticipants = new Map<
+    string,
+    { identity: string; trackPublications: Map<string, unknown> }
+  >();
   opts: { autoSubscribe: boolean } | null = null;
   token = "";
   connected = false;
@@ -95,7 +98,10 @@ function harness(opts: { staleTimes?: number } = {}) {
           staleLeft--;
           throw new Error("MAP_VERSION_STALE");
         }
-        return { url: "wss://x", token: `${req.context}:${req.context === "PRIVATE_ROOM" ? req.zoneId : ""}` };
+        return {
+          url: "wss://x",
+          token: `${req.context}:${req.context === "PRIVATE_ROOM" ? req.zoneId : ""}`,
+        };
       },
       roomFactory: () => new FakeRoom() as unknown as V2Room,
       capture: {
@@ -153,7 +159,8 @@ describe("RtcV2Runtime integrado", () => {
     expect(h.presencePayloads.length).toBeGreaterThan(0);
     for (const p of h.presencePayloads) {
       const keys = Object.keys(p as object);
-      for (const banned of ["x", "y", "vx", "vy", "zone", "position", "velocity"]) expect(keys).not.toContain(banned);
+      for (const banned of ["x", "y", "vx", "vy", "zone", "position", "velocity"])
+        expect(keys).not.toContain(banned);
     }
     await h.rt.dispose();
   });
@@ -172,8 +179,17 @@ describe("RtcV2Runtime integrado", () => {
     await settle();
     expect([...h.rt.getSnapshot().mediaPeers].sort()).toEqual(["u2", "u3"]);
     h.remoteMove({
-      type: "POSITION_SYNC", userId: "u2", sessionId: "x", generation: 1, seq: 1, t: Date.now(),
-      x: 0.05, y: 0.95, vx: 0, vy: 0, moving: false,
+      type: "POSITION_SYNC",
+      userId: "u2",
+      sessionId: "x",
+      generation: 1,
+      seq: 1,
+      t: Date.now(),
+      x: 0.05,
+      y: 0.95,
+      vx: 0,
+      vy: 0,
+      moving: false,
     } as MovementEvent);
     await settle(400);
     expect([...h.rt.getSnapshot().mediaPeers].sort()).toEqual(["u2", "u3"]);
@@ -195,9 +211,11 @@ describe("RtcV2Runtime integrado", () => {
     expect(s.context).toEqual({ kind: "PRIVATE_ROOM", zoneId: "feedback" });
     expect(s.roomStatus).toBe("CONNECTED");
     expect(FakeRoom.maxLive).toBe(1);
-    expect(h.tokenCalls.filter((c) => c.context === "PRIVATE_ROOM").map((c) => (c as { zoneId: string }).zoneId)).toEqual([
-      "feedback",
-    ]);
+    expect(
+      h.tokenCalls
+        .filter((c) => c.context === "PRIVATE_ROOM")
+        .map((c) => (c as { zoneId: string }).zoneId),
+    ).toEqual(["feedback"]);
     await h.rt.dispose();
   });
 
@@ -229,7 +247,9 @@ describe("RtcV2Runtime integrado", () => {
     expect(h.refreshMap).toHaveBeenCalledTimes(1);
     const priv = h.tokenCalls.filter((c) => c.context === "PRIVATE_ROOM");
     expect(priv.map((c) => c.mapVersion)).toEqual([1, 2]);
-    expect(h.tokenCalls.length).toBe(priv.length + h.tokenCalls.filter((c) => c.context === "LOBBY").length);
+    expect(h.tokenCalls.length).toBe(
+      priv.length + h.tokenCalls.filter((c) => c.context === "LOBBY").length,
+    );
     expect(priv.length).toBe(2);
     expect(s.roomStatus).toBe("CONNECTED");
     expect(s.context).toEqual({ kind: "PRIVATE_ROOM", zoneId: "reuniao" });

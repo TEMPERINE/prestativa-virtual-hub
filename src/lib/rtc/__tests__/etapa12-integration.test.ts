@@ -132,7 +132,13 @@ describe("guardas estáticas do path v2", () => {
   const v2 = src("lib/rtc/useLiveKit-v2.ts") + src("lib/rtc/rtc-v2-runtime.ts");
   const scene = src("components/office/OfficeScene.tsx");
   it("V2 não usa desiredPeers/videoVisibleIds/audiblePeerIds/clientId/participantOwnerId", () => {
-    for (const w of ["desiredPeers", "audiblePeerIds", "participantOwnerId", "clientId", "sessionStorage"])
+    for (const w of [
+      "desiredPeers",
+      "audiblePeerIds",
+      "participantOwnerId",
+      "clientId",
+      "sessionStorage",
+    ])
       expect(v2).not.toContain(w);
     // parâmetros legados recebidos pela assinatura são ignorados
     expect(v2).toMatch(/_legacyRoomKey/);

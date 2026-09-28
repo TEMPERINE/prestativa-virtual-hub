@@ -22,11 +22,17 @@ vi.mock("@/lib/map-overrides", async (importOriginal) => {
     zoneRectFromOverrides: (id: string) => {
       const o = current;
       if (!o) return null;
-      let a = Infinity, b = Infinity, c = -Infinity, d = -Infinity;
+      let a = Infinity,
+        b = Infinity,
+        c = -Infinity,
+        d = -Infinity;
       for (let r = 0; r < o.rows; r++)
         for (let k = 0; k < o.cols; k++)
           if (o.zones[r * o.cols + k] === id) {
-            a = Math.min(a, k); c = Math.max(c, k); b = Math.min(b, r); d = Math.max(d, r);
+            a = Math.min(a, k);
+            c = Math.max(c, k);
+            b = Math.min(b, r);
+            d = Math.max(d, r);
           }
       if (!isFinite(a)) return null;
       return { x1: a / o.cols, y1: b / o.rows, x2: (c + 1) / o.cols, y2: (d + 1) / o.rows };
@@ -35,26 +41,32 @@ vi.mock("@/lib/map-overrides", async (importOriginal) => {
 });
 
 const { legacyCallZoneAt } = await import("@/lib/legacy-call-zone");
-const { zoneIdAtPoint, classifyPoint, meetingZoneAtPoint, resolveMeetingZone } = await import(
-  "../canonical-zones"
-);
+const { zoneIdAtPoint, classifyPoint, meetingZoneAtPoint, resolveMeetingZone } =
+  await import("../canonical-zones");
 const { normalizeMapOverrides } = await import("@/lib/map-sync");
 const { issueLiveKitTokenV2, TokenV2Error } = await import("../livekit-token-v2");
 const { ZONES } = await import("@/lib/office-map");
-const { MAP_GRID_COLS, MAP_GRID_ROWS } = await import("@/lib/map-sync").then((m) => m as never as {
-  MAP_GRID_COLS: number;
-  MAP_GRID_ROWS: number;
-});
+const { MAP_GRID_COLS, MAP_GRID_ROWS } = await import("@/lib/map-sync").then(
+  (m) =>
+    m as never as {
+      MAP_GRID_COLS: number;
+      MAP_GRID_ROWS: number;
+    },
+);
 
 const COLS = MAP_GRID_COLS ?? 128;
 const ROWS = MAP_GRID_ROWS ?? 80;
 
-function paint(rects: Record<string, { x1: number; y1: number; x2: number; y2: number }>, holes: Array<{ x: number; y: number }> = []) {
+function paint(
+  rects: Record<string, { x1: number; y1: number; x2: number; y2: number }>,
+  holes: Array<{ x: number; y: number }> = [],
+) {
   const zones: Array<string | null> = new Array(COLS * ROWS).fill(null);
   for (const [id, r] of Object.entries(rects))
     for (let row = 0; row < ROWS; row++)
       for (let col = 0; col < COLS; col++) {
-        const cx = (col + 0.5) / COLS, cy = (row + 0.5) / ROWS;
+        const cx = (col + 0.5) / COLS,
+          cy = (row + 0.5) / ROWS;
         if (cx >= r.x1 && cx <= r.x2 && cy >= r.y1 && cy <= r.y2) zones[row * COLS + col] = id;
       }
   for (const h of holes) zones[Math.floor(h.y * ROWS) * COLS + Math.floor(h.x * COLS)] = null;
@@ -83,13 +95,28 @@ const POINTS: Array<{ x: number; y: number }> = [
 ];
 for (const z of builtin) {
   const r = z.rect;
-  const cx = (r.x1 + r.x2) / 2, cy = (r.y1 + r.y2) / 2;
-  POINTS.push({ x: cx, y: cy }, { x: r.x1, y: r.y1 }, { x: r.x2, y: r.y2 }, { x: r.x1 - 0.002, y: cy }, { x: r.x2 + 0.002, y: cy });
+  const cx = (r.x1 + r.x2) / 2,
+    cy = (r.y1 + r.y2) / 2;
+  POINTS.push(
+    { x: cx, y: cy },
+    { x: r.x1, y: r.y1 },
+    { x: r.x2, y: r.y2 },
+    { x: r.x1 - 0.002, y: cy },
+    { x: r.x2 + 0.002, y: cy },
+  );
 }
 
 const RAW_MAPS: Record<string, unknown> = {
   "sem overrides (sem linha)": null,
-  "reset (linha vazia)": { cols: COLS, rows: ROWS, blocked: [], zones: [], customZones: [], zoneKinds: {}, spawnPoints: {} },
+  "reset (linha vazia)": {
+    cols: COLS,
+    rows: ROWS,
+    blocked: [],
+    zones: [],
+    customZones: [],
+    zoneKinds: {},
+    spawnPoints: {},
+  },
   "com overrides": paint(
     {
       reuniao: { x1: 0.7, y1: 0.06, x2: 0.9, y2: 0.42 },
@@ -122,7 +149,13 @@ describe("paridade de zona v1 × V2 × servidor", () => {
       const S = "33333333-3333-4333-8333-333333333333";
       const deps = {
         isMember: async () => true,
-        getOfficeSession: async () => ({ user_id: U, session_id: S, generation: 1, workspace_id: WS, active: true }),
+        getOfficeSession: async () => ({
+          user_id: U,
+          session_id: S,
+          generation: 1,
+          workspace_id: WS,
+          active: true,
+        }),
         getCanonicalMap: async () => (raw ? { data: raw, version } : null),
         getDisplayName: async () => "X",
         config: { url: "wss://x", apiKey: "APIk", apiSecret: "s".repeat(40) },
@@ -137,7 +170,14 @@ describe("paridade de zona v1 × V2 × servidor", () => {
         try {
           const r = await issueLiveKitTokenV2(
             U,
-            { context: "PRIVATE_ROOM", workspaceId: WS, sessionId: S, generation: 1, mapVersion, zoneId: c.zoneId },
+            {
+              context: "PRIVATE_ROOM",
+              workspaceId: WS,
+              sessionId: S,
+              generation: 1,
+              mapVersion,
+              zoneId: c.zoneId,
+            },
             deps,
           );
           server = r.roomName.endsWith(`:${c.zoneId}`) ? "OK" : "WRONG_ROOM";

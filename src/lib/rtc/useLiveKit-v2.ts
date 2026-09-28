@@ -76,7 +76,10 @@ function mediaError(code: string | null): Error {
  * workspace, sessão ou generation; null quando a sessão não está ACTIVE
  * (takeover/logout) → runtime desmontado.
  */
-export function runtimeKey(myId: string | null, cfg: RtcV2HookConfig | null | undefined): string | null {
+export function runtimeKey(
+  myId: string | null,
+  cfg: RtcV2HookConfig | null | undefined,
+): string | null {
   return myId && cfg?.active && cfg.workspaceId && cfg.sessionId
     ? `${myId}|${cfg.workspaceId}|${cfg.sessionId}|${cfg.generation}`
     : null;

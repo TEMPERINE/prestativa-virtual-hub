@@ -12,10 +12,7 @@ import { supabase } from "@/integrations/supabase/client";
  * Quando `roomKey` é null (lobby, ou usuário não autenticado), o hook não
  * conecta a nada e devolve roster vazio.
  */
-export function useRoomRoster(
-  roomKey: string | null,
-  myId: string | null,
-): string[] {
+export function useRoomRoster(roomKey: string | null, myId: string | null): string[] {
   const [roster, setRoster] = useState<string[]>([]);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
@@ -53,7 +50,11 @@ export function useRoomRoster(
     });
 
     return () => {
-      try { void ch.untrack(); } catch { /* noop */ }
+      try {
+        void ch.untrack();
+      } catch {
+        /* noop */
+      }
       supabase.removeChannel(ch);
       channelRef.current = null;
       setRoster([]);

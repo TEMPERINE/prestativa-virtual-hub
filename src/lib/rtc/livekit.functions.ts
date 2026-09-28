@@ -3,9 +3,18 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
 
 const Input = z.object({
-  roomName: z.string().min(1).max(200).regex(/^[a-zA-Z0-9_:.\-]+$/),
+  roomName: z
+    .string()
+    .min(1)
+    .max(200)
+    .regex(/^[a-zA-Z0-9_:.\-]+$/),
   userId: z.string().uuid(),
-  clientId: z.string().min(8).max(80).regex(/^[a-zA-Z0-9_-]+$/).optional(),
+  clientId: z
+    .string()
+    .min(8)
+    .max(80)
+    .regex(/^[a-zA-Z0-9_-]+$/)
+    .optional(),
 });
 
 export const getLiveKitAccess = createServerFn({ method: "POST" })
@@ -13,7 +22,9 @@ export const getLiveKitAccess = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => Input.parse(d))
   .handler(async ({ data, context }) => {
     if (data.userId !== context.userId) {
-      throw new Error("Sessão da chamada não corresponde ao personagem atual. Recarregue o espaço.");
+      throw new Error(
+        "Sessão da chamada não corresponde ao personagem atual. Recarregue o espaço.",
+      );
     }
 
     const apiKey = process.env.LIVEKIT_API_KEY;
@@ -29,7 +40,9 @@ export const getLiveKitAccess = createServerFn({ method: "POST" })
       .eq("id", context.userId)
       .maybeSingle();
 
-    const participantIdentity = data.clientId ? `${context.userId}:${data.clientId}` : context.userId;
+    const participantIdentity = data.clientId
+      ? `${context.userId}:${data.clientId}`
+      : context.userId;
 
     const { AccessToken } = await import("livekit-server-sdk");
     const at = new AccessToken(apiKey, apiSecret, {
