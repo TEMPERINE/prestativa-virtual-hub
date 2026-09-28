@@ -293,9 +293,6 @@ export class LocalMedia {
       this.screen.status = "error";
       this.screen.error = errMsg(e);
       this.emit();
-      emitTelemetry(this.telemetry, "SCREEN_SHARE_OFF", {
-        error: { code: this.screen.error, message: this.screen.error },
-      });
       return;
     }
     if (this.disposed || op !== this.screen.op || !this.room) {
