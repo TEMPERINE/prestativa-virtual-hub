@@ -188,6 +188,9 @@ export class LiveKitRoomManager {
     this.running = true;
     this.idle = this.reconcile().finally(() => {
       this.running = false;
+      // Destino alterado enquanto o loop terminava (kick ignorado por
+      // running=true): reconcilia de novo em vez de perder o wakeup.
+      if (!this.disposed && !this.settled()) this.kick();
     });
   }
 
