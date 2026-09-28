@@ -1,9 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  DEFAULT_RTC_ENGINE,
-  getRtcEngine,
-  parseRtcEngine,
-} from "@/lib/rtc/rtc-engine";
+import { DEFAULT_RTC_ENGINE, getRtcEngine, parseRtcEngine } from "@/lib/rtc/rtc-engine";
 
 describe("feature flag VITE_RTC_ENGINE", () => {
   it('deve aceitar "v1" como valor valido', () => {
@@ -25,7 +21,7 @@ describe("feature flag VITE_RTC_ENGINE", () => {
     expect(parseRtcEngine("v3")).toBe("v1");
     expect(parseRtcEngine("livekit")).toBe("v1");
     expect(parseRtcEngine("true")).toBe("v1");
-    expect(parseRtcEngine("  V2  ".slice(0, 0) + "xyz")).toBe("v1");
+    expect(parseRtcEngine("xyz")).toBe("v1");
   });
 
   it("deve aceitar valores com espacos e maiusculas/minusculas", () => {
