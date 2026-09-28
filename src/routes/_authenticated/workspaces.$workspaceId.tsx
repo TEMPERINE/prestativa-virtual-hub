@@ -129,7 +129,19 @@ function WorkspaceScenePage() {
   return (
     <>
       <div style={{ visibility: ready ? "visible" : "hidden" }}>
-        <OfficeScene onHydrated={handleHydrated} />
+        <OfficeScene
+          onHydrated={handleHydrated}
+          rtcSession={
+            session.sessionId && session.generation !== null
+              ? {
+                  workspaceId,
+                  sessionId: session.sessionId,
+                  generation: session.generation,
+                  active: session.status === "ACTIVE",
+                }
+              : null
+          }
+        />
       </div>
       {!ready && (
         <PreloadScreen
