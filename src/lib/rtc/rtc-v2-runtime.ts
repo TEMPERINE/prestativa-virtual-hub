@@ -301,7 +301,7 @@ export class RtcV2Runtime {
     if (this.disposed) return;
     this.setSelfPosition(x, y);
     this.movement.updateLocal(x, y, 0, 0);
-    this.movement.announcePosition();
+    this.movement.announcePosition({ jump: true });
   }
 
   toggleMic(): Promise<void> {
