@@ -5,6 +5,9 @@ import { PreloadScreen } from "@/components/office/PreloadScreen";
 import { supabase } from "@/integrations/supabase/client";
 import { setCurrentWorkspaceId } from "@/lib/workspace/current";
 import { toast } from "sonner";
+import { useOfficeSession } from "@/lib/rtc/useOfficeSession";
+import { officeGateView } from "@/lib/rtc/office-session-binding";
+import { Button } from "@/components/ui/button";
 
 export const Route = createFileRoute("/_authenticated/workspaces/$workspaceId")({
   head: () => ({
@@ -23,6 +26,13 @@ function WorkspaceScenePage() {
   const [sceneHydrated, setSceneHydrated] = useState(false);
   const [ready, setReady] = useState(false);
   const hydratedRef = useRef(false);
+  const [userId, setUserId] = useState<string | null>(null);
+  // Sessão única (RTC v2 Etapa 3B): só a sessão mais recente monta o OfficeScene.
+  const { state: session, retry: retryClaim } = useOfficeSession(
+    authorized ? userId : null,
+    authorized ? workspaceId : null,
+  );
+  const gate = officeGateView(session.status);
 
   // Set workspace ID synchronously on mount, before scene mounts.
   // Done in render (idempotent) so first OfficeScene effects see it.
@@ -60,6 +70,7 @@ function WorkspaceScenePage() {
       }
       try { localStorage.setItem("lastWorkspaceId", workspaceId); } catch {}
       setCurrentWorkspaceId(workspaceId);
+      setUserId(u.user.id);
       setAuthorized(true);
     })();
     return () => { cancel = true; };
@@ -83,6 +94,34 @@ function WorkspaceScenePage() {
     return (
       <div className="min-h-screen flex items-center justify-center text-sm text-muted-foreground">
         Carregando espaço…
+      </div>
+    );
+  }
+
+  if (gate === "replaced") {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center gap-3 p-6 text-center">
+        <h1 className="text-lg font-semibold">Sessão aberta em outro dispositivo</h1>
+        <p className="text-sm text-muted-foreground max-w-sm">
+          Sua conta entrou no escritório em outro navegador ou dispositivo. Esta janela foi desconectada.
+        </p>
+      </div>
+    );
+  }
+
+  if (gate === "error") {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center gap-3 p-6 text-center">
+        <p className="text-sm text-muted-foreground">Não foi possível iniciar sua sessão no escritório.</p>
+        <Button onClick={retryClaim}>Tentar novamente</Button>
+      </div>
+    );
+  }
+
+  if (gate !== "scene") {
+    return (
+      <div className="min-h-screen flex items-center justify-center text-sm text-muted-foreground">
+        Iniciando sessão…
       </div>
     );
   }
