@@ -80,7 +80,6 @@ function harness(opts: { staleTimes?: number } = {}) {
       };
     },
   };
-  let rt!: RtcV2Runtime;
   let mapVersion = 1;
   const refreshMap = vi.fn(() => {
     rt.setMap({ state: "SYNCING", version: mapVersion, map: null });
@@ -89,7 +88,7 @@ function harness(opts: { staleTimes?: number } = {}) {
       rt.setMap({ state: "READY", version: mapVersion, map: null });
     });
   });
-  rt = new RtcV2Runtime(
+  const rt: RtcV2Runtime = new RtcV2Runtime(
     { userId: "me", workspaceId: "ws", sessionId: "s1", generation: 3 },
     {
       fetchToken: async (req) => {
