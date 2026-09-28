@@ -20,8 +20,8 @@ import type { MediaContext } from "./media-context";
  * CONNECT_RADIUS preservado do lobby do RTC v1 (OfficeScene PROXIMITY_CONNECT).
  */
 export const CONNECT_RADIUS = 0.038;
-/** Spec não define margem → CONNECT_RADIUS * 1.15. */
-export const DISCONNECT_RADIUS = CONNECT_RADIUS * 1.15;
+/** Margem preservada do lobby atual do Prestativa Office. */
+export const DISCONNECT_RADIUS = 0.052;
 
 export interface Position {
   x: number;
