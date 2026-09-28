@@ -405,6 +405,11 @@ export class RtcV2Runtime {
   private prevOnline = new Set<string>();
   private onPresence(): void {
     const online = this.presence.getRoster();
+    // Roster vazio = canal em (re)sync; não é evidência de saída.
+    if (online.size === 0) {
+      this.emit();
+      return;
+    }
     for (const uid of this.prevOnline) {
       if (!online.has(uid) && this.movement.getRemoteStates().has(uid)) {
         this.movement.forgetRemote(uid);
