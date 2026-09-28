@@ -133,7 +133,8 @@ const ICE_RE = /candidate:\S*\s+\d+\s+(udp|tcp)/i;
 const IPV4_RE = /\b(?:\d{1,3}\.){3}\d{1,3}\b/;
 const IPV6_RE = /\b(?:[0-9a-f]{1,4}:){3,7}[0-9a-f]{1,4}\b/i;
 const EMAIL_RE = /[^\s@]+@[^\s@]+\.[^\s@]+/;
-const SECRET_WORD_RE = /(api[_-]?secret|api[_-]?key|secret|token|password|senha|bearer|authorization)\s*[:=]?\s*\S+/i;
+const SECRET_WORD_RE =
+  /(api[_-]?secret|api[_-]?key|secret|token|password|senha|bearer|authorization)\s*[:=]?\s*\S+/i;
 const LIVEKIT_KEY_RE = /\b(API|sk|sb_secret|sb_publishable)[_A-Za-z0-9]{8,}\b/;
 const LONG_OPAQUE_RE = /[A-Za-z0-9+/_=-]{40,}/;
 const PHONE_RE = /\+?\d[\d\s().-]{8,}\d/;
@@ -178,7 +179,10 @@ export function sanitizeMetadata(
 }
 
 /** Apenas código/categoria + mensagem sanitizada; nunca o objeto cru. */
-export function sanitizeError(err: unknown): { errorCode: string | null; errorMessage: string | null } {
+export function sanitizeError(err: unknown): {
+  errorCode: string | null;
+  errorMessage: string | null;
+} {
   if (err == null) return { errorCode: null, errorMessage: null };
   let code: unknown = null;
   let message: unknown = null;

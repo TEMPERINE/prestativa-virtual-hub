@@ -51,7 +51,8 @@ describe("RtcTelemetry", () => {
     t.record("CAM_ON");
     await t.dispose();
     expect(a.rows.map((r) => r.details.eventSeq)).toEqual([1, 2, 3]);
-    for (const r of a.rows) expect(r).toMatchObject({ session_id: "s1", generation: 2, workspace_id: "w1" });
+    for (const r of a.rows)
+      expect(r).toMatchObject({ session_id: "s1", generation: 2, workspace_id: "w1" });
   });
 
   it("3. batch enviado ao atingir o limite", async () => {
@@ -144,7 +145,18 @@ describe("RtcTelemetry", () => {
     });
     await t.dispose();
     const dump = JSON.stringify(a.rows);
-    for (const bad of [JWT, "supersecretvalue", "shhh", "secret stack", "candidate:", "10.0.0.1", "127.0.0.1", "v=0", "user@example.com", "nested"]) {
+    for (const bad of [
+      JWT,
+      "supersecretvalue",
+      "shhh",
+      "secret stack",
+      "candidate:",
+      "10.0.0.1",
+      "127.0.0.1",
+      "v=0",
+      "user@example.com",
+      "nested",
+    ]) {
       expect(dump).not.toContain(bad);
     }
     const d = a.rows[0].details;
@@ -159,7 +171,14 @@ describe("RtcTelemetry", () => {
   });
 
   it("16. metadata válida permanece", () => {
-    expect(sanitizeMetadata({ reason: "user_left", attempt: 2, participantCount: 4, trackKind: "audio" })).toEqual({
+    expect(
+      sanitizeMetadata({
+        reason: "user_left",
+        attempt: 2,
+        participantCount: 4,
+        trackKind: "audio",
+      }),
+    ).toEqual({
       reason: "user_left",
       attempt: 2,
       participantCount: 4,
@@ -197,7 +216,12 @@ describe("RtcTelemetry", () => {
     t.record("CONTEXT_CHANGED", { dedupeKey: "LOBBY#1" });
     t.record("CONTEXT_CHANGED", { dedupeKey: "ZONE_A#2" });
     await t.dispose();
-    expect(a.rows.map((r) => r.event_type)).toEqual(["MIC_ON", "MIC_ON", "CONTEXT_CHANGED", "CONTEXT_CHANGED"]);
+    expect(a.rows.map((r) => r.event_type)).toEqual([
+      "MIC_ON",
+      "MIC_ON",
+      "CONTEXT_CHANGED",
+      "CONTEXT_CHANGED",
+    ]);
   });
 
   it("21. movimento normal não é aceito", async () => {
@@ -256,7 +280,10 @@ describe("RtcTelemetry", () => {
     for (let i = 0; i < 100; i++) moved.push(i); // posição não passa pela telemetria
     for (let i = 0; i < 10; i++) {
       t.record("CONTEXT_CHANGE_REQUESTED", { context: i % 2 ? "LOBBY" : "PRIVATE_ROOM" });
-      t.record("CONTEXT_CHANGED", { context: i % 2 ? "LOBBY" : "PRIVATE_ROOM", dedupeKey: `c${i}` });
+      t.record("CONTEXT_CHANGED", {
+        context: i % 2 ? "LOBBY" : "PRIVATE_ROOM",
+        dedupeKey: `c${i}`,
+      });
     }
     for (let i = 0; i < 5; i++) {
       t.record("ROOM_RECONNECTING");
