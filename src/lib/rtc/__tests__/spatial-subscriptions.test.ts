@@ -251,9 +251,12 @@ describe("SpatialSubscriptions", () => {
     r1.emit("participantConnected", r1.add("z", ["camera"]));
     ss.setRemotePosition("a", at(FAR));
     expect(late.calls).toEqual([]);
-    expect(ps[0].all().filter((p) => p !== late).every((p) => p.calls.join() === "true")).toBe(
-      true,
-    );
+    expect(
+      ps[0]
+        .all()
+        .filter((p) => p !== late)
+        .every((p) => p.calls.join() === "true"),
+    ).toBe(true);
     const a2 = r2.add("a", ["camera"], true);
     ss.setRemotePosition("a", at(IN));
     expect(a2.all()[0].calls).toEqual([true]);
