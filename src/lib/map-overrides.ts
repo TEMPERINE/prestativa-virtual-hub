@@ -5,6 +5,7 @@ import type { ZoneId } from "./office-map";
 import {
   MapSyncController,
   normalizeMapOverrides,
+  isMapOverridesShape,
   type CanonicalMapRow,
   type MapSnapshot,
 } from "./map-sync";
@@ -125,14 +126,11 @@ function readCacheEnvelope(): CacheEnvelope | null {
 function persist(s: MapSnapshot) {
   if (typeof window === "undefined") return;
   try {
-    if (s.map) {
-      window.localStorage.setItem(
-        STORAGE_KEY,
-        JSON.stringify({ version: s.version, data: s.map, workspaceId: controllerWs }),
-      );
-    } else {
-      window.localStorage.removeItem(STORAGE_KEY);
-    }
+    // Sempre grava o envelope com version: um reset (map null) substitui o cache antigo.
+    window.localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({ version: s.version, data: s.map, workspaceId: controllerWs }),
+    );
   } catch (e) {
     console.warn("[map-sync] falha ao gravar cache local", e);
   }
@@ -219,8 +217,9 @@ export async function pushOverridesToCloud(
   try {
     const ws = await getWs();
     if (!ws) return { ok: false, error: "Nenhum workspace ativo." };
-    const normalized = normalizeMapOverrides(o);
-    if (!normalized) return { ok: false, error: "Mapa inválido." };
+    if (!isMapOverridesShape(o)) return { ok: false, error: "Mapa inválido." };
+    // Mapa vazio persiste o documento vazio canônico (mesma linha, trigger incrementa version).
+    const normalized = normalizeMapOverrides(o) ?? emptyOverrides();
     const { supabase } = await import("@/integrations/supabase/client");
     const { data: userData } = await supabase.auth.getUser();
     const { data, error } = await supabase
@@ -250,12 +249,14 @@ export async function pushOverridesToCloud(
   }
 }
 
-export async function clearOverridesInCloud(): Promise<void> {
-  const ws = await getWs();
-  if (!ws) return;
-  const { supabase } = await import("@/integrations/supabase/client");
-  const { error } = await supabase.from("map_overrides").delete().eq("workspace_id", ws);
-  if (error) console.warn("[map-sync] falha ao limpar mapa", error.message);
+/**
+ * Reset do mapa: NUNCA apaga a linha. Grava o documento vazio canônico via
+ * upsert na mesma linha do workspace; o trigger incrementa version (17 → 18).
+ */
+export async function clearOverridesInCloud(): Promise<{ ok: boolean; error?: string }> {
+  const res = await pushOverridesToCloud(emptyOverrides());
+  if (!res.ok) console.warn("[map-sync] falha ao resetar mapa", res.error);
+  return res;
 }
 
 export function subscribeOverridesFromCloud(onChange: (o: MapOverrides | null) => void) {
@@ -285,8 +286,8 @@ export function subscribeOverridesFromCloud(onChange: (o: MapOverrides | null) =
           const next = payload.new as { version?: number } | null;
           if (next && next.version != null) onVersion(next.version);
           else if (payload.eventType === "DELETE") {
-            sync.applyCleared();
-            deliver();
+            // Legado: reset não apaga mais a linha. Revalida no banco sem regredir version.
+            sync.load().then(deliver);
           }
         },
       );

@@ -12,11 +12,40 @@ import type { MapOverrides } from "./map-overrides";
 export const MAP_GRID_COLS = 128;
 export const MAP_GRID_ROWS = 80;
 
-/** Converte qualquer valor bruto no MapOverrides canônico (grid 128×80), ou null se inválido. */
-export function normalizeMapOverrides(raw: unknown): MapOverrides | null {
-  if (!raw || typeof raw !== "object") return null;
+/** Estrutura mínima de um documento de overrides (vazio ou não). */
+export function isMapOverridesShape(raw: unknown): raw is MapOverrides {
+  if (!raw || typeof raw !== "object") return false;
   const o = raw as MapOverrides;
-  if (!o.cols || !o.rows || !Array.isArray(o.blocked)) return null;
+  return !!o.cols && !!o.rows && Array.isArray(o.blocked);
+}
+
+/**
+ * Documento sem nenhum conteúdo (estado persistido pelo reset). Única regra de
+ * "sem overrides": normaliza para null, igual à ausência de linha — o app usa
+ * a geometria base/default.
+ */
+export function isEmptyMapOverrides(o: MapOverrides): boolean {
+  const has = (v: unknown) => (Array.isArray(v) ? v.length > 0 : !!v && Object.keys(v).length > 0);
+  return (
+    !o.blocked.some((b) => b === 1) &&
+    !(Array.isArray(o.zones) && o.zones.some((z) => z != null)) &&
+    !has(o.customZones) &&
+    !has(o.zoneKinds) &&
+    !has(o.spawnPoints) &&
+    !has(o.props) &&
+    !o.theme &&
+    !o.customTheme
+  );
+}
+
+/**
+ * Converte qualquer valor bruto no MapOverrides canônico (grid 128×80).
+ * Retorna null se inválido OU vazio (reset) — ambos significam "mapa base".
+ */
+export function normalizeMapOverrides(raw: unknown): MapOverrides | null {
+  if (!isMapOverridesShape(raw)) return null;
+  const o = raw;
+  if (isEmptyMapOverrides(o)) return null;
   const zonesIn = Array.isArray(o.zones) ? o.zones : [];
   const size = MAP_GRID_COLS * MAP_GRID_ROWS;
   const blocked = new Array<number>(size).fill(0);
@@ -78,9 +107,9 @@ export class MapSyncController {
 
   /** Restaura cache local (sempre via normalizador). Não marca READY. */
   restoreCache(raw: unknown, version: number) {
-    const map = normalizeMapOverrides(raw);
-    if (!map || version < this.version) return;
-    this.map = map;
+    if (raw !== null && !isMapOverridesShape(raw)) return;
+    if (version < this.version) return;
+    this.map = normalizeMapOverrides(raw);
     this.version = version;
     this.emit();
   }
@@ -115,9 +144,8 @@ export class MapSyncController {
   /** Resultado confirmado de um save (versão devolvida pelo banco). */
   applyConfirmed(raw: unknown, version: number) {
     if (version <= this.version) return;
-    const map = normalizeMapOverrides(raw);
-    if (!map) return;
-    this.map = map;
+    if (!isMapOverridesShape(raw)) return;
+    this.map = normalizeMapOverrides(raw); // null = reset (mapa base)
     this.version = version;
     if (this.target < version) this.target = version;
     this.error = null;
@@ -125,7 +153,7 @@ export class MapSyncController {
     this.emit();
   }
 
-  /** Linha removida no banco (reset do mapa). */
+  /** Limpeza local não salva (não altera version). */
   applyCleared() {
     this.map = null;
     this.emit();
@@ -156,13 +184,11 @@ export class MapSyncController {
         return;
       }
       if (row) {
-        const map = normalizeMapOverrides(row.data);
         // Nunca diminuir: resposta de versão antiga é descartada.
-        if (map && row.version > this.version) {
-          this.map = map;
+        // Documento vazio (reset) é aceito e normaliza para null (mapa base).
+        if (row.version > this.version && isMapOverridesShape(row.data)) {
+          this.map = normalizeMapOverrides(row.data);
           this.version = row.version;
-        } else if (map && row.version === this.version && !this.map) {
-          this.map = map;
         }
       } else if (this.version === 0) {
         this.map = null;
