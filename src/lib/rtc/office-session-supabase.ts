@@ -51,7 +51,7 @@ export function createSupabaseOfficeSessionBackend(
     openTakeoverChannel(userId, handlers) {
       let subscribedOnce = false;
       const channel = supabase.channel(sessionTopic(userId), {
-        config: { private: true, broadcast: { self: false } },
+        config: { private: true, broadcast: { self: false, ack: true } },
       });
       channel.on("broadcast", { event: SESSION_REPLACED_EVENT }, ({ payload }) => {
         const p = payload as Partial<SessionReplacedEvent>;
