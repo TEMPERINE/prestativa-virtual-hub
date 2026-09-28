@@ -189,10 +189,6 @@ function writeLocalSavedPosition(userId: string, point: Point, zone: string, fac
   }
 }
 
-function pointInsideRect(p: Point, rect: { x1: number; y1: number; x2: number; y2: number }) {
-  return p.x >= rect.x1 && p.x <= rect.x2 && p.y >= rect.y1 && p.y <= rect.y2;
-}
-
 function describeMediaError(err: unknown, kind: "microfone" | "câmera"): string {
   const name = (err as { name?: string } | null)?.name ?? "";
   const msg = (err as { message?: string } | null)?.message ?? "";
