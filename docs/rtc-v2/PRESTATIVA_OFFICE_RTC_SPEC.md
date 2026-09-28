@@ -94,21 +94,27 @@ Criar `office_sessions` com uma linha por usuário:
 - `session_id uuid not null`
 - `generation bigint not null`
 - `workspace_id uuid not null`
+- `active boolean not null default true`
 - `claimed_at timestamptz not null`
 - `updated_at timestamptz not null`
 
+> **Correção (Etapa 2, 2026-09-28):** a linha de `office_sessions` NUNCA é apagada no logout/release, para preservar `generation` monotonicamente entre sessões. O release apenas define `active=false`.
+
 RPC `claim_office_session(session_id, workspace_id)`:
 
-- obter usuário via `auth.uid()`;
-- validar membership do workspace;
-- incrementar `generation` atomicamente;
-- tornar a nova sessão a única válida;
+- obter usuário exclusivamente via `auth.uid()`;
+- validar membership do workspace (`is_workspace_member`);
+- criar a linha na primeira utilização (`generation=1`);
+- nas seguintes, incrementar `generation` atomicamente, substituir `session_id` e `workspace_id`, definir `active=true` e atualizar timestamps;
 - retornar `session_id` e `generation`.
 
 RPC `release_office_session(session_id, generation)`:
 
-- liberar apenas se `session_id` e `generation` ainda forem os atuais;
-- uma sessão antiga nunca pode apagar a sessão nova.
+- atuar apenas se `session_id` e `generation` ainda forem os atuais;
+- definir `active=false`; NÃO apagar a linha; NÃO zerar `generation`;
+- uma sessão antiga nunca pode liberar a sessão nova.
+
+Clientes não têm INSERT/UPDATE/DELETE diretos em `office_sessions`; toda mudança passa pelas RPCs.
 
 Canal privado de takeover:
 

@@ -30,7 +30,7 @@ Gate: build, lint e teste mínimo executando.
 
 Criar nova migration em `supabase/migrations/` contendo:
 
-1. `office_sessions` + RLS;
+1. `office_sessions` + RLS (com coluna `active`; release define `active=false` e nunca apaga a linha nem zera `generation` — correção registrada na spec em 2026-09-28);
 2. RPC `claim_office_session`;
 3. RPC `release_office_session`;
 4. `rtc_events` append-only + RLS;
