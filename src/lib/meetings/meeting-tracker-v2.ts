@@ -1,0 +1,121 @@
+// RTC v2 Etapa 13 — Meeting tracker administrativo.
+//
+// Fonte de verdade: o estado do LiveKitRoomManager (status + contexto da Room
+// conectada). Nunca posição, desiredPeers, Presence ou meeting_participants.
+//
+// Regras:
+//  - join somente quando status === CONNECTED e a Room conectada é PRIVATE_ROOM(zoneId);
+//  - RECONNECTING da MESMA Room preserva a participação (sem leave/join);
+//  - mudança de contexto, disconnect terminal, ERROR, runtime desmontado
+//    (takeover) ou dispose → exatamente um leave;
+//  - A → B: leave A, e join B somente depois de B CONNECTED;
+//  - operações serializadas num único loop; idempotente a eventos repetidos;
+//  - falha de RPC é apenas logada: nunca toca mídia, contexto ou Room;
+//  - join que falhou não é re-tentado até a zona desejada mudar (sem loop).
+
+import type { MediaContext } from "@/lib/rtc/media-context";
+import type { RoomManagerStatus } from "@/lib/rtc/livekit-room-manager";
+
+export interface MeetingRoomState {
+  status: RoomManagerStatus | null;
+  connected: MediaContext | null;
+}
+
+export interface MeetingTrackerDeps {
+  /** Retorna o id da participação/reunião ou null. Pode lançar. */
+  join(zoneId: string): Promise<string | null>;
+  leave(meetingId: string): Promise<void>;
+  onError?(op: "join" | "leave", err: unknown): void;
+  onChange?(meetingId: string | null): void;
+}
+
+export class MeetingTrackerV2 {
+  private desired: string | null = null;
+  private joinedZone: string | null = null;
+  private meetingId: string | null = null;
+  private failedZone: string | null = null;
+  private running = false;
+  private disposed = false;
+  private idle: Promise<void> = Promise.resolve();
+
+  constructor(private readonly deps: MeetingTrackerDeps) {}
+
+  getMeetingId(): string | null {
+    return this.meetingId;
+  }
+
+  whenIdle(): Promise<void> {
+    return this.idle;
+  }
+
+  observe(s: MeetingRoomState | null): void {
+    if (this.disposed) return;
+    const zone =
+      s?.connected?.kind === "PRIVATE_ROOM" ? (s.connected as { zoneId: string }).zoneId : null;
+    let next: string | null = null;
+    if (zone && s?.status === "CONNECTED") next = zone;
+    else if (zone && s?.status === "RECONNECTING" && zone === this.desired) next = zone;
+    if (next !== this.desired) {
+      this.desired = next;
+      if (next !== this.failedZone) this.failedZone = null;
+    }
+    this.kick();
+  }
+
+  dispose(): Promise<void> {
+    if (!this.disposed) {
+      this.disposed = true;
+      this.desired = null;
+      this.kick();
+    }
+    return this.idle;
+  }
+
+  private kick(): void {
+    if (this.running) return;
+    this.running = true;
+    this.idle = this.loop().finally(() => {
+      this.running = false;
+    });
+  }
+
+  private setMeeting(id: string | null): void {
+    this.meetingId = id;
+    this.deps.onChange?.(id);
+  }
+
+  private async loop(): Promise<void> {
+    for (;;) {
+      const d = this.desired;
+      if (this.joinedZone && this.joinedZone !== d) {
+        const id = this.meetingId;
+        this.joinedZone = null;
+        this.setMeeting(null);
+        if (id) {
+          try {
+            await this.deps.leave(id);
+          } catch (e) {
+            this.deps.onError?.("leave", e);
+          }
+        }
+        continue;
+      }
+      if (d && !this.joinedZone && d !== this.failedZone) {
+        let id: string | null = null;
+        try {
+          id = await this.deps.join(d);
+        } catch (e) {
+          this.deps.onError?.("join", e);
+        }
+        if (id) {
+          this.joinedZone = d;
+          this.setMeeting(id);
+        } else {
+          this.failedZone = d;
+        }
+        continue;
+      }
+      return;
+    }
+  }
+}
