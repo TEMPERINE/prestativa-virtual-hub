@@ -159,15 +159,15 @@ describe("LiveKit token v2", () => {
       "ZONE_NOT_FOUND",
     );
   });
-  it("14. zona não privada é rejeitada", async () => {
+  it("14. local de trabalho (workspace) também vira ZONE_ROOM", async () => {
     expect(await code(issueLiveKitTokenV2(U1, priv({ zoneId: "custom-work" }), makeDeps()))).toBe(
-      "ZONE_NOT_PRIVATE",
+      "OK",
     );
-    // mapa base (sem overrides): diretoria é workspace e sem vídeo
+    // mapa base (sem overrides): diretoria é workspace e sem vídeo → ZONE_ROOM
     const d = makeDeps({ map: null });
     expect(
       await code(issueLiveKitTokenV2(U1, priv({ zoneId: "diretoria", mapVersion: 0 }), d)),
-    ).toBe("ZONE_NOT_PRIVATE");
+    ).toBe("OK");
     expect(await code(issueLiveKitTokenV2(U1, priv({ zoneId: "reuniao", mapVersion: 0 }), d))).toBe(
       "OK",
     );
