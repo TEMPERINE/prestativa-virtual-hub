@@ -100,9 +100,9 @@ function setup(ids = ["a"]) {
 }
 
 describe("SpatialSubscriptions", () => {
-  it("constantes: CONNECT < DISCONNECT = CONNECT*1.15", () => {
+  it("constantes: CONNECT=0.038, DISCONNECT=0.052, CONNECT < DISCONNECT", () => {
     expect(CONNECT_RADIUS).toBe(0.038);
-    expect(DISCONNECT_RADIUS).toBeCloseTo(0.038 * 1.15, 12);
+    expect(DISCONNECT_RADIUS).toBe(0.052);
     expect(CONNECT_RADIUS).toBeLessThan(DISCONNECT_RADIUS);
   });
 
