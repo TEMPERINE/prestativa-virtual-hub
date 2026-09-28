@@ -1,0 +1,231 @@
+/**
+ * RTC v2 — Etapa 10: Presence lento (online/offline) por workspace.
+ *
+ * Canal privado `workspace:{workspaceId}:presence`, separado do canal de
+ * movimento (erros de Presence podem fechar o channel inteiro).
+ * - Um único track() por SUBSCRIBED (inicial ou reconexão). Sem heartbeat.
+ * - Payload sem posição, zona, room, mic/cam ou relógio.
+ * - untrack() best-effort + remoção do canal no cleanup.
+ * - Erros (incl. rate limit) são expostos; rejoin com cooldown, uma tentativa por ciclo.
+ * O roster significa apenas "online neste workspace" — não é roster LiveKit
+ * nem decide Private Room. Ainda não integrado ao Office.
+ */
+import type { SupabaseClient } from "@supabase/supabase-js";
+
+export interface PresencePayload {
+  userId: string;
+  sessionId: string;
+  generation: number;
+  workspaceId: string;
+  joinedAt: string;
+}
+
+export type PresenceState = Record<string, PresencePayload[]>;
+
+export type PresenceStatus = "IDLE" | "JOINING" | "ONLINE" | "ERROR" | "RATE_LIMITED" | "CLOSED";
+
+export interface PresenceTransportHandlers {
+  /** sync/join/leave: sempre entrega o estado completo atual. */
+  onPresence(kind: "sync" | "join" | "leave", state: PresenceState): void;
+  onSubscribed(): void;
+  onError(message: string): void;
+}
+
+export interface PresenceTransportHandle {
+  track(payload: PresencePayload): Promise<unknown> | unknown;
+  untrack(): Promise<unknown> | unknown;
+  close(): Promise<void> | void;
+}
+
+export interface PresenceTransport {
+  open(handlers: PresenceTransportHandlers): PresenceTransportHandle;
+}
+
+export interface OfficePresenceOptions {
+  self: Omit<PresencePayload, "joinedAt"> & { joinedAt?: string };
+  transport: PresenceTransport;
+  /** Cooldown antes de uma única tentativa de rejoin após erro. */
+  rejoinCooldownMs?: number;
+}
+
+export const PRESENCE_REJOIN_COOLDOWN_MS = 30_000;
+
+export function presenceTopic(workspaceId: string): string {
+  return `workspace:${workspaceId}:presence`;
+}
+
+export function isRateLimitError(message: string): boolean {
+  return /rate.?limit/i.test(message);
+}
+
+export class OfficePresence {
+  private readonly payload: PresencePayload;
+  private readonly transport: PresenceTransport;
+  private readonly cooldownMs: number;
+
+  private handle: PresenceTransportHandle | null = null;
+  private epoch = 0;
+  private disposed = false;
+  private rejoinTimer: ReturnType<typeof setTimeout> | null = null;
+
+  private _status: PresenceStatus = "IDLE";
+  private _error: string | null = null;
+  private roster = new Map<string, PresencePayload>();
+  private listeners = new Set<() => void>();
+
+  constructor(opts: OfficePresenceOptions) {
+    this.payload = {
+      userId: opts.self.userId,
+      sessionId: opts.self.sessionId,
+      generation: opts.self.generation,
+      workspaceId: opts.self.workspaceId,
+      joinedAt: opts.self.joinedAt ?? new Date().toISOString(),
+    };
+    this.transport = opts.transport;
+    this.cooldownMs = opts.rejoinCooldownMs ?? PRESENCE_REJOIN_COOLDOWN_MS;
+  }
+
+  get status(): PresenceStatus {
+    return this._status;
+  }
+  get error(): string | null {
+    return this._error;
+  }
+  getRoster(): ReadonlyMap<string, PresencePayload> {
+    return this.roster;
+  }
+  getTrackedPayload(): Readonly<PresencePayload> {
+    return this.payload;
+  }
+  subscribe(fn: () => void): () => void {
+    this.listeners.add(fn);
+    return () => this.listeners.delete(fn);
+  }
+
+  start(): void {
+    if (this.disposed || this.handle) return;
+    const myEpoch = ++this.epoch;
+    this.setStatus("JOINING");
+    this.handle = this.transport.open({
+      onSubscribed: () => {
+        if (myEpoch !== this.epoch || this.disposed) return;
+        this._error = null;
+        this.setStatus("ONLINE");
+        // Único track() por assinatura — nunca como keepalive.
+        void Promise.resolve(this.handle?.track({ ...this.payload })).catch((e) =>
+          this.fail(myEpoch, e instanceof Error ? e.message : String(e)),
+        );
+      },
+      onPresence: (_kind, state) => {
+        if (myEpoch !== this.epoch || this.disposed) return;
+        this.applyState(state);
+      },
+      onError: (msg) => this.fail(myEpoch, msg),
+    });
+  }
+
+  async dispose(): Promise<void> {
+    if (this.disposed) return;
+    this.disposed = true;
+    this.epoch++;
+    if (this.rejoinTimer) clearTimeout(this.rejoinTimer);
+    this.rejoinTimer = null;
+    const h = this.handle;
+    this.handle = null;
+    if (h) {
+      try {
+        await h.untrack();
+      } catch {
+        /* best-effort */
+      }
+      await h.close();
+    }
+    this.roster.clear();
+    this._status = "CLOSED";
+    this.listeners.clear();
+  }
+
+  private fail(myEpoch: number, message: string): void {
+    if (myEpoch !== this.epoch || this.disposed) return;
+    this._error = message;
+    console.warn("[office-presence]", message);
+    this.setStatus(isRateLimitError(message) ? "RATE_LIMITED" : "ERROR");
+    if (this.rejoinTimer) return; // uma tentativa por ciclo
+    this.rejoinTimer = setTimeout(() => {
+      this.rejoinTimer = null;
+      if (this.disposed) return;
+      const old = this.handle;
+      this.handle = null;
+      this.epoch++;
+      void Promise.resolve(old?.close()).finally(() => {
+        if (!this.disposed) this.start();
+      });
+    }, this.cooldownMs);
+  }
+
+  private applyState(state: PresenceState): void {
+    const next = new Map<string, PresencePayload>();
+    for (const metas of Object.values(state)) {
+      for (const m of metas ?? []) {
+        if (!m || typeof m.userId !== "string") continue;
+        const cur = next.get(m.userId);
+        if (!cur || m.generation > cur.generation) {
+          next.set(m.userId, {
+            userId: m.userId,
+            sessionId: m.sessionId,
+            generation: m.generation,
+            workspaceId: m.workspaceId,
+            joinedAt: m.joinedAt,
+          });
+        }
+      }
+    }
+    this.roster = next;
+    this.notify();
+  }
+
+  private setStatus(s: PresenceStatus): void {
+    this._status = s;
+    this.notify();
+  }
+
+  private notify(): void {
+    for (const fn of this.listeners) fn();
+  }
+}
+
+/** Adaptador Supabase: canal privado exclusivo de Presence. */
+export function createSupabasePresenceTransport(
+  supabase: SupabaseClient,
+  workspaceId: string,
+  userId: string,
+): PresenceTransport {
+  return {
+    open(handlers) {
+      const channel = supabase.channel(presenceTopic(workspaceId), {
+        config: { private: true, presence: { key: userId } },
+      });
+      const emit = (kind: "sync" | "join" | "leave") =>
+        handlers.onPresence(kind, channel.presenceState() as unknown as PresenceState);
+      channel.on("presence", { event: "sync" }, () => emit("sync"));
+      channel.on("presence", { event: "join" }, () => emit("join"));
+      channel.on("presence", { event: "leave" }, () => emit("leave"));
+      channel.on("system", {}, (payload: { status?: string; message?: string; extension?: string }) => {
+        if (payload?.status === "error") handlers.onError(payload.message ?? "presence system error");
+      });
+      channel.subscribe((status, err) => {
+        if (status === "SUBSCRIBED") handlers.onSubscribed();
+        else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
+          handlers.onError(`${status}${err ? `: ${err.message}` : ""}`);
+        }
+      });
+      return {
+        track: (p) => channel.track(p as unknown as Record<string, unknown>),
+        untrack: () => channel.untrack(),
+        async close() {
+          await supabase.removeChannel(channel);
+        },
+      };
+    },
+  };
+}
