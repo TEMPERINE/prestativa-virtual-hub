@@ -38,6 +38,8 @@ export interface MovementEvent {
   vx?: number;
   vy?: number;
   moving?: boolean;
+  /** true somente em salto explícito (announceJump). POSITION_SYNC normal nunca. */
+  jump?: boolean;
   /** Somente diagnóstico — nunca usado para ordenar. */
   ts?: number;
 }
@@ -52,6 +54,8 @@ export interface RemoteAvatarState {
   vx: number;
   vy: number;
   moving: boolean;
+  /** Último evento aceito foi um salto explícito (snap visual). */
+  jump: boolean;
 }
 
 export interface MovementSelf {
@@ -230,7 +234,7 @@ export class MovementRealtime {
    * Anúncio explícito e único da posição atual (ex.: teleporte). Não é
    * periódico e não altera o estado de movimento.
    */
-  announcePosition(): void {
+  announcePosition(opts?: { jump?: boolean }): void {
     if (this.disposed || !this.local) return;
     this.emit({
       type: "POSITION_SYNC",
@@ -239,6 +243,7 @@ export class MovementRealtime {
       vx: this.moving ? this.local.vx : 0,
       vy: this.moving ? this.local.vy : 0,
       moving: this.moving,
+      ...(opts?.jump ? { jump: true } : {}),
     });
   }
 
@@ -365,6 +370,7 @@ export class MovementRealtime {
       vx: moving ? (e.vx ?? 0) : 0,
       vy: moving ? (e.vy ?? 0) : 0,
       moving,
+      jump: e.jump === true,
     });
     for (const fn of this.listeners) fn(this.remotes);
   }

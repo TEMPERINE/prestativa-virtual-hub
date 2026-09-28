@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { RemoteMotionPredictor, facingFromVector } from "@/lib/rtc/remote-motion";
 import { createPortal } from "react-dom";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -336,6 +337,8 @@ export function OfficeScene({
   // glide between ~120 ms broadcast samples instead of teleporting.
   const remoteWrapRefs = useRef<Map<string, HTMLDivElement | null>>(new Map());
   const remoteSmoothRef = useRef<Map<string, { x: number; y: number }>>(new Map());
+  // RTC v2: predição visual entre eventos de Movement (START/CHANGE/STOP/SYNC).
+  const v2PredictorRef = useRef(new RemoteMotionPredictor());
   // Fast realtime presence signal. It accelerates discovery, but is NOT the
   // authority for visibility: the database `is_online` flag is the durable
   // game-state source, so idle players never disappear just because a presence
@@ -687,8 +690,19 @@ export function OfficeScene({
   useEffect(() => {
     if (!IS_RTC_V2 || !v2Avatars || !v2Online) return;
     const myId = meIdRef.current;
+    const now = performance.now();
+    const predictor = v2PredictorRef.current;
     for (const [uid, a] of v2Avatars) {
-      if (uid !== myId && v2Online.has(uid)) maybeStartRemoteTeleportFromCurrent(uid, { x: a.x, y: a.y }, 0);
+      if (uid === myId || !v2Online.has(uid)) continue;
+      // Só salto explícito (announceJump) usa o efeito de teleporte.
+      // POSITION_SYNC/CHANGE/STOP viram correção suave no predictor visual.
+      if (predictor.ingest(a, now) === "jump") {
+        remoteSmoothRef.current.delete(uid);
+        maybeStartRemoteTeleportFromCurrent(uid, { x: a.x, y: a.y }, 0);
+      }
+    }
+    for (const uid of Array.from(predictor.keys())) {
+      if (!v2Avatars.has(uid) || !v2Online.has(uid)) predictor.forget(uid);
     }
     setPositions((prev) => {
       const next: Record<string, RemotePos> = { ...prev };
@@ -700,12 +714,7 @@ export function OfficeScene({
       for (const [uid, a] of v2Avatars) {
         if (uid === myId || !v2Online.has(uid)) continue;
         const cur = prev[uid];
-        const facing: Facing =
-          Math.abs(a.vx) > Math.abs(a.vy)
-            ? (a.vx > 0 ? "right" : "left")
-            : Math.abs(a.vy) > 0
-              ? (a.vy > 0 ? "down" : "up")
-              : (cur?.facing ?? "down");
+        const facing: Facing = facingFromVector(a.vx, a.vy, cur?.facing ?? "down");
         next[uid] = { user_id: uid, x: a.x, y: a.y, zone: callZoneAt(a), facing, is_online: true, ts: a.seq };
       }
       return next;
@@ -838,6 +847,7 @@ export function OfficeScene({
         const t = tracker.get(p.user_id);
         if (!t) { hasWork = true; break; }
         if (t.lastX !== p.x || t.lastY !== p.y) { hasWork = true; break; }
+        if (IS_RTC_V2 && v2PredictorRef.current.isMoving(p.user_id)) { hasWork = true; break; }
         if (now - t.lastMove < MOVE_DECAY_MS) { hasWork = true; break; }
         if (t.frame !== 0) { hasWork = true; break; }
       }
@@ -869,7 +879,11 @@ export function OfficeScene({
           t.lastY = p.y;
           t.lastMove = now;
         }
-        const moving = now - t.lastMove < MOVE_DECAY_MS;
+        // V2: walk enquanto o estado remoto for moving=true (não depende de
+        // chegar pacote novo); moving=false → idle imediato.
+        const moving = IS_RTC_V2
+          ? v2PredictorRef.current.isMoving(p.user_id)
+          : now - t.lastMove < MOVE_DECAY_MS;
         const newFrame = moving
           ? (t.frame >= 5 || t.frame < 1 ? 1 : t.frame + 1)
           : 0;
@@ -2473,8 +2487,11 @@ export function OfficeScene({
         if (uid === myId) continue;
         const el = remoteWrapRefs.current.get(uid);
         if (!el) continue;
-        const target = positions[uid];
-        if (!target) continue;
+        const net = positions[uid];
+        if (!net) continue;
+        const target = IS_RTC_V2
+          ? (v2PredictorRef.current.sample(uid, performance.now()) ?? net)
+          : net;
         let s = remoteSmoothRef.current.get(uid);
         if (!s) {
           s = { x: target.x, y: target.y };
@@ -2488,7 +2505,11 @@ export function OfficeScene({
         }
         const dx = target.x - s.x;
         const dy = target.y - s.y;
-        if (Math.abs(dx) < SNAP_DIST && Math.abs(dy) < SNAP_DIST) {
+        if (IS_RTC_V2) {
+          // Predictor já suaviza; desenha a amostra exata do frame.
+          s.x = target.x;
+          s.y = target.y;
+        } else if (Math.abs(dx) < SNAP_DIST && Math.abs(dy) < SNAP_DIST) {
           if (s.x !== target.x || s.y !== target.y) {
             s.x = target.x;
             s.y = target.y;
