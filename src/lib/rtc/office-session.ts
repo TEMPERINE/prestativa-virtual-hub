@@ -6,6 +6,8 @@
  * Ainda não conectado ao produto.
  */
 
+import { emitTelemetry, type RtcTelemetrySink } from "./rtc-telemetry-types";
+
 export type OfficeSessionStatus = "IDLE" | "CLAIMING" | "ACTIVE" | "REPLACED" | "ERROR";
 
 export interface OfficeSessionState {
@@ -67,6 +69,7 @@ export class OfficeSessionController {
   constructor(
     private readonly backend: OfficeSessionBackend,
     private readonly newSessionId: () => string = generateSessionId,
+    private readonly telemetry?: RtcTelemetrySink,
   ) {}
 
   getState(): OfficeSessionState {
@@ -79,7 +82,13 @@ export class OfficeSessionController {
   }
 
   private set(patch: Partial<OfficeSessionState>) {
+    const prev = this.state.status;
     this.state = { ...this.state, ...patch };
+    if (prev !== "REPLACED" && this.state.status === "REPLACED") {
+      emitTelemetry(this.telemetry, "SESSION_REPLACED", {
+        dedupeKey: `${this.state.sessionId}#${this.state.generation}`,
+      });
+    }
     for (const l of this.listeners) l(this.state);
   }
 
@@ -108,6 +117,9 @@ export class OfficeSessionController {
       generation: result.generation,
       workspaceId,
       error: null,
+    });
+    emitTelemetry(this.telemetry, "SESSION_CLAIMED", {
+      session: { sessionId: result.sessionId, generation: result.generation, workspaceId },
     });
     await this.attachChannel(userId);
     if (this.channel && this.state.status === "ACTIVE") {

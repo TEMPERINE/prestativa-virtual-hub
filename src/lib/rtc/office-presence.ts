@@ -11,6 +11,7 @@
  * nem decide Private Room. Ainda não integrado ao Office.
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { emitTelemetry, type RtcTelemetrySink } from "./rtc-telemetry-types";
 
 export interface PresencePayload {
   userId: string;
@@ -46,6 +47,7 @@ export interface OfficePresenceOptions {
   transport: PresenceTransport;
   /** Cooldown antes de uma única tentativa de rejoin após erro. */
   rejoinCooldownMs?: number;
+  telemetry?: RtcTelemetrySink;
 }
 
 export const PRESENCE_REJOIN_COOLDOWN_MS = 30_000;
@@ -62,6 +64,7 @@ export class OfficePresence {
   private readonly payload: PresencePayload;
   private readonly transport: PresenceTransport;
   private readonly cooldownMs: number;
+  private readonly telemetry?: RtcTelemetrySink;
 
   private handle: PresenceTransportHandle | null = null;
   private epoch = 0;
@@ -83,6 +86,7 @@ export class OfficePresence {
     };
     this.transport = opts.transport;
     this.cooldownMs = opts.rejoinCooldownMs ?? PRESENCE_REJOIN_COOLDOWN_MS;
+    this.telemetry = opts.telemetry;
   }
 
   get status(): PresenceStatus {
@@ -149,7 +153,12 @@ export class OfficePresence {
     if (myEpoch !== this.epoch || this.disposed) return;
     this._error = message;
     console.warn("[office-presence]", message);
-    this.setStatus(isRateLimitError(message) ? "RATE_LIMITED" : "ERROR");
+    const rateLimited = isRateLimitError(message);
+    this.setStatus(rateLimited ? "RATE_LIMITED" : "ERROR");
+    emitTelemetry(this.telemetry, "PRESENCE_ERROR", {
+      error: { code: rateLimited ? "RATE_LIMITED" : "PRESENCE_ERROR", message },
+      metadata: { channel: "presence" },
+    });
     if (this.rejoinTimer) return; // uma tentativa por ciclo
     this.rejoinTimer = setTimeout(() => {
       this.rejoinTimer = null;

@@ -15,6 +15,13 @@
 // Não ligado ao produto. RTC v1 (useLiveKit.ts) permanece intocado.
 
 import type { MediaContext } from "./media-context";
+import {
+  emitTelemetry,
+  isMapVersionStaleError,
+  type RtcTelemetryEventType,
+  type RtcTelemetrySink,
+  type TelemetryFields,
+} from "./rtc-telemetry-types";
 
 export type RoomManagerStatus =
   | "DISCONNECTED"
@@ -59,6 +66,7 @@ export type RoomFactory = () => RoomLike;
 export interface RoomManagerDeps {
   tokenProvider: TokenProvider;
   roomFactory?: RoomFactory;
+  telemetry?: RtcTelemetrySink;
 }
 
 const OFFLINE: MediaContext = { kind: "OFFLINE" };
@@ -157,6 +165,11 @@ export class LiveKitRoomManager {
     const a = this.active;
     this.active = null;
     if (a) await this.closeRoom(a);
+    if (a)
+      this.tel("ROOM_DISCONNECTED", a.ctx, {
+        disconnectReason: "dispose",
+        connectionState: "DISCONNECTED",
+      });
     this.patch({ status: "DISCONNECTED", connected: null, roomName: null, error: null });
     this.listeners.clear();
   }
@@ -188,6 +201,10 @@ export class LiveKitRoomManager {
         this.patch({ status: "DISCONNECTING" });
         await this.closeRoom(a);
         if (this.active === a) this.active = null;
+        this.tel("ROOM_DISCONNECTED", a.ctx, {
+          disconnectReason: "context_change",
+          connectionState: "DISCONNECTED",
+        });
         this.patch({ status: "DISCONNECTED", connected: null, roomName: null });
         continue;
       }
@@ -198,6 +215,7 @@ export class LiveKitRoomManager {
 
       // 2) Token (resultado obsoleto é descartado).
       this.patch({ status: "CONNECTING", error: null });
+      this.tel("ROOM_CONNECT_REQUESTED", target, { roomName: null });
       let info: ConnectionInfo;
       try {
         info = await this.deps.tokenProvider(target);
@@ -239,6 +257,7 @@ export class LiveKitRoomManager {
         roomName: info.roomName ?? null,
         error: null,
       });
+      this.tel("ROOM_SIGNAL_CONNECTED", target);
       // se o destino mudou durante o connect, o loop desconecta na próxima volta
     }
   }
@@ -246,18 +265,28 @@ export class LiveKitRoomManager {
   private attach(a: Active): void {
     const isCurrent = () => !this.disposed && this.active === a && !a.closing;
     const onReconnecting = () => {
-      if (isCurrent() && this.snap.status === "CONNECTED") this.patch({ status: "RECONNECTING" });
+      if (isCurrent() && this.snap.status === "CONNECTED") {
+        this.patch({ status: "RECONNECTING" });
+        this.tel("ROOM_RECONNECTING", a.ctx);
+      }
     };
     const onReconnected = () => {
-      if (isCurrent() && this.snap.status === "RECONNECTING") this.patch({ status: "CONNECTED" });
+      if (isCurrent() && this.snap.status === "RECONNECTING") {
+        this.patch({ status: "CONNECTED" });
+        this.tel("ROOM_RECONNECTED", a.ctx);
+      }
     };
-    const onDisconnected = () => {
+    const onDisconnected = (reason?: unknown) => {
       if (!isCurrent()) return;
       // Só é "inesperado" depois de CONNECTED/RECONNECTING; durante connect o catch trata.
       if (this.snap.status !== "CONNECTED" && this.snap.status !== "RECONNECTING") return;
       this.detach(a);
       this.active = null;
-      this.fail(a.ctx, new Error("disconnected"));
+      this.tel("ROOM_DISCONNECTED", a.ctx, {
+        disconnectReason:
+          typeof reason === "string" || typeof reason === "number" ? String(reason) : "unexpected",
+      });
+      this.fail(a.ctx, new Error("disconnected"), false);
     };
     a.listeners = [
       ["reconnecting", onReconnecting],
@@ -283,13 +312,31 @@ export class LiveKitRoomManager {
     }
   }
 
-  private fail(ctx: MediaContext, e: unknown): void {
+  private fail(ctx: MediaContext, e: unknown, connectFailure = true): void {
     this.failedCtx = ctx;
+    if (connectFailure) {
+      if (isMapVersionStaleError(e)) this.tel("MAP_STALE", ctx, { error: e });
+      this.tel("ROOM_CONNECT_FAILED", ctx, { error: e, connectionState: "ERROR" });
+    }
     this.patch({
       status: "ERROR",
       connected: null,
       roomName: null,
       error: e instanceof Error ? e.message : String(e),
+    });
+  }
+
+  private tel(
+    type: RtcTelemetryEventType,
+    ctx: MediaContext | null,
+    extra: TelemetryFields = {},
+  ): void {
+    emitTelemetry(this.deps.telemetry, type, {
+      context: ctx?.kind ?? null,
+      zoneId: ctx && ctx.kind === "PRIVATE_ROOM" ? ctx.zoneId : null,
+      roomName: this.snap.roomName,
+      connectionState: this.snap.status,
+      ...extra,
     });
   }
 

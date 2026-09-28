@@ -12,6 +12,7 @@
 
 import type { OfficeSessionStatus } from "./office-session";
 import type { MapSyncState } from "../map-sync";
+import { emitTelemetry, type RtcTelemetrySink } from "./rtc-telemetry-types";
 
 export const PRIVATE_ROOM_CONFIRM_MS = 300;
 
@@ -54,6 +55,7 @@ export interface MediaContextDeps {
   resolveZone: (pos: SelfPosition, mapVersion: number) => ResolvedZone;
   timers?: TimerApi;
   confirmMs?: number;
+  telemetry?: RtcTelemetrySink;
 }
 
 const OFFLINE: MediaContext = { kind: "OFFLINE" };
@@ -67,6 +69,18 @@ const defaultTimers: TimerApi = {
 export function sameContext(a: MediaContext, b: MediaContext): boolean {
   if (a.kind !== b.kind) return false;
   return a.kind !== "PRIVATE_ROOM" || a.zoneId === (b as { zoneId: string }).zoneId;
+}
+
+function ctxFields(ctx: MediaContext, prev: MediaContext, mapVersion: number | undefined) {
+  return {
+    context: ctx.kind,
+    zoneId: ctx.kind === "PRIVATE_ROOM" ? ctx.zoneId : null,
+    mapVersion: mapVersion ?? null,
+    metadata: {
+      previousContext: prev.kind,
+      previousZoneId: prev.kind === "PRIVATE_ROOM" ? prev.zoneId : null,
+    },
+  };
 }
 
 export class MediaContextController {
@@ -223,7 +237,22 @@ export class MediaContextController {
     ) {
       return;
     }
+    const prev = this.snap;
     this.snap = next;
+    if (!sameContext(prev.desired, next.desired)) {
+      emitTelemetry(
+        this.deps.telemetry,
+        "CONTEXT_CHANGE_REQUESTED",
+        ctxFields(next.desired, prev.desired, this.map?.version),
+      );
+    }
+    if (!sameContext(prev.context, next.context)) {
+      emitTelemetry(
+        this.deps.telemetry,
+        "CONTEXT_CHANGED",
+        ctxFields(next.context, prev.context, this.map?.version),
+      );
+    }
     for (const l of this.listeners) l(next);
   }
 }

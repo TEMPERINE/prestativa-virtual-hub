@@ -9,6 +9,8 @@
 // de room.remoteParticipants. Handlers ficam presos à Room que os registrou e
 // são ignorados se ela não for mais a atual.
 
+import { emitTelemetry, telemetryObjectKey, type RtcTelemetrySink } from "./rtc-telemetry-types";
+
 export type RemoteSource = "microphone" | "camera" | "screen_share" | "screen_share_audio";
 
 export interface RemotePublicationLike {
@@ -99,8 +101,11 @@ export function buildRemoteSnapshot(room: RemoteRoomLike | null): RemoteMediaSna
 export class RemoteMedia {
   private room: RemoteRoomLike | null = null;
   private handler: (() => void) | null = null;
+  private subscribedHandler: ((track?: unknown) => void) | null = null;
   private snapshot: RemoteMediaSnapshot = { participants: [] };
   private listeners = new Set<(s: RemoteMediaSnapshot) => void>();
+
+  constructor(private readonly telemetry?: RtcTelemetrySink) {}
 
   getSnapshot(): RemoteMediaSnapshot {
     return this.snapshot;
@@ -119,6 +124,16 @@ export class RemoteMedia {
       if (this.room !== room) return; // evento atrasado da Room antiga
       this.refresh();
     };
+    // Evidência de mídia remota: somente TrackSubscribed com track real.
+    const onSubscribed = (track?: unknown) => {
+      if (this.room !== room || !track) return;
+      emitTelemetry(this.telemetry, "ROOM_MEDIA_ACTIVE", {
+        dedupeKey: telemetryObjectKey(room),
+        metadata: { reason: "remote_subscribed" },
+      });
+    };
+    this.subscribedHandler = onSubscribed;
+    room.on("trackSubscribed", onSubscribed);
     this.handler = handler;
     for (const ev of REMOTE_MEDIA_EVENTS) room.on(ev, handler);
     this.refresh(); // roster inicial: participantes já presentes
@@ -127,7 +142,9 @@ export class RemoteMedia {
   detachRoom(room: RemoteRoomLike): void {
     if (this.room !== room) return;
     if (this.handler) for (const ev of REMOTE_MEDIA_EVENTS) room.off(ev, this.handler);
+    if (this.subscribedHandler) room.off("trackSubscribed", this.subscribedHandler);
     this.handler = null;
+    this.subscribedHandler = null;
     this.room = null;
     this.refresh();
   }
