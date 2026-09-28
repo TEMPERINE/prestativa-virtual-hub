@@ -74,7 +74,7 @@ Responda **apenas** com um JSON válido neste formato exato:
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Authorization": `Bearer ${key}`,
+        Authorization: `Bearer ${key}`,
       },
       body: JSON.stringify({
         model: "google/gemini-2.5-flash",

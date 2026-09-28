@@ -55,8 +55,16 @@ export function useMeetingRecorder({ getLocalAudioTrack, remoteStreams }: Args) 
     if (!ctx || !dest) return;
     const current = new Set(Object.values(remoteStreams));
     for (const [stream, source] of sourcesRef.current) {
-      if (!current.has(stream) && stream !== ownedMicStreamRef.current && stream !== displayStreamRef.current) {
-        try { source.disconnect(); } catch { /* noop */ }
+      if (
+        !current.has(stream) &&
+        stream !== ownedMicStreamRef.current &&
+        stream !== displayStreamRef.current
+      ) {
+        try {
+          source.disconnect();
+        } catch {
+          /* noop */
+        }
         sourcesRef.current.delete(stream);
       }
     }
@@ -79,15 +87,31 @@ export function useMeetingRecorder({ getLocalAudioTrack, remoteStreams }: Args) 
       tickRef.current = null;
     }
     for (const [, src] of sourcesRef.current) {
-      try { src.disconnect(); } catch { /* noop */ }
+      try {
+        src.disconnect();
+      } catch {
+        /* noop */
+      }
     }
     sourcesRef.current.clear();
     if (ownedMicStreamRef.current) {
-      ownedMicStreamRef.current.getTracks().forEach((t) => { try { t.stop(); } catch { /* noop */ } });
+      ownedMicStreamRef.current.getTracks().forEach((t) => {
+        try {
+          t.stop();
+        } catch {
+          /* noop */
+        }
+      });
       ownedMicStreamRef.current = null;
     }
     if (displayStreamRef.current) {
-      displayStreamRef.current.getTracks().forEach((t) => { try { t.stop(); } catch { /* noop */ } });
+      displayStreamRef.current.getTracks().forEach((t) => {
+        try {
+          t.stop();
+        } catch {
+          /* noop */
+        }
+      });
       displayStreamRef.current = null;
     }
     if (audioCtxRef.current) {
@@ -100,219 +124,229 @@ export function useMeetingRecorder({ getLocalAudioTrack, remoteStreams }: Args) 
     setElapsedSeconds(0);
   }, []);
 
-  const start = useCallback(async (meetingId: string) => {
-    console.log("[recorder] start() called", { meetingId, isRecording });
-    if (isRecording) {
-      console.warn("[recorder] already recording, abort start()");
-      return;
-    }
+  const start = useCallback(
+    async (meetingId: string) => {
+      console.log("[recorder] start() called", { meetingId, isRecording });
+      if (isRecording) {
+        console.warn("[recorder] already recording, abort start()");
+        return;
+      }
 
-    // 1) Captura de tela.
-    let displayStream: MediaStream;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const desktop = (window as any).prestativaDesktop as
-      | {
-          getScreenSourceId?: () => Promise<string | null>;
-          getScreenStream?: () => Promise<MediaStream>;
-        }
-      | undefined;
-    console.log("[recorder] capture path", {
-      hasDesktop: !!desktop,
-      hasGetSourceId: !!desktop?.getScreenSourceId,
-      hasGetStream: !!desktop?.getScreenStream,
-      hasGetDisplayMedia: !!navigator.mediaDevices?.getDisplayMedia,
-      inIframe: window.self !== window.top,
-    });
-    try {
-      if (desktop?.getScreenSourceId) {
-        console.log("[recorder] requesting desktop source id…");
-        const sourceId = await desktop.getScreenSourceId();
-        console.log("[recorder] desktop sourceId:", sourceId);
-        if (!sourceId) throw new Error("no-screen-source");
-        displayStream = await navigator.mediaDevices.getUserMedia({
-          audio: {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            mandatory: { chromeMediaSource: "desktop" } as any,
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          } as any,
-          video: {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            mandatory: {
-              chromeMediaSource: "desktop",
-              chromeMediaSourceId: sourceId,
-              maxFrameRate: 30,
-              maxWidth: 1920,
-              maxHeight: 1080,
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            } as any,
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          } as any,
-        });
-        console.log("[recorder] desktop stream ok");
-      } else if (desktop?.getScreenStream) {
-        console.log("[recorder] using legacy getScreenStream…");
-        displayStream = await desktop.getScreenStream();
-      } else {
-        if (!navigator.mediaDevices?.getDisplayMedia) {
-          throw new Error("getDisplayMedia indisponível neste ambiente");
-        }
-        console.log("[recorder] calling getDisplayMedia…");
-        try {
-          displayStream = await navigator.mediaDevices.getDisplayMedia({
-            video: { frameRate: 15 },
+      // 1) Captura de tela.
+      let displayStream: MediaStream;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const desktop = (window as any).prestativaDesktop as
+        | {
+            getScreenSourceId?: () => Promise<string | null>;
+            getScreenStream?: () => Promise<MediaStream>;
+          }
+        | undefined;
+      console.log("[recorder] capture path", {
+        hasDesktop: !!desktop,
+        hasGetSourceId: !!desktop?.getScreenSourceId,
+        hasGetStream: !!desktop?.getScreenStream,
+        hasGetDisplayMedia: !!navigator.mediaDevices?.getDisplayMedia,
+        inIframe: window.self !== window.top,
+      });
+      try {
+        if (desktop?.getScreenSourceId) {
+          console.log("[recorder] requesting desktop source id…");
+          const sourceId = await desktop.getScreenSourceId();
+          console.log("[recorder] desktop sourceId:", sourceId);
+          if (!sourceId) throw new Error("no-screen-source");
+          displayStream = await navigator.mediaDevices.getUserMedia({
             audio: {
-              echoCancellation: false,
-              noiseSuppression: false,
-              autoGainControl: false,
-            },
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              mandatory: { chromeMediaSource: "desktop" } as any,
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            } as any,
+            video: {
+              mandatory: {
+                chromeMediaSource: "desktop",
+                chromeMediaSourceId: sourceId,
+                maxFrameRate: 30,
+                maxWidth: 1920,
+                maxHeight: 1080,
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              } as any,
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            } as any,
           });
-        } catch (innerErr) {
-          const innerName = (innerErr as { name?: string })?.name;
-          console.warn("[recorder] getDisplayMedia first attempt failed:", innerName, innerErr);
-          if (innerName === "TypeError" || innerName === "NotSupportedError") {
+          console.log("[recorder] desktop stream ok");
+        } else if (desktop?.getScreenStream) {
+          console.log("[recorder] using legacy getScreenStream…");
+          displayStream = await desktop.getScreenStream();
+        } else {
+          if (!navigator.mediaDevices?.getDisplayMedia) {
+            throw new Error("getDisplayMedia indisponível neste ambiente");
+          }
+          console.log("[recorder] calling getDisplayMedia…");
+          try {
             displayStream = await navigator.mediaDevices.getDisplayMedia({
-              video: true,
-              audio: true,
+              video: { frameRate: 15 },
+              audio: {
+                echoCancellation: false,
+                noiseSuppression: false,
+                autoGainControl: false,
+              },
             });
-          } else {
-            throw innerErr;
+          } catch (innerErr) {
+            const innerName = (innerErr as { name?: string })?.name;
+            console.warn("[recorder] getDisplayMedia first attempt failed:", innerName, innerErr);
+            if (innerName === "TypeError" || innerName === "NotSupportedError") {
+              displayStream = await navigator.mediaDevices.getDisplayMedia({
+                video: true,
+                audio: true,
+              });
+            } else {
+              throw innerErr;
+            }
+          }
+          console.log("[recorder] getDisplayMedia ok", {
+            videoTracks: displayStream.getVideoTracks().length,
+            audioTracks: displayStream.getAudioTracks().length,
+          });
+        }
+      } catch (err) {
+        const name = (err as { name?: string })?.name;
+        const msg = (err as { message?: string })?.message ?? "";
+        console.error("[recorder] getDisplayMedia error:", name, msg, err);
+        if (name === "NotAllowedError") {
+          toast.error(
+            msg.includes("permissions policy") || msg.includes("display-capture")
+              ? "Gravação bloqueada pelo navegador neste preview. Abra o app publicado para gravar."
+              : "Você precisa confirmar para gravar a reunião.",
+          );
+        } else if (name === "NotFoundError") {
+          toast.error("Nenhuma tela disponível para gravar.");
+        } else {
+          toast.error(`Não foi possível capturar a tela: ${msg || name || "erro desconhecido"}`);
+        }
+        return;
+      }
+
+      displayStreamRef.current = displayStream;
+
+      // Se o usuário parar pela barra nativa do navegador, finalizamos.
+      const videoTrack = displayStream.getVideoTracks()[0];
+      if (videoTrack) {
+        videoTrack.addEventListener("ended", () => {
+          if (recorderRef.current && recorderRef.current.state !== "inactive") {
+            void stopRef.current?.();
+          }
+        });
+      }
+
+      // 2) Mic — usa o track da call se utilizável; senão pede um dedicado.
+      const callTrack = getLocalAudioTrack();
+      const usableCallTrack =
+        callTrack && callTrack.enabled && callTrack.readyState === "live" ? callTrack : null;
+      let ownedMic: MediaStream | null = null;
+      if (!usableCallTrack) {
+        try {
+          ownedMic = await navigator.mediaDevices.getUserMedia({
+            audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+          });
+          ownedMicStreamRef.current = ownedMic;
+        } catch (err) {
+          console.warn("[recorder] sem mic dedicado:", err);
+        }
+      }
+
+      try {
+        const AudioCtor: typeof AudioContext =
+          (window as any).AudioContext || (window as any).webkitAudioContext;
+        const ctx = new AudioCtor();
+        audioCtxRef.current = ctx;
+        if (ctx.state === "suspended") {
+          try {
+            await ctx.resume();
+          } catch {
+            /* noop */
           }
         }
-        console.log("[recorder] getDisplayMedia ok", {
-          videoTracks: displayStream.getVideoTracks().length,
-          audioTracks: displayStream.getAudioTracks().length,
-        });
-      }
-    } catch (err) {
-      const name = (err as { name?: string })?.name;
-      const msg = (err as { message?: string })?.message ?? "";
-      console.error("[recorder] getDisplayMedia error:", name, msg, err);
-      if (name === "NotAllowedError") {
-        toast.error(
-          msg.includes("permissions policy") || msg.includes("display-capture")
-            ? "Gravação bloqueada pelo navegador neste preview. Abra o app publicado para gravar."
-            : "Você precisa confirmar para gravar a reunião.",
+        const dest = ctx.createMediaStreamDestination();
+        destinationRef.current = dest;
+
+        // Áudio do sistema (vem do displayStream se o usuário marcou "compartilhar áudio").
+        if (displayStream.getAudioTracks().length > 0) {
+          try {
+            const src = ctx.createMediaStreamSource(
+              new MediaStream(displayStream.getAudioTracks()),
+            );
+            src.connect(dest);
+            sourcesRef.current.set(displayStream, src);
+          } catch (err) {
+            console.warn("[recorder] não conectou áudio do sistema:", err);
+          }
+        }
+        // Mic
+        if (usableCallTrack) {
+          const ms = new MediaStream([usableCallTrack]);
+          const src = ctx.createMediaStreamSource(ms);
+          src.connect(dest);
+          sourcesRef.current.set(ms, src);
+        } else if (ownedMic && ownedMic.getAudioTracks().length > 0) {
+          const src = ctx.createMediaStreamSource(ownedMic);
+          src.connect(dest);
+          sourcesRef.current.set(ownedMic, src);
+        }
+        // Peers
+        for (const stream of Object.values(remoteStreamsRef.current)) {
+          if (stream.getAudioTracks().length === 0) continue;
+          try {
+            const src = ctx.createMediaStreamSource(stream);
+            src.connect(dest);
+            sourcesRef.current.set(stream, src);
+          } catch {
+            /* noop */
+          }
+        }
+
+        // Monta o stream final: vídeo da tela + áudio mixado.
+        const finalStream = new MediaStream();
+        displayStream.getVideoTracks().forEach((t) => finalStream.addTrack(t));
+        dest.stream.getAudioTracks().forEach((t) => finalStream.addTrack(t));
+
+        const mime = pickMime();
+        const recorder = new MediaRecorder(
+          finalStream,
+          mime
+            ? { mimeType: mime, videoBitsPerSecond: 1_500_000, audioBitsPerSecond: 96_000 }
+            : { videoBitsPerSecond: 1_500_000, audioBitsPerSecond: 96_000 },
         );
-      } else if (name === "NotFoundError") {
-        toast.error("Nenhuma tela disponível para gravar.");
-      } else {
-        toast.error(`Não foi possível capturar a tela: ${msg || name || "erro desconhecido"}`);
-      }
-      return;
-    }
-
-    displayStreamRef.current = displayStream;
-
-    // Se o usuário parar pela barra nativa do navegador, finalizamos.
-    const videoTrack = displayStream.getVideoTracks()[0];
-    if (videoTrack) {
-      videoTrack.addEventListener("ended", () => {
-        if (recorderRef.current && recorderRef.current.state !== "inactive") {
-          void stopRef.current?.();
-        }
-      });
-    }
-
-    // 2) Mic — usa o track da call se utilizável; senão pede um dedicado.
-    const callTrack = getLocalAudioTrack();
-    const usableCallTrack = callTrack && callTrack.enabled && callTrack.readyState === "live"
-      ? callTrack
-      : null;
-    let ownedMic: MediaStream | null = null;
-    if (!usableCallTrack) {
-      try {
-        ownedMic = await navigator.mediaDevices.getUserMedia({
-          audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
-        });
-        ownedMicStreamRef.current = ownedMic;
+        recorderRef.current = recorder;
+        chunksRef.current = [];
+        recorder.ondataavailable = (e) => {
+          if (e.data && e.data.size > 0) chunksRef.current.push(e.data);
+        };
+        recorder.start(2000);
+        meetingIdRef.current = meetingId;
+        startedAtRef.current = Date.now();
+        setIsRecording(true);
+        // Marca a reunião como gravada para aparecer no histórico
+        void (async () => {
+          try {
+            const { error } = await rpc("meeting_mark_recording_started", {
+              _meeting_id: meetingId,
+            });
+            if (error) console.warn("[recorder] mark_recording_started failed", error);
+          } catch (e) {
+            console.warn("[recorder] mark_recording_started threw", e);
+          }
+        })();
+        tickRef.current = window.setInterval(() => {
+          setElapsedSeconds(Math.floor((Date.now() - startedAtRef.current) / 1000));
+        }, 1000);
+        toast.success("🔴 Gravando tela + áudio…");
       } catch (err) {
-        console.warn("[recorder] sem mic dedicado:", err);
+        console.error("[recorder] start error:", err);
+        toast.error("Não foi possível iniciar a gravação.");
+        cleanup();
       }
-    }
-
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const AudioCtor: typeof AudioContext = (window as any).AudioContext || (window as any).webkitAudioContext;
-      const ctx = new AudioCtor();
-      audioCtxRef.current = ctx;
-      if (ctx.state === "suspended") {
-        try { await ctx.resume(); } catch { /* noop */ }
-      }
-      const dest = ctx.createMediaStreamDestination();
-      destinationRef.current = dest;
-
-      // Áudio do sistema (vem do displayStream se o usuário marcou "compartilhar áudio").
-      if (displayStream.getAudioTracks().length > 0) {
-        try {
-          const src = ctx.createMediaStreamSource(new MediaStream(displayStream.getAudioTracks()));
-          src.connect(dest);
-          sourcesRef.current.set(displayStream, src);
-        } catch (err) {
-          console.warn("[recorder] não conectou áudio do sistema:", err);
-        }
-      }
-      // Mic
-      if (usableCallTrack) {
-        const ms = new MediaStream([usableCallTrack]);
-        const src = ctx.createMediaStreamSource(ms);
-        src.connect(dest);
-        sourcesRef.current.set(ms, src);
-      } else if (ownedMic && ownedMic.getAudioTracks().length > 0) {
-        const src = ctx.createMediaStreamSource(ownedMic);
-        src.connect(dest);
-        sourcesRef.current.set(ownedMic, src);
-      }
-      // Peers
-      for (const stream of Object.values(remoteStreamsRef.current)) {
-        if (stream.getAudioTracks().length === 0) continue;
-        try {
-          const src = ctx.createMediaStreamSource(stream);
-          src.connect(dest);
-          sourcesRef.current.set(stream, src);
-        } catch { /* noop */ }
-      }
-
-      // Monta o stream final: vídeo da tela + áudio mixado.
-      const finalStream = new MediaStream();
-      displayStream.getVideoTracks().forEach((t) => finalStream.addTrack(t));
-      dest.stream.getAudioTracks().forEach((t) => finalStream.addTrack(t));
-
-      const mime = pickMime();
-      const recorder = new MediaRecorder(
-        finalStream,
-        mime
-          ? { mimeType: mime, videoBitsPerSecond: 1_500_000, audioBitsPerSecond: 96_000 }
-          : { videoBitsPerSecond: 1_500_000, audioBitsPerSecond: 96_000 },
-      );
-      recorderRef.current = recorder;
-      chunksRef.current = [];
-      recorder.ondataavailable = (e) => {
-        if (e.data && e.data.size > 0) chunksRef.current.push(e.data);
-      };
-      recorder.start(2000);
-      meetingIdRef.current = meetingId;
-      startedAtRef.current = Date.now();
-      setIsRecording(true);
-      // Marca a reunião como gravada para aparecer no histórico
-      void (async () => {
-        try {
-          const { error } = await rpc("meeting_mark_recording_started", { _meeting_id: meetingId });
-          if (error) console.warn("[recorder] mark_recording_started failed", error);
-        } catch (e) {
-          console.warn("[recorder] mark_recording_started threw", e);
-        }
-      })();
-      tickRef.current = window.setInterval(() => {
-        setElapsedSeconds(Math.floor((Date.now() - startedAtRef.current) / 1000));
-      }, 1000);
-      toast.success("🔴 Gravando tela + áudio…");
-
-    } catch (err) {
-      console.error("[recorder] start error:", err);
-      toast.error("Não foi possível iniciar a gravação.");
-      cleanup();
-    }
-  }, [isRecording, getLocalAudioTrack, cleanup]);
+    },
+    [isRecording, getLocalAudioTrack, cleanup],
+  );
 
   const stop = useCallback(async () => {
     const recorder = recorderRef.current;
@@ -329,7 +363,11 @@ export function useMeetingRecorder({ getLocalAudioTrack, remoteStreams }: Args) 
     const stopped = new Promise<void>((resolve) => {
       recorder.onstop = () => resolve();
     });
-    try { recorder.stop(); } catch { /* noop */ }
+    try {
+      recorder.stop();
+    } catch {
+      /* noop */
+    }
     await stopped;
 
     const mime = recorder.mimeType || "video/webm";
@@ -368,7 +406,11 @@ export function useMeetingRecorder({ getLocalAudioTrack, remoteStreams }: Args) 
   useEffect(() => {
     return () => {
       if (recorderRef.current && recorderRef.current.state !== "inactive") {
-        try { recorderRef.current.stop(); } catch { /* noop */ }
+        try {
+          recorderRef.current.stop();
+        } catch {
+          /* noop */
+        }
       }
       cleanup();
     };

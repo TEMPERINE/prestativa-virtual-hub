@@ -39,13 +39,7 @@ type Args = {
  * sai da sala ou todos os peers caem, fechamos a participação. Se ele troca
  * de sala, fecha a anterior e abre uma nova.
  */
-function useMeetingTrackerV1({
-  zoneId,
-  zoneLabel,
-  isMeetingZone,
-  peerCount,
-  enabled,
-}: Args) {
+function useMeetingTrackerV1({ zoneId, zoneLabel, isMeetingZone, peerCount, enabled }: Args) {
   const [activeMeetingId, setActiveMeetingId] = useState<string | null>(null);
   const activeMeetingRef = useRef<string | null>(null);
   const activeZoneRef = useRef<string | null>(null);
@@ -157,7 +151,8 @@ function useMeetingTrackerV2({ enabled, v2Room, labelFor }: Args) {
         const { error } = await rpc("meeting_leave", { _meeting_id: id });
         if (error) throw error;
       },
-      onError: (op, err) => console.error(`[meeting] meeting_${op} falhou (mídia não afetada):`, err),
+      onError: (op, err) =>
+        console.error(`[meeting] meeting_${op} falhou (mídia não afetada):`, err),
       onChange: setActiveMeetingId,
     });
     setTracker(t);

@@ -5,7 +5,10 @@ import type { MediaContext } from "@/lib/rtc/media-context";
 
 const P = (zoneId: string): MediaContext => ({ kind: "PRIVATE_ROOM", zoneId }) as MediaContext;
 const LOBBY = { kind: "LOBBY" } as MediaContext;
-const st = (status: MeetingRoomState["status"], connected: MediaContext | null): MeetingRoomState => ({
+const st = (
+  status: MeetingRoomState["status"],
+  connected: MediaContext | null,
+): MeetingRoomState => ({
   status,
   connected,
 });
