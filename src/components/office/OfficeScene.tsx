@@ -10,10 +10,9 @@ import {
   type Point,
   type ZoneId,
 } from "@/lib/office-map";
-import { zoneRectFromOverrides, getZoneKind, customZonesFromOverrides, pullOverridesFromCloud, subscribeOverridesFromCloud, spawnPointForZone } from "@/lib/map-overrides";
+import { loadOverrides, zoneRectFromOverrides, getZoneKind, customZonesFromOverrides, pullOverridesFromCloud, subscribeOverridesFromCloud, spawnPointForZone } from "@/lib/map-overrides";
 import { legacyCallZoneAt } from "@/lib/legacy-call-zone";
 import { zoneIdAtPoint } from "@/lib/rtc/canonical-zones";
-import { loadOverrides } from "@/lib/map-overrides";
 import { useOfficeTheme } from "@/hooks/useOfficeTheme";
 import parkLeft from "@/assets/scene-park-left.webp";
 import roadRight from "@/assets/scene-road-right.webp";
