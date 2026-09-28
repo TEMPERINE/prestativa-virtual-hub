@@ -578,10 +578,11 @@ export function MapEditor() {
   const clearSaved = useCallback(async () => {
     if (!(await appConfirm({ title: "Remover overrides salvos?", description: "Remove local e nuvem. O mapa voltará ao padrão.", confirmLabel: "Remover", destructive: true }))) return;
     clearOverrides();
-    await clearOverridesInCloud();
+    const res = await clearOverridesInCloud();
     setOverrides(seedFromDefaults());
     setDirty(true);
-    toast.success("Overrides removidos.");
+    if (res.ok) toast.success("Overrides removidos.");
+    else toast.error(`Falha ao resetar na nuvem: ${res.error ?? "erro desconhecido"}`);
   }, []);
 
 
