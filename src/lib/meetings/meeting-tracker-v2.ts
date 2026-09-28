@@ -75,6 +75,7 @@ export class MeetingTrackerV2 {
     if (next !== this.desired) {
       this.desired = next;
       if (next !== this.failedZone) this.failedZone = null;
+      this.attemptsZone = null;
       this.interrupt();
     } else if (wasConnected && !this.connectedNow) {
       this.interrupt();
