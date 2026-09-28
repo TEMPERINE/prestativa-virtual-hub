@@ -41,7 +41,7 @@ vi.mock("@/lib/map-overrides", async (importOriginal) => {
 });
 
 const { legacyCallZoneAt } = await import("@/lib/legacy-call-zone");
-const { zoneIdAtPoint, classifyPoint, meetingZoneAtPoint, resolveMeetingZone } =
+const { zoneIdAtPoint, classifyPoint, classifyZone, meetingZoneAtPoint, resolveMeetingZone } =
   await import("../canonical-zones");
 const { normalizeMapOverrides } = await import("@/lib/map-sync");
 const { issueLiveKitTokenV2, TokenV2Error } = await import("../livekit-token-v2");
@@ -193,5 +193,45 @@ describe("paridade de zona v1 × V2 × servidor", () => {
   it("mapa vazio normaliza para null nos dois lados (zonas embutidas valem)", () => {
     expect(normalizeMapOverrides(RAW_MAPS["reset (linha vazia)"])).toBeNull();
     expect(zoneIdAtPoint(null, { x: 0.8, y: 0.2 })).toBe("reuniao");
+  });
+});
+
+describe("rtcMode canônico: zoneKind separado de rtcMode", () => {
+  const map = normalizeMapOverrides({
+    ...paint({
+      reuniao: { x1: 0.7, y1: 0.06, x2: 0.9, y2: 0.42 },
+      diretoria: { x1: 0.32, y1: 0.1, x2: 0.64, y2: 0.3 },
+      "custom-portaria": { x1: 0.05, y1: 0.9, x2: 0.15, y2: 0.99 },
+    }),
+    customZones: [{ id: "custom-portaria", label: "Portaria", color: "#000" }],
+    zoneKinds: { "custom-portaria": "workspace" },
+  });
+
+  it("common -> ZONE_ROOM", () => {
+    const c = classifyPoint(map, { x: 0.8, y: 0.2 });
+    expect([c.zoneId, c.kind, c.rtcMode]).toEqual(["reuniao", "common", "ZONE_ROOM"]);
+  });
+  it("workspace -> ZONE_ROOM (sem vídeo)", () => {
+    const c = classifyPoint(map, { x: 0.5, y: 0.2 });
+    expect([c.zoneId, c.kind, c.supportsVideo, c.rtcMode]).toEqual([
+      "diretoria",
+      "workspace",
+      false,
+      "ZONE_ROOM",
+    ]);
+    expect(resolveMeetingZone(map, "diretoria").ok).toBe(true);
+  });
+  it("Portaria como workspace -> ZONE_ROOM", () => {
+    const c = classifyPoint(map, { x: 0.1, y: 0.95 });
+    expect([c.zoneId, c.kind, c.rtcMode]).toEqual(["custom-portaria", "workspace", "ZONE_ROOM"]);
+  });
+  it("ponto sem zona -> PROXIMITY_LOBBY", () => {
+    const c = classifyPoint(map, { x: 0.5, y: 0.6 });
+    expect([c.zoneId, c.rtcMode, c.isPrivateRoom]).toEqual(["lobby", "PROXIMITY_LOBBY", false]);
+    expect(meetingZoneAtPoint(map, { x: 0.5, y: 0.6 })).toBeNull();
+  });
+  it("atendentes embutidos (sem overrides) -> ZONE_ROOM", () => {
+    for (let i = 1; i <= 10; i++)
+      expect(classifyZone(null, `atendente-${i}`).rtcMode).toBe("ZONE_ROOM");
   });
 });

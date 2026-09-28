@@ -396,14 +396,27 @@ export class RtcV2Runtime {
     this.spatial.detachRoom(room);
   }
 
+  /**
+   * Só esquece posição de quem SAIU do Presence (estava online e não está mais).
+   * Quem ainda não apareceu no Presence (join em trânsito, sync inicial vazio,
+   * rejoin) mantém a posição recebida pelo Movement — usuário parado não
+   * reenviaria posição e ficaria sem proximidade para sempre.
+   */
+  private prevOnline = new Set<string>();
   private onPresence(): void {
     const online = this.presence.getRoster();
-    for (const uid of this.movement.getRemoteStates().keys()) {
-      if (!online.has(uid)) {
+    // Roster vazio = canal em (re)sync; não é evidência de saída.
+    if (online.size === 0) {
+      this.emit();
+      return;
+    }
+    for (const uid of this.prevOnline) {
+      if (!online.has(uid) && this.movement.getRemoteStates().has(uid)) {
         this.movement.forgetRemote(uid);
         this.spatial.removeRemotePosition(uid);
       }
     }
+    this.prevOnline = new Set(online.keys());
     this.emit();
   }
 

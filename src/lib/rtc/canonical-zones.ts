@@ -1,9 +1,9 @@
-// Resolução PURA de zona de reunião a partir do mapa canônico (map_overrides
-// normalizado). Replica exatamente a regra do cliente:
+// Resolução PURA de zona a partir do mapa canônico (map_overrides normalizado):
 //   - com overrides: a zona só existe se estiver pintada no grid;
 //   - sem overrides (sem linha / reset): zonas embutidas (ZONES, exceto lobby);
-//   - aceita reunião se `supportsVideo` OU kind === "common".
-// Kind: zoneKinds > customZone.kind > DEFAULT_ZONE_KINDS > "common".
+//   - toda zona existente (common OU workspace) → rtcMode ZONE_ROOM;
+//     só circulação (sem zona) → PROXIMITY_LOBBY.
+// Kind (domínio): zoneKinds > customZone.kind > DEFAULT_ZONE_KINDS > "common".
 import { ZONES, zoneAt as builtinZoneAt, type Point } from "@/lib/office-map";
 import {
   DEFAULT_ZONE_KINDS,
@@ -25,14 +25,24 @@ function kindOf(map: MapOverrides | null, id: string): ZoneKind {
   return DEFAULT_ZONE_KINDS[id] ?? "common";
 }
 
+/**
+ * Modo RTC derivado do domínio:
+ *  - PROXIMITY_LOBBY: circulação (ponto sem zona pintada) → Room LOBBY + proximidade;
+ *  - ZONE_ROOM: qualquer zona existente (common OU workspace) → Room própria, autoSubscribe.
+ * zoneKind (semântica do editor) é independente do rtcMode.
+ */
+export type RtcMode = "PROXIMITY_LOBBY" | "ZONE_ROOM";
+
 /** Classificação canônica de uma zona (mesma para cliente V2 e Token V2). */
 export interface ZoneClassification {
   zoneId: string;
   /** Zona existe neste mapa (pintada, ou embutida quando não há overrides). */
   exists: boolean;
+  /** Tipo de domínio do editor ("common" | "workspace"); não decide RTC. */
   kind: ZoneKind;
   supportsVideo: boolean;
-  /** true = sala de reunião privada (Room LiveKit própria); false = área comum/lobby. */
+  rtcMode: RtcMode;
+  /** true = rtcMode ZONE_ROOM (Room LiveKit própria). */
   isPrivateRoom: boolean;
 }
 
@@ -43,6 +53,7 @@ export function classifyZone(map: MapOverrides | null, zoneId: string): ZoneClas
       exists: true,
       kind: "common",
       supportsVideo: false,
+      rtcMode: "PROXIMITY_LOBBY",
       isPrivateRoom: false,
     };
   }
@@ -57,12 +68,14 @@ export function classifyZone(map: MapOverrides | null, zoneId: string): ZoneClas
   }
   const kind = kindOf(map, zoneId);
   const supportsVideo = builtin?.supportsVideo ?? false;
+  const rtcMode: RtcMode = exists ? "ZONE_ROOM" : "PROXIMITY_LOBBY";
   return {
     zoneId,
     exists,
     kind,
     supportsVideo,
-    isPrivateRoom: exists && (supportsVideo || kind === "common"),
+    rtcMode,
+    isPrivateRoom: rtcMode === "ZONE_ROOM",
   };
 }
 

@@ -70,8 +70,10 @@ function harness(opts: { staleTimes?: number } = {}) {
       return { send: (e) => sent.push(e), close: () => void closed.movement++ };
     },
   };
+  let presenceHandlers: Parameters<PresenceTransport["open"]>[0] | null = null;
   const presenceTransport: PresenceTransport = {
     open(h) {
+      presenceHandlers = h;
       queueMicrotask(() => h.onSubscribed());
       return {
         track: (p) => void presencePayloads.push(p),
@@ -124,6 +126,16 @@ function harness(opts: { staleTimes?: number } = {}) {
     closed,
     refreshMap,
     remoteMove: (e: MovementEvent) => movementHandlers?.onEvent(e),
+    presence: (ids: string[]) =>
+      presenceHandlers?.onPresence(
+        "sync",
+        Object.fromEntries(
+          ids.map((u) => [
+            u,
+            [{ userId: u, sessionId: "s", generation: 1, workspaceId: "ws", joinedAt: "t" }],
+          ]),
+        ),
+      ),
   };
 }
 
@@ -294,5 +306,35 @@ describe("RtcV2Runtime integrado", () => {
     expect(h.closed.presence).toBe(1);
     expect(h.rt.getSnapshot().disposed).toBe(true);
     expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("corredor: usuário parado cuja Presence ainda não chegou mantém posição e é assinado", async () => {
+    const h = harness();
+    h.rt.start();
+    h.rt.setSelfPosition(LOBBY.x, LOBBY.y);
+    await settle(400);
+    const room = FakeRoom.all.at(-1)!;
+    const setSub = vi.fn();
+    room.remoteParticipants.set("u2", {
+      identity: "u2",
+      trackPublications: new Map([["t1", { trackSid: "t1", setSubscribed: setSub }]]),
+    });
+    room.fire("participantConnected", room.remoteParticipants.get("u2"));
+    // u2 anuncia (SNAPSHOT_REQUEST com posição) e fica parado
+    h.remoteMove({
+      type: "SNAPSHOT_REQUEST", userId: "u2", sessionId: "x", generation: 1, seq: 1,
+      t: Date.now(), x: LOBBY.x + 0.01, y: LOBBY.y,
+    } as MovementEvent);
+    // sync de Presence chega ANTES do join de u2 (só "me")
+    h.presence(["me"]);
+    await settle(400);
+    expect(setSub).toHaveBeenLastCalledWith(true);
+    expect(h.rt.getSnapshot().mediaPeers).toEqual(["u2"]);
+    // u2 entra e depois SAI do Presence → posição esquecida, unsubscribe
+    h.presence(["me", "u2"]);
+    h.presence(["me"]);
+    await settle();
+    expect(setSub).toHaveBeenLastCalledWith(false);
+    await h.rt.dispose();
   });
 });
