@@ -66,7 +66,7 @@ function emptyOverrides(): MapOverrides {
 }
 
 // Defaults for built-in zones — workstations are claimable, social rooms are common.
-const DEFAULT_ZONE_KINDS: Record<string, ZoneKind> = {
+export const DEFAULT_ZONE_KINDS: Record<string, ZoneKind> = {
   "atendente-1": "workspace",
   "atendente-2": "workspace",
   "atendente-3": "workspace",
