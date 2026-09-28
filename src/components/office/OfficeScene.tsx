@@ -2544,12 +2544,20 @@ export function OfficeScene({
   // está efetivamente em uma conversa automática com pelo menos 1 outro peer
   // próximo/na mesma área, não apenas conectado ao SFU global do workspace.
   const isPrivateZone = currentZone.id !== "lobby";
+  const currentZoneRef = useRef(currentZone);
+  currentZoneRef.current = currentZone;
+  const meetingLabelFor = useCallback(
+    (zoneId: string) => (currentZoneRef.current.id === zoneId ? currentZoneRef.current.label : zoneId),
+    [],
+  );
   const { activeMeetingId } = useMeetingTracker({
     zoneId: currentZone.id,
     zoneLabel: currentZone.label,
     isMeetingZone: isPrivateZone,
     peerCount: desiredPeers.length,
     enabled: !!me?.id,
+    v2Room: rtc.v2?.room ?? null,
+    labelFor: meetingLabelFor,
   });
 
   // Gravação manual (botão). Mixa mic + áudio dos peers e envia ao storage.

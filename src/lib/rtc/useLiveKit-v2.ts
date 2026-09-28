@@ -30,6 +30,8 @@ export interface RtcV2HookConfig {
 /** Canais extras do V2 consumidos pelo OfficeScene (movimento/presença). */
 export interface RtcV2Controls {
   context: MediaContext;
+  /** Estado mínimo da Room (LiveKitRoomManager) para o meeting tracker. */
+  room: { status: RoomManagerStatus; connected: MediaContext | null };
   avatars: ReadonlyMap<string, RemoteAvatarState>;
   online: ReadonlyMap<string, PresencePayload>;
   reportMotion: (x: number, y: number, vx: number, vy: number) => void;
@@ -313,6 +315,7 @@ export function useLiveKitV2(
     if (!runtime || !snap) return null;
     return {
       context: snap.context,
+      room: snap.room,
       avatars: snap.avatars,
       online: snap.online,
       reportMotion: (x, y, vx, vy) => runtime.reportMotion(x, y, vx, vy),

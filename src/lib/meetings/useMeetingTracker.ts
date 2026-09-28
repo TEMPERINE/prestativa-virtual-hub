@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from "react";
+import { ACTIVE_RTC_ENGINE } from "@/lib/rtc/useLiveKit";
+import { MeetingTrackerV2, type MeetingRoomState } from "./meeting-tracker-v2";
 import { supabase } from "@/integrations/supabase/client";
 import { getCurrentWorkspaceId } from "@/lib/workspace/current";
 
@@ -21,6 +23,10 @@ type Args = {
   peerCount: number;
   /** O user já está autenticado? Se null/false, hook não faz nada. */
   enabled: boolean;
+  /** V2: estado da Room vindo do LiveKitRoomManager (fonte de verdade). */
+  v2Room?: MeetingRoomState | null;
+  /** V2: label para o zoneId efetivamente conectado. */
+  labelFor?: (zoneId: string) => string;
 };
 
 /**
@@ -33,13 +39,7 @@ type Args = {
  * sai da sala ou todos os peers caem, fechamos a participação. Se ele troca
  * de sala, fecha a anterior e abre uma nova.
  */
-export function useMeetingTracker({
-  zoneId,
-  zoneLabel,
-  isMeetingZone,
-  peerCount,
-  enabled,
-}: Args) {
+function useMeetingTrackerV1({ zoneId, zoneLabel, isMeetingZone, peerCount, enabled }: Args) {
   const [activeMeetingId, setActiveMeetingId] = useState<string | null>(null);
   const activeMeetingRef = useRef<string | null>(null);
   const activeZoneRef = useRef<string | null>(null);
@@ -122,3 +122,54 @@ export function useMeetingTracker({
 
   return { activeMeetingId };
 }
+
+/**
+ * V2 — join/leave derivados exclusivamente da Room privada realmente
+ * CONNECTED (ver meeting-tracker-v2.ts). Falhas só são logadas.
+ */
+function useMeetingTrackerV2({ enabled, v2Room, labelFor }: Args) {
+  const [activeMeetingId, setActiveMeetingId] = useState<string | null>(null);
+  const labelRef = useRef(labelFor);
+  labelRef.current = labelFor;
+  const [tracker, setTracker] = useState<MeetingTrackerV2 | null>(null);
+
+  useEffect(() => {
+    if (!enabled) return;
+    const t = new MeetingTrackerV2({
+      join: async (zoneId) => {
+        const ws = getCurrentWorkspaceId();
+        if (!ws) throw new Error("workspace ainda não setado");
+        const { data, error } = await rpc("meeting_join", {
+          _workspace_id: ws,
+          _zone_id: zoneId,
+          _zone_label: labelRef.current?.(zoneId) ?? zoneId,
+        });
+        if (error) throw error;
+        return (data as string | null) ?? null;
+      },
+      leave: async (id) => {
+        const { error } = await rpc("meeting_leave", { _meeting_id: id });
+        if (error) throw error;
+      },
+      onError: (op, err) =>
+        console.error(`[meeting] meeting_${op} falhou (mídia não afetada):`, err),
+      onChange: setActiveMeetingId,
+    });
+    setTracker(t);
+    return () => {
+      setTracker(null);
+      void t.dispose();
+    };
+  }, [enabled]);
+
+  const status = v2Room?.status ?? null;
+  const connected = v2Room?.connected ?? null;
+  useEffect(() => {
+    tracker?.observe({ status, connected });
+  }, [tracker, status, connected]);
+
+  return { activeMeetingId };
+}
+
+export const useMeetingTracker: (args: Args) => { activeMeetingId: string | null } =
+  ACTIVE_RTC_ENGINE === "v2" ? useMeetingTrackerV2 : useMeetingTrackerV1;

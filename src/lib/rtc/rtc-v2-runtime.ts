@@ -92,6 +92,8 @@ export interface RtcV2Snapshot {
   roomStatus: RoomManagerSnapshot["status"];
   roomName: string | null;
   error: string | null;
+  /** Status + contexto da Room realmente conectada (referência estável). */
+  room: { status: RoomManagerSnapshot["status"]; connected: MediaContext | null };
   context: MediaContext;
   local: LocalMediaSnapshot;
   remote: RemoteMediaSnapshot;
@@ -441,6 +443,10 @@ export class RtcV2Runtime {
       roomStatus: r.status,
       roomName: r.roomName,
       error: r.error,
+      room:
+        this.snap && this.snap.room.status === r.status && this.snap.room.connected === r.connected
+          ? this.snap.room
+          : { status: r.status, connected: r.connected },
       context: this.context.getSnapshot().context,
       local: this.local.getSnapshot(),
       remote: this.remote.getSnapshot(),
