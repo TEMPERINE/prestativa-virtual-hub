@@ -140,7 +140,11 @@ describe("LiveKitRoomManager", () => {
     m.setDesiredContext(LOBBY);
     await settle(m);
     expect(h.rooms[0].opts).toEqual({ autoSubscribe: false });
-    expect(m.getSnapshot()).toMatchObject({ status: "CONNECTED", connected: LOBBY, roomName: "room:LOBBY" });
+    expect(m.getSnapshot()).toMatchObject({
+      status: "CONNECTED",
+      connected: LOBBY,
+      roomName: "room:LOBBY",
+    });
   });
 
   it("3. PRIVATE_ROOM conecta com autoSubscribe:true", async () => {
@@ -234,7 +238,11 @@ describe("LiveKitRoomManager", () => {
     m.setDesiredContext(B);
     m.setDesiredContext(LOBBY);
     await flush();
-    h.pendingTokens.forEach((t) => t.d.resolve({ url: "u", token: t.ctx }));
+    // resolve tokens conforme forem pedidos (A obsoleto, depois LOBBY)
+    for (let i = 0; i < 5; i++) {
+      h.pendingTokens.splice(0).forEach((t) => t.d.resolve({ url: "u", token: t.ctx }));
+      await flush();
+    }
     await settle(m);
     // Nenhum fila histórica: B nunca é tentado; termina em LOBBY.
     expect(h.tokenCalls).not.toContain("B");

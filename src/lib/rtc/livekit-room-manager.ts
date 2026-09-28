@@ -40,7 +40,9 @@ export interface ConnectionInfo {
   roomName?: string;
 }
 
-export type TokenProvider = (ctx: Exclude<MediaContext, { kind: "OFFLINE" }>) => Promise<ConnectionInfo>;
+export type TokenProvider = (
+  ctx: Exclude<MediaContext, { kind: "OFFLINE" }>,
+) => Promise<ConnectionInfo>;
 
 export type RoomEventName = "reconnecting" | "reconnected" | "disconnected";
 
@@ -83,7 +85,8 @@ export async function createLiveKitRoomFactory(): Promise<RoomFactory> {
   return () => {
     const room = new Room({ adaptiveStream: true, dynacast: true });
     return {
-      connect: (url, token, opts) => room.connect(url, token, { autoSubscribe: opts.autoSubscribe }),
+      connect: (url, token, opts) =>
+        room.connect(url, token, { autoSubscribe: opts.autoSubscribe }),
       disconnect: () => room.disconnect(false),
       on: (e, fn) => void room.on(map[e] as never, fn as never),
       off: (e, fn) => void room.off(map[e] as never, fn as never),
@@ -233,7 +236,12 @@ export class LiveKitRoomManager {
         await this.closeRoom(a);
         return;
       }
-      this.patch({ status: "CONNECTED", connected: target, roomName: info.roomName ?? null, error: null });
+      this.patch({
+        status: "CONNECTED",
+        connected: target,
+        roomName: info.roomName ?? null,
+        error: null,
+      });
       // se o destino mudou durante o connect, o loop desconecta na próxima volta
     }
   }
