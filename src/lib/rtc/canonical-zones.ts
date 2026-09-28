@@ -25,8 +25,21 @@ function kindOf(map: MapOverrides | null, id: string): ZoneKind {
   return DEFAULT_ZONE_KINDS[id] ?? "common";
 }
 
-export function resolveMeetingZone(map: MapOverrides | null, zoneId: string): ZoneResolution {
-  if (!zoneId || zoneId === "lobby") return { ok: false, reason: "ZONE_NOT_FOUND" };
+/** Classificação canônica de uma zona (mesma para cliente V2 e Token V2). */
+export interface ZoneClassification {
+  zoneId: string;
+  /** Zona existe neste mapa (pintada, ou embutida quando não há overrides). */
+  exists: boolean;
+  kind: ZoneKind;
+  supportsVideo: boolean;
+  /** true = sala de reunião privada (Room LiveKit própria); false = área comum/lobby. */
+  isPrivateRoom: boolean;
+}
+
+export function classifyZone(map: MapOverrides | null, zoneId: string): ZoneClassification {
+  if (!zoneId || zoneId === "lobby") {
+    return { zoneId: "lobby", exists: true, kind: "common", supportsVideo: false, isPrivateRoom: false };
+  }
   const builtin = ZONES.find((z) => z.id === zoneId && z.id !== "lobby");
   let exists: boolean;
   if (map) {
@@ -36,9 +49,16 @@ export function resolveMeetingZone(map: MapOverrides | null, zoneId: string): Zo
   } else {
     exists = !!builtin;
   }
-  if (!exists) return { ok: false, reason: "ZONE_NOT_FOUND" };
-  const meeting = (builtin?.supportsVideo ?? false) || kindOf(map, zoneId) === "common";
-  return meeting ? { ok: true, zoneId } : { ok: false, reason: "ZONE_NOT_PRIVATE" };
+  const kind = kindOf(map, zoneId);
+  const supportsVideo = builtin?.supportsVideo ?? false;
+  return { zoneId, exists, kind, supportsVideo, isPrivateRoom: exists && (supportsVideo || kind === "common") };
+}
+
+export function resolveMeetingZone(map: MapOverrides | null, zoneId: string): ZoneResolution {
+  if (!zoneId || zoneId === "lobby") return { ok: false, reason: "ZONE_NOT_FOUND" };
+  const c = classifyZone(map, zoneId);
+  if (!c.exists) return { ok: false, reason: "ZONE_NOT_FOUND" };
+  return c.isPrivateRoom ? { ok: true, zoneId } : { ok: false, reason: "ZONE_NOT_PRIVATE" };
 }
 
 // ─── Regra PURA ponto → zona (RTC v2, Etapa 12) ─────────────────────────────
@@ -98,4 +118,9 @@ export function meetingZoneAtPoint(map: MapOverrides | null, p: Point): string |
   if (id === "lobby") return null;
   const r = resolveMeetingZone(map, id);
   return r.ok ? r.zoneId : null;
+}
+
+/** Ponto → classificação completa, pela regra canônica. */
+export function classifyPoint(map: MapOverrides | null, p: Point): ZoneClassification {
+  return classifyZone(map, zoneIdAtPoint(map, p));
 }

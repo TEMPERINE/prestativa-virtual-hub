@@ -11,6 +11,9 @@ import {
   type ZoneId,
 } from "@/lib/office-map";
 import { zoneRectFromOverrides, getZoneKind, customZonesFromOverrides, pullOverridesFromCloud, subscribeOverridesFromCloud, spawnPointForZone } from "@/lib/map-overrides";
+import { legacyCallZoneAt } from "@/lib/legacy-call-zone";
+import { zoneIdAtPoint } from "@/lib/rtc/canonical-zones";
+import { loadOverrides } from "@/lib/map-overrides";
 import { useOfficeTheme } from "@/hooks/useOfficeTheme";
 import parkLeft from "@/assets/scene-park-left.webp";
 import roadRight from "@/assets/scene-road-right.webp";
@@ -209,23 +212,10 @@ function describeMediaError(err: unknown, kind: "microfone" | "câmera"): string
   return msg ? `Não foi possível acessar o(a) ${kind}: ${msg}` : `Não foi possível acessar o(a) ${kind}.`;
 }
 
+// v1: regra legada (lê o cache global do mapa). v2: regra canônica pura
+// compartilhada com o Token V2 (canonical-zones), recebendo o mesmo mapa.
 function callZoneAt(p: Point): ZoneId {
-  // Fonte principal: a zona pintada no editor. Se o ponto cair num pequeno
-  // buraco sem pintura dentro do envelope de uma sala comum (mesa/cadeira/
-  // detalhe visual), ainda conta como a mesma sala para a chamada. Isso não
-  // cria zonas internas nos assentos nem usa áreas legadas de atendimento.
-  const direct = zoneAt(p);
-  if (direct.id !== "lobby") return direct.id;
-
-  const commonZones = [
-    ...ZONES.filter((z) => z.id !== "lobby").map((z) => z.id),
-    ...customZonesFromOverrides().map((z) => z.id),
-  ];
-  for (const id of commonZones) {
-    const rect = zoneRectFromOverrides(id as ZoneId);
-    if (rect && pointInsideRect(p, rect)) return id as ZoneId;
-  }
-  return "lobby";
+  return IS_RTC_V2 ? (zoneIdAtPoint(loadOverrides(), p) as ZoneId) : legacyCallZoneAt(p);
 }
 
 const MEETING_AREA_RECT_PADDING = 0.018;
