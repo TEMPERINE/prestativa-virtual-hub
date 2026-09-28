@@ -16,19 +16,30 @@ vi.mock("@/integrations/supabase/client", () => {
   const from = () => {
     let pending: Row | null = null;
     const q = {
-      upsert: (v: { data: unknown }) => { pending = upsert(v.data); return q; },
+      upsert: (v: { data: unknown }) => {
+        pending = upsert(v.data);
+        return q;
+      },
       select: () => q,
       eq: () => q,
       single: async () => ({ data: pending, error: null }),
       maybeSingle: async () => ({ data: db.row, error: null }),
-      delete: () => { db.deletes++; return q; },
+      delete: () => {
+        db.deletes++;
+        return q;
+      },
     };
     return q;
   };
   return { supabase: { from, auth: { getUser: async () => ({ data: { user: { id: "u1" } } }) } } };
 });
 
-const small = (z: string) => ({ cols: 2, rows: 2, blocked: [1, 0, 0, 0], zones: [z, null, null, null] });
+const small = (z: string) => ({
+  cols: 2,
+  rows: 2,
+  blocked: [1, 0, 0, 0],
+  zones: [z, null, null, null],
+});
 const fetchRow = async () => (db.row ? { data: db.row.data, version: db.row.version } : null);
 
 async function freshModule() {
@@ -41,7 +52,12 @@ async function freshModule() {
     },
     dispatchEvent: () => true,
   });
-  vi.stubGlobal("CustomEvent", class { constructor(public type: string) {} });
+  vi.stubGlobal(
+    "CustomEvent",
+    class {
+      constructor(public type: string) {}
+    },
+  );
   const cur = await import("@/lib/workspace/current");
   cur.setCurrentWorkspaceId("ws1");
   const mo = await import("@/lib/map-overrides");
@@ -49,7 +65,10 @@ async function freshModule() {
   return { mo, store };
 }
 
-beforeEach(() => { db.row = { workspace_id: "ws1", data: small("a"), version: 17 }; db.deletes = 0; });
+beforeEach(() => {
+  db.row = { workspace_id: "ws1", data: small("a"), version: 17 };
+  db.deletes = 0;
+});
 
 describe("Etapa 4B — reset sem DELETE", () => {
   it("1/2. version 17 + reset = 18; nova edição = 19", async () => {
@@ -69,7 +88,10 @@ describe("Etapa 4B — reset sem DELETE", () => {
     const { mo } = await freshModule();
     await mo.pullOverridesFromCloud();
     const seen: number[] = [];
-    for (let i = 0; i < 3; i++) { await mo.clearOverridesInCloud(); seen.push(mo.getMapSync().snapshot().version); }
+    for (let i = 0; i < 3; i++) {
+      await mo.clearOverridesInCloud();
+      seen.push(mo.getMapSync().snapshot().version);
+    }
     expect(seen).toEqual([18, 19, 20]);
     expect(db.row!.workspace_id).toBe("ws1");
   });
