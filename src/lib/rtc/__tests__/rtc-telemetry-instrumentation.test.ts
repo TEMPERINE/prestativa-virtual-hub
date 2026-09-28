@@ -424,8 +424,6 @@ describe("Etapa 11B — Presence / Movement", () => {
   it("PRESENCE_ERROR em erro real; sync/join/leave não geram telemetria", async () => {
     const { adapter, rows } = recAdapter();
     const tel = new RtcTelemetry({ adapter, session: emptySession });
-    let h!: Parameters<Parameters<typeof OfficePresence.prototype.start>[0] extends never ? never : never>[0];
-    void h;
     let handlers!: { onPresence: (k: "sync", s: object) => void; onSubscribed(): void; onError(m: string): void };
     const p = new OfficePresence({
       self: { userId: "u1", sessionId: "s1", generation: 1, workspaceId: "w1" },
