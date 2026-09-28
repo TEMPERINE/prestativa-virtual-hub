@@ -685,6 +685,53 @@ export function OfficeScene({
     return out;
   }, [audibleConnectedPeers, rtc.remoteScreenStreams]);
 
+  // ---- RTC v2: posição própria → runtime (contexto, spatial, movement) ----
+  const rtcV2Ready = !!rtc.v2;
+  useEffect(() => {
+    if (!IS_RTC_V2 || !rtcV2Ready || !positionHydratedRef.current) return;
+    const v2 = rtcV2Ref.current;
+    if (!v2) return;
+    // Caminhada já reportou via reportMotion; salto sem caminhada = teleporte.
+    if (performance.now() - lastMotionAtRef.current < 250) v2.setSelfPosition(pos.x, pos.y);
+    else v2.announceJump(pos.x, pos.y);
+  }, [pos.x, pos.y, rtcV2Ready]);
+
+  // ---- RTC v2: Movement V2 + Presence V2 → estado já usado pelo renderer ----
+  const v2Avatars = rtc.v2?.avatars ?? null;
+  const v2Online = rtc.v2?.online ?? null;
+  useEffect(() => {
+    if (!IS_RTC_V2 || !v2Avatars || !v2Online) return;
+    const myId = meIdRef.current;
+    for (const [uid, a] of v2Avatars) {
+      if (uid !== myId && v2Online.has(uid)) maybeStartRemoteTeleportFromCurrent(uid, { x: a.x, y: a.y }, 0);
+    }
+    setPositions((prev) => {
+      const next: Record<string, RemotePos> = { ...prev };
+      for (const [uid, cur] of Object.entries(prev)) {
+        if (uid === myId) continue;
+        const online = v2Online.has(uid);
+        if (cur.is_online !== online) next[uid] = { ...cur, is_online: online };
+      }
+      for (const [uid, a] of v2Avatars) {
+        if (uid === myId || !v2Online.has(uid)) continue;
+        const cur = prev[uid];
+        const facing: Facing =
+          Math.abs(a.vx) > Math.abs(a.vy)
+            ? (a.vx > 0 ? "right" : "left")
+            : Math.abs(a.vy) > 0
+              ? (a.vy > 0 ? "down" : "up")
+              : (cur?.facing ?? "down");
+        next[uid] = { user_id: uid, x: a.x, y: a.y, zone: callZoneAt(a), facing, is_online: true, ts: a.seq };
+      }
+      return next;
+    });
+    setPresentPeerIds((prev) => {
+      const ids = new Set([...v2Online.keys()].filter((id) => id !== myId));
+      if (prev.size === ids.size && [...ids].every((id) => prev.has(id))) return prev;
+      return ids;
+    });
+  }, [v2Avatars, v2Online, maybeStartRemoteTeleportFromCurrent]);
+
   // Wires global audio unlock so remote <audio> tags can autoplay.
   // Camera/mic access stays inside the user's click/keyboard gesture.
   useEffect(() => {
