@@ -236,7 +236,9 @@ export class MovementRealtime {
     return Math.abs(lb - la) / la > this.speedRatio;
   }
 
-  private motion(type: MovementEventType): Omit<MovementEvent, "userId" | "sessionId" | "generation" | "seq"> {
+  private motion(
+    type: MovementEventType,
+  ): Omit<MovementEvent, "userId" | "sessionId" | "generation" | "seq"> {
     const l = this.local!;
     const stopped = type === "MOTION_STOP";
     return {

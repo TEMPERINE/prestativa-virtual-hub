@@ -210,9 +210,14 @@ export function createSupabasePresenceTransport(
       channel.on("presence", { event: "sync" }, () => emit("sync"));
       channel.on("presence", { event: "join" }, () => emit("join"));
       channel.on("presence", { event: "leave" }, () => emit("leave"));
-      channel.on("system", {}, (payload: { status?: string; message?: string; extension?: string }) => {
-        if (payload?.status === "error") handlers.onError(payload.message ?? "presence system error");
-      });
+      channel.on(
+        "system",
+        {},
+        (payload: { status?: string; message?: string; extension?: string }) => {
+          if (payload?.status === "error")
+            handlers.onError(payload.message ?? "presence system error");
+        },
+      );
       channel.subscribe((status, err) => {
         if (status === "SUBSCRIBED") handlers.onSubscribed();
         else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {

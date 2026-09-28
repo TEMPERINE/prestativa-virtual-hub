@@ -8,7 +8,8 @@ import {
 } from "@/lib/rtc/movement-realtime";
 
 function fakeTransport() {
-  const opened: { handlers: MovementTransportHandlers; sent: MovementEvent[]; closed: boolean }[] = [];
+  const opened: { handlers: MovementTransportHandlers; sent: MovementEvent[]; closed: boolean }[] =
+    [];
   const transport: MovementTransport = {
     open(handlers) {
       const entry = { handlers, sent: [] as MovementEvent[], closed: false };
@@ -64,7 +65,14 @@ describe("MovementRealtime", () => {
     const { m, t } = setup();
     m.updateLocal(0.1, 0.1, 0.2, 0);
     expect(types(t.all()).at(-1)).toBe("MOTION_START");
-    expect(t.all().at(-1)).toMatchObject({ x: 0.1, y: 0.1, vx: 0.2, vy: 0, generation: 1, sessionId: "s-me" });
+    expect(t.all().at(-1)).toMatchObject({
+      x: 0.1,
+      y: 0.1,
+      vx: 0.2,
+      vy: 0,
+      generation: 1,
+      sessionId: "s-me",
+    });
   });
 
   it("3/19. 60 FPS contínuo não gera broadcast por frame", () => {
@@ -90,7 +98,14 @@ describe("MovementRealtime", () => {
     const { m, t } = setup();
     m.updateLocal(0, 0, 1, 0);
     m.updateLocal(0.4321, 0.1234, 0, 0);
-    expect(t.all().at(-1)).toMatchObject({ type: "MOTION_STOP", x: 0.4321, y: 0.1234, vx: 0, vy: 0, moving: false });
+    expect(t.all().at(-1)).toMatchObject({
+      type: "MOTION_STOP",
+      x: 0.4321,
+      y: 0.1234,
+      vx: 0,
+      vy: 0,
+      moving: false,
+    });
   });
 
   it("6. POSITION_SYNC ~1/s enquanto move", () => {
@@ -136,7 +151,12 @@ describe("MovementRealtime", () => {
     const { m, h } = setup();
     h().onEvent(ev({ seq: 50, x: 0.1 }));
     h().onEvent(ev({ generation: 2, sessionId: "s2b", seq: 1, x: 0.9 }));
-    expect(m.getRemoteStates().get("u2")).toMatchObject({ generation: 2, sessionId: "s2b", seq: 1, x: 0.9 });
+    expect(m.getRemoteStates().get("u2")).toMatchObject({
+      generation: 2,
+      sessionId: "s2b",
+      seq: 1,
+      x: 0.9,
+    });
     h().onEvent(ev({ generation: 1, seq: 99, x: 0.0 }));
     expect(m.getRemoteStates().get("u2")?.x).toBe(0.9);
   });

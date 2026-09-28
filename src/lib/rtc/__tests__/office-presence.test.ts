@@ -6,7 +6,11 @@ import {
   type PresenceTransport,
   type PresenceTransportHandlers,
 } from "@/lib/rtc/office-presence";
-import { movementTopic, MovementRealtime, type MovementTransport } from "@/lib/rtc/movement-realtime";
+import {
+  movementTopic,
+  MovementRealtime,
+  type MovementTransport,
+} from "@/lib/rtc/movement-realtime";
 
 function fakeTransport() {
   const opened: {
@@ -36,7 +40,13 @@ function fakeTransport() {
   return { transport, opened, trackCount };
 }
 
-const self = { userId: "me", sessionId: "s1", generation: 3, workspaceId: "w1", joinedAt: "2026-01-01T00:00:00Z" };
+const self = {
+  userId: "me",
+  sessionId: "s1",
+  generation: 3,
+  workspaceId: "w1",
+  joinedAt: "2026-01-01T00:00:00Z",
+};
 const meta = (userId: string, generation = 1): PresencePayload => ({
   userId,
   sessionId: `s-${userId}`,
@@ -70,8 +80,15 @@ describe("OfficePresence", () => {
     const { t, h } = setup();
     h().onSubscribed();
     const p = t.opened[0].tracks[0] as unknown as Record<string, unknown>;
-    expect(Object.keys(p).sort()).toEqual(["generation", "joinedAt", "sessionId", "userId", "workspaceId"]);
-    for (const k of ["x", "y", "vx", "vy", "zoneId", "roomName", "direction"]) expect(p).not.toHaveProperty(k);
+    expect(Object.keys(p).sort()).toEqual([
+      "generation",
+      "joinedAt",
+      "sessionId",
+      "userId",
+      "workspaceId",
+    ]);
+    for (const k of ["x", "y", "vx", "vy", "zoneId", "roomName", "direction"])
+      expect(p).not.toHaveProperty(k);
     expect(p).toMatchObject({ sessionId: "s1", generation: 3 });
   });
 
@@ -110,7 +127,13 @@ describe("OfficePresence", () => {
     const closed = vi.fn();
     const p = new OfficePresence({
       self,
-      transport: { open: () => ({ track: () => {}, untrack: () => Promise.reject(new Error("x")), close: closed }) },
+      transport: {
+        open: () => ({
+          track: () => {},
+          untrack: () => Promise.reject(new Error("x")),
+          close: closed,
+        }),
+      },
     });
     p.start();
     await p.dispose();
@@ -156,7 +179,10 @@ describe("OfficePresence", () => {
         return { send: () => {}, close: () => void (movementClosed = true) };
       },
     };
-    const m = new MovementRealtime({ self: { userId: "me", sessionId: "s1", generation: 3 }, transport: mt });
+    const m = new MovementRealtime({
+      self: { userId: "me", sessionId: "s1", generation: 3 },
+      transport: mt,
+    });
     m.start();
     const { p, h } = setup({ cooldown: 10 });
     topics.push(presenceTopic("w1"));
