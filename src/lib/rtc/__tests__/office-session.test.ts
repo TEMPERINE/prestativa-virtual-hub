@@ -21,7 +21,12 @@ function makeBackend() {
     }),
     release: vi.fn(async (sessionId: string, generation: number) => {
       if (releaseError) throw releaseError;
-      if (db.row && db.row.sessionId === sessionId && db.row.generation === generation && db.row.active) {
+      if (
+        db.row &&
+        db.row.sessionId === sessionId &&
+        db.row.generation === generation &&
+        db.row.active
+      ) {
         db.row.active = false;
         return true;
       }
