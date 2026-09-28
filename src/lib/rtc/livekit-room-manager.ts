@@ -69,10 +69,7 @@ export function sameCtx(a: MediaContext | null, b: MediaContext | null): boolean
   return a.kind !== "PRIVATE_ROOM" || a.zoneId === (b as { zoneId: string }).zoneId;
 }
 
-export function roomNameFor(workspaceId: string, ctx: MediaContext): string | null {
-  if (ctx.kind === "OFFLINE") return null;
-  return `prestativa-office:${workspaceId}:${ctx.kind === "LOBBY" ? "lobby" : ctx.zoneId}`;
-}
+export { roomNameFor } from "./room-names";
 
 /** Factory de produção — único `new Room()` do RTC v2. Carregada sob demanda. */
 export async function createLiveKitRoomFactory(): Promise<RoomFactory> {
