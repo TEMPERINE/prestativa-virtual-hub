@@ -1,0 +1,1 @@
+- RTC v2: zona (ponto→zoneId/kind/privado) vem só de src/lib/rtc/canonical-zones.ts, usado pelo cliente V2 e pelo Token V2 — evita divergência cliente/servidor; o callZoneAt legado (src/lib/legacy-call-zone.ts) fica só no v1.
