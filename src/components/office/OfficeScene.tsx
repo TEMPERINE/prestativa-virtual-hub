@@ -67,7 +67,10 @@ import { LogOut, Mic, MicOff, Video, VideoOff, MonitorUp, Users, Pencil, User as
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import EmojiPicker, { EmojiStyle, Theme as EmojiTheme } from "emoji-picker-react";
 import { Link } from "@tanstack/react-router";
-import { useLiveKit } from "@/lib/rtc/useLiveKit";
+import { useLiveKit, ACTIVE_RTC_ENGINE, type RtcV2HookConfig } from "@/lib/rtc/useLiveKit";
+
+// Motor RTC escolhido uma vez por execução (VITE_RTC_ENGINE; default v1).
+const IS_RTC_V2 = ACTIVE_RTC_ENGINE === "v2";
 import { installAudioUnlockListeners, unlockAudioPlayback } from "@/lib/rtc/audio-unlock";
 import { RemoteVideoTiles } from "./RemoteVideoTiles";
 import { CamPreviewAndPicker } from "./CamPreviewAndPicker";
@@ -326,7 +329,10 @@ function nearbyWalkablePoint(anchor: Point, avoid: Point[] = [], preferredZoneId
   return anchor;
 }
 
-export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
+export function OfficeScene({
+  onHydrated,
+  rtcSession = null,
+}: { onHydrated?: () => void; rtcSession?: RtcV2HookConfig | null } = {}) {
   const officeTheme = useOfficeTheme();
   // Capacidades por nível do espaço atual — controlam botões de gravar,
   // teleporte e troca de personagem.
@@ -640,17 +646,28 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
   const audiblePeerIds = useMemo(() => new Set(desiredPeers), [desiredPeers]);
   // Conexão LiveKit por zona; `audiblePeerIds` controla setSubscribed nas
   // tracks remotas e mantém a experiência simétrica dentro da sala.
-  const rtc = useLiveKit(me?.id ?? null, roomKey, audiblePeerIds);
+  // v1: comportamento legado (roomKey + filtro). v2: sessão ACTIVE da rota;
+  // roster privado vem do LiveKit e o lobby é filtrado por SpatialSubscriptions.
+  const rtc = useLiveKit(
+    me?.id ?? null,
+    IS_RTC_V2 ? null : roomKey,
+    IS_RTC_V2 ? null : audiblePeerIds,
+    IS_RTC_V2 ? rtcSession : null,
+  );
+  const rtcV2Ref = useRef(rtc.v2);
+  rtcV2Ref.current = rtc.v2;
+  const lastMotionAtRef = useRef(0);
   useEffect(() => {
     connectedPeersRef.current = new Set(desiredPeers);
   }, [desiredPeers]);
 
   // Peers audíveis = quem está conectado no LiveKit ∩ política de mídia atual.
   const audibleConnectedPeers = useMemo(
-    () => rtc.connectedPeers.filter((id) => audiblePeerIds.has(id)),
+    () => (IS_RTC_V2 ? rtc.connectedPeers : rtc.connectedPeers.filter((id) => audiblePeerIds.has(id))),
     [rtc.connectedPeers, audiblePeerIds],
   );
   const audibleStreams = useMemo(() => {
+    if (IS_RTC_V2) return rtc.remoteStreams;
     const out: Record<string, MediaStream> = {};
     for (const id of audibleConnectedPeers) {
       const s = rtc.remoteStreams[id];
@@ -659,6 +676,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
     return out;
   }, [audibleConnectedPeers, rtc.remoteStreams]);
   const audibleScreenStreams = useMemo(() => {
+    if (IS_RTC_V2) return rtc.remoteScreenStreams;
     const out: Record<string, MediaStream> = {};
     for (const id of audibleConnectedPeers) {
       const s = rtc.remoteScreenStreams[id];
@@ -666,6 +684,53 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
     }
     return out;
   }, [audibleConnectedPeers, rtc.remoteScreenStreams]);
+
+  // ---- RTC v2: posição própria → runtime (contexto, spatial, movement) ----
+  const rtcV2Ready = !!rtc.v2;
+  useEffect(() => {
+    if (!IS_RTC_V2 || !rtcV2Ready || !positionHydratedRef.current) return;
+    const v2 = rtcV2Ref.current;
+    if (!v2) return;
+    // Caminhada já reportou via reportMotion; salto sem caminhada = teleporte.
+    if (performance.now() - lastMotionAtRef.current < 250) v2.setSelfPosition(pos.x, pos.y);
+    else v2.announceJump(pos.x, pos.y);
+  }, [pos.x, pos.y, rtcV2Ready]);
+
+  // ---- RTC v2: Movement V2 + Presence V2 → estado já usado pelo renderer ----
+  const v2Avatars = rtc.v2?.avatars ?? null;
+  const v2Online = rtc.v2?.online ?? null;
+  useEffect(() => {
+    if (!IS_RTC_V2 || !v2Avatars || !v2Online) return;
+    const myId = meIdRef.current;
+    for (const [uid, a] of v2Avatars) {
+      if (uid !== myId && v2Online.has(uid)) maybeStartRemoteTeleportFromCurrent(uid, { x: a.x, y: a.y }, 0);
+    }
+    setPositions((prev) => {
+      const next: Record<string, RemotePos> = { ...prev };
+      for (const [uid, cur] of Object.entries(prev)) {
+        if (uid === myId) continue;
+        const online = v2Online.has(uid);
+        if (cur.is_online !== online) next[uid] = { ...cur, is_online: online };
+      }
+      for (const [uid, a] of v2Avatars) {
+        if (uid === myId || !v2Online.has(uid)) continue;
+        const cur = prev[uid];
+        const facing: Facing =
+          Math.abs(a.vx) > Math.abs(a.vy)
+            ? (a.vx > 0 ? "right" : "left")
+            : Math.abs(a.vy) > 0
+              ? (a.vy > 0 ? "down" : "up")
+              : (cur?.facing ?? "down");
+        next[uid] = { user_id: uid, x: a.x, y: a.y, zone: callZoneAt(a), facing, is_online: true, ts: a.seq };
+      }
+      return next;
+    });
+    setPresentPeerIds((prev) => {
+      const ids = new Set([...v2Online.keys()].filter((id) => id !== myId));
+      if (prev.size === ids.size && [...ids].every((id) => prev.has(id))) return prev;
+      return ids;
+    });
+  }, [v2Avatars, v2Online, maybeStartRemoteTeleportFromCurrent]);
 
   // Wires global audio unlock so remote <audio> tags can autoplay.
   // Camera/mic access stays inside the user's click/keyboard gesture.
@@ -712,10 +777,12 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
     const updatedAt = new Date(payload.ts).toISOString();
     writeLocalSavedPosition(userId, { x, y }, z, f);
     const ch = positionBroadcastChannelRef.current;
-    if (ch && positionBroadcastReadyRef.current) {
+    if (!IS_RTC_V2 && ch && positionBroadcastReadyRef.current) {
       void ch.send({ type: "broadcast", event: "position", payload });
     }
     const now = performance.now();
+    // v2: movimento ao vivo é do Movement V2; sem escrita periódica no banco.
+    if (IS_RTC_V2 && !persistNow) return;
     // Persistência leve: broadcast já cobre tempo real, então salvamos no DB
     // só de 2 em 2s enquanto anda. Snapshot final no keyup/pagehide já força
     // persistNow=true, mantendo a posição correta ao desconectar.
@@ -880,6 +947,10 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
     // re-render é aceitável — só roda enquanto há tecla pressionada.
     lastPosCommit.current = performance.now();
     setPos(np);
+    if (IS_RTC_V2) {
+      lastMotionAtRef.current = performance.now();
+      rtcV2Ref.current?.reportMotion(np.x, np.y, (dx / step) * SPEED_PER_SEC, (dy / step) * SPEED_PER_SEC);
+    }
     const now = performance.now();
 
     if (now - lastSent.current > SEND_INTERVAL_MS) {
@@ -1304,14 +1375,15 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
       if (token) {
         try { await supabase.realtime.setAuth(token); } catch { /* noop */ }
       }
-      ch.subscribe();
+      if (!IS_RTC_V2) ch.subscribe();
       reactionCh.subscribe();
-      positionBroadcastCh.subscribe((status) => {
+      if (!IS_RTC_V2) positionBroadcastCh.subscribe((status) => {
         positionBroadcastReadyRef.current = status === "SUBSCRIBED";
         if (status === "SUBSCRIBED") requestLiveState();
       });
       claimsCh.subscribe();
-      presenceCh.subscribe(async (status) => {
+      // v2: Presence legado (com posição + heartbeat) não roda; usa Presence V2.
+      if (!IS_RTC_V2) presenceCh.subscribe(async (status) => {
         if (status !== "SUBSCRIBED") return;
         const uid = meIdRef.current;
         if (!uid || !positionHydratedRef.current) return;
@@ -1328,7 +1400,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
     // Heartbeat presence every second so peers detect each other within 1s of
     // joining and the "frozen avatar" symptom can't happen even if both
     // postgres_changes and broadcasts get dropped on flaky networks.
-    const presenceHeartbeat = window.setInterval(() => {
+    const presenceHeartbeat = IS_RTC_V2 ? 0 : window.setInterval(() => {
       const uid = meIdRef.current;
       if (!uid || !positionHydratedRef.current) return;
       const cur = posRef.current;
@@ -1345,6 +1417,7 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
     // closes the gap so the other avatars don't appear "frozen".
     const onVisible = () => {
       if (document.visibilityState !== "visible") return;
+      if (IS_RTC_V2) return;
       const uid = meIdRef.current;
       if (!uid || !positionHydratedRef.current) return;
       const cur = posRef.current;
@@ -1481,14 +1554,14 @@ export function OfficeScene({ onHydrated }: { onHydrated?: () => void } = {}) {
         return next;
       });
     };
-    const positionsPoll = window.setInterval(() => {
+    const positionsPoll = IS_RTC_V2 ? 0 : window.setInterval(() => {
       void syncPositions();
     }, 1000);
 
     // Idle DB heartbeat — persist the local position every 2s even when
     // standing still, so other clients' DB poll never reads a stale row and
     // can't snap our avatar back to a previous spot.
-    const persistHeartbeat = window.setInterval(() => {
+    const persistHeartbeat = IS_RTC_V2 ? 0 : window.setInterval(() => {
       const uid = meIdRef.current;
       if (!uid || !positionHydratedRef.current) return;
       const cur = posRef.current;

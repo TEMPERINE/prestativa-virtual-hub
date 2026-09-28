@@ -1,0 +1,370 @@
+/**
+ * RTC v2 — Etapa 12: hook React que monta o runtime V2 e o adapta ao
+ * contrato público de useLiveKit (RtcMeshState). Só coordena; a lógica está
+ * nos módulos RTC v2. Um runtime por (usuário, workspace, sessão, generation).
+ */
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import type { RtcConnectionStatus, RtcMeshState } from "./useLiveKit-v1";
+import { RtcV2Runtime, createV2RoomFactory, type RtcV2Snapshot } from "./rtc-v2-runtime";
+import { mountDeferred } from "./rtc-v2-mount";
+import { StreamCache, buildRemoteStreams } from "./rtc-v2-streams";
+import {
+  createV2CaptureAdapter,
+  enumerateV2Devices,
+  isV2LocalTrack,
+  type DeviceSelection,
+} from "./rtc-v2-devices";
+import type { RemoteAvatarState } from "./movement-realtime";
+import type { PresencePayload } from "./office-presence";
+import type { MediaContext } from "./media-context";
+import type { RoomManagerStatus } from "./livekit-room-manager";
+
+export interface RtcV2HookConfig {
+  workspaceId: string;
+  sessionId: string;
+  generation: number;
+  /** false quando a sessão deixou de ser ACTIVE → runtime é desmontado. */
+  active: boolean;
+}
+
+/** Canais extras do V2 consumidos pelo OfficeScene (movimento/presença). */
+export interface RtcV2Controls {
+  context: MediaContext;
+  avatars: ReadonlyMap<string, RemoteAvatarState>;
+  online: ReadonlyMap<string, PresencePayload>;
+  reportMotion: (x: number, y: number, vx: number, vy: number) => void;
+  setSelfPosition: (x: number, y: number) => void;
+  announceJump: (x: number, y: number) => void;
+  retry: () => void;
+}
+
+export function mapRoomStatus(
+  status: RoomManagerStatus | null,
+  context: MediaContext | null,
+): RtcConnectionStatus {
+  switch (status) {
+    case null:
+      return "idle";
+    case "CONNECTING":
+    case "DISCONNECTING":
+      return "connecting";
+    case "CONNECTED":
+      return "connected";
+    case "RECONNECTING":
+      return "reconnecting";
+    case "ERROR":
+      return "error";
+    case "DISCONNECTED":
+      return !context || context.kind === "OFFLINE" ? "idle" : "connecting";
+  }
+}
+
+const MEDIA_ERROR_NAME: Record<string, string> = {
+  permission_denied: "NotAllowedError",
+  device_not_found: "NotFoundError",
+  device_busy: "NotReadableError",
+};
+
+function mediaError(code: string | null): Error {
+  const e = new Error(code ?? "media_error");
+  e.name = MEDIA_ERROR_NAME[code ?? ""] ?? "Error";
+  return e;
+}
+
+const noopSubscribe = () => () => {};
+const nullSnapshot = () => null;
+const makeStream = (tracks: MediaStreamTrack[]) => new MediaStream(tracks);
+
+export function useLiveKitV2(
+  myId: string | null,
+  _legacyRoomKey: string | null,
+  _legacyVisibleIds?: ReadonlySet<string> | null,
+  v2Config?: RtcV2HookConfig | null,
+): RtcMeshState & { v2: RtcV2Controls | null } {
+  const [runtime, setRuntime] = useState<RtcV2Runtime | null>(null);
+  const runtimeRef = useRef<RtcV2Runtime | null>(null);
+  runtimeRef.current = runtime;
+
+  // ---------- dispositivos (não pedem permissão) ----------
+  const [videoDevices, setVideoDevices] = useState<MediaDeviceInfo[]>([]);
+  const [audioInputDevices, setAudioInputDevices] = useState<MediaDeviceInfo[]>([]);
+  const [audioOutputDevices, setAudioOutputDevices] = useState<MediaDeviceInfo[]>([]);
+  const [selection, setSelection] = useState<DeviceSelection & { audioOutput: string | null }>({
+    audioInput: null,
+    videoInput: null,
+    audioOutput: null,
+  });
+  const selectionRef = useRef(selection);
+  selectionRef.current = selection;
+
+  const refreshDevices = useCallback(async () => {
+    const d = await enumerateV2Devices();
+    setVideoDevices(d.video);
+    setAudioInputDevices(d.audioInput);
+    setAudioOutputDevices(d.audioOutput);
+  }, []);
+
+  useEffect(() => {
+    void refreshDevices();
+    const h = () => void refreshDevices();
+    try {
+      navigator.mediaDevices?.addEventListener?.("devicechange", h);
+    } catch {
+      /* noop */
+    }
+    return () => {
+      try {
+        navigator.mediaDevices?.removeEventListener?.("devicechange", h);
+      } catch {
+        /* noop */
+      }
+    };
+  }, [refreshDevices]);
+
+  // ---------- montagem do runtime ----------
+  const key =
+    myId && v2Config?.active && v2Config.workspaceId && v2Config.sessionId
+      ? `${myId}|${v2Config.workspaceId}|${v2Config.sessionId}|${v2Config.generation}`
+      : null;
+  const cfgRef = useRef(v2Config);
+  cfgRef.current = v2Config;
+
+  useEffect(() => {
+    if (!key || !myId || !cfgRef.current) {
+      setRuntime(null);
+      return;
+    }
+    const cfg = cfgRef.current;
+    const cancel = mountDeferred(
+      async () => {
+        const [{ supabase }, tokenMod, movementMod, presenceMod, telemetryMod, mapMod, factory] =
+          await Promise.all([
+            import("@/integrations/supabase/client"),
+            import("./livekit-token-v2.functions"),
+            import("./movement-realtime"),
+            import("./office-presence"),
+            import("./rtc-telemetry"),
+            import("@/lib/map-overrides"),
+            createV2RoomFactory(),
+          ]);
+        const rt = new RtcV2Runtime(
+          {
+            userId: myId,
+            workspaceId: cfg.workspaceId,
+            sessionId: cfg.sessionId,
+            generation: cfg.generation,
+          },
+          {
+            fetchToken: (req) => tokenMod.getLiveKitTokenV2({ data: req }),
+            roomFactory: factory,
+            capture: createV2CaptureAdapter(() => selectionRef.current),
+            movementTransport: movementMod.createSupabaseMovementTransport(
+              supabase,
+              cfg.workspaceId,
+            ),
+            presenceTransport: presenceMod.createSupabasePresenceTransport(
+              supabase,
+              cfg.workspaceId,
+              myId,
+            ),
+            telemetryAdapter: telemetryMod.createSupabaseTelemetryAdapter(supabase),
+            refreshMap: () => void mapMod.getMapSync().load(),
+          },
+        );
+        const sync = mapMod.getMapSync();
+        rt.setMap(sync.snapshot());
+        if (sync.snapshot().state !== "READY") void sync.load();
+        return rt;
+      },
+      (rt) => setRuntime(rt),
+    );
+    return () => {
+      cancel();
+      setRuntime(null);
+    };
+  }, [key, myId]);
+
+  // Mapa canônico → runtime (mesmo MapSyncController do Office; sem canal extra).
+  useEffect(() => {
+    if (!runtime) return;
+    let alive = true;
+    const push = () => {
+      void import("@/lib/map-overrides").then((m) => {
+        if (alive) runtime.setMap(m.getMapSync().snapshot());
+      });
+    };
+    push();
+    window.addEventListener("map-overrides-changed", push);
+    return () => {
+      alive = false;
+      window.removeEventListener("map-overrides-changed", push);
+    };
+  }, [runtime]);
+
+  const snap: RtcV2Snapshot | null = useSyncExternalStore(
+    runtime?.subscribe ?? noopSubscribe,
+    runtime?.getSnapshot ?? nullSnapshot,
+    nullSnapshot,
+  );
+
+  // ---------- streams ----------
+  const avCache = useMemo(() => new StreamCache(makeStream), [runtime]);
+  const screenCache = useMemo(() => new StreamCache(makeStream), [runtime]);
+  const localCache = useMemo(() => new StreamCache(makeStream), [runtime]);
+
+  const { remoteStreams, remoteScreenStreams } = useMemo(() => {
+    if (!snap) return { remoteStreams: {}, remoteScreenStreams: {} };
+    return buildRemoteStreams(snap.remote, new Set(snap.mediaPeers), avCache, screenCache);
+  }, [snap?.remote, snap?.mediaPeers, avCache, screenCache]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const connectedPeers = useMemo(() => snap?.mediaPeers ?? [], [snap?.mediaPeers]);
+
+  const camTrack = snap?.local.camera.status === "on" ? runtime?.local.getTrack("camera") : null;
+  const screenTrack =
+    snap?.local.screenShare.status === "on" ? runtime?.local.getTrack("screen_share") : null;
+  const localVideoStream = isV2LocalTrack(camTrack)
+    ? localCache.get("cam", [camTrack.mediaStreamTrack])
+    : null;
+  const localScreenStream = isV2LocalTrack(screenTrack)
+    ? localCache.get("screen", [screenTrack.mediaStreamTrack])
+    : null;
+
+  // ---------- ações ----------
+  const toggleMic = useCallback(async () => {
+    const rt = runtimeRef.current;
+    if (!rt) return;
+    await rt.toggleMic();
+    const m = rt.local.getSnapshot().microphone;
+    if (m.status === "error") throw mediaError(m.error);
+  }, []);
+  const toggleCam = useCallback(async () => {
+    const rt = runtimeRef.current;
+    if (!rt) return;
+    await rt.toggleCam();
+    const c = rt.local.getSnapshot().camera;
+    if (c.status === "error") throw mediaError(c.error);
+  }, []);
+  const toggleScreen = useCallback(async () => {
+    const rt = runtimeRef.current;
+    if (!rt) return;
+    await rt.toggleScreen();
+    const s = rt.local.getSnapshot().screenShare;
+    if (s.status === "error") throw mediaError(s.error);
+  }, []);
+
+  // Troca de dispositivo com captura ativa = recaptura explícita no novo device.
+  const setVideoDevice = useCallback(async (deviceId: string) => {
+    setSelection((s) => ({ ...s, videoInput: deviceId }));
+    selectionRef.current = { ...selectionRef.current, videoInput: deviceId };
+    const rt = runtimeRef.current;
+    if (rt && rt.local.getSnapshot().camera.intent) {
+      await rt.local.setCameraEnabled(false);
+      await rt.local.setCameraEnabled(true);
+    }
+  }, []);
+  const setAudioInputDevice = useCallback(async (deviceId: string) => {
+    setSelection((s) => ({ ...s, audioInput: deviceId }));
+    selectionRef.current = { ...selectionRef.current, audioInput: deviceId };
+    const rt = runtimeRef.current;
+    if (rt && rt.local.getSnapshot().microphone.intent) {
+      await rt.local.setMicrophoneEnabled(false);
+      await rt.local.setMicrophoneEnabled(true);
+    }
+  }, []);
+  const setAudioOutputDevice = useCallback(async (deviceId: string) => {
+    setSelection((s) => ({ ...s, audioOutput: deviceId }));
+    try {
+      await runtimeRef.current?.currentRoom()?.setAudioOutput?.(deviceId);
+    } catch {
+      /* noop */
+    }
+  }, []);
+
+  // Igual ao v1: só roda quando a UI chama (gesto do usuário).
+  const prewarmMic = useCallback(async () => {
+    try {
+      const s = await navigator.mediaDevices.getUserMedia({ audio: true });
+      s.getTracks().forEach((t) => t.stop());
+      void refreshDevices();
+    } catch {
+      /* noop */
+    }
+  }, [refreshDevices]);
+
+  const getLocalAudioTrack = useCallback((): MediaStreamTrack | null => {
+    const rt = runtimeRef.current;
+    if (!rt || rt.local.getSnapshot().microphone.status !== "on") return null;
+    const t = rt.local.getTrack("microphone");
+    return isV2LocalTrack(t) ? t.mediaStreamTrack : null;
+  }, []);
+
+  const v2: RtcV2Controls | null = useMemo(() => {
+    if (!runtime || !snap) return null;
+    return {
+      context: snap.context,
+      avatars: snap.avatars,
+      online: snap.online,
+      reportMotion: (x, y, vx, vy) => runtime.reportMotion(x, y, vx, vy),
+      setSelfPosition: (x, y) => runtime.setSelfPosition(x, y),
+      announceJump: (x, y) => runtime.announceJump(x, y),
+      retry: () => runtime.retry(),
+    };
+  }, [runtime, snap]);
+
+  const connectionStatus = mapRoomStatus(snap?.roomStatus ?? null, snap?.context ?? null);
+
+  return useMemo(
+    () => ({
+      micOn: snap?.local.microphone.status === "on",
+      camOn: snap?.local.camera.status === "on",
+      screenOn: snap?.local.screenShare.status === "on",
+      toggleMic,
+      toggleCam,
+      toggleScreen,
+      remoteStreams,
+      remoteScreenStreams,
+      connectedPeers,
+      speakingPeers: snap?.speaking ?? {},
+      selfSpeaking: snap?.selfSpeaking ?? false,
+      localVideoStream,
+      localScreenStream,
+      videoDevices,
+      selectedVideoDeviceId: selection.videoInput,
+      setVideoDevice,
+      audioInputDevices,
+      selectedAudioInputDeviceId: selection.audioInput,
+      setAudioInputDevice,
+      audioOutputDevices,
+      selectedAudioOutputDeviceId: selection.audioOutput,
+      setAudioOutputDevice,
+      prewarmMic,
+      getLocalAudioTrack,
+      connectionStatus,
+      lastError: snap?.error ?? null,
+      roomKey: snap?.roomName ?? null,
+      v2,
+    }),
+    [
+      snap,
+      toggleMic,
+      toggleCam,
+      toggleScreen,
+      remoteStreams,
+      remoteScreenStreams,
+      connectedPeers,
+      localVideoStream,
+      localScreenStream,
+      videoDevices,
+      audioInputDevices,
+      audioOutputDevices,
+      selection,
+      setVideoDevice,
+      setAudioInputDevice,
+      setAudioOutputDevice,
+      prewarmMic,
+      getLocalAudioTrack,
+      connectionStatus,
+      v2,
+    ],
+  );
+}

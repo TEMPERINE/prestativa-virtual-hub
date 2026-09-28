@@ -166,7 +166,13 @@ export class MovementRealtime {
         subscribedBefore = true;
         void isReconnect;
         // Uma única solicitação por assinatura (bootstrap ou reconexão).
-        this.emit({ type: "SNAPSHOT_REQUEST" });
+        // Carrega a posição própria (se conhecida) para que quem já está no
+        // workspace também descubra o recém-chegado sem esperar movimento.
+        this.emit(
+          this.local
+            ? { type: "SNAPSHOT_REQUEST", x: this.local.x, y: this.local.y, vx: 0, vy: 0, moving: false }
+            : { type: "SNAPSHOT_REQUEST" },
+        );
       },
       onError: (msg) => {
         if (myEpoch !== this.epoch) return;
@@ -211,6 +217,27 @@ export class MovementRealtime {
       this.lastSentVector = { vx, vy };
       this.emit(this.motion("MOTION_CHANGE"));
     }
+  }
+
+  /**
+   * Anúncio explícito e único da posição atual (ex.: teleporte). Não é
+   * periódico e não altera o estado de movimento.
+   */
+  announcePosition(): void {
+    if (this.disposed || !this.local) return;
+    this.emit({
+      type: "POSITION_SYNC",
+      x: this.local.x,
+      y: this.local.y,
+      vx: this.moving ? this.local.vx : 0,
+      vy: this.moving ? this.local.vy : 0,
+      moving: this.moving,
+    });
+  }
+
+  /** Esquece o estado remoto de um usuário (ex.: saiu do Presence). */
+  forgetRemote(userId: string): void {
+    if (this.remotes.delete(userId)) for (const fn of this.listeners) fn(this.remotes);
   }
 
   getRemoteStates(): ReadonlyMap<string, RemoteAvatarState> {
@@ -290,6 +317,7 @@ export class MovementRealtime {
     if (!isMovementEvent(e) || e.userId === this.self.userId) return;
 
     if (e.type === "SNAPSHOT_REQUEST") {
+      if (typeof e.x === "number" && typeof e.y === "number") this.accept({ ...e, moving: false });
       // Responde apenas com o próprio estado; nunca gera outro request.
       if (this.local) {
         this.emit({
@@ -304,6 +332,11 @@ export class MovementRealtime {
       return;
     }
 
+    if (typeof e.x !== "number" || typeof e.y !== "number") return;
+    this.accept(e);
+  }
+
+  private accept(e: MovementEvent): void {
     if (typeof e.x !== "number" || typeof e.y !== "number") return;
     const prev = this.remotes.get(e.userId);
     if (prev) {

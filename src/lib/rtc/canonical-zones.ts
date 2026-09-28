@@ -4,8 +4,14 @@
 //   - sem overrides (sem linha / reset): zonas embutidas (ZONES, exceto lobby);
 //   - aceita reunião se `supportsVideo` OU kind === "common".
 // Kind: zoneKinds > customZone.kind > DEFAULT_ZONE_KINDS > "common".
-import { ZONES } from "@/lib/office-map";
-import { DEFAULT_ZONE_KINDS, type MapOverrides, type ZoneKind } from "@/lib/map-overrides";
+import { ZONES, zoneAt as builtinZoneAt, type Point } from "@/lib/office-map";
+import {
+  DEFAULT_ZONE_KINDS,
+  cellIndex,
+  pointToCell,
+  type MapOverrides,
+  type ZoneKind,
+} from "@/lib/map-overrides";
 
 export type ZoneResolution =
   | { ok: true; zoneId: string }
@@ -33,4 +39,63 @@ export function resolveMeetingZone(map: MapOverrides | null, zoneId: string): Zo
   if (!exists) return { ok: false, reason: "ZONE_NOT_FOUND" };
   const meeting = (builtin?.supportsVideo ?? false) || kindOf(map, zoneId) === "common";
   return meeting ? { ok: true, zoneId } : { ok: false, reason: "ZONE_NOT_PRIVATE" };
+}
+
+// ─── Regra PURA ponto → zona (RTC v2, Etapa 12) ─────────────────────────────
+// Espelha callZoneAt do cliente legado, mas recebendo o mapa canônico
+// explicitamente (sem localStorage/estado global):
+//   1) com mapa: célula pintada → zona (se for embutida ou custom conhecida);
+//      senão, envelope (bounding box das células pintadas) de uma zona conhecida;
+//   2) sem mapa: retângulos das zonas embutidas.
+// Retorna "lobby" quando nenhuma zona se aplica.
+
+function knownZone(map: MapOverrides, id: string): boolean {
+  return ZONES.some((z) => z.id === id && z.id !== "lobby") ||
+    !!map.customZones?.some((c) => c.id === id);
+}
+
+export function paintedRect(
+  map: MapOverrides,
+  id: string,
+): { x1: number; y1: number; x2: number; y2: number } | null {
+  let minC = Infinity, minR = Infinity, maxC = -Infinity, maxR = -Infinity;
+  for (let r = 0; r < map.rows; r++) {
+    for (let c = 0; c < map.cols; c++) {
+      if (map.zones[cellIndex(c, r, map.cols)] === id) {
+        if (c < minC) minC = c;
+        if (c > maxC) maxC = c;
+        if (r < minR) minR = r;
+        if (r > maxR) maxR = r;
+      }
+    }
+  }
+  if (!Number.isFinite(minC)) return null;
+  return { x1: minC / map.cols, y1: minR / map.rows, x2: (maxC + 1) / map.cols, y2: (maxR + 1) / map.rows };
+}
+
+export function zoneIdAtPoint(map: MapOverrides | null, p: Point): string {
+  if (!map) return builtinZoneAt(p).id;
+  const { col, row } = pointToCell(p, map.cols, map.rows);
+  const direct = map.zones[cellIndex(col, row, map.cols)];
+  if (direct && direct !== "lobby" && knownZone(map, direct)) return direct;
+  const ids = [
+    ...ZONES.filter((z) => z.id !== "lobby").map((z) => z.id as string),
+    ...(map.customZones ?? []).map((c) => c.id),
+  ];
+  for (const id of ids) {
+    const rect = paintedRect(map, id);
+    if (rect && p.x >= rect.x1 && p.x <= rect.x2 && p.y >= rect.y1 && p.y <= rect.y2) return id;
+  }
+  return "lobby";
+}
+
+/**
+ * Zona de reunião privada no ponto, pela MESMA regra que o Token V2 valida.
+ * null = lobby / zona que não é sala de reunião.
+ */
+export function meetingZoneAtPoint(map: MapOverrides | null, p: Point): string | null {
+  const id = zoneIdAtPoint(map, p);
+  if (id === "lobby") return null;
+  const r = resolveMeetingZone(map, id);
+  return r.ok ? r.zoneId : null;
 }
