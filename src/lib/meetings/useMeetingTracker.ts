@@ -151,8 +151,11 @@ function useMeetingTrackerV2({ enabled, v2Room, labelFor }: Args) {
         const { error } = await rpc("meeting_leave", { _meeting_id: id });
         if (error) throw error;
       },
-      onError: (op, err) =>
-        console.error(`[meeting] meeting_${op} falhou (mídia não afetada):`, err),
+      onError: (op, err, attempt, final) =>
+        console.error(
+          `[meeting] meeting_${op} falhou (tentativa ${attempt}${final ? ", desistindo" : ""}; mídia não afetada):`,
+          err,
+        ),
       onChange: setActiveMeetingId,
     });
     setTracker(t);
