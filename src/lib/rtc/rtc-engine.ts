@@ -21,9 +21,7 @@ export const DEFAULT_RTC_ENGINE: RtcEngine = "v1";
  * Aceita "v1" e "v2" (case-insensitive, com trim).
  * Ausente, vazio ou invalido retorna "v1".
  */
-export function parseRtcEngine(
-  raw?: string | null | undefined,
-): RtcEngine {
+export function parseRtcEngine(raw?: string | null | undefined): RtcEngine {
   const value = (raw ?? "").toString().trim().toLowerCase();
   if (value === "v2") return "v2";
   if (value === "v1") return "v1";
