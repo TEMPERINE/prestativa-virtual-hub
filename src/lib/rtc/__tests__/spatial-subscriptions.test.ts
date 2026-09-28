@@ -83,8 +83,8 @@ class FakeRoom implements SpatialRoomLike {
 
 const LOBBY = { kind: "LOBBY" } as const;
 const PRIVATE = { kind: "PRIVATE_ROOM", zoneId: "z1" } as const;
-const ORIGIN = { x: 0.5, y: 0.5 };
-const at = (d: number) => ({ x: 0.5 + d, y: 0.5 });
+const ORIGIN = { x: 0, y: 0.5 };
+const at = (d: number) => ({ x: d, y: 0.5 });
 const IN = CONNECT_RADIUS * 0.5;
 const BORDER = (CONNECT_RADIUS + DISCONNECT_RADIUS) / 2;
 const FAR = DISCONNECT_RADIUS * 2;
@@ -171,7 +171,7 @@ describe("SpatialSubscriptions", () => {
     ss.setRemotePosition("a", at(IN));
     for (let i = 0; i < 1000; i++) {
       ss.setRemotePosition("a", at(IN * ((i % 10) / 10)));
-      ss.setLocalPosition({ x: 0.5, y: 0.5 + (i % 3) * 1e-4 });
+      ss.setLocalPosition({ x: 0, y: 0.5 + (i % 3) * 1e-4 });
     }
     expect(totalCalls(ps[0])).toBe(2);
   });
@@ -230,7 +230,7 @@ describe("SpatialSubscriptions", () => {
   it("16/17/18. decisões independentes; mover um não afeta os demais", () => {
     const { ps, ss } = setup(["a", "b", "c"]);
     ss.setRemotePosition("a", at(IN));
-    ss.setRemotePosition("b", { x: 0.5, y: 0.5 - IN });
+    ss.setRemotePosition("b", { x: 0, y: 0.5 - IN });
     ss.setRemotePosition("c", at(FAR));
     expect(ss.getInRange()).toEqual(["a", "b"]);
     expect(totalCalls(ps[2])).toBe(0);
