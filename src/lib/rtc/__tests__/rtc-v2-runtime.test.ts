@@ -145,6 +145,7 @@ describe("RtcV2Runtime integrado", () => {
     h.rt.setSelfPosition(LOBBY.x, LOBBY.y);
     await settle(400);
     const s = h.rt.getSnapshot();
+    console.log("DBG", JSON.stringify(h.tokenCalls), JSON.stringify(h.rt.rooms.getSnapshot()), JSON.stringify(h.rt.context.getSnapshot()));
     expect(s.context.kind).toBe("LOBBY");
     expect(s.roomStatus).toBe("CONNECTED");
     expect(FakeRoom.all.at(-1)!.opts).toEqual({ autoSubscribe: false });
