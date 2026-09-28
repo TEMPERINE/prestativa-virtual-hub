@@ -107,7 +107,11 @@ export class LocalMedia {
 
   // ---------- estado ----------
   getSnapshot(): LocalMediaSnapshot {
-    const d = (s: DeviceSlot): DeviceState => ({ intent: s.intent, status: s.status, error: s.error });
+    const d = (s: DeviceSlot): DeviceState => ({
+      intent: s.intent,
+      status: s.status,
+      error: s.error,
+    });
     return {
       microphone: d(this.slots.microphone),
       camera: d(this.slots.camera),
@@ -336,10 +340,13 @@ export class LocalMedia {
 
 /** Adapter de captura real. Configurações preservadas do RTC v1. */
 export function createLiveKitCaptureAdapter(): CaptureAdapter {
-  const wrap = (t: {
-    stop(): void;
-    mediaStreamTrack: MediaStreamTrack;
-  }, source: LocalSource): LocalTrackLike & { raw: unknown } => ({
+  const wrap = (
+    t: {
+      stop(): void;
+      mediaStreamTrack: MediaStreamTrack;
+    },
+    source: LocalSource,
+  ): LocalTrackLike & { raw: unknown } => ({
     raw: t,
     source,
     stop: () => t.stop(),
@@ -371,9 +378,7 @@ export function createLiveKitCaptureAdapter(): CaptureAdapter {
     async createScreenTracks() {
       const lk = await import("livekit-client");
       const ts = await lk.createLocalScreenTracks({ audio: true });
-      return ts.map((t) =>
-        wrap(t, t.kind === "audio" ? "screen_share_audio" : "screen_share"),
-      );
+      return ts.map((t) => wrap(t, t.kind === "audio" ? "screen_share_audio" : "screen_share"));
     },
   };
 }

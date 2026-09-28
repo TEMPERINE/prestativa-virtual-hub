@@ -19,7 +19,10 @@ class FakePub implements RemotePublicationLike {
 class FakeParticipant implements RemoteParticipantLike {
   trackPublications = new Map<string, FakePub>();
   setSubscribedCalls = 0;
-  constructor(public readonly identity: string, public readonly metadata = "") {}
+  constructor(
+    public readonly identity: string,
+    public readonly metadata = "",
+  ) {}
   setSubscribed() {
     this.setSubscribedCalls++;
   }
@@ -162,7 +165,9 @@ describe("RemoteMedia", () => {
     expect(pa.screenShare?.subscribed).toBe(true);
     mic.isMuted = true;
     room.emit("trackMuted", mic, a);
-    expect(rm.getSnapshot().participants.find((p) => p.identity === "a")!.microphone?.muted).toBe(true);
+    expect(rm.getSnapshot().participants.find((p) => p.identity === "a")!.microphone?.muted).toBe(
+      true,
+    );
     void b;
   });
 
