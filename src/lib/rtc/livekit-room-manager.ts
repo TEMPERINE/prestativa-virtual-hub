@@ -165,7 +165,11 @@ export class LiveKitRoomManager {
     const a = this.active;
     this.active = null;
     if (a) await this.closeRoom(a);
-    if (a) this.tel("ROOM_DISCONNECTED", a.ctx, { disconnectReason: "dispose", connectionState: "DISCONNECTED" });
+    if (a)
+      this.tel("ROOM_DISCONNECTED", a.ctx, {
+        disconnectReason: "dispose",
+        connectionState: "DISCONNECTED",
+      });
     this.patch({ status: "DISCONNECTED", connected: null, roomName: null, error: null });
     this.listeners.clear();
   }
@@ -322,7 +326,11 @@ export class LiveKitRoomManager {
     });
   }
 
-  private tel(type: RtcTelemetryEventType, ctx: MediaContext | null, extra: TelemetryFields = {}): void {
+  private tel(
+    type: RtcTelemetryEventType,
+    ctx: MediaContext | null,
+    extra: TelemetryFields = {},
+  ): void {
     emitTelemetry(this.deps.telemetry, type, {
       context: ctx?.kind ?? null,
       zoneId: ctx && ctx.kind === "PRIVATE_ROOM" ? ctx.zoneId : null,

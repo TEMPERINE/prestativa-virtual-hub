@@ -9,11 +9,7 @@
 // de room.remoteParticipants. Handlers ficam presos à Room que os registrou e
 // são ignorados se ela não for mais a atual.
 
-import {
-  emitTelemetry,
-  telemetryObjectKey,
-  type RtcTelemetrySink,
-} from "./rtc-telemetry-types";
+import { emitTelemetry, telemetryObjectKey, type RtcTelemetrySink } from "./rtc-telemetry-types";
 
 export type RemoteSource = "microphone" | "camera" | "screen_share" | "screen_share_audio";
 

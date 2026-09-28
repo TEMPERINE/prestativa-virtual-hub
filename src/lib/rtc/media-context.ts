@@ -14,7 +14,6 @@ import type { OfficeSessionStatus } from "./office-session";
 import type { MapSyncState } from "../map-sync";
 import { emitTelemetry, type RtcTelemetrySink } from "./rtc-telemetry-types";
 
-
 export const PRIVATE_ROOM_CONFIRM_MS = 300;
 
 export type MediaContext =
@@ -241,10 +240,18 @@ export class MediaContextController {
     const prev = this.snap;
     this.snap = next;
     if (!sameContext(prev.desired, next.desired)) {
-      emitTelemetry(this.deps.telemetry, "CONTEXT_CHANGE_REQUESTED", ctxFields(next.desired, prev.desired, this.map?.version));
+      emitTelemetry(
+        this.deps.telemetry,
+        "CONTEXT_CHANGE_REQUESTED",
+        ctxFields(next.desired, prev.desired, this.map?.version),
+      );
     }
     if (!sameContext(prev.context, next.context)) {
-      emitTelemetry(this.deps.telemetry, "CONTEXT_CHANGED", ctxFields(next.context, prev.context, this.map?.version));
+      emitTelemetry(
+        this.deps.telemetry,
+        "CONTEXT_CHANGED",
+        ctxFields(next.context, prev.context, this.map?.version),
+      );
     }
     for (const l of this.listeners) l(next);
   }

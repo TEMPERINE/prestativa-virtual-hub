@@ -89,8 +89,10 @@ export function isMapVersionStaleError(e: unknown): boolean {
   if (typeof e === "string") return e.includes(MAP_VERSION_STALE_CODE);
   if (typeof e === "object") {
     const o = e as { code?: unknown; message?: unknown };
-    return o.code === MAP_VERSION_STALE_CODE ||
-      (typeof o.message === "string" && o.message.includes(MAP_VERSION_STALE_CODE));
+    return (
+      o.code === MAP_VERSION_STALE_CODE ||
+      (typeof o.message === "string" && o.message.includes(MAP_VERSION_STALE_CODE))
+    );
   }
   return false;
 }

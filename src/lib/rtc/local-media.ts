@@ -18,11 +18,7 @@
 //
 // Não ligado ao produto. RTC v1 (useLiveKit.ts) permanece intocado.
 
-import {
-  emitTelemetry,
-  telemetryObjectKey,
-  type RtcTelemetrySink,
-} from "./rtc-telemetry-types";
+import { emitTelemetry, telemetryObjectKey, type RtcTelemetrySink } from "./rtc-telemetry-types";
 
 export type LocalSource = "microphone" | "camera" | "screen_share" | "screen_share_audio";
 

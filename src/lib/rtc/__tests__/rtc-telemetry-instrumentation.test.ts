@@ -153,15 +153,17 @@ describe("Etapa 11B — timeline integrada", () => {
     expect(salaRows.map((r) => r.event_type)).toEqual(
       expect.arrayContaining(["ROOM_SIGNAL_CONNECTED", "ROOM_DISCONNECTED"]),
     );
-    expect(rows.find((r) => r.event_type === "ROOM_SIGNAL_CONNECTED" && r.zone_id === "sala-1")?.room_name).toBe(
-      "prestativa-office:w1:sala-1",
-    );
+    expect(
+      rows.find((r) => r.event_type === "ROOM_SIGNAL_CONNECTED" && r.zone_id === "sala-1")
+        ?.room_name,
+    ).toBe("prestativa-office:w1:sala-1");
     // 30 posições no mesmo contexto não geraram eventos
     expect(seq.filter((t) => t === "CONTEXT_CHANGE_REQUESTED")).toHaveLength(3);
     // eventSeq monotônico e sessão associada
     const seqs = rows.map((r) => r.details.eventSeq as number);
     expect(seqs).toEqual(seqs.map((_, k) => k + 1));
-    for (const r of rows) expect(r).toMatchObject({ session_id: "s1", generation: 1, workspace_id: "w1" });
+    for (const r of rows)
+      expect(r).toMatchObject({ session_id: "s1", generation: 1, workspace_id: "w1" });
 
     // privacidade
     const dump = JSON.stringify(rows);
@@ -205,15 +207,25 @@ describe("Etapa 11B — RoomManager", () => {
     for (const r of [withTel, withBad, withThrow]) expect(r).toEqual(none);
     await okTel.dispose();
     await bad.dispose();
-    expect(ok.rows.map((r) => r.event_type)).toEqual(["ROOM_CONNECT_REQUESTED", "ROOM_CONNECT_FAILED"]);
+    expect(ok.rows.map((r) => r.event_type)).toEqual([
+      "ROOM_CONNECT_REQUESTED",
+      "ROOM_CONNECT_FAILED",
+    ]);
   });
 
   it("MAP_VERSION_STALE: REQUESTED → MAP_STALE → CONNECT_FAILED, sem retry", async () => {
     const { adapter, rows } = recAdapter();
     const tel = new RtcTelemetry({ adapter, session: emptySession });
-    const r = await runFail(tel, Object.assign(new Error("MAP_VERSION_STALE"), { code: "MAP_VERSION_STALE" }));
+    const r = await runFail(
+      tel,
+      Object.assign(new Error("MAP_VERSION_STALE"), { code: "MAP_VERSION_STALE" }),
+    );
     await tel.dispose();
-    expect(rows.map((x) => x.event_type)).toEqual(["ROOM_CONNECT_REQUESTED", "MAP_STALE", "ROOM_CONNECT_FAILED"]);
+    expect(rows.map((x) => x.event_type)).toEqual([
+      "ROOM_CONNECT_REQUESTED",
+      "MAP_STALE",
+      "ROOM_CONNECT_FAILED",
+    ]);
     expect(r.calls).toBe(1);
     expect(r.snap.status).toBe("ERROR");
   });
@@ -254,7 +266,11 @@ describe("Etapa 11B — RoomManager", () => {
     const { adapter, rows } = recAdapter();
     const tel = new RtcTelemetry({ adapter, session: emptySession });
     const room = new FakeRoom();
-    const rm = new LiveKitRoomManager({ tokenProvider: tokens, roomFactory: () => room, telemetry: tel });
+    const rm = new LiveKitRoomManager({
+      tokenProvider: tokens,
+      roomFactory: () => room,
+      telemetry: tel,
+    });
     rm.setDesiredContext({ kind: "LOBBY" });
     await rm.whenIdle();
     room.fire("disconnected", 2);
@@ -315,11 +331,9 @@ describe("Etapa 11B — MediaContext", () => {
     await tel.dispose();
     const changed = rows.filter((r) => r.event_type === "CONTEXT_CHANGED");
     expect(changed.map((r) => r.context)).toEqual(["LOBBY"]);
-    expect(rows.filter((r) => r.event_type === "CONTEXT_CHANGE_REQUESTED").map((r) => r.context)).toEqual([
-      "LOBBY",
-      "PRIVATE_ROOM",
-      "LOBBY",
-    ]);
+    expect(
+      rows.filter((r) => r.event_type === "CONTEXT_CHANGE_REQUESTED").map((r) => r.context),
+    ).toEqual(["LOBBY", "PRIVATE_ROOM", "LOBBY"]);
   });
 });
 
@@ -424,7 +438,11 @@ describe("Etapa 11B — Presence / Movement", () => {
   it("PRESENCE_ERROR em erro real; sync/join/leave não geram telemetria", async () => {
     const { adapter, rows } = recAdapter();
     const tel = new RtcTelemetry({ adapter, session: emptySession });
-    let handlers!: { onPresence: (k: "sync", s: object) => void; onSubscribed(): void; onError(m: string): void };
+    let handlers!: {
+      onPresence: (k: "sync", s: object) => void;
+      onSubscribed(): void;
+      onError(m: string): void;
+    };
     const p = new OfficePresence({
       self: { userId: "u1", sessionId: "s1", generation: 1, workspaceId: "w1" },
       transport: {
@@ -437,7 +455,9 @@ describe("Etapa 11B — Presence / Movement", () => {
     });
     p.start();
     handlers.onSubscribed();
-    handlers.onPresence("sync", { a: [{ userId: "a", sessionId: "x", generation: 1, workspaceId: "w1", joinedAt: "t" }] });
+    handlers.onPresence("sync", {
+      a: [{ userId: "a", sessionId: "x", generation: 1, workspaceId: "w1", joinedAt: "t" }],
+    });
     handlers.onError("ClientPresenceRateLimitReached");
     await p.dispose();
     await tel.dispose();
