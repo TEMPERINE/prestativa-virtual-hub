@@ -5,6 +5,7 @@
  * VITE_RTC_ENGINE (ausente/inválido = v1). Em cada execução só um hook é
  * chamado — nunca v1 e v2 juntos — respeitando as Rules of Hooks.
  */
+import { useMemo } from "react";
 import { getRtcEngine, type RtcEngine } from "./rtc-engine";
 import { useLiveKitV1 } from "./useLiveKit-v1";
 import { useLiveKitV2, type RtcV2HookConfig, type RtcV2Controls } from "./useLiveKit-v2";
@@ -22,14 +23,17 @@ type Hook = (
   v2Config?: RtcV2HookConfig | null,
 ) => LiveKitState;
 
+function useLiveKitV1Facade(
+  myId: string | null,
+  roomKey: string | null,
+  videoVisibleIds?: ReadonlySet<string> | null,
+): LiveKitState {
+  const state = useLiveKitV1(myId, roomKey, videoVisibleIds);
+  return useMemo(() => ({ ...state, v2: null }), [state]);
+}
+
 export function selectLiveKitHook(engine: RtcEngine): Hook {
-  if (engine === "v2") return useLiveKitV2;
-  const v1: Hook = (myId, roomKey, videoVisibleIds) => ({
-    // eslint-disable-next-line react-hooks/rules-of-hooks -- escolha estável por execução
-    ...useLiveKitV1(myId, roomKey, videoVisibleIds),
-    v2: null,
-  });
-  return v1;
+  return engine === "v2" ? useLiveKitV2 : useLiveKitV1Facade;
 }
 
 export const ACTIVE_RTC_ENGINE: RtcEngine = getRtcEngine();
