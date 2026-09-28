@@ -3,19 +3,27 @@ import { readFileSync } from "node:fs";
 import { MapSyncController, normalizeMapOverrides, type CanonicalMapRow } from "@/lib/map-sync";
 
 const small = (zone: string) => ({
-  cols: 2, rows: 2, blocked: [1, 0, 0, 0], zones: [zone, null, null, null],
+  cols: 2,
+  rows: 2,
+  blocked: [1, 0, 0, 0],
+  zones: [zone, null, null, null],
 });
 
 function deferred<T>() {
-  let resolve!: (v: T) => void; let reject!: (e: unknown) => void;
-  const promise = new Promise<T>((a, b) => { resolve = a; reject = b; });
+  let resolve!: (v: T) => void;
+  let reject!: (e: unknown) => void;
+  const promise = new Promise<T>((a, b) => {
+    resolve = a;
+    reject = b;
+  });
   return { promise, resolve, reject };
 }
 
 describe("normalizeMapOverrides", () => {
   it("resample para 128x80 e preenche defaults", () => {
     const n = normalizeMapOverrides(small("reuniao"))!;
-    expect(n.cols).toBe(128); expect(n.rows).toBe(80);
+    expect(n.cols).toBe(128);
+    expect(n.rows).toBe(80);
     expect(n.blocked.length).toBe(128 * 80);
     expect(n.zones[0]).toBe("reuniao");
     expect(n.zones[127]).toBeNull();
@@ -33,15 +41,20 @@ describe("normalizeMapOverrides", () => {
 
 describe("MapSyncController", () => {
   it("1. carregamento inicial normaliza e fica READY", async () => {
-    const c = new MapSyncController({ fetchCanonical: async () => ({ data: small("a"), version: 3 }) });
+    const c = new MapSyncController({
+      fetchCanonical: async () => ({ data: small("a"), version: 3 }),
+    });
     expect(c.snapshot().state).toBe("LOADING");
     await c.load();
     const s = c.snapshot();
-    expect(s.state).toBe("READY"); expect(s.version).toBe(3); expect(s.map!.cols).toBe(128);
+    expect(s.state).toBe("READY");
+    expect(s.version).toBe(3);
+    expect(s.map!.cols).toBe(128);
   });
 
   it("2. atualização Realtime passa pelo normalizador (refetch canônico)", async () => {
-    const fetch = vi.fn<() => Promise<CanonicalMapRow>>()
+    const fetch = vi
+      .fn<() => Promise<CanonicalMapRow>>()
       .mockResolvedValueOnce({ data: small("a"), version: 1 })
       .mockResolvedValueOnce({ data: small("b"), version: 2 });
     const c = new MapSyncController({ fetchCanonical: fetch });
@@ -62,7 +75,8 @@ describe("MapSyncController", () => {
 
   it("4. version maior inicia SYNCING e volta para READY", async () => {
     const d = deferred<CanonicalMapRow>();
-    const fetch = vi.fn<() => Promise<CanonicalMapRow>>()
+    const fetch = vi
+      .fn<() => Promise<CanonicalMapRow>>()
       .mockResolvedValueOnce({ data: small("a"), version: 1 })
       .mockReturnValueOnce(d.promise);
     const c = new MapSyncController({ fetchCanonical: fetch });
@@ -86,7 +100,8 @@ describe("MapSyncController", () => {
 
   it("7. resposta atrasada de versão antiga não sobrescreve a nova", async () => {
     const d12 = deferred<CanonicalMapRow>();
-    const fetch = vi.fn<() => Promise<CanonicalMapRow>>()
+    const fetch = vi
+      .fn<() => Promise<CanonicalMapRow>>()
       .mockResolvedValueOnce({ data: small("v11"), version: 11 })
       .mockReturnValueOnce(d12.promise)
       .mockResolvedValueOnce({ data: small("v13"), version: 13 });
@@ -105,17 +120,21 @@ describe("MapSyncController", () => {
 
   it("8. duas atualizações rápidas convergem para a maior", async () => {
     let v = 1;
-    const c = new MapSyncController({ fetchCanonical: async () => ({ data: small(`v${v}`), version: v }) });
+    const c = new MapSyncController({
+      fetchCanonical: async () => ({ data: small(`v${v}`), version: v }),
+    });
     await c.load();
     v = 3;
-    const a = c.notify(2); const b = c.notify(3);
+    const a = c.notify(2);
+    const b = c.notify(3);
     await Promise.all([a, b]);
     expect(c.snapshot()).toMatchObject({ state: "READY", version: 3 });
   });
 
   it("banco atrasado (versão menor que a anunciada) refaz fetch e depois ERROR explícito", async () => {
     const c = new MapSyncController({
-      fetchCanonical: async () => ({ data: small("a"), version: 1 }), maxStaleRefetch: 2,
+      fetchCanonical: async () => ({ data: small("a"), version: 1 }),
+      maxStaleRefetch: 2,
     });
     await c.load();
     await c.notify(5);
@@ -124,7 +143,8 @@ describe("MapSyncController", () => {
   });
 
   it("9/10. erro no fetch => ERROR; retry bem-sucedido => READY", async () => {
-    const fetch = vi.fn<() => Promise<CanonicalMapRow>>()
+    const fetch = vi
+      .fn<() => Promise<CanonicalMapRow>>()
       .mockRejectedValueOnce(new Error("offline"))
       .mockResolvedValueOnce({ data: small("a"), version: 7 });
     const c = new MapSyncController({ fetchCanonical: fetch });
@@ -147,7 +167,9 @@ describe("MapSyncController", () => {
 
 describe("11. nenhum caminho grava override bruto no cache canônico", () => {
   let src = "";
-  beforeEach(() => { src = readFileSync("src/lib/map-overrides.ts", "utf8"); });
+  beforeEach(() => {
+    src = readFileSync("src/lib/map-overrides.ts", "utf8");
+  });
   it("sem variável de cache mutável nem escrita direta de payload", () => {
     expect(src).not.toMatch(/\bcache\s*=/);
     expect(src).not.toMatch(/resampleOverrides/);
@@ -168,7 +190,12 @@ describe("integração map-overrides", () => {
       },
       dispatchEvent: () => true,
     });
-    vi.stubGlobal("CustomEvent", class { constructor(public type: string) {} });
+    vi.stubGlobal(
+      "CustomEvent",
+      class {
+        constructor(public type: string) {}
+      },
+    );
     const mo = await import("@/lib/map-overrides");
     mo.__resetMapSyncForTests();
   });

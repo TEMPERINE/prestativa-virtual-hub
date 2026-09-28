@@ -22,17 +22,16 @@ export type CustomZone = { id: string; label: string; color: string; kind?: Zone
 
 export type SpawnPoint = { x: number; y: number };
 
-export type PropAction =
-  | { type: "gate-zone"; zoneId: string; blockedFrame: number };
+export type PropAction = { type: "gate-zone"; zoneId: string; blockedFrame: number };
 
 export type PropInstance = {
-  id: string;            // uuid local
-  defId: string;         // ref ao PROP_CATALOG
-  x: number;             // centro normalizado 0..1
+  id: string; // uuid local
+  defId: string; // ref ao PROP_CATALOG
+  x: number; // centro normalizado 0..1
   y: number;
-  w: number;             // largura normalizada (altura derivada do aspectRatio)
-  interactive: boolean;  // toggle pelo editor
-  frame?: number;        // frame inicial padrão (se não houver prop_state remoto)
+  w: number; // largura normalizada (altura derivada do aspectRatio)
+  interactive: boolean; // toggle pelo editor
+  frame?: number; // frame inicial padrão (se não houver prop_state remoto)
   actions?: PropAction[]; // efeitos do prop sobre o mundo (ex.: trancar sala)
 };
 
@@ -67,16 +66,22 @@ function emptyOverrides(): MapOverrides {
 
 // Defaults for built-in zones — workstations are claimable, social rooms are common.
 const DEFAULT_ZONE_KINDS: Record<string, ZoneKind> = {
-  "atendente-1": "workspace", "atendente-2": "workspace", "atendente-3": "workspace",
-  "atendente-4": "workspace", "atendente-5": "workspace", "atendente-6": "workspace",
-  "atendente-7": "workspace", "atendente-8": "workspace", "atendente-9": "workspace",
+  "atendente-1": "workspace",
+  "atendente-2": "workspace",
+  "atendente-3": "workspace",
+  "atendente-4": "workspace",
+  "atendente-5": "workspace",
+  "atendente-6": "workspace",
+  "atendente-7": "workspace",
+  "atendente-8": "workspace",
+  "atendente-9": "workspace",
   "atendente-10": "workspace",
-  "supervisao": "workspace",
-  "diretoria": "workspace",
-  "reuniao": "common",
-  "feedback": "common",
-  "descompressao": "common",
-  "lobby": "common",
+  supervisao: "workspace",
+  diretoria: "workspace",
+  reuniao: "common",
+  feedback: "common",
+  descompressao: "common",
+  lobby: "common",
 };
 
 export function getZoneKind(id: string): ZoneKind {
@@ -121,7 +126,10 @@ function persist(s: MapSnapshot) {
   if (typeof window === "undefined") return;
   try {
     if (s.map) {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ version: s.version, data: s.map, workspaceId: controllerWs }));
+      window.localStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify({ version: s.version, data: s.map, workspaceId: controllerWs }),
+      );
     } else {
       window.localStorage.removeItem(STORAGE_KEY);
     }
@@ -202,11 +210,11 @@ export async function pullOverridesFromCloud(): Promise<MapOverrides | null> {
 }
 
 // Canal privado de aviso de versão (workspace:{id}:map). Só transporta `version`.
-type MapChannel = { send: (m: unknown) => Promise<unknown> };
+type MapChannel = import("@supabase/supabase-js").RealtimeChannel;
 let mapChannel: MapChannel | null = null;
 
 export async function pushOverridesToCloud(
-  o: MapOverrides
+  o: MapOverrides,
 ): Promise<{ ok: boolean; error?: string }> {
   try {
     const ws = await getWs();
@@ -224,7 +232,7 @@ export async function pushOverridesToCloud(
           updated_by: userData.user?.id ?? null,
           updated_at: new Date().toISOString(),
         },
-        { onConflict: "workspace_id" }
+        { onConflict: "workspace_id" },
       )
       .select("data, version")
       .single();
@@ -250,9 +258,7 @@ export async function clearOverridesInCloud(): Promise<void> {
   if (error) console.warn("[map-sync] falha ao limpar mapa", error.message);
 }
 
-export function subscribeOverridesFromCloud(
-  onChange: (o: MapOverrides | null) => void
-) {
+export function subscribeOverridesFromCloud(onChange: (o: MapOverrides | null) => void) {
   let cancelled = false;
   let cleanup = () => {};
   (async () => {
@@ -282,7 +288,7 @@ export function subscribeOverridesFromCloud(
             sync.applyCleared();
             deliver();
           }
-        }
+        },
       );
     const bcChannel = supabase
       .channel(`workspace:${ws}:map`, { config: { private: true } })
@@ -372,11 +378,14 @@ export function customZonesFromOverrides(): CustomZone[] {
 // Bounding box (normalized 0..1) of all painted tiles for a given zone id.
 // Returns null when nothing is painted for that zone.
 export function zoneRectFromOverrides(
-  id: ZoneId
+  id: ZoneId,
 ): { x1: number; y1: number; x2: number; y2: number } | null {
   const o = loadOverrides();
   if (!o) return null;
-  let minC = Infinity, minR = Infinity, maxC = -Infinity, maxR = -Infinity;
+  let minC = Infinity,
+    minR = Infinity,
+    maxC = -Infinity,
+    maxR = -Infinity;
   for (let r = 0; r < o.rows; r++) {
     for (let c = 0; c < o.cols; c++) {
       if (o.zones[cellIndex(c, r, o.cols)] === id) {
@@ -395,7 +404,6 @@ export function zoneRectFromOverrides(
     y2: (maxR + 1) / o.rows,
   };
 }
-
 
 // Spawn point overrides — exact teleport landing per zone.
 export function spawnPointForZone(id: string): SpawnPoint | null {
