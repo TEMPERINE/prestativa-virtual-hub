@@ -18,6 +18,12 @@
 //
 // Não ligado ao produto. RTC v1 (useLiveKit.ts) permanece intocado.
 
+import {
+  emitTelemetry,
+  telemetryObjectKey,
+  type RtcTelemetrySink,
+} from "./rtc-telemetry-types";
+
 export type LocalSource = "microphone" | "camera" | "screen_share" | "screen_share_audio";
 
 /** Track local mínima. */
@@ -101,9 +107,17 @@ export class LocalMedia {
   /** Publicações ativas: track → room onde está publicada. */
   private published = new Map<LocalTrackLike, PublishTargetLike>();
 
-  constructor(adapter: CaptureAdapter) {
+  constructor(
+    adapter: CaptureAdapter,
+    private readonly telemetry?: RtcTelemetrySink,
+  ) {
     this.adapter = adapter;
   }
+
+  private static readonly EV = {
+    microphone: { on: "MIC_ON", off: "MIC_OFF", err: "MIC_ERROR" },
+    camera: { on: "CAM_ON", off: "CAM_OFF", err: "CAM_ERROR" },
+  } as const;
 
   // ---------- estado ----------
   getSnapshot(): LocalMediaSnapshot {
@@ -174,7 +188,13 @@ export class LocalMedia {
     if (this.room !== room || this.published.get(track) !== room || !this.isLive(track)) {
       if (this.published.get(track) === room) this.published.delete(track);
       await room.unpublishTrack(track).catch(() => {});
+      return;
     }
+    // Evidência real: track local efetivamente publicada nesta Room.
+    emitTelemetry(this.telemetry, "ROOM_MEDIA_ACTIVE", {
+      dedupeKey: telemetryObjectKey(room),
+      metadata: { trackSource: track.source, reason: "local_published" },
+    });
   }
 
   private async unpublish(track: LocalTrackLike): Promise<void> {
@@ -206,12 +226,14 @@ export class LocalMedia {
     const slot = this.slots[kind];
     const op = ++slot.op;
     if (!on) {
+      const wasOn = slot.intent || slot.track !== null;
       slot.intent = false;
       slot.status = "off";
       slot.error = null;
       const t = slot.track;
       slot.track = null;
       this.emit();
+      if (wasOn) emitTelemetry(this.telemetry, LocalMedia.EV[kind].off);
       if (t) {
         t.stop();
         await this.unpublish(t);
@@ -240,6 +262,9 @@ export class LocalMedia {
       slot.status = "error";
       slot.error = errMsg(e);
       this.emit();
+      emitTelemetry(this.telemetry, LocalMedia.EV[kind].err, {
+        error: { code: slot.error, message: slot.error },
+      });
       return;
     }
     if (this.disposed || op !== slot.op || !slot.intent) {
@@ -249,6 +274,7 @@ export class LocalMedia {
     slot.track = track;
     slot.status = "on";
     this.emit();
+    emitTelemetry(this.telemetry, LocalMedia.EV[kind].on);
     await this.publish(track);
   }
 
@@ -267,6 +293,9 @@ export class LocalMedia {
       this.screen.status = "error";
       this.screen.error = errMsg(e);
       this.emit();
+      emitTelemetry(this.telemetry, "SCREEN_SHARE_OFF", {
+        error: { code: this.screen.error, message: this.screen.error },
+      });
       return;
     }
     if (this.disposed || op !== this.screen.op || !this.room) {
@@ -281,6 +310,7 @@ export class LocalMedia {
     this.screen.unsub = tracks.map((t) => t.onEnded(() => this.stopScreenShare()));
     this.screen.status = "on";
     this.emit();
+    emitTelemetry(this.telemetry, "SCREEN_SHARE_ON");
     await Promise.all(tracks.map((t) => this.publish(t)));
   }
 
@@ -293,6 +323,7 @@ export class LocalMedia {
   private stopScreenInternal(): LocalTrackLike[] {
     this.screen.op++;
     const tracks = this.screen.tracks;
+    if (tracks.length > 0) emitTelemetry(this.telemetry, "SCREEN_SHARE_OFF");
     for (const u of this.screen.unsub) u();
     this.screen.unsub = [];
     this.screen.tracks = [];

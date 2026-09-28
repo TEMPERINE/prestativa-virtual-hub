@@ -17,6 +17,7 @@
  * Ainda não integrado ao Office.
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { emitTelemetry, type RtcTelemetrySink } from "./rtc-telemetry-types";
 
 export type MovementEventType =
   | "MOTION_START"
@@ -85,6 +86,8 @@ export interface MovementRealtimeOptions {
   speedChangeRatio?: number;
   /** Velocidade abaixo disso = parado. */
   stopEpsilon?: number;
+  /** Somente falhas de canal/broadcast. Movimento normal NUNCA é registrado. */
+  telemetry?: RtcTelemetrySink;
 }
 
 export const POSITION_SYNC_INTERVAL_MS = 1000;
@@ -122,6 +125,7 @@ export class MovementRealtime {
   private readonly cosThreshold: number;
   private readonly speedRatio: number;
   private readonly stopEps: number;
+  private readonly telemetry?: RtcTelemetrySink;
 
   private handle: MovementTransportHandle | null = null;
   private epoch = 0;
@@ -144,6 +148,7 @@ export class MovementRealtime {
     this.cosThreshold = Math.cos(((opts.changeAngleDeg ?? 20) * Math.PI) / 180);
     this.speedRatio = opts.speedChangeRatio ?? 0.25;
     this.stopEps = opts.stopEpsilon ?? 1e-6;
+    this.telemetry = opts.telemetry;
   }
 
   start(): void {
@@ -166,6 +171,10 @@ export class MovementRealtime {
       onError: (msg) => {
         if (myEpoch !== this.epoch) return;
         this.lastError = msg;
+        emitTelemetry(this.telemetry, "BROADCAST_ERROR", {
+          error: { code: "BROADCAST_ERROR", message: msg },
+          metadata: { channel: "movement" },
+        });
       },
     });
   }
