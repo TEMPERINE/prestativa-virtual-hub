@@ -38,7 +38,11 @@ export const getLiveKitTokenV2 = createServerFn({ method: "POST" })
           return row ? { data: row.data, version: Number(row.version) } : null;
         },
         async getDisplayName(userId) {
-          const { data: p } = await sb.from("profiles").select("display_name").eq("id", userId).maybeSingle();
+          const { data: p } = await sb
+            .from("profiles")
+            .select("display_name")
+            .eq("id", userId)
+            .maybeSingle();
           return p?.display_name ?? null;
         },
         config: {

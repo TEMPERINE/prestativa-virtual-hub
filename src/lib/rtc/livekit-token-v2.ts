@@ -26,7 +26,11 @@ export const TokenV2Input = z.discriminatedUnion("context", [
       sessionId: z.string().uuid(),
       generation: z.number().int().positive(),
       mapVersion: z.number().int().min(0),
-      zoneId: z.string().min(1).max(100).regex(/^[a-zA-Z0-9_\-]+$/),
+      zoneId: z
+        .string()
+        .min(1)
+        .max(100)
+        .regex(/^[a-zA-Z0-9_-]+$/),
     })
     .strict(),
 ]);
