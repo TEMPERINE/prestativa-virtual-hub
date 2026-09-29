@@ -7,6 +7,7 @@
 import officeMapDefault from "@/assets/office-map.webp";
 import officeMapCopa from "@/assets/office-map-copa.jpg.asset.json";
 import officeMapJunino from "@/assets/office-map-junino.jpg.asset.json";
+import officeMapHalloween from "@/assets/office-map-halloween.png.asset.json";
 import officeMapNivel1 from "@/assets/office-map-nivel1.jpg.asset.json";
 import officeMapNivel2 from "@/assets/office-map-nivel2.png.asset.json";
 import {
@@ -61,6 +62,13 @@ export const OFFICE_THEMES: OfficeTheme[] = [
     label: "Festa Junina",
     description: "Bandeirinhas, girassóis e xadrez vermelho — arraiá no espaço.",
     url: officeMapJunino.url,
+    minTier: 3,
+  },
+  {
+    id: "halloween",
+    label: "Halloween",
+    description: "Abóboras, luzes e decoração de Halloween no escritório.",
+    url: officeMapHalloween.url,
     minTier: 3,
   },
 ];
