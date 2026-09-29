@@ -383,7 +383,7 @@ describe("LocalMedia — Etapa 14B (mic lifecycle)", () => {
     const a = new MuteAdapter();
     const room = new CountingRoom();
     const events: string[] = [];
-    const lm = new LocalMedia(a, { emit: (e) => events.push(e.eventType) } as never);
+    const lm = new LocalMedia(a, { record: (e: string) => events.push(e) } as never);
     await lm.attachRoom(room);
     return { a, room, lm, events };
   }
