@@ -12,7 +12,11 @@
 //  - no máximo uma Room anexada → nunca publicação simultânea em duas Rooms;
 //  - screen share não tem intent: termina em qualquer troca de Room/contexto;
 //  - reattach da MESMA Room (reconnect de rede) é no-op;
-//  - OFF = unpublish + stop da captura;
+//  - Mic (Etapa 14B): OFF = mute oficial da track (captura preservada, nada é
+//    enviado); ON = unmute da MESMA track/publicação. Nova captura só quando
+//    não há track válida (nunca houve, ended, falhou). Troca de dispositivo usa
+//    o lifecycle da própria track (setDevice), sem unpublish/recreate.
+//  - Cam = OFF = unpublish + stop da captura;
 //  - erro de captura → status "error", intent OFF, sem retry automático;
 //  - dispose() para tudo e invalida Promises pendentes.
 //
@@ -28,6 +32,13 @@ export interface LocalTrackLike {
   stop(): void;
   /** Dispara quando a captura termina fora do nosso controle (ex.: "Parar compartilhamento"). Retorna unsubscribe. */
   onEnded(fn: () => void): () => void;
+  /** Mute oficial (LiveKit): sem envio de áudio, captura/publicação preservadas. */
+  mute?(): Promise<void>;
+  unmute?(): Promise<void>;
+  /** true se a captura subjacente terminou (MediaStreamTrack ended). */
+  isEnded?(): boolean;
+  /** Troca a fonte preservando track/publicação/sender. Retorna se o device real confere. */
+  setDevice?(deviceId: string): Promise<boolean>;
 }
 
 /** Superfície mínima de uma Room para publicar. */
@@ -72,6 +83,7 @@ interface DeviceSlot {
   error: string | null;
   track: LocalTrackLike | null;
   op: number;
+  endedUnsub: (() => void) | null;
 }
 
 function errMsg(e: unknown): string {
@@ -90,8 +102,8 @@ export class LocalMedia {
   private disposed = false;
   private listeners = new Set<(s: LocalMediaSnapshot) => void>();
   private slots: Record<Kind, DeviceSlot> = {
-    microphone: { intent: false, status: "off", error: null, track: null, op: 0 },
-    camera: { intent: false, status: "off", error: null, track: null, op: 0 },
+    microphone: { intent: false, status: "off", error: null, track: null, op: 0, endedUnsub: null },
+    camera: { intent: false, status: "off", error: null, track: null, op: 0, endedUnsub: null },
   };
   private screen = {
     status: "off" as DeviceStatus,
@@ -224,31 +236,83 @@ export class LocalMedia {
     return this.setDevice("camera", on);
   }
 
+  /** Mic usa mute/unmute quando a track suporta; câmera mantém stop/recreate. */
+  private canMute(
+    kind: Kind,
+    t: LocalTrackLike | null,
+  ): t is LocalTrackLike & {
+    mute(): Promise<void>;
+    unmute(): Promise<void>;
+  } {
+    return (
+      kind === "microphone" && !!t && typeof t.mute === "function" && typeof t.unmute === "function"
+    );
+  }
+
+  private trackValid(t: LocalTrackLike | null): boolean {
+    return !!t && !(t.isEnded?.() ?? false);
+  }
+
+  /** Descarta a track do slot: stop + unpublish, sem referências antigas. */
+  private async dropTrack(slot: DeviceSlot): Promise<void> {
+    const t = slot.track;
+    slot.track = null;
+    slot.endedUnsub?.();
+    slot.endedUnsub = null;
+    if (t) {
+      t.stop();
+      await this.unpublish(t);
+    }
+  }
+
   private async setDevice(kind: Kind, on: boolean): Promise<void> {
     if (this.disposed) return;
     const slot = this.slots[kind];
     const op = ++slot.op;
     if (!on) {
-      const wasOn = slot.intent || slot.track !== null;
+      const wasOn = slot.intent || (slot.track !== null && slot.status !== "off");
       slot.intent = false;
       slot.status = "off";
       slot.error = null;
       const t = slot.track;
-      slot.track = null;
+      if (this.canMute(kind, t) && this.trackValid(t)) {
+        // Mute oficial: publicação fica muted, nenhum áudio é enviado.
+        this.emit();
+        if (wasOn) emitTelemetry(this.telemetry, LocalMedia.EV[kind].off);
+        try {
+          await t.mute();
+        } catch {
+          // mute falhou: garante privacidade descartando a captura.
+          if (slot.track === t) await this.dropTrack(slot);
+        }
+        return;
+      }
       this.emit();
       if (wasOn) emitTelemetry(this.telemetry, LocalMedia.EV[kind].off);
-      if (t) {
-        t.stop();
-        await this.unpublish(t);
-      }
+      await this.dropTrack(slot);
       return;
     }
     slot.intent = true;
     slot.error = null;
+    if (slot.track && !this.trackValid(slot.track)) await this.dropTrack(slot);
+    if (this.disposed || op !== slot.op || !slot.intent) return;
     if (slot.track) {
+      const t = slot.track;
+      const wasOff = slot.status !== "on";
       slot.status = "on";
       this.emit();
-      await this.publish(slot.track);
+      if (this.canMute(kind, t)) {
+        try {
+          await t.unmute();
+        } catch (e) {
+          if (this.disposed || op !== slot.op) return;
+          await this.failDevice(kind, slot, e);
+          return;
+        }
+        if (this.disposed || op !== slot.op || !slot.intent) return;
+        if (wasOff) emitTelemetry(this.telemetry, LocalMedia.EV[kind].on);
+      }
+      await this.publish(t);
       return;
     }
     slot.status = "starting";
@@ -261,13 +325,7 @@ export class LocalMedia {
           : await this.adapter.createCameraTrack();
     } catch (e) {
       if (this.disposed || op !== slot.op) return;
-      slot.intent = false;
-      slot.status = "error";
-      slot.error = errMsg(e);
-      this.emit();
-      emitTelemetry(this.telemetry, LocalMedia.EV[kind].err, {
-        error: { code: slot.error, message: slot.error },
-      });
+      await this.failDevice(kind, slot, e);
       return;
     }
     if (this.disposed || op !== slot.op || !slot.intent) {
@@ -275,10 +333,75 @@ export class LocalMedia {
       return;
     }
     slot.track = track;
+    if (kind === "microphone") {
+      slot.endedUnsub = track.onEnded(() => void this.onTrackEnded(kind, track));
+    }
     slot.status = "on";
     this.emit();
     emitTelemetry(this.telemetry, LocalMedia.EV[kind].on);
     await this.publish(track);
+  }
+
+  private async failDevice(kind: Kind, slot: DeviceSlot, e: unknown): Promise<void> {
+    slot.intent = false;
+    slot.status = "error";
+    slot.error = errMsg(e);
+    const msg = slot.error;
+    await this.dropTrack(slot);
+    this.emit();
+    emitTelemetry(this.telemetry, LocalMedia.EV[kind].err, {
+      error: { code: msg, message: msg },
+    });
+  }
+
+  /** Captura terminou fora do nosso controle: descarta; próximo ON readquire. */
+  private async onTrackEnded(kind: Kind, track: LocalTrackLike): Promise<void> {
+    const slot = this.slots[kind];
+    if (this.disposed || slot.track !== track) return;
+    slot.op++;
+    const wasOn = slot.intent;
+    await this.dropTrack(slot);
+    if (wasOn) {
+      await this.failDevice(kind, slot, new Error("track_ended"));
+    } else {
+      this.emit();
+    }
+  }
+
+  /**
+   * Troca o dispositivo de entrada do mic preservando track/publicação/sender.
+   * Sem track: nada a fazer (o adapter usa a seleção na próxima captura).
+   * Sem suporte a setDevice: fallback para recaptura explícita.
+   */
+  async setMicrophoneDevice(deviceId: string): Promise<void> {
+    if (this.disposed) return;
+    const slot = this.slots.microphone;
+    const t = slot.track;
+    if (!t || !this.trackValid(t)) {
+      if (t) await this.dropTrack(slot);
+      if (slot.intent) {
+        slot.intent = false;
+        await this.setDevice("microphone", true);
+      }
+      return;
+    }
+    if (typeof t.setDevice !== "function") {
+      if (!slot.intent) {
+        await this.dropTrack(slot);
+        return;
+      }
+      await this.dropTrack(slot);
+      slot.intent = false;
+      await this.setDevice("microphone", true);
+      return;
+    }
+    const op = slot.op;
+    try {
+      await t.setDevice(deviceId);
+    } catch (e) {
+      if (this.disposed || op !== slot.op || slot.track !== t) return;
+      await this.failDevice("microphone", slot, e);
+    }
   }
 
   // ---------- screen share ----------
@@ -353,11 +476,7 @@ export class LocalMedia {
       s.intent = false;
       s.status = "off";
       s.error = null;
-      if (s.track) {
-        s.track.stop();
-        ops.push(this.unpublish(s.track));
-        s.track = null;
-      }
+      if (s.track) ops.push(this.dropTrack(s));
     }
     for (const t of [...this.published.keys()]) ops.push(this.unpublish(t));
     this.room = null;

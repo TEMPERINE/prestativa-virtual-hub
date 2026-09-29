@@ -280,10 +280,8 @@ export function useLiveKitV2(
     setSelection((s) => ({ ...s, audioInput: deviceId }));
     selectionRef.current = { ...selectionRef.current, audioInput: deviceId };
     const rt = runtimeRef.current;
-    if (rt && rt.local.getSnapshot().microphone.intent) {
-      await rt.local.setMicrophoneEnabled(false);
-      await rt.local.setMicrophoneEnabled(true);
-    }
+    // Etapa 14B: troca a fonte na MESMA track/publicação (sem OFF/ON).
+    if (rt) await rt.local.setMicrophoneDevice(deviceId);
   }, []);
   const setAudioOutputDevice = useCallback(async (deviceId: string) => {
     setSelection((s) => ({ ...s, audioOutput: deviceId }));

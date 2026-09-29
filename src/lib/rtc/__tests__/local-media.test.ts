@@ -324,3 +324,220 @@ describe("LocalMedia", () => {
     expect(a.calls.mic).toBe(1);
   });
 });
+
+// ─── Etapa 14B: mic mute/unmute, troca de device e reacquire ─────────────
+class MuteMicTrack extends FakeTrack {
+  muted = false;
+  deviceId = "default";
+  /** "sender": id da captura atual; muda em setDevice (restartTrack). */
+  captureId = 1;
+  sends(): boolean {
+    return !this.stopped && !this.muted;
+  }
+  constructor() {
+    super("microphone");
+  }
+  async mute() {
+    this.muted = true;
+  }
+  async unmute() {
+    this.muted = false;
+  }
+  isEnded() {
+    return this.stopped;
+  }
+  failDevice: unknown = null;
+  async setDevice(id: string) {
+    if (this.failDevice) throw this.failDevice;
+    this.deviceId = id;
+    this.captureId++;
+    return true;
+  }
+}
+
+class MuteAdapter extends FakeAdapter {
+  mics: MuteMicTrack[] = [];
+  override async createMicrophoneTrack() {
+    this.calls.mic++;
+    if (this.fail.mic) throw this.fail.mic;
+    const t = new MuteMicTrack();
+    this.mics.push(t);
+    this.created.push(t);
+    return t;
+  }
+}
+
+class CountingRoom extends FakeRoom {
+  unpublishCalls = 0;
+  override async unpublishTrack(t: LocalTrackLike) {
+    this.unpublishCalls++;
+    this.published.delete(t);
+  }
+  mics() {
+    return [...this.published].filter((t) => t.source === "microphone");
+  }
+}
+
+describe("LocalMedia — Etapa 14B (mic lifecycle)", () => {
+  async function setup() {
+    const a = new MuteAdapter();
+    const room = new CountingRoom();
+    const events: string[] = [];
+    const lm = new LocalMedia(a, { record: (e: string) => events.push(e) } as never);
+    await lm.attachRoom(room);
+    return { a, room, lm, events };
+  }
+
+  it("1. primeira ativação cria captura e publica", async () => {
+    const { a, room, lm } = await setup();
+    await lm.setMicrophoneEnabled(true);
+    expect(a.calls.mic).toBe(1);
+    expect(room.mics()).toEqual([a.mics[0]]);
+    expect(a.mics[0].sends()).toBe(true);
+  });
+
+  it("2/6. MIC OFF não cria track, muta e não envia áudio", async () => {
+    const { a, room, lm } = await setup();
+    await lm.setMicrophoneEnabled(true);
+    await lm.setMicrophoneEnabled(false);
+    expect(a.calls.mic).toBe(1);
+    expect(a.mics[0].muted).toBe(true);
+    expect(a.mics[0].sends()).toBe(false);
+    expect(lm.getSnapshot().microphone).toEqual({ intent: false, status: "off", error: null });
+  });
+
+  it("3/4/5/7. OFF→ON reutiliza a mesma track/publicação, sem duplicar", async () => {
+    const { a, room, lm } = await setup();
+    await lm.setMicrophoneEnabled(true);
+    await lm.setMicrophoneEnabled(false);
+    await lm.setMicrophoneEnabled(true);
+    expect(a.calls.mic).toBe(1);
+    expect(room.mics()).toEqual([a.mics[0]]);
+    expect(room.publishCalls).toBe(1);
+    expect(room.unpublishCalls).toBe(0);
+    expect(a.mics[0].stopped).toBe(false);
+    expect(a.mics[0].sends()).toBe(true);
+  });
+
+  it("8/9/10. troca de device usa o novo deviceId na mesma publicação", async () => {
+    const { a, room, lm } = await setup();
+    await lm.setMicrophoneEnabled(true);
+    const cap = a.mics[0].captureId;
+    await lm.setMicrophoneDevice("usb-mic");
+    expect(a.mics[0].deviceId).toBe("usb-mic");
+    expect(a.mics[0].captureId).toBe(cap + 1);
+    expect(a.calls.mic).toBe(1);
+    expect(room.mics()).toEqual([a.mics[0]]);
+    expect(room.unpublishCalls).toBe(0);
+  });
+
+  it("troca de device com mic OFF não liga o mic", async () => {
+    const { a, lm } = await setup();
+    await lm.setMicrophoneEnabled(true);
+    await lm.setMicrophoneEnabled(false);
+    await lm.setMicrophoneDevice("usb-mic");
+    expect(a.mics[0].sends()).toBe(false);
+    expect(lm.getSnapshot().microphone.intent).toBe(false);
+  });
+
+  it("troca de device sem track não captura", async () => {
+    const { a, lm } = await setup();
+    await lm.setMicrophoneDevice("usb-mic");
+    expect(a.calls.mic).toBe(0);
+  });
+
+  it("falha na troca de device gera MIC_ERROR sem quebrar Room", async () => {
+    const { a, room, lm, events } = await setup();
+    await lm.setMicrophoneEnabled(true);
+    a.mics[0].failDevice = Object.assign(new Error("x"), { name: "NotFoundError" });
+    await lm.setMicrophoneDevice("gone");
+    expect(events).toContain("MIC_ERROR");
+    expect(lm.getSnapshot().microphone.status).toBe("error");
+    expect(room.mics()).toEqual([]);
+    expect(lm.getSnapshot().roomAttached).toBe(true);
+  });
+
+  it("11. track ended → ON readquire nova captura", async () => {
+    const { a, room, lm, events } = await setup();
+    await lm.setMicrophoneEnabled(true);
+    a.mics[0].browserEnd();
+    await flush();
+    expect(events).toContain("MIC_ERROR");
+    expect(room.mics()).toEqual([]);
+    await lm.setMicrophoneEnabled(true);
+    expect(a.calls.mic).toBe(2);
+    expect(room.mics()).toEqual([a.mics[1]]);
+  });
+
+  it("11b. track ended enquanto OFF → ON readquire", async () => {
+    const { a, room, lm } = await setup();
+    await lm.setMicrophoneEnabled(true);
+    await lm.setMicrophoneEnabled(false);
+    a.mics[0].stopped = true; // captura morreu silenciosamente
+    await lm.setMicrophoneEnabled(true);
+    expect(a.calls.mic).toBe(2);
+    expect(room.mics()).toEqual([a.mics[1]]);
+  });
+
+  it("12. falha de reacquire gera MIC_ERROR sem quebrar Room", async () => {
+    const { a, lm, events } = await setup();
+    await lm.setMicrophoneEnabled(true);
+    a.mics[0].browserEnd();
+    await flush();
+    a.fail.mic = Object.assign(new Error("busy"), { name: "NotReadableError" });
+    await lm.setMicrophoneEnabled(true);
+    expect(events.filter((e) => e === "MIC_ERROR").length).toBe(2);
+    expect(lm.getSnapshot().microphone.error).toBe("device_busy");
+    expect(lm.getSnapshot().roomAttached).toBe(true);
+  });
+
+  it("13/14. lobby → private → lobby com mic ON mantém a mesma captura", async () => {
+    const { a, room, lm } = await setup();
+    await lm.setMicrophoneEnabled(true);
+    const priv = new CountingRoom();
+    await lm.attachRoom(priv);
+    expect(room.mics()).toEqual([]);
+    expect(priv.mics()).toEqual([a.mics[0]]);
+    const lobby = new CountingRoom();
+    await lm.attachRoom(lobby);
+    expect(priv.mics()).toEqual([]);
+    expect(lobby.mics()).toEqual([a.mics[0]]);
+    expect(a.calls.mic).toBe(1);
+    expect(a.mics[0].sends()).toBe(true);
+  });
+
+  it("mic OFF não é publicado em nova Room", async () => {
+    const { a, lm } = await setup();
+    await lm.setMicrophoneEnabled(true);
+    await lm.setMicrophoneEnabled(false);
+    const r2 = new CountingRoom();
+    await lm.attachRoom(r2);
+    expect(r2.mics()).toEqual([]);
+    expect(a.mics[0].sends()).toBe(false);
+  });
+
+  it("9. regressão do incidente: ON, OFF, ON, entrada de terceiro, troca de device", async () => {
+    const { a, room, lm } = await setup();
+    await lm.setMicrophoneEnabled(true);
+    await lm.setMicrophoneEnabled(false);
+    await lm.setMicrophoneEnabled(true);
+    // entrada de terceiro participante: nenhum método de LocalMedia é chamado
+    const before = { pub: room.publishCalls, unpub: room.unpublishCalls };
+    await lm.setMicrophoneDevice("headset");
+    expect(a.calls.mic).toBe(1);
+    expect(a.mics[0].stopped).toBe(false);
+    expect(room.mics()).toEqual([a.mics[0]]);
+    expect(room.publishCalls).toBe(before.pub);
+    expect(room.unpublishCalls).toBe(before.unpub);
+    expect(a.mics[0].deviceId).toBe("headset");
+    expect(a.mics[0].sends()).toBe(true);
+  });
+
+  it("dispose para a captura mutada", async () => {
+    const { a, lm } = await setup();
+    await lm.setMicrophoneEnabled(true);
+    await lm.setMicrophoneEnabled(false);
+    await lm.dispose();
+    expect(a.mics[0].stopped).toBe(true);
+  });
+});
