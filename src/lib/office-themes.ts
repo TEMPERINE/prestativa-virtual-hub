@@ -8,6 +8,7 @@ import officeMapDefaultAsset from "@/assets/office-map-default-v2.png.asset.json
 const officeMapDefault = officeMapDefaultAsset.url;
 import officeMapJunino from "@/assets/office-map-junino.jpg.asset.json";
 import officeMapHalloween from "@/assets/office-map-halloween.png.asset.json";
+import officeMapNatal from "@/assets/office-map-natal.png.asset.json";
 import officeMapNivel1 from "@/assets/office-map-nivel1.jpg.asset.json";
 import officeMapNivel2 from "@/assets/office-map-nivel2.png.asset.json";
 import {
@@ -62,6 +63,13 @@ export const OFFICE_THEMES: OfficeTheme[] = [
     label: "Halloween",
     description: "Abóboras, luzes e decoração de Halloween no escritório.",
     url: officeMapHalloween.url,
+    minTier: 3,
+  },
+  {
+    id: "natal",
+    label: "Natal",
+    description: "Árvores, guirlandas e luzes de Natal no escritório.",
+    url: officeMapNatal.url,
     minTier: 3,
   },
 ];
