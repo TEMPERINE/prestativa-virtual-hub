@@ -84,6 +84,37 @@ function mstInfo(mst: unknown) {
   };
 }
 
+/** Etapa 14B: dispositivo/constraints REAIS da captura (sem conteúdo de áudio). */
+function captureInfo(mst: unknown) {
+  const call = (k: string): Record<string, unknown> | null => {
+    try {
+      const f = g(mst, k);
+      return typeof f === "function" ? ((f as () => Record<string, unknown>).call(mst) ?? null) : null;
+    } catch {
+      return null;
+    }
+  };
+  const st = call("getSettings");
+  const cs = call("getConstraints");
+  const reqDev = cs ? g(cs, "deviceId") : null;
+  const reqId = typeof reqDev === "string" ? reqDev : (g(reqDev, "exact") ?? g(reqDev, "ideal"));
+  const lbl = str(g(mst, "label"));
+  return {
+    reqDeviceId: short(reqId),
+    realDeviceId: short(st ? g(st, "deviceId") : null),
+    realGroupId: short(st ? g(st, "groupId") : null),
+    label: lbl ? lbl.slice(0, 48) : null,
+    ec: st ? bool(g(st, "echoCancellation")) : null,
+    ns: st ? bool(g(st, "noiseSuppression")) : null,
+    agc: st ? bool(g(st, "autoGainControl")) : null,
+    channelCount: st ? (g(st, "channelCount") ?? null) : null,
+    sampleRate: st ? (g(st, "sampleRate") ?? null) : null,
+    reqEc: cs ? (g(cs, "echoCancellation") ?? null) : null,
+    reqNs: cs ? (g(cs, "noiseSuppression") ?? null) : null,
+    reqAgc: cs ? (g(cs, "autoGainControl") ?? null) : null,
+  };
+}
+
 function mapValues(m: unknown): unknown[] {
   try {
     return m instanceof Map ? [...m.values()] : [];
@@ -201,6 +232,7 @@ export class AudioDiagnostics {
         deviceFrom: reason?.deviceFrom ?? null,
         deviceTo: reason?.deviceTo ?? null,
         ...mstInfo(mst),
+        ...captureInfo(mst),
         status: "track_created",
       });
       this.prevMic = null;
@@ -245,7 +277,12 @@ export class AudioDiagnostics {
     const lkOn = g(lk, "on");
     const lkOff = g(lk, "off");
     if (typeof lkOn === "function" && typeof lkOff === "function") {
-      const h = () => this.safe(() => this.localTrackEvent("restarted"));
+      const h = () =>
+        this.safe(() => {
+          this.localTrackEvent("restarted");
+          // restartTrack/setDeviceId trocam a MediaStreamTrack: re-vincula.
+          this.onLocalMediaChange();
+        });
       (lkOn as (e: string, f: Handler) => void).call(lk, "restarted", h);
       this.micUnbind.push(() =>
         (lkOff as (e: string, f: Handler) => void).call(lk, "restarted", h),
@@ -350,6 +387,7 @@ export class AudioDiagnostics {
       reason,
       status: "check",
       ...mstInfo(mst),
+      ...captureInfo(mst),
       micIntent: this.deps.getMicIntent(),
       micPublications: pubs.length,
       publicationSid: pub ? short(g(pub, "trackSid")) : null,
