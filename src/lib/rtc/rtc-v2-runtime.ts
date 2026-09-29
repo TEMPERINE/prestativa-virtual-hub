@@ -37,6 +37,7 @@ import {
 } from "./movement-realtime";
 import { OfficePresence, type PresencePayload, type PresenceTransport } from "./office-presence";
 import { RemoteMedia, type RemoteMediaSnapshot, type RemoteRoomLike } from "./remote-media";
+import { AudioDiagnostics, type DiagTimers } from "./rtc-audio-diagnostics";
 import { RtcTelemetry, type TelemetryAdapter } from "./rtc-telemetry";
 import { isMapVersionStaleError } from "./rtc-telemetry-types";
 import { SpatialSubscriptions, type SpatialRoomLike } from "./spatial-subscriptions";
@@ -48,6 +49,8 @@ export interface V2Room extends RoomLike, PublishTargetLike {
   on(event: string, fn: (...args: unknown[]) => void): void;
   off(event: string, fn: (...args: unknown[]) => void): void;
   setAudioOutput?(deviceId: string): Promise<void>;
+  /** Room livekit-client crua — SOMENTE para diagnóstico (Etapa 14A). */
+  readonly raw?: unknown;
 }
 
 export interface RtcV2Config {
@@ -86,6 +89,8 @@ export interface RtcV2Deps {
   timers?: TimerApi;
   /** Parada automática do movimento quando nenhuma amostra chega. */
   motionIdleMs?: number;
+  /** Timers do diagnóstico de áudio (testes). */
+  diagTimers?: DiagTimers;
 }
 
 export interface RtcV2Snapshot {
@@ -122,6 +127,8 @@ export class RtcV2Runtime {
   readonly spatial: SpatialSubscriptions;
   readonly movement: MovementRealtime;
   readonly presence: OfficePresence;
+  /** Etapa 14A: observador de áudio; nunca controla o RTC. */
+  readonly audioDiag: AudioDiagnostics;
 
   private readonly timers: TimerApi;
   private readonly idleMs: number;
@@ -204,6 +211,17 @@ export class RtcV2Runtime {
       transport: deps.presenceTransport,
       telemetry: sink,
     });
+    this.audioDiag = new AudioDiagnostics({
+      sink,
+      getMicIntent: () => this.local.getSnapshot().microphone.intent,
+      getMicTrack: () =>
+        this.local.getTrack("microphone") as unknown as {
+          mediaStreamTrack?: MediaStreamTrack;
+          lk?: unknown;
+        } | null,
+      getRoomName: () => this.rooms.getSnapshot().roomName,
+      timers: deps.diagTimers,
+    });
     this.snap = this.build();
   }
 
@@ -215,7 +233,10 @@ export class RtcV2Runtime {
     this.unsubs.push(
       this.context.subscribe((s) => this.rooms.setDesiredContext(s.context)),
       this.rooms.subscribe((s) => this.onRooms(s)),
-      this.local.subscribe(() => this.emit()),
+      this.local.subscribe(() => {
+        this.audioDiag.onLocalMediaChange();
+        this.emit();
+      }),
       this.remote.subscribe(() => this.emit()),
       this.movement.subscribe((states) => {
         for (const [uid, st] of states) this.spatial.setRemotePosition(uid, { x: st.x, y: st.y });
@@ -243,6 +264,7 @@ export class RtcV2Runtime {
     for (const u of this.unsubs) u();
     this.unsubs = [];
     this.detachRoom();
+    this.audioDiag.dispose();
     this.context.dispose();
     await Promise.allSettled([
       this.local.dispose(),
@@ -383,12 +405,14 @@ export class RtcV2Runtime {
     };
     this.speakHandler = onSpeakers;
     room.on("activeSpeakersChanged", onSpeakers);
+    this.audioDiag.attachRoom(room.raw, ctx);
   }
 
   private detachRoom(): void {
     const room = this.attached;
     if (!room) return;
     this.attached = null;
+    this.audioDiag.detachRoom();
     if (this.speakHandler) room.off("activeSpeakersChanged", this.speakHandler);
     this.speakHandler = null;
     this.speaking = {};
@@ -521,6 +545,7 @@ export async function createV2RoomFactory(): Promise<() => V2Room> {
         if (!isV2LocalTrack(track)) return;
         await room.localParticipant.unpublishTrack(track.lk as never, false);
       },
+      raw: room,
       async setAudioOutput(deviceId) {
         await room.switchActiveDevice("audiooutput", deviceId);
       },

@@ -276,6 +276,7 @@ export function useLiveKitV2(
     }
   }, []);
   const setAudioInputDevice = useCallback(async (deviceId: string) => {
+    runtimeRef.current?.audioDiag.noteDeviceChange(selectionRef.current.audioInput, deviceId);
     setSelection((s) => ({ ...s, audioInput: deviceId }));
     selectionRef.current = { ...selectionRef.current, audioInput: deviceId };
     const rt = runtimeRef.current;
