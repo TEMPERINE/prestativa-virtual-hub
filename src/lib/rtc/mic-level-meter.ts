@@ -39,7 +39,11 @@ export class MicLevelMeter {
   setTrack(track: unknown | null, key: string | null): void {
     if (this.disposed) return;
     const k = track ? key : null;
-    if (k === this.key && (k === null || this.analyser)) return;
+    if (k === null && this.key === null) {
+      this.report(0);
+      return;
+    }
+    if (k === this.key && this.analyser) return;
     this.unbind();
     this.key = k;
     if (!track) {
