@@ -89,7 +89,9 @@ function captureInfo(mst: unknown) {
   const call = (k: string): Record<string, unknown> | null => {
     try {
       const f = g(mst, k);
-      return typeof f === "function" ? ((f as () => Record<string, unknown>).call(mst) ?? null) : null;
+      return typeof f === "function"
+        ? ((f as () => Record<string, unknown>).call(mst) ?? null)
+        : null;
     } catch {
       return null;
     }

@@ -237,11 +237,16 @@ export class LocalMedia {
   }
 
   /** Mic usa mute/unmute quando a track suporta; câmera mantém stop/recreate. */
-  private canMute(kind: Kind, t: LocalTrackLike | null): t is LocalTrackLike & {
+  private canMute(
+    kind: Kind,
+    t: LocalTrackLike | null,
+  ): t is LocalTrackLike & {
     mute(): Promise<void>;
     unmute(): Promise<void>;
   } {
-    return kind === "microphone" && !!t && typeof t.mute === "function" && typeof t.unmute === "function";
+    return (
+      kind === "microphone" && !!t && typeof t.mute === "function" && typeof t.unmute === "function"
+    );
   }
 
   private trackValid(t: LocalTrackLike | null): boolean {
