@@ -15,7 +15,11 @@
  * setSubscribed, replaceTrack, setParameters, reconnect). Só leitura + getStats.
  * Toda exceção é engolida. Sem áudio, SDP, ICE, IP, tokens: ids encurtados a 8 chars.
  */
-import { emitTelemetry, type RtcTelemetrySink, type RtcTelemetryEventType } from "./rtc-telemetry-types";
+import {
+  emitTelemetry,
+  type RtcTelemetrySink,
+  type RtcTelemetryEventType,
+} from "./rtc-telemetry-types";
 
 export const AUDIO_STATS_INTERVAL_MS = 2000;
 export const AUDIO_SWAP_CHECK_MS = 3000;
@@ -108,8 +112,11 @@ export class AudioDiagnostics {
   private micLk: unknown = null;
   private micUnbind: Array<() => void> = [];
   private prevMic: { mstId: string | null; pubSid: string | null } | null = null;
-  private pendingReason: { reason: string; deviceFrom: string | null; deviceTo: string | null } | null =
-    null;
+  private pendingReason: {
+    reason: string;
+    deviceFrom: string | null;
+    deviceTo: string | null;
+  } | null = null;
   private disposed = false;
 
   constructor(private readonly deps: AudioDiagnosticsDeps) {
@@ -240,7 +247,9 @@ export class AudioDiagnostics {
     if (typeof lkOn === "function" && typeof lkOff === "function") {
       const h = () => this.safe(() => this.localTrackEvent("restarted"));
       (lkOn as (e: string, f: Handler) => void).call(lk, "restarted", h);
-      this.micUnbind.push(() => (lkOff as (e: string, f: Handler) => void).call(lk, "restarted", h));
+      this.micUnbind.push(() =>
+        (lkOff as (e: string, f: Handler) => void).call(lk, "restarted", h),
+      );
     }
   }
 
@@ -251,7 +260,8 @@ export class AudioDiagnostics {
       publicationSid: this.micPubSid(),
       trackSid: short(g(this.micLk, "sid")) ?? null,
     });
-    if (event === "ended" || event === "mute" || event === "unmute") this.snapshot(`local_${event}`, null);
+    if (event === "ended" || event === "mute" || event === "unmute")
+      this.snapshot(`local_${event}`, null);
   }
 
   private localPub(event: string, pub: unknown): void {
@@ -331,7 +341,8 @@ export class AudioDiagnostics {
   private swapCheck(mst: MediaStreamTrack, reason: string): void {
     if (this.disposed) return;
     const pubs = this.micPubs();
-    const pub = pubs.find((p) => g(g(g(p, "track"), "mediaStreamTrack"), "id") === mst.id) ?? pubs[0];
+    const pub =
+      pubs.find((p) => g(g(g(p, "track"), "mediaStreamTrack"), "id") === mst.id) ?? pubs[0];
     const track = g(pub, "track");
     const sInfo = this.senderInfo(track);
     const currentMst = this.deps.getMicTrack()?.mediaStreamTrack;
@@ -432,7 +443,9 @@ export class AudioDiagnostics {
     // RX: cada track remota de áudio (mic).
     for (const p of mapValues(room.remoteParticipants)) {
       for (const pub of mapValues(g(p, "audioTrackPublications")).filter(isMicPub)) {
-        const track = g(pub, "track") as { getRTCStatsReport?: () => Promise<RTCStatsReport | undefined> };
+        const track = g(pub, "track") as {
+          getRTCStatsReport?: () => Promise<RTCStatsReport | undefined>;
+        };
         let report: RTCStatsReport | undefined;
         try {
           report = track?.getRTCStatsReport ? await track.getRTCStatsReport() : undefined;
