@@ -1,6 +1,10 @@
 /** Etapa 14A — diagnóstico de áudio: só observa, nunca controla. */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { AudioDiagnostics, AUDIO_STATS_INTERVAL_MS, AUDIO_SWAP_CHECK_MS } from "../rtc-audio-diagnostics";
+import {
+  AudioDiagnostics,
+  AUDIO_STATS_INTERVAL_MS,
+  AUDIO_SWAP_CHECK_MS,
+} from "../rtc-audio-diagnostics";
 import { LocalMedia, type CaptureAdapter, type LocalTrackLike } from "../local-media";
 import type { RtcTelemetryEventType, TelemetryFields } from "../rtc-telemetry-types";
 
@@ -92,7 +96,9 @@ describe("AudioDiagnostics", () => {
     h.raw.fire("participantConnected", { identity: "tracy-0000-1111" });
     expect(mute).not.toHaveBeenCalled();
     expect(h.raw.unpublish).not.toHaveBeenCalled();
-    const snap = h.of("AUDIO_SNAPSHOT").find((e) => e.f.metadata?.reason === "participant_connected");
+    const snap = h
+      .of("AUDIO_SNAPSHOT")
+      .find((e) => e.f.metadata?.reason === "participant_connected");
     expect(snap?.f.metadata?.identity).toBe("tracy-00");
     expect(String(snap?.f.metadata?.snapshot)).toContain("me:TR_mic1:m0:live");
     h.diag.dispose();
@@ -125,8 +131,17 @@ describe("AudioDiagnostics", () => {
     h.raw.fire("trackUnsubscribed", track, pub, { identity: "dani-1234-xx" });
     const evs = h.of("AUDIO_REMOTE_TRACK").map((e) => e.f.metadata);
     expect(evs).toHaveLength(2);
-    expect(evs[0]).toMatchObject({ event: "subscribed", identity: "dani-123", publicationSid: "TR_dani", subscribed: true });
-    expect(evs[1]).toMatchObject({ event: "unsubscribed", identity: "dani-123", subscribed: false });
+    expect(evs[0]).toMatchObject({
+      event: "subscribed",
+      identity: "dani-123",
+      publicationSid: "TR_dani",
+      subscribed: true,
+    });
+    expect(evs[1]).toMatchObject({
+      event: "unsubscribed",
+      identity: "dani-123",
+      subscribed: false,
+    });
     h.diag.dispose();
   });
 
@@ -138,7 +153,11 @@ describe("AudioDiagnostics", () => {
     const next = new FakeMst("new-2222");
     h.setMic({ mediaStreamTrack: next });
     const swaps = h.of("AUDIO_MIC_SWAP").map((e) => e.f.metadata);
-    expect(swaps.at(-1)).toMatchObject({ reason: "mic_on", prevMstId: "old-1111", mstId: "new-2222" });
+    expect(swaps.at(-1)).toMatchObject({
+      reason: "mic_on",
+      prevMstId: "old-1111",
+      mstId: "new-2222",
+    });
     (h.raw.localParticipant.audioTrackPublications as Map<string, unknown>).set("p", {
       trackSid: "TR_new",
       source: "microphone",
@@ -229,8 +248,20 @@ describe("AudioDiagnostics", () => {
       setParameters: vi.fn(),
       getStats: vi.fn(async () => {
         const m = new Map<string, Record<string, unknown>>([
-          ["o", { type: "outbound-rtp", kind: "audio", bytesSent: 1000, packetsSent: 50, mediaSourceId: "ms1" }],
-          ["s", { type: "media-source", kind: "audio", audioLevel: 0.2, trackIdentifier: "tx-11111" }],
+          [
+            "o",
+            {
+              type: "outbound-rtp",
+              kind: "audio",
+              bytesSent: 1000,
+              packetsSent: 50,
+              mediaSourceId: "ms1",
+            },
+          ],
+          [
+            "s",
+            { type: "media-source", kind: "audio", audioLevel: 0.2, trackIdentifier: "tx-11111" },
+          ],
         ]);
         return m as unknown as RTCStatsReport;
       }),
@@ -240,23 +271,50 @@ describe("AudioDiagnostics", () => {
       source: "microphone",
       track: { mediaStreamTrack: mst, sender },
     });
-    const rxStats = vi.fn(async () =>
-      new Map([["i", { type: "inbound-rtp", kind: "audio", bytesReceived: 900, packetsReceived: 45, packetsLost: 0 }]]) as unknown as RTCStatsReport,
+    const rxStats = vi.fn(
+      async () =>
+        new Map([
+          [
+            "i",
+            {
+              type: "inbound-rtp",
+              kind: "audio",
+              bytesReceived: 900,
+              packetsReceived: 45,
+              packetsLost: 0,
+            },
+          ],
+        ]) as unknown as RTCStatsReport,
     );
     h.raw.remoteParticipants.set("dani", {
       identity: "dani-abcdef",
       audioTrackPublications: new Map([
-        ["r", { trackSid: "TR_d", source: "microphone", isSubscribed: true, track: { getRTCStatsReport: rxStats, mediaStreamTrack: new FakeMst("rx") } }],
+        [
+          "r",
+          {
+            trackSid: "TR_d",
+            source: "microphone",
+            isSubscribed: true,
+            track: { getRTCStatsReport: rxStats, mediaStreamTrack: new FakeMst("rx") },
+          },
+        ],
       ]),
     });
     h.setMic({ mediaStreamTrack: mst });
     h.diag.attachRoom(h.raw, { kind: "PRIVATE_ROOM", zoneId: "reuniao" });
     await vi.advanceTimersByTimeAsync(AUDIO_STATS_INTERVAL_MS);
     expect(h.of("AUDIO_TX_STATS")[0]?.f.metadata).toMatchObject({
-      bytesSent: 1000, packetsSent: 50, audioLevel: 0.2, senderMatchesLocal: true, micPublications: 1,
+      bytesSent: 1000,
+      packetsSent: 50,
+      audioLevel: 0.2,
+      senderMatchesLocal: true,
+      micPublications: 1,
     });
     expect(h.of("AUDIO_RX_STATS")[0]?.f.metadata).toMatchObject({
-      identity: "dani-abc", bytesReceived: 900, packetsReceived: 45, packetsLost: 0,
+      identity: "dani-abc",
+      bytesReceived: 900,
+      packetsReceived: 45,
+      packetsLost: 0,
     });
     expect(sender.replaceTrack).not.toHaveBeenCalled();
     expect(sender.setParameters).not.toHaveBeenCalled();
