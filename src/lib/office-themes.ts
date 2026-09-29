@@ -4,8 +4,8 @@
 // e sincronizado em nuvem), de forma que todos os usuários do mesmo
 // espaço vejam o mesmo tema.
 
-import officeMapDefault from "@/assets/office-map.webp";
-import officeMapCopa from "@/assets/office-map-copa.jpg.asset.json";
+import officeMapDefaultAsset from "@/assets/office-map-default-v2.png.asset.json";
+const officeMapDefault = officeMapDefaultAsset.url;
 import officeMapJunino from "@/assets/office-map-junino.jpg.asset.json";
 import officeMapHalloween from "@/assets/office-map-halloween.png.asset.json";
 import officeMapNivel1 from "@/assets/office-map-nivel1.jpg.asset.json";
@@ -49,13 +49,6 @@ export const OFFICE_THEMES: OfficeTheme[] = [
     description: "Layout intermediário com até 5 estações de trabalho.",
     url: officeMapNivel2.url,
     minTier: 2,
-  },
-  {
-    id: "rumo-ao-hexa",
-    label: "Rumo ao Hexa",
-    description: "Decoração temática verde e amarela para a Copa.",
-    url: officeMapCopa.url,
-    minTier: 3,
   },
   {
     id: "festa-junina",
