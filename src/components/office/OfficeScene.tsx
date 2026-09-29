@@ -1,3 +1,4 @@
+import { MicLevelMeter } from "./MicLevelMeter";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { RemoteMotionPredictor, facingFromVector } from "@/lib/rtc/remote-motion";
 import { createPortal } from "react-dom";
@@ -3549,6 +3550,7 @@ export function OfficeScene({
               >
                 {rtc.micOn ? <Mic className="w-4 h-4" /> : <MicOff className="w-4 h-4" />}
               </IconButton>
+              {rtc.v2 && <MicLevelMeter track={rtc.v2.localMicTrack} />}
               <DeviceMenu
                 title="Configurações de áudio"
                 sections={[

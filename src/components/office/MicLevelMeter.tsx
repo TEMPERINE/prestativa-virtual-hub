@@ -2,8 +2,23 @@ import { useEffect, useRef, useState } from "react";
 import { MicLevelMeter as Meter, type MeterAnalyser } from "@/lib/rtc/mic-level-meter";
 
 /** Medidor visual da LocalAudioTrack (RTC v2). Nunca controla o microfone. */
-export function MicLevelMeter({ track, trackKey }: { track: unknown | null; trackKey: string | null }) {
+export function MicLevelMeter({ track }: { track: unknown | null }) {
   const [level, setLevel] = useState(0);
+  // restartTrack/setDeviceId trocam a MediaStreamTrack dentro do mesmo objeto.
+  const [restarts, setRestarts] = useState(0);
+  useEffect(() => {
+    const t = track as {
+      on?: (e: string, f: () => void) => void;
+      off?: (e: string, f: () => void) => void;
+    } | null;
+    if (!t?.on || !t.off) return;
+    const h = () => setRestarts((n) => n + 1);
+    t.on("restarted", h);
+    return () => t.off?.("restarted", h);
+  }, [track]);
+  const mstId =
+    (track as { mediaStreamTrack?: { id?: string } } | null)?.mediaStreamTrack?.id ?? null;
+  const trackKey = track ? `${mstId ?? "?"}:${restarts}` : null;
   const meterRef = useRef<Meter | null>(null);
   const [factory, setFactory] = useState<((t: unknown) => MeterAnalyser) | null>(null);
 
@@ -45,7 +60,9 @@ export function MicLevelMeter({ track, trackKey }: { track: unknown | null; trac
   return (
     <div
       className="flex items-end gap-[2px] h-3.5 mx-1"
-      aria-label={active ? `Nível do microfone ${Math.round(scaled * 100)}%` : "Microfone desligado"}
+      aria-label={
+        active ? `Nível do microfone ${Math.round(scaled * 100)}%` : "Microfone desligado"
+      }
       title={active ? "Entrada do seu microfone" : "Microfone desligado"}
     >
       {Array.from({ length: bars }, (_, i) => {
