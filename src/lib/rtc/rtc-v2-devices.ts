@@ -36,20 +36,59 @@ export interface DeviceSelection {
   videoInput: string | null;
 }
 
-type LkLocalTrack = { stop(): void; mediaStreamTrack: MediaStreamTrack; kind?: string };
+type LkLocalTrack = {
+  stop(): void;
+  mediaStreamTrack: MediaStreamTrack;
+  kind?: string;
+  mute?(): Promise<unknown>;
+  unmute?(): Promise<unknown>;
+  setDeviceId?(id: ConstrainDOMString): Promise<boolean>;
+  on?(e: string, fn: () => void): unknown;
+  off?(e: string, fn: () => void): unknown;
+};
 
 function wrap(t: LkLocalTrack, source: LocalSource): V2LocalTrack {
-  return {
+  const base: V2LocalTrack = {
     lk: t,
-    mediaStreamTrack: t.mediaStreamTrack,
+    // getter: restartTrack/setDeviceId trocam a MediaStreamTrack subjacente.
+    get mediaStreamTrack() {
+      return t.mediaStreamTrack;
+    },
     source,
     stop: () => t.stop(),
     onEnded: (fn) => {
-      const h = () => fn();
-      t.mediaStreamTrack.addEventListener("ended", h);
-      return () => t.mediaStreamTrack.removeEventListener("ended", h);
+      // Rebind a cada restart (a MediaStreamTrack muda).
+      let bound: MediaStreamTrack | null = null;
+      const h = () => {
+        // Mute oficial do LiveKit não encerra a track; restart encerra a antiga
+        // mas já troca a referência — só a track ATUAL encerrada conta.
+        if (bound === t.mediaStreamTrack) fn();
+      };
+      const bind = () => {
+        bound?.removeEventListener("ended", h);
+        bound = t.mediaStreamTrack;
+        bound.addEventListener("ended", h);
+      };
+      bind();
+      t.on?.("restarted", bind);
+      return () => {
+        bound?.removeEventListener("ended", h);
+        t.off?.("restarted", bind);
+      };
     },
   };
+  if (source === "microphone" && t.mute && t.unmute) {
+    base.mute = async () => void (await t.mute!());
+    base.unmute = async () => void (await t.unmute!());
+    base.isEnded = () => t.mediaStreamTrack?.readyState === "ended";
+    if (t.setDeviceId) {
+      base.setDevice = async (id) => {
+        const ok = await t.setDeviceId!({ exact: id });
+        return ok;
+      };
+    }
+  }
+  return base;
 }
 
 /** Adapter de captura real. `getSelection` é lido a cada captura. */
