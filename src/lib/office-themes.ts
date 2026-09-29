@@ -65,6 +65,13 @@ export const OFFICE_THEMES: OfficeTheme[] = [
     url: officeMapHalloween.url,
     minTier: 3,
   },
+  {
+    id: "natal",
+    label: "Natal",
+    description: "Árvores, guirlandas e luzes de Natal no escritório.",
+    url: officeMapNatal.url,
+    minTier: 3,
+  },
 ];
 
 export const DEFAULT_THEME_ID = "default";
