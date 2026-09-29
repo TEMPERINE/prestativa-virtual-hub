@@ -26,6 +26,14 @@ export const RTC_TELEMETRY_EVENT_TYPES = [
   "MAP_STALE",
   "PRESENCE_ERROR",
   "BROADCAST_ERROR",
+  // Etapa 14A — diagnóstico de áudio (somente observação)
+  "AUDIO_LOCAL_TRACK",
+  "AUDIO_LOCAL_PUB",
+  "AUDIO_MIC_SWAP",
+  "AUDIO_REMOTE_TRACK",
+  "AUDIO_TX_STATS",
+  "AUDIO_RX_STATS",
+  "AUDIO_SNAPSHOT",
 ] as const;
 
 export type RtcTelemetryEventType = (typeof RTC_TELEMETRY_EVENT_TYPES)[number];
