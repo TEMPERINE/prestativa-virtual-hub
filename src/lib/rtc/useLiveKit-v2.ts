@@ -38,6 +38,8 @@ export interface RtcV2Controls {
   setSelfPosition: (x: number, y: number) => void;
   announceJump: (x: number, y: number) => void;
   retry: () => void;
+  /** LocalAudioTrack (LiveKit) atual com mic ON, só para o medidor visual. */
+  localMicTrack: unknown | null;
 }
 
 export function mapRoomStatus(
@@ -321,6 +323,10 @@ export function useLiveKitV2(
       setSelfPosition: (x, y) => runtime.setSelfPosition(x, y),
       announceJump: (x, y) => runtime.announceJump(x, y),
       retry: () => runtime.retry(),
+      localMicTrack:
+        snap.local.microphone.status === "on"
+          ? ((runtime.local.getTrack("microphone") as { lk?: unknown } | null)?.lk ?? null)
+          : null,
     };
   }, [runtime, snap]);
 
