@@ -10,6 +10,7 @@ import {
   Search, Star, Download, Check, X, AlertCircle, CheckCircle2, Send, Mail,
 } from "lucide-react";
 import { generateMeetingAi } from "@/lib/meetings/ai.functions";
+import { getRecordingUrl } from "@/lib/meetings/recording.functions";
 import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent,
   DropdownMenuItem, DropdownMenuCheckboxItem, DropdownMenuSeparator, DropdownMenuLabel,
