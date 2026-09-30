@@ -6,7 +6,7 @@ em todos os frames; o sino é rotacionado em torno do ponto de pivô (gancho
 do suporte). Assim o balanço é geometricamente correto e bem visível.
 
 Frames (ordem no catálogo):
-  0 = repouso (0°)   1 = -18°   2 = -9°   3 = +9°   4 = +18°
+  0 = repouso (0°)   1 = -32°   2 = -16°   3 = +16°   4 = +32°
 """
 from PIL import Image
 import numpy as np
@@ -16,7 +16,7 @@ SRC = "src/assets/props"
 BELL = os.path.join(SRC, "bell-meta-source-bell.png")
 BRACKET = os.path.join(SRC, "bell-meta-source-bracket.png")
 
-ANGLES = [0, -18, -9, 9, 18]  # frame 0..4
+ANGLES = [0, -32, -16, 16, 32]  # frame 0..4; ampla oscilação legível no mapa
 
 
 def crop_alpha(im, thresh=12):
