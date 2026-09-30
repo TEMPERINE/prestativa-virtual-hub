@@ -35,3 +35,18 @@ describe("feature flag VITE_RTC_ENGINE", () => {
     expect(["v1", "v2"]).toContain(engine);
   });
 });
+
+import { isLovablePreviewHost, resolveRtcEngine } from "@/lib/rtc/rtc-engine";
+describe("engine por domínio", () => {
+  it("preview usa a flag; publicado e outros ficam em v1", () => {
+    expect(resolveRtcEngine("id-preview--2c4196a3-d2a8.lovable.app", "v2")).toBe("v2");
+    expect(resolveRtcEngine("project--2c4196a3-dev.lovable.app", "v2")).toBe("v2");
+    expect(resolveRtcEngine("abc.lovableproject.com", "v2")).toBe("v2");
+    expect(resolveRtcEngine("prestativa-virtual-hub.lovable.app", "v2")).toBe("v1");
+    expect(resolveRtcEngine("project--2c4196a3.lovable.app", "v2")).toBe("v1");
+    expect(resolveRtcEngine("meudominio.com.br", "v2")).toBe("v1");
+    expect(resolveRtcEngine("localhost", "v2")).toBe("v1");
+    expect(resolveRtcEngine(null, "v2")).toBe("v1");
+    expect(isLovablePreviewHost("evil-id-preview--x.lovable.app.com")).toBe(false);
+  });
+});

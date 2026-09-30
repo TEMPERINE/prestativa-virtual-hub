@@ -18,8 +18,8 @@ export interface S3Config {
 /** Secrets exigidos para gravar; ausentes → lista de nomes (nunca valores). */
 export function readS3Config(): { ok: true; cfg: S3Config } | { ok: false; missing: string[] } {
   const env = process.env;
-  const supaUrl = env["SUPABASE_URL"];
-  const endpoint = env["RECORDING_S3_ENDPOINT"] || (supaUrl ? `${supaUrl}/storage/v1/s3` : "");
+  // Storage externo S3-compatible (ex.: R2: https://<account>.r2.cloudflarestorage.com, region "auto").
+  const endpoint = (env["RECORDING_S3_ENDPOINT"] ?? "").trim();
   const region = env["RECORDING_S3_REGION"] ?? "";
   const accessKey = env["RECORDING_S3_ACCESS_KEY_ID"] ?? "";
   const secret = env["RECORDING_S3_SECRET_ACCESS_KEY"] ?? "";

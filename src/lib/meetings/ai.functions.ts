@@ -36,12 +36,13 @@ export const generateMeetingAi = createServerFn({ method: "POST" })
     });
     if (markErr) throw new Error(markErr.message ?? "Sem permissão.");
 
-    // 3) Baixa o arquivo via admin (bucket é privado)
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data: blob, error: dlErr } = await supabaseAdmin.storage
-      .from("meeting-recordings")
-      .download(meeting.recording_path);
-    if (dlErr || !blob) {
+    // 3) Baixa o arquivo no servidor (Cloud p/ WebM antigo, S3/R2 p/ MP4 V2)
+    const store = await import("./recording-storage.server");
+    let file: { bytes: ArrayBuffer; mime: string };
+    try {
+      const backend = await store.resolveRecordingBackend(meetingId, meeting.recording_path);
+      file = await store.downloadRecording(backend, meeting.recording_path);
+    } catch {
       await sb.rpc("meeting_set_ai_error", {
         _meeting_id: meetingId,
         _error: "Não consegui baixar a gravação.",
@@ -50,14 +51,15 @@ export const generateMeetingAi = createServerFn({ method: "POST" })
     }
 
     // 4) base64
-    const buf = Buffer.from(await blob.arrayBuffer());
+    const buf = Buffer.from(file.bytes);
     if (buf.byteLength > 25 * 1024 * 1024) {
       const msg = "Gravação muito grande (limite 25 MB) para transcrição automática.";
       await sb.rpc("meeting_set_ai_error", { _meeting_id: meetingId, _error: msg });
       throw new Error(msg);
     }
     const base64 = buf.toString("base64");
-    const mime = blob.type || "video/webm";
+    const mime = file.mime;
+    const filename = mime.includes("mp4") ? "meeting.mp4" : "meeting.webm";
 
     // 5) Lovable AI Gateway — Gemini 2.5 Flash aceita áudio/vídeo inline.
     const key = process.env.LOVABLE_API_KEY;

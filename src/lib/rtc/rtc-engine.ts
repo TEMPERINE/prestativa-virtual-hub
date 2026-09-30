@@ -1,26 +1,16 @@
 /**
- * Feature flag do motor RTC (Etapa 1 da reconstrucao RTC v2).
+ * Seleção do motor RTC.
  *
- * Valores aceitos para VITE_RTC_ENGINE:
- *  - "v1" (default)
- *  - "v2"
- *
- * Qualquer valor ausente ou invalido resolve para "v1",
- * garantindo que o RTC v1 continue sendo o comportamento padrao.
- *
- * IMPORTANTE: nesta etapa a flag NAO seleciona nem executa nenhum motor RTC.
- * A integracao efetiva v1/v2 acontecera em etapa futura.
+ * Regra por domínio (o site publicado nunca liga V2 por engano):
+ *  - domínio de PREVIEW do Lovable → valor de VITE_RTC_ENGINE (hoje "v2");
+ *  - domínio publicado (prestativa-virtual-hub.lovable.app) → sempre "v1";
+ *  - qualquer outro domínio (ou sem window, ex.: SSR) → sempre "v1".
  */
 
 export type RtcEngine = "v1" | "v2";
 
 export const DEFAULT_RTC_ENGINE: RtcEngine = "v1";
 
-/**
- * Interpreta o valor bruto de VITE_RTC_ENGINE de forma pura e deterministica.
- * Aceita "v1" e "v2" (case-insensitive, com trim).
- * Ausente, vazio ou invalido retorna "v1".
- */
 export function parseRtcEngine(raw?: string | null | undefined): RtcEngine {
   const value = (raw ?? "").toString().trim().toLowerCase();
   if (value === "v2") return "v2";
@@ -28,11 +18,23 @@ export function parseRtcEngine(raw?: string | null | undefined): RtcEngine {
   return DEFAULT_RTC_ENGINE;
 }
 
-/**
- * Le a flag do ambiente de build (import.meta.env.VITE_RTC_ENGINE).
- * Nao conecta ao produto ainda; apenas expoe o valor interpretado.
- */
+/** Hosts de preview do Lovable (id-preview--*, project--*-dev, *.lovableproject.com). */
+export function isLovablePreviewHost(hostname: string | null | undefined): boolean {
+  const h = (hostname ?? "").toLowerCase();
+  if (!h) return false;
+  if (h.endsWith(".lovableproject.com")) return true;
+  if (!h.endsWith(".lovable.app")) return false;
+  const sub = h.slice(0, -".lovable.app".length);
+  return sub.startsWith("id-preview--") || /^project--.+-dev$/.test(sub) || sub.startsWith("preview--");
+}
+
+/** Pura: decide o motor a partir do host e do valor bruto da flag. */
+export function resolveRtcEngine(hostname: string | null | undefined, raw?: string | null): RtcEngine {
+  return isLovablePreviewHost(hostname) ? parseRtcEngine(raw) : "v1";
+}
+
 export function getRtcEngine(): RtcEngine {
   const raw = import.meta?.env?.VITE_RTC_ENGINE;
-  return parseRtcEngine(typeof raw === "string" ? raw : undefined);
+  const host = typeof window !== "undefined" ? window.location.hostname : null;
+  return resolveRtcEngine(host, typeof raw === "string" ? raw : undefined);
 }
