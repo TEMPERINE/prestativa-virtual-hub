@@ -193,6 +193,71 @@ export type Database = {
           },
         ]
       }
+      meeting_egress: {
+        Row: {
+          created_at: string
+          duration_seconds: number | null
+          egress_id: string | null
+          ended_at: string | null
+          error: string | null
+          file_path: string | null
+          file_size: number | null
+          id: string
+          meeting_id: string
+          room_name: string
+          started_at: string | null
+          started_by: string
+          status: string
+          stopped_by: string | null
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          duration_seconds?: number | null
+          egress_id?: string | null
+          ended_at?: string | null
+          error?: string | null
+          file_path?: string | null
+          file_size?: number | null
+          id?: string
+          meeting_id: string
+          room_name: string
+          started_at?: string | null
+          started_by: string
+          status?: string
+          stopped_by?: string | null
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          duration_seconds?: number | null
+          egress_id?: string | null
+          ended_at?: string | null
+          error?: string | null
+          file_path?: string | null
+          file_size?: number | null
+          id?: string
+          meeting_id?: string
+          room_name?: string
+          started_at?: string | null
+          started_by?: string
+          status?: string
+          stopped_by?: string | null
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "meeting_egress_meeting_id_fkey"
+            columns: ["meeting_id"]
+            isOneToOne: false
+            referencedRelation: "meetings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       meeting_favorites: {
         Row: {
           created_at: string
