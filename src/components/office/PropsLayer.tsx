@@ -387,6 +387,36 @@ export function PropsLayer({ selfX, selfY, focusedRect = null }: Props) {
         const refY = p.y - hNorm * (1 - (def.depthRefY ?? 1));
         const focusOffset = focusedRect && def.foregroundWhenFocused ? 60000 : 0;
         const zIndex = focusOffset + Math.max(1, Math.round(refY * 1000));
+        const style = {
+          left: `${p.x * 100}%`,
+          top: `${p.y * 100}%`,
+          width: `${wPct}%`,
+          height: `${hPct}%`,
+          transform: "translate(-50%, -100%)",
+          objectFit: "contain" as const,
+          objectPosition: "bottom center",
+          zIndex,
+          imageRendering: "pixelated" as const,
+        };
+        // Props animados: todos os quadros ficam carregados e empilhados; a
+        // animação só alterna qual está visível. Assim a troca é instantânea
+        // mesmo com conexão lenta (antes cada quadro só começava a baixar na
+        // hora do toque e o sino parecia congelado).
+        if (def.animation) {
+          const current = def.frames[frame] ? frame : 0;
+          return def.frames.map((frameSrc, idx) => (
+            <img
+              key={`${p.id}-${idx}`}
+              src={frameSrc}
+              alt={idx === current ? def.label : ""}
+              aria-hidden={idx === current ? undefined : true}
+              draggable={false}
+              loading="eager"
+              className="absolute pointer-events-none select-none"
+              style={{ ...style, visibility: idx === current ? "visible" : "hidden" }}
+            />
+          ));
+        }
         return (
           <img
             key={p.id}
@@ -394,17 +424,7 @@ export function PropsLayer({ selfX, selfY, focusedRect = null }: Props) {
             alt={def.label}
             draggable={false}
             className="absolute pointer-events-none select-none"
-            style={{
-              left: `${p.x * 100}%`,
-              top: `${p.y * 100}%`,
-              width: `${wPct}%`,
-              height: `${hPct}%`,
-              transform: "translate(-50%, -100%)",
-              objectFit: "contain",
-              objectPosition: "bottom center",
-              zIndex,
-              imageRendering: "pixelated",
-            }}
+            style={style}
           />
         );
       })}
