@@ -959,6 +959,12 @@ function AiPanel({
           <AlertCircle className="w-3 h-3" /> {meeting.ai_error}
         </div>
       )}
+      {participantNames.length > 0 && (
+        <div className="text-xs text-muted-foreground mb-2 inline-flex items-start gap-1">
+          <Users className="w-3 h-3 mt-0.5 shrink-0" />
+          <span>Participantes: {participantNames.join(", ")}</span>
+        </div>
+      )}
       {busy && !meeting.summary && (
         <div className="text-sm bg-muted/40 rounded-md p-4 space-y-2 animate-pulse">
           <div className="h-3 bg-muted rounded w-3/4" />
