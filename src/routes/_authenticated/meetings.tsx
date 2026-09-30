@@ -747,6 +747,7 @@ function MeetingCard({
             <div className="overflow-hidden">
               {meeting.recording_path && (
                 <RecordingPlayer
+                  meetingId={meeting.id}
                   path={meeting.recording_path}
                   durationSec={meeting.recording_duration_seconds ?? null}
                   active={open}
@@ -972,26 +973,31 @@ function AiPanel({
 }
 
 function RecordingPlayer({
+  meetingId,
   path,
   durationSec,
   active = true,
 }: {
+  meetingId: string;
   path: string;
   durationSec: number | null;
   active?: boolean;
 }) {
+  const getUrlFn = useServerFn(getRecordingUrl);
   const [url, setUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   const load = async () => {
     if (url || loading) return;
     setLoading(true);
-    const { data, error } = await supabase.storage
-      .from("meeting-recordings")
-      .createSignedUrl(path, 60 * 60);
-    setLoading(false);
-    if (error || !data?.signedUrl) return;
-    setUrl(data.signedUrl);
+    try {
+      const r = await getUrlFn({ data: { meetingId } });
+      if (r.ok) setUrl(r.url);
+    } catch {
+      /* sem URL: player fica oculto */
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {

@@ -12,16 +12,16 @@ describe("Etapa 14D — gravação server-side", () => {
     process.env["SUPABASE_URL"] = "https://x.supabase.co";
     const r = readS3Config();
     expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.missing).toEqual(["RECORDING_S3_REGION", "RECORDING_S3_ACCESS_KEY_ID", "RECORDING_S3_SECRET_ACCESS_KEY"]);
+    if (!r.ok) expect(r.missing).toEqual(["RECORDING_S3_ENDPOINT", "RECORDING_S3_REGION", "RECORDING_S3_ACCESS_KEY_ID", "RECORDING_S3_SECRET_ACCESS_KEY"]);
   });
 
-  it("endpoint padrão = S3 do storage do projeto; bucket meeting-recordings", () => {
-    process.env["SUPABASE_URL"] = "https://x.supabase.co";
-    process.env["RECORDING_S3_REGION"] = "sa-east-1";
+  it("R2: endpoint customizado, region auto, bucket meeting-recordings", () => {
+    process.env["RECORDING_S3_ENDPOINT"] = "https://acc.r2.cloudflarestorage.com";
+    process.env["RECORDING_S3_REGION"] = "auto";
     process.env["RECORDING_S3_ACCESS_KEY_ID"] = "a";
     process.env["RECORDING_S3_SECRET_ACCESS_KEY"] = "b";
     const r = readS3Config();
-    expect(r.ok && r.cfg).toMatchObject({ endpoint: "https://x.supabase.co/storage/v1/s3", bucket: "meeting-recordings" });
+    expect(r.ok && r.cfg).toMatchObject({ endpoint: "https://acc.r2.cloudflarestorage.com", bucket: "meeting-recordings" });
   });
 
   it("status do Egress mapeado; abortado/limite = failed", () => {
