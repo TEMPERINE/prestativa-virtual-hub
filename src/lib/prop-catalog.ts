@@ -62,7 +62,7 @@ export const BUILTIN_PROPS: PropDef[] = [
     // índice → ângulo do sino: 0 = repouso (0°); 1 = -32°; 2 = -16°; 3 = +16°; 4 = +32°
     frames: [bellMeta1, bellMeta2, bellMeta3, bellMeta4, bellMeta5],
     defaultW: 0.05,
-    aspectRatio: 240 / 250, // canvas idêntico em todos os frames (pivô fixo)
+    aspectRatio: 320 / 300, // canvas idêntico em todos os frames (pivô fixo)
     interactive: true,
     interactKey: "x",
     depthRefY: 0.5,
