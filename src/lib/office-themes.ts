@@ -108,8 +108,18 @@ export function getCurrentTheme(): OfficeTheme {
 }
 
 export async function setCurrentThemeId(id: string): Promise<{ ok: boolean; error?: string }> {
-  const base = loadOverrides() ?? newOverrides();
-  const next = { ...base, theme: id };
+  // Nunca partir de um mapa vazio: se o cache local não tem o mapa do espaço,
+  // buscar o canônico na nuvem antes de gravar, para que trocar de tema jamais
+  // apague paredes, zonas, spawns ou elementos já desenhados.
+  let base = loadOverrides();
+  if (!base) {
+    try {
+      base = await pullOverridesFromCloud();
+    } catch {
+      base = null;
+    }
+  }
+  const next = { ...(base ?? newOverrides()), theme: id };
   saveOverrides(next);
   if (typeof window !== "undefined") {
     window.dispatchEvent(new CustomEvent(EVENT));
