@@ -93,6 +93,7 @@ import { OnboardingWizard } from "@/components/onboarding/OnboardingWizard";
 import { useMeetingTracker } from "@/lib/meetings/useMeetingTracker";
 import { useMeetingRecorder } from "@/lib/meetings/useMeetingRecorder";
 import { useServerRecorder } from "@/lib/meetings/useServerRecorder";
+import { RecordingNameDialog } from "@/components/office/RecordingNameDialog";
 import { getCurrentWorkspaceId } from "@/lib/workspace/current";
 import { useWorkspaceTier } from "@/lib/workspace/useWorkspaceTier";
 
@@ -3449,6 +3450,19 @@ export function OfficeScene({
           open={savedNotesOpen}
           onOpenChange={setSavedNotesOpen}
           userId={me.id}
+        />
+      )}
+
+      {IS_RTC_V2 && serverRecorder.completed && (
+        <RecordingNameDialog
+          meetingId={serverRecorder.completed.meetingId}
+          defaultTitle={`Reunião — ${new Date().toLocaleString("pt-BR", {
+            day: "2-digit",
+            month: "2-digit",
+            hour: "2-digit",
+            minute: "2-digit",
+          })}`}
+          onClose={serverRecorder.dismissCompleted}
         />
       )}
 

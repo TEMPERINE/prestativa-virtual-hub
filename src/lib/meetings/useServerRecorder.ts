@@ -11,28 +11,71 @@ import type { RecorderState } from "./useMeetingRecorder";
  * reflete o Egress real mesmo se outra pessoa iniciou/parou.
  * Falhas aqui nunca tocam a Room/mídia.
  */
+export type ServerRecorderState = RecorderState & {
+  /** Gravação recém-concluída iniciada por mim — para pedir um nome. Nunca bloqueia nada. */
+  completed: { meetingId: string } | null;
+  dismissCompleted: () => void;
+};
+
 export function useServerRecorder(opts: {
   meetingId: string | null;
   isRoomConnected: () => boolean;
-}): RecorderState {
+}): ServerRecorderState {
   const startFn = useServerFn(startServerRecording);
   const stopFn = useServerFn(stopServerRecording);
   const [active, setActive] = useState<{ startedAt: number } | null>(null);
   const [busy, setBusy] = useState(false);
   const [elapsed, setElapsed] = useState(0);
+  const [completed, setCompleted] = useState<{ meetingId: string } | null>(null);
   const meetingRef = useRef<string | null>(null);
+  /** Egress que EU iniciei e vi rodando nesta sessão — só esses geram o pedido de nome. */
+  const mineRef = useRef<Set<string>>(new Set());
+  const askedRef = useRef<Set<string>>(new Set());
+  const uidRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    void supabase.auth.getUser().then(({ data }) => {
+      if (!cancelled) uidRef.current = data.user?.id ?? null;
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const refresh = useCallback(async (meetingId: string | null) => {
     if (!meetingId) return setActive(null);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data } = await (supabase as any)
+    const { data: rows } = await (supabase as any)
       .from("meeting_egress")
-      .select("status, started_at, created_at")
+      .select("id, status, started_by, started_at, created_at")
       .eq("meeting_id", meetingId)
-      .in("status", ["starting", "active", "ending"])
-      .maybeSingle();
-    setActive(data ? { startedAt: Date.parse(data.started_at ?? data.created_at) } : null);
+      .order("created_at", { ascending: false })
+      .limit(5);
+
+    const list = (rows ?? []) as Array<{
+      id: string;
+      status: string;
+      started_by: string | null;
+      started_at: string | null;
+      created_at: string;
+    }>;
+
+    const running = list.find((r) => ["starting", "active", "ending"].includes(r.status));
+    setActive(running ? { startedAt: Date.parse(running.started_at ?? running.created_at) } : null);
+
+    for (const r of list) {
+      if (r.started_by && r.started_by === uidRef.current) {
+        if (["starting", "active", "ending"].includes(r.status)) mineRef.current.add(r.id);
+        if (r.status === "complete" && mineRef.current.has(r.id) && !askedRef.current.has(r.id)) {
+          askedRef.current.add(r.id);
+          setCompleted({ meetingId });
+        }
+      }
+    }
   }, []);
+
+  const dismissCompleted = useCallback(() => setCompleted(null), []);
 
   useEffect(() => {
     const id = opts.meetingId;
@@ -106,5 +149,13 @@ export function useServerRecorder(opts: {
     }
   }, [stopFn, refresh]);
 
-  return { isRecording: !!active, isUploading: busy, elapsedSeconds: elapsed, start, stop };
+  return {
+    isRecording: !!active,
+    isUploading: busy,
+    elapsedSeconds: elapsed,
+    start,
+    stop,
+    completed,
+    dismissCompleted,
+  };
 }

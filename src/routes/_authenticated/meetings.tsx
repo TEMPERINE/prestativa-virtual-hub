@@ -136,6 +136,7 @@ function MeetingsPage() {
           new Set([
             ...meetingList.map((m) => m.host_id).filter(Boolean) as string[],
             ...Array.from(shareMap.values()),
+            ...((parts ?? []) as ParticipantRow[]).map((p) => p.user_id),
           ]),
         );
         if (userIds.length > 0) {
@@ -346,6 +347,7 @@ function MeetingsPage() {
                   key={m.id}
                   meeting={m}
                   participants={participantsByMeeting[m.id] ?? []}
+                  profilesById={profiles}
                   hostProfile={m.host_id ? profiles[m.host_id] : undefined}
                   receivedFromSenderId={receivedShares.get(m.id) ?? null}
                   receivedFromProfile={(() => {
@@ -542,9 +544,26 @@ function EmptyState({ selected, hasQuery }: { selected: FolderSel; hasQuery: boo
   );
 }
 
+/** Nomes dos participantes da reunião, deduplicados por user_id e sem inventar nomes. */
+function participantNamesOf(
+  participants: ParticipantRow[],
+  profilesById: Record<string, { display_name: string; avatar_color: string }>,
+): string[] {
+  const seen = new Set<string>();
+  const names: string[] = [];
+  for (const p of participants) {
+    if (seen.has(p.user_id)) continue;
+    seen.add(p.user_id);
+    const name = profilesById[p.user_id]?.display_name;
+    if (name) names.push(name);
+  }
+  return names;
+}
+
 function MeetingCard({
   meeting,
   participants,
+  profilesById,
   hostProfile,
   receivedFromSenderId,
   receivedFromProfile,
@@ -560,6 +579,7 @@ function MeetingCard({
 }: {
   meeting: MeetingRow;
   participants: ParticipantRow[];
+  profilesById: Record<string, { display_name: string; avatar_color: string }>;
   hostProfile?: { display_name: string; avatar_color: string };
   receivedFromSenderId: string | null;
   receivedFromProfile?: { display_name: string; avatar_color: string };
@@ -583,6 +603,8 @@ function MeetingCard({
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(meeting.title ?? meeting.zone_label);
   const hasContent = !!(meeting.recording_path || meeting.summary || meeting.transcript);
+  const uniqueCount = new Set(participants.map((p) => p.user_id)).size;
+  const names = participantNamesOf(participants, profilesById);
 
   const commitRename = () => {
     setEditing(false);
@@ -728,9 +750,20 @@ function MeetingCard({
               })}
               {durationMin ? ` · ${durationMin} min` : ""}
             </span>
-            <span className="inline-flex items-center gap-1">
+            <span className="inline-flex items-center gap-1" title={names.join(", ")}>
               <Users className="w-3 h-3" />
-              {participants.length || "—"} participação{participants.length === 1 ? "" : "s"} sua{participants.length === 1 ? "" : "s"}
+              {uniqueCount > 0 ? (
+                <>
+                  {uniqueCount} participante{uniqueCount === 1 ? "" : "s"}
+                  {names.length > 0 && (
+                    <span className="text-muted-foreground/80 truncate max-w-[22rem]">
+                      · {names.join(", ")}
+                    </span>
+                  )}
+                </>
+              ) : (
+                "Participantes não registrados"
+              )}
             </span>
             <span className="text-muted-foreground/80">· {meeting.zone_label}</span>
             {receivedFromSenderId && (
@@ -756,7 +789,7 @@ function MeetingCard({
               )}
 
               {meeting.recording_path && (
-                <AiPanel meeting={meeting} onAiUpdated={onAiUpdated} />
+                <AiPanel meeting={meeting} participantNames={names} onAiUpdated={onAiUpdated} />
               )}
 
               <PersonalNotes meetingId={meeting.id} active={open} />
@@ -836,9 +869,11 @@ function safeFilename(s: string): string {
 
 function AiPanel({
   meeting,
+  participantNames,
   onAiUpdated,
 }: {
   meeting: MeetingRow;
+  participantNames: string[];
   onAiUpdated: (transcript: string, summary: string) => void;
 }) {
   const generate = useServerFn(generateMeetingAi);
@@ -924,6 +959,12 @@ function AiPanel({
           <AlertCircle className="w-3 h-3" /> {meeting.ai_error}
         </div>
       )}
+      {participantNames.length > 0 && (
+        <div className="text-xs text-muted-foreground mb-2 inline-flex items-start gap-1">
+          <Users className="w-3 h-3 mt-0.5 shrink-0" />
+          <span>Participantes: {participantNames.join(", ")}</span>
+        </div>
+      )}
       {busy && !meeting.summary && (
         <div className="text-sm bg-muted/40 rounded-md p-4 space-y-2 animate-pulse">
           <div className="h-3 bg-muted rounded w-3/4" />
@@ -987,15 +1028,18 @@ function RecordingPlayer({
   const getUrlFn = useServerFn(getRecordingUrl);
   const [url, setUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [failed, setFailed] = useState(false);
 
   const load = async () => {
     if (url || loading) return;
     setLoading(true);
+    setFailed(false);
     try {
       const r = await getUrlFn({ data: { meetingId } });
       if (r.ok) setUrl(r.url);
+      else setFailed(true);
     } catch {
-      /* sem URL: player fica oculto */
+      setFailed(true);
     } finally {
       setLoading(false);
     }
@@ -1029,9 +1073,16 @@ function RecordingPlayer({
           className="w-full rounded-md bg-black aspect-video"
           preload="metadata"
         />
+      ) : failed ? (
+        <div className="text-xs text-muted-foreground inline-flex items-center gap-2">
+          <span>Não consegui abrir a gravação agora.</span>
+          <button onClick={() => void load()} className="text-primary hover:underline">
+            Tentar de novo
+          </button>
+        </div>
       ) : (
         <div className="text-xs text-muted-foreground inline-flex items-center gap-1">
-          {loading ? <><Loader2 className="w-3 h-3 animate-spin" /> Carregando gravação…</> : "Gravação indisponível."}
+          <Loader2 className="w-3 h-3 animate-spin" /> Carregando gravação…
         </div>
       )}
     </div>
