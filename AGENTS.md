@@ -1,1 +1,2 @@
 - RTC v2: zona (ponto→zoneId/kind/privado) vem só de src/lib/rtc/canonical-zones.ts, usado pelo cliente V2 e pelo Token V2 — evita divergência cliente/servidor; o callZoneAt legado (src/lib/legacy-call-zone.ts) fica só no v1.
+- Os quadros do sino são gerados por `scripts/build-bell-meta.py` a partir de `bell-meta-rest-source.png`; isso mantém suporte fixo e pivô consistente sem depender de fontes separadas ausentes.
