@@ -24,9 +24,8 @@ export function PropsLayer({ selfX, selfY, focusedRect = null }: Props) {
     () => loadOverrides()?.props ?? []
   );
   const [frames, setFrames] = useState<Record<string, number>>({});
-  // A animação curta atualiza somente a imagem do prop, sem depender dos
-  // re-renders da cena (que podem atrasar e engolir quadros do sino).
-  const animatedImagesRef = useRef<Record<string, HTMLImageElement>>({});
+  // Override local de frame durante animação one-shot (não persiste no servidor).
+  const [animFrames, setAnimFrames] = useState<Record<string, number>>({});
   const animTimersRef = useRef<Record<string, number>>({});
   // Ticks já processados localmente — evita que o eco realtime do nosso
   // próprio clique reinicie a animação no meio.
@@ -174,25 +173,28 @@ export function PropsLayer({ selfX, selfY, focusedRect = null }: Props) {
       delete animTimersRef.current[propId];
     }
     const rest = anim.restFrame ?? 0;
-    const showFrame = (frame: number) => {
-      const image = animatedImagesRef.current[propId];
-      const source = def.frames[frame] ?? def.frames[rest];
-      if (image && source) image.src = source;
-    };
+    // IMPORTANTE: capturar o frame ANTES do setState. O updater do React roda
+    // de forma assíncrona (no render), e ler `sequence[i]` lá dentro pega o
+    // `i` já incrementado — sob lag de render todos os updates colapsam para
+    // `undefined` e a animação parece "não rodar".
     let i = 0;
     const step = () => {
       if (i >= anim.sequence.length) {
         delete animTimersRef.current[propId];
-        showFrame(rest);
+        setAnimFrames((p) => {
+          const n = { ...p };
+          delete n[propId];
+          return n;
+        });
         return;
       }
       const frameValue = anim.sequence[i];
       i++;
-      showFrame(frameValue);
+      setAnimFrames((p) => ({ ...p, [propId]: frameValue }));
       animTimersRef.current[propId] = window.setTimeout(step, anim.frameMs);
     };
-    showFrame(rest);
-    step();
+    setAnimFrames((p) => ({ ...p, [propId]: rest }));
+    animTimersRef.current[propId] = window.setTimeout(step, 0);
   }, []);
 
   // Cleanup timers no unmount
@@ -376,7 +378,8 @@ export function PropsLayer({ selfX, selfY, focusedRect = null }: Props) {
         const baseFrame = def.animation
           ? (def.animation.restFrame ?? 0)
           : (frames[p.id] ?? p.frame ?? 0);
-        const src = def.frames[baseFrame] ?? def.frames[0];
+        const frame = animFrames[p.id] ?? baseFrame;
+        const src = def.frames[frame] ?? def.frames[0];
 
         const wPct = p.w * 100;
         const hPct = (p.w / def.aspectRatio) * 100;
@@ -387,10 +390,6 @@ export function PropsLayer({ selfX, selfY, focusedRect = null }: Props) {
         return (
           <img
             key={p.id}
-            ref={def.animation ? (image) => {
-              if (image) animatedImagesRef.current[p.id] = image;
-              else delete animatedImagesRef.current[p.id];
-            } : undefined}
             src={src}
             alt={def.label}
             draggable={false}
