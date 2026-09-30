@@ -26,6 +26,7 @@ import { getCurrentWorkspaceId, subscribeCurrentWorkspaceId } from "@/lib/worksp
 import { useWorkspaceTier } from "@/lib/workspace/useWorkspaceTier";
 import { toast } from "sonner";
 import { MapSavePoints } from "./MapSavePoints";
+import { defaultBlocked } from "@/lib/default-map-blocked";
 import { appPrompt, appConfirm } from "@/components/ui/app-dialogs";
 
 import { ArrowLeft, Eraser, Square, Download, Trash2, Eye, EyeOff, Undo, Plus, X, Briefcase, Users, MapPin, Hand, Zap, ZapOff, Lock, Map as MapIcon, Boxes, LayoutGrid, Upload, Loader2, Palette, Check } from "lucide-react";
@@ -42,48 +43,9 @@ type Tool =
 // Seed overrides from the hardcoded COLLIDERS + ZONES so the user starts
 // with the current layout already painted and can tweak from there.
 function seedFromDefaults(): MapOverrides {
+  // Padrão = paredes e móveis bloqueados do layout original (sem zonas).
   const o = newOverrides();
-  // Blocked tiles from COLLIDERS rectangles.
-  for (const c of COLLIDERS) {
-    const c0 = Math.max(0, Math.floor(c.x1 * o.cols));
-    const c1 = Math.min(o.cols - 1, Math.ceil(c.x2 * o.cols) - 1);
-    const r0 = Math.max(0, Math.floor(c.y1 * o.rows));
-    const r1 = Math.min(o.rows - 1, Math.ceil(c.y2 * o.rows) - 1);
-    for (let r = r0; r <= r1; r++) {
-      for (let cc = c0; cc <= c1; cc++) {
-        o.blocked[cellIndex(cc, r, o.cols)] = 1;
-      }
-    }
-  }
-  // Zones from ZONES rectangles (skip lobby). Materialize each as a
-  // customZone so the user can rename/recolor/delete them like any other.
-  const seededCustom: CustomZone[] = [];
-  const seededKinds: Record<string, ZoneKind> = {};
-  for (const z of ZONES) {
-    if (z.id === "lobby") continue;
-    const c0 = Math.max(0, Math.floor(z.rect.x1 * o.cols));
-    const c1 = Math.min(o.cols - 1, Math.ceil(z.rect.x2 * o.cols) - 1);
-    const r0 = Math.max(0, Math.floor(z.rect.y1 * o.rows));
-    const r1 = Math.min(o.rows - 1, Math.ceil(z.rect.y2 * o.rows) - 1);
-    for (let r = r0; r <= r1; r++) {
-      for (let cc = c0; cc <= c1; cc++) {
-        o.zones[cellIndex(cc, r, o.cols)] = z.id;
-      }
-    }
-    const kind: ZoneKind =
-      z.id === "reuniao" || z.id === "feedback" || z.id === "descompressao"
-        ? "common"
-        : "workspace";
-    seededCustom.push({
-      id: z.id,
-      label: z.label,
-      color: ZONE_COLORS[z.id] ?? "#888",
-      kind,
-    });
-    seededKinds[z.id] = kind;
-  }
-  o.customZones = seededCustom;
-  o.zoneKinds = seededKinds;
+  o.blocked = defaultBlocked(o.cols * o.rows);
   return o;
 }
 
