@@ -2585,7 +2585,11 @@ export function OfficeScene({
       if (getZoneKind(c.id) !== "workspace") continue;
       const rect = zoneRectFromOverrides(c.id as ZoneId);
       if (!rect) continue;
-      out.push({ id: c.id, label: c.label, rect });
+      // An edited built-in zone can also appear among custom zones. Keep one
+      // hit area per ID so overlapping cards cannot retain independent hover.
+      const existing = out.findIndex((zone) => zone.id === c.id);
+      if (existing >= 0) out[existing] = { id: c.id, label: c.label, rect };
+      else out.push({ id: c.id, label: c.label, rect });
     }
     return out;
   }, [claims]);
@@ -3885,7 +3889,30 @@ function WorkspaceZoneHover({
   children: React.ReactNode;
 }) {
   const anchorRef = useRef<HTMLDivElement>(null);
+  const popupRef = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState<{ left: number; top: number } | null>(null);
+
+  useEffect(() => {
+    if (!isHovered) return;
+    const inside = (rect: DOMRect, x: number, y: number) =>
+      x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom;
+    const onMove = (event: PointerEvent) => {
+      const anchor = anchorRef.current;
+      const popup = popupRef.current;
+      if (anchor && inside(anchor.getBoundingClientRect(), event.clientX, event.clientY)) return;
+      if (popup && inside(popup.getBoundingClientRect(), event.clientX, event.clientY)) return;
+      onLeave();
+    };
+    const onOut = (event: PointerEvent) => {
+      if (!event.relatedTarget) onLeave();
+    };
+    document.addEventListener("pointermove", onMove);
+    document.addEventListener("pointerout", onOut);
+    return () => {
+      document.removeEventListener("pointermove", onMove);
+      document.removeEventListener("pointerout", onOut);
+    };
+  }, [isHovered, onLeave]);
 
   useEffect(() => {
     if (!isHovered) {
@@ -3921,7 +3948,6 @@ function WorkspaceZoneHover({
         zIndex: isHovered ? 55 : 15,
       }}
       onMouseEnter={onEnter}
-      onMouseLeave={onLeave}
     >
       <div
         className="absolute inset-0 rounded-md transition-all duration-150 pointer-events-none"
@@ -3935,6 +3961,7 @@ function WorkspaceZoneHover({
       {isHovered && pos && typeof document !== "undefined" &&
         createPortal(
           <div
+            ref={popupRef}
             style={{
               position: "fixed",
               left: pos.left,
