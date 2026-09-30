@@ -20,6 +20,7 @@ import { Route as AuthenticatedMeetingsRouteImport } from './routes/_authenticat
 import { Route as AuthenticatedAguardandoConviteRouteImport } from './routes/_authenticated/aguardando-convite'
 import { Route as AuthenticatedWorkspacesIndexRouteImport } from './routes/_authenticated/workspaces.index'
 import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authenticated/admin.index'
+import { Route as ApiPublicLivekitEgressRouteImport } from './routes/api/public/livekit-egress'
 import { Route as AuthenticatedWorkspacesNewRouteImport } from './routes/_authenticated/workspaces.new'
 import { Route as AuthenticatedWorkspacesWorkspaceIdRouteImport } from './routes/_authenticated/workspaces.$workspaceId'
 import { Route as AuthenticatedOfficeEditorRouteImport } from './routes/_authenticated/office_.editor'
@@ -83,6 +84,11 @@ const AuthenticatedAdminIndexRoute = AuthenticatedAdminIndexRouteImport.update({
   path: '/admin/',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const ApiPublicLivekitEgressRoute = ApiPublicLivekitEgressRouteImport.update({
+  id: '/api/public/livekit-egress',
+  path: '/api/public/livekit-egress',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthenticatedWorkspacesNewRoute =
   AuthenticatedWorkspacesNewRouteImport.update({
     id: '/workspaces/new',
@@ -135,6 +141,7 @@ export interface FileRoutesByFullPath {
   '/office/editor': typeof AuthenticatedOfficeEditorRoute
   '/workspaces/$workspaceId': typeof AuthenticatedWorkspacesWorkspaceIdRoute
   '/workspaces/new': typeof AuthenticatedWorkspacesNewRoute
+  '/api/public/livekit-egress': typeof ApiPublicLivekitEgressRoute
   '/admin/': typeof AuthenticatedAdminIndexRoute
   '/workspaces/': typeof AuthenticatedWorkspacesIndexRoute
 }
@@ -153,6 +160,7 @@ export interface FileRoutesByTo {
   '/office/editor': typeof AuthenticatedOfficeEditorRoute
   '/workspaces/$workspaceId': typeof AuthenticatedWorkspacesWorkspaceIdRoute
   '/workspaces/new': typeof AuthenticatedWorkspacesNewRoute
+  '/api/public/livekit-egress': typeof ApiPublicLivekitEgressRoute
   '/admin': typeof AuthenticatedAdminIndexRoute
   '/workspaces': typeof AuthenticatedWorkspacesIndexRoute
 }
@@ -173,6 +181,7 @@ export interface FileRoutesById {
   '/_authenticated/office_/editor': typeof AuthenticatedOfficeEditorRoute
   '/_authenticated/workspaces/$workspaceId': typeof AuthenticatedWorkspacesWorkspaceIdRoute
   '/_authenticated/workspaces/new': typeof AuthenticatedWorkspacesNewRoute
+  '/api/public/livekit-egress': typeof ApiPublicLivekitEgressRoute
   '/_authenticated/admin/': typeof AuthenticatedAdminIndexRoute
   '/_authenticated/workspaces/': typeof AuthenticatedWorkspacesIndexRoute
 }
@@ -193,6 +202,7 @@ export interface FileRouteTypes {
     | '/office/editor'
     | '/workspaces/$workspaceId'
     | '/workspaces/new'
+    | '/api/public/livekit-egress'
     | '/admin/'
     | '/workspaces/'
   fileRoutesByTo: FileRoutesByTo
@@ -211,6 +221,7 @@ export interface FileRouteTypes {
     | '/office/editor'
     | '/workspaces/$workspaceId'
     | '/workspaces/new'
+    | '/api/public/livekit-egress'
     | '/admin'
     | '/workspaces'
   id:
@@ -230,6 +241,7 @@ export interface FileRouteTypes {
     | '/_authenticated/office_/editor'
     | '/_authenticated/workspaces/$workspaceId'
     | '/_authenticated/workspaces/new'
+    | '/api/public/livekit-egress'
     | '/_authenticated/admin/'
     | '/_authenticated/workspaces/'
   fileRoutesById: FileRoutesById
@@ -240,6 +252,7 @@ export interface RootRouteChildren {
   AuthRoute: typeof AuthRoute
   DownloadRoute: typeof DownloadRoute
   SobreRoute: typeof SobreRoute
+  ApiPublicLivekitEgressRoute: typeof ApiPublicLivekitEgressRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -320,6 +333,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/admin/'
       preLoaderRoute: typeof AuthenticatedAdminIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/api/public/livekit-egress': {
+      id: '/api/public/livekit-egress'
+      path: '/api/public/livekit-egress'
+      fullPath: '/api/public/livekit-egress'
+      preLoaderRoute: typeof ApiPublicLivekitEgressRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/_authenticated/workspaces/new': {
       id: '/_authenticated/workspaces/new'
@@ -406,6 +426,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthRoute: AuthRoute,
   DownloadRoute: DownloadRoute,
   SobreRoute: SobreRoute,
+  ApiPublicLivekitEgressRoute: ApiPublicLivekitEgressRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
