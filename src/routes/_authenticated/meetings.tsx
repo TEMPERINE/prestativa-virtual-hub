@@ -789,7 +789,7 @@ function MeetingCard({
               )}
 
               {meeting.recording_path && (
-                <AiPanel meeting={meeting} onAiUpdated={onAiUpdated} />
+                <AiPanel meeting={meeting} participantNames={names} onAiUpdated={onAiUpdated} />
               )}
 
               <PersonalNotes meetingId={meeting.id} active={open} />
@@ -869,9 +869,11 @@ function safeFilename(s: string): string {
 
 function AiPanel({
   meeting,
+  participantNames,
   onAiUpdated,
 }: {
   meeting: MeetingRow;
+  participantNames: string[];
   onAiUpdated: (transcript: string, summary: string) => void;
 }) {
   const generate = useServerFn(generateMeetingAi);
