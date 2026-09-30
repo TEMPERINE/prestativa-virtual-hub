@@ -149,5 +149,13 @@ export function useServerRecorder(opts: {
     }
   }, [stopFn, refresh]);
 
-  return { isRecording: !!active, isUploading: busy, elapsedSeconds: elapsed, start, stop };
+  return {
+    isRecording: !!active,
+    isUploading: busy,
+    elapsedSeconds: elapsed,
+    start,
+    stop,
+    completed,
+    dismissCompleted,
+  };
 }
