@@ -603,6 +603,8 @@ function MeetingCard({
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(meeting.title ?? meeting.zone_label);
   const hasContent = !!(meeting.recording_path || meeting.summary || meeting.transcript);
+  const uniqueCount = new Set(participants.map((p) => p.user_id)).size;
+  const names = participantNamesOf(participants, profilesById);
 
   const commitRename = () => {
     setEditing(false);
