@@ -61,13 +61,40 @@ export const generateMeetingAi = createServerFn({ method: "POST" })
     const mime = file.mime;
     const filename = mime.includes("mp4") ? "meeting.mp4" : "meeting.webm";
 
-    // 5) Lovable AI Gateway — Gemini 2.5 Flash aceita áudio/vídeo inline.
+    // 5) Nomes reais dos participantes (deduplicados). Nunca inventar nomes.
+    let participantNames: string[] = [];
+    try {
+      const { data: parts } = await supabase
+        .from("meeting_participants")
+        .select("user_id")
+        .eq("meeting_id", meetingId);
+      const ids = Array.from(new Set((parts ?? []).map((p) => p.user_id)));
+      if (ids.length > 0) {
+        const { data: profs } = await supabase
+          .from("profiles")
+          .select("id, display_name")
+          .in("id", ids);
+        participantNames = (profs ?? [])
+          .map((p) => p.display_name)
+          .filter((n): n is string => !!n);
+      }
+    } catch {
+      participantNames = [];
+    }
+
+    // 6) Lovable AI Gateway — Gemini 2.5 Flash aceita áudio/vídeo inline.
     const key = process.env.LOVABLE_API_KEY;
     if (!key) throw new Error("LOVABLE_API_KEY ausente no servidor.");
 
+    const rosterBlock =
+      participantNames.length > 0
+        ? `\n\nParticipantes registrados desta reunião: ${participantNames.join(", ")}.
+Use esses nomes APENAS quando a voz puder ser identificada com segurança pelo conteúdo (ex.: alguém se apresenta ou é chamado pelo nome). Nunca invente nomes nem atribua falas por suposição — na dúvida use "Pessoa 1", "Pessoa 2" etc.`
+        : "";
+
     const prompt = `Você recebeu a gravação de uma reunião de trabalho (em português do Brasil).
 1. Transcreva tudo o que foi dito, com falantes anônimos como "Pessoa 1", "Pessoa 2" etc. Inclua timestamps aproximados a cada bloco quando possível.
-2. Em seguida, gere um resumo executivo curto com: tópicos discutidos, decisões tomadas e itens de ação (com responsável quando mencionado).
+2. Em seguida, gere um resumo executivo curto com: tópicos discutidos, decisões tomadas e itens de ação (com responsável quando mencionado).${rosterBlock}
 
 Responda **apenas** com um JSON válido neste formato exato:
 {"transcript": "...texto da transcrição...", "summary": "...resumo em markdown..."}`;
