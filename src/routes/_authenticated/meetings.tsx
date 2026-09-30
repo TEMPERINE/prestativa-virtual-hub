@@ -544,9 +544,26 @@ function EmptyState({ selected, hasQuery }: { selected: FolderSel; hasQuery: boo
   );
 }
 
+/** Nomes dos participantes da reunião, deduplicados por user_id e sem inventar nomes. */
+function participantNamesOf(
+  participants: ParticipantRow[],
+  profilesById: Record<string, { display_name: string; avatar_color: string }>,
+): string[] {
+  const seen = new Set<string>();
+  const names: string[] = [];
+  for (const p of participants) {
+    if (seen.has(p.user_id)) continue;
+    seen.add(p.user_id);
+    const name = profilesById[p.user_id]?.display_name;
+    if (name) names.push(name);
+  }
+  return names;
+}
+
 function MeetingCard({
   meeting,
   participants,
+  profilesById,
   hostProfile,
   receivedFromSenderId,
   receivedFromProfile,
@@ -562,6 +579,7 @@ function MeetingCard({
 }: {
   meeting: MeetingRow;
   participants: ParticipantRow[];
+  profilesById: Record<string, { display_name: string; avatar_color: string }>;
   hostProfile?: { display_name: string; avatar_color: string };
   receivedFromSenderId: string | null;
   receivedFromProfile?: { display_name: string; avatar_color: string };
