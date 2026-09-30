@@ -339,7 +339,19 @@ export function OfficeScene({
   const remoteWrapRefs = useRef<Map<string, HTMLDivElement | null>>(new Map());
   const remoteSmoothRef = useRef<Map<string, { x: number; y: number }>>(new Map());
   // RTC v2: predição visual entre eventos de Movement (START/CHANGE/STOP/SYNC).
-  const v2PredictorRef = useRef(new RemoteMotionPredictor());
+  // Diagnóstico 14C (temporário): localStorage.rtcMotionTrace = "1" → window.__rtcMotionTrace
+  const v2PredictorRef = useRef(
+    new RemoteMotionPredictor(
+      typeof window !== "undefined" && window.localStorage?.getItem("rtcMotionTrace") === "1"
+        ? (t) => {
+            const w = window as unknown as { __rtcMotionTrace?: unknown[] };
+            const buf = (w.__rtcMotionTrace ??= []);
+            buf.push(t);
+            if (buf.length > 2000) buf.shift();
+          }
+        : undefined,
+    ),
+  );
   // Fast realtime presence signal. It accelerates discovery, but is NOT the
   // authority for visibility: the database `is_online` flag is the durable
   // game-state source, so idle players never disappear just because a presence
