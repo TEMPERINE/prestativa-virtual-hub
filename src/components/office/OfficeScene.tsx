@@ -92,6 +92,7 @@ import { EditProfileModal } from "@/components/profile/EditProfileModal";
 import { OnboardingWizard } from "@/components/onboarding/OnboardingWizard";
 import { useMeetingTracker } from "@/lib/meetings/useMeetingTracker";
 import { useMeetingRecorder } from "@/lib/meetings/useMeetingRecorder";
+import { useServerRecorder } from "@/lib/meetings/useServerRecorder";
 import { getCurrentWorkspaceId } from "@/lib/workspace/current";
 import { useWorkspaceTier } from "@/lib/workspace/useWorkspaceTier";
 
@@ -2573,11 +2574,21 @@ export function OfficeScene({
     labelFor: meetingLabelFor,
   });
 
-  // Gravação manual (botão). Mixa mic + áudio dos peers e envia ao storage.
-  const recorder = useMeetingRecorder({
+  // Gravação manual (botão). V1: MediaRecorder local (legado).
+  // V2 (Etapa 14D): gravação server-side via LiveKit Egress — sem getDisplayMedia.
+  const legacyRecorder = useMeetingRecorder({
     getLocalAudioTrack: rtc.getLocalAudioTrack,
     remoteStreams: audibleStreams,
   });
+  const v2RoomRef = useRef(rtc.v2?.room ?? null);
+  v2RoomRef.current = rtc.v2?.room ?? null;
+  const serverRecorder = useServerRecorder({
+    meetingId: IS_RTC_V2 ? activeMeetingId : null,
+    isRoomConnected: () =>
+      v2RoomRef.current?.status === "CONNECTED" &&
+      v2RoomRef.current?.connected?.kind === "PRIVATE_ROOM",
+  });
+  const recorder = IS_RTC_V2 ? serverRecorder : legacyRecorder;
 
 
 
