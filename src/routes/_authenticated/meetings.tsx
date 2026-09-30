@@ -136,6 +136,7 @@ function MeetingsPage() {
           new Set([
             ...meetingList.map((m) => m.host_id).filter(Boolean) as string[],
             ...Array.from(shareMap.values()),
+            ...((parts ?? []) as ParticipantRow[]).map((p) => p.user_id),
           ]),
         );
         if (userIds.length > 0) {
