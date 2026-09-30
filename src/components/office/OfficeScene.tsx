@@ -3452,6 +3452,19 @@ export function OfficeScene({
         />
       )}
 
+      {IS_RTC_V2 && serverRecorder.completed && (
+        <RecordingNameDialog
+          meetingId={serverRecorder.completed.meetingId}
+          defaultTitle={`Reunião — ${new Date().toLocaleString("pt-BR", {
+            day: "2-digit",
+            month: "2-digit",
+            hour: "2-digit",
+            minute: "2-digit",
+          })}`}
+          onClose={serverRecorder.dismissCompleted}
+        />
+      )}
+
 
 
 
