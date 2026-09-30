@@ -24,9 +24,8 @@ export function PropsLayer({ selfX, selfY, focusedRect = null }: Props) {
     () => loadOverrides()?.props ?? []
   );
   const [frames, setFrames] = useState<Record<string, number>>({});
-  // A animação curta atualiza somente a imagem do prop, sem depender dos
-  // re-renders da cena (que podem atrasar e engolir quadros do sino).
-  const animatedImagesRef = useRef<Record<string, HTMLImageElement>>({});
+  // Override local de frame durante animação one-shot (não persiste no servidor).
+  const [animFrames, setAnimFrames] = useState<Record<string, number>>({});
   const animTimersRef = useRef<Record<string, number>>({});
   // Ticks já processados localmente — evita que o eco realtime do nosso
   // próprio clique reinicie a animação no meio.
@@ -174,25 +173,28 @@ export function PropsLayer({ selfX, selfY, focusedRect = null }: Props) {
       delete animTimersRef.current[propId];
     }
     const rest = anim.restFrame ?? 0;
-    const showFrame = (frame: number) => {
-      const image = animatedImagesRef.current[propId];
-      const source = def.frames[frame] ?? def.frames[rest];
-      if (image && source) image.src = source;
-    };
+    // IMPORTANTE: capturar o frame ANTES do setState. O updater do React roda
+    // de forma assíncrona (no render), e ler `sequence[i]` lá dentro pega o
+    // `i` já incrementado — sob lag de render todos os updates colapsam para
+    // `undefined` e a animação parece "não rodar".
     let i = 0;
     const step = () => {
       if (i >= anim.sequence.length) {
         delete animTimersRef.current[propId];
-        showFrame(rest);
+        setAnimFrames((p) => {
+          const n = { ...p };
+          delete n[propId];
+          return n;
+        });
         return;
       }
       const frameValue = anim.sequence[i];
       i++;
-      showFrame(frameValue);
+      setAnimFrames((p) => ({ ...p, [propId]: frameValue }));
       animTimersRef.current[propId] = window.setTimeout(step, anim.frameMs);
     };
-    showFrame(rest);
-    step();
+    setAnimFrames((p) => ({ ...p, [propId]: rest }));
+    animTimersRef.current[propId] = window.setTimeout(step, 0);
   }, []);
 
   // Cleanup timers no unmount
@@ -376,7 +378,8 @@ export function PropsLayer({ selfX, selfY, focusedRect = null }: Props) {
         const baseFrame = def.animation
           ? (def.animation.restFrame ?? 0)
           : (frames[p.id] ?? p.frame ?? 0);
-        const src = def.frames[baseFrame] ?? def.frames[0];
+        const frame = animFrames[p.id] ?? baseFrame;
+        const src = def.frames[frame] ?? def.frames[0];
 
         const wPct = p.w * 100;
         const hPct = (p.w / def.aspectRatio) * 100;
@@ -384,28 +387,44 @@ export function PropsLayer({ selfX, selfY, focusedRect = null }: Props) {
         const refY = p.y - hNorm * (1 - (def.depthRefY ?? 1));
         const focusOffset = focusedRect && def.foregroundWhenFocused ? 60000 : 0;
         const zIndex = focusOffset + Math.max(1, Math.round(refY * 1000));
+        const style = {
+          left: `${p.x * 100}%`,
+          top: `${p.y * 100}%`,
+          width: `${wPct}%`,
+          height: `${hPct}%`,
+          transform: "translate(-50%, -100%)",
+          objectFit: "contain" as const,
+          objectPosition: "bottom center",
+          zIndex,
+          imageRendering: "pixelated" as const,
+        };
+        // Props animados: todos os quadros ficam carregados e empilhados; a
+        // animação só alterna qual está visível. Assim a troca é instantânea
+        // mesmo com conexão lenta (antes cada quadro só começava a baixar na
+        // hora do toque e o sino parecia congelado).
+        if (def.animation) {
+          const current = def.frames[frame] ? frame : 0;
+          return def.frames.map((frameSrc, idx) => (
+            <img
+              key={`${p.id}-${idx}`}
+              src={frameSrc}
+              alt={idx === current ? def.label : ""}
+              aria-hidden={idx === current ? undefined : true}
+              draggable={false}
+              loading="eager"
+              className="absolute pointer-events-none select-none"
+              style={{ ...style, visibility: idx === current ? "visible" : "hidden" }}
+            />
+          ));
+        }
         return (
           <img
             key={p.id}
-            ref={def.animation ? (image) => {
-              if (image) animatedImagesRef.current[p.id] = image;
-              else delete animatedImagesRef.current[p.id];
-            } : undefined}
             src={src}
             alt={def.label}
             draggable={false}
             className="absolute pointer-events-none select-none"
-            style={{
-              left: `${p.x * 100}%`,
-              top: `${p.y * 100}%`,
-              width: `${wPct}%`,
-              height: `${hPct}%`,
-              transform: "translate(-50%, -100%)",
-              objectFit: "contain",
-              objectPosition: "bottom center",
-              zIndex,
-              imageRendering: "pixelated",
-            }}
+            style={style}
           />
         );
       })}

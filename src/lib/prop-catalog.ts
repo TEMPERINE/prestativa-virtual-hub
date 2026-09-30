@@ -5,7 +5,7 @@
 import doorClosed from "@/assets/props/door-closed.png.asset.json";
 import doorOpen from "@/assets/props/door-open.png.asset.json";
 // Sino Meta — frames gerados por scripts/build-bell-meta.py: suporte 100%
-// fixo, sino rotacionado em torno do pivô do gancho (0°, -32°, -16°, +16°, +32°).
+// fixo, sino rotacionado em torno do pivô do gancho (0°, -18°, -9°, +9°, +18°).
 // Importados direto (bundle) para nunca servir versão desatualizada.
 import bellMeta1 from "@/assets/props/bell-meta-1.png";
 import bellMeta2 from "@/assets/props/bell-meta-2.png";
@@ -59,10 +59,10 @@ export const BUILTIN_PROPS: PropDef[] = [
   {
     id: "bell-meta",
     label: "Sino Meta",
-    // índice → ângulo do sino: 0 = repouso (0°); 1 = -32°; 2 = -16°; 3 = +16°; 4 = +32°
+    // índice → ângulo do sino: 0 = repouso (0°); 1 = -18°; 2 = -9°; 3 = +9°; 4 = +18°
     frames: [bellMeta1, bellMeta2, bellMeta3, bellMeta4, bellMeta5],
     defaultW: 0.05,
-    aspectRatio: 320 / 300, // canvas idêntico em todos os frames (pivô fixo)
+    aspectRatio: 240 / 250, // canvas idêntico em todos os frames (pivô fixo)
     interactive: true,
     interactKey: "x",
     depthRefY: 0.5,
@@ -74,7 +74,7 @@ export const BUILTIN_PROPS: PropDef[] = [
         4, 3, 0, 2, 1, 2, 0, 3,
         3, 0, 2, 0,
       ],
-      frameMs: 95,
+      frameMs: 75,
       restFrame: 0,
     },
     soundUrl: bellSound.url,
