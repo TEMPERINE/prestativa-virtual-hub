@@ -6,8 +6,8 @@ import { startServerRecording, stopServerRecording } from "./egress.functions";
 import type { RecorderState } from "./useMeetingRecorder";
 
 /**
- * RTC V2 — gravação server-side (LiveKit Egress). Sem getDisplayMedia,
- * sem MediaRecorder. Estado vem de meeting_egress (realtime), então
+ * RTC V2 — gravação server-side (LiveKit Egress). Sem captura de tela local,
+ * sem gravador no navegador. Estado vem de meeting_egress (realtime), então
  * reflete o Egress real mesmo se outra pessoa iniciou/parou.
  * Falhas aqui nunca tocam a Room/mídia.
  */
