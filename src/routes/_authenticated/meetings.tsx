@@ -748,9 +748,20 @@ function MeetingCard({
               })}
               {durationMin ? ` · ${durationMin} min` : ""}
             </span>
-            <span className="inline-flex items-center gap-1">
+            <span className="inline-flex items-center gap-1" title={names.join(", ")}>
               <Users className="w-3 h-3" />
-              {participants.length || "—"} participação{participants.length === 1 ? "" : "s"} sua{participants.length === 1 ? "" : "s"}
+              {uniqueCount > 0 ? (
+                <>
+                  {uniqueCount} participante{uniqueCount === 1 ? "" : "s"}
+                  {names.length > 0 && (
+                    <span className="text-muted-foreground/80 truncate max-w-[22rem]">
+                      · {names.join(", ")}
+                    </span>
+                  )}
+                </>
+              ) : (
+                "Participantes não registrados"
+              )}
             </span>
             <span className="text-muted-foreground/80">· {meeting.zone_label}</span>
             {receivedFromSenderId && (
