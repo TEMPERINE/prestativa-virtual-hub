@@ -43,9 +43,9 @@ export function MapSavePoints({
     if (!ws) return toast.error("Nenhum escritório ativo.");
     const name = await appPrompt({
       title: "Novo Save Point",
-      message: "Dê um nome para este save",
+      description: "Dê um nome para este save",
       defaultValue: new Date().toLocaleString("pt-BR"),
-    } as never);
+    });
     if (!name || !String(name).trim()) return;
     const { data: u } = await supabase.auth.getUser();
     setBusy(true);
@@ -64,8 +64,8 @@ export function MapSavePoints({
   const load = async (sp: SavePoint) => {
     const ok = await appConfirm({
       title: `Carregar "${sp.name}"?`,
-      message: "O mapa atual no editor será substituído. Clique em Salvar depois para aplicar no escritório.",
-    } as never);
+      description: "O mapa atual no editor será substituído. Clique em Salvar depois para aplicar no escritório.",
+    });
     if (!ok) return;
     const norm = normalizeMapOverrides(sp.data);
     if (!norm) return toast.error("Save Point vazio ou inválido.");
@@ -75,7 +75,7 @@ export function MapSavePoints({
   };
 
   const remove = async (sp: SavePoint) => {
-    const ok = await appConfirm({ title: `Excluir "${sp.name}"?`, message: "Isso não pode ser desfeito." } as never);
+    const ok = await appConfirm({ title: `Excluir "${sp.name}"?`, description: "Isso não pode ser desfeito.", destructive: true });
     if (!ok) return;
     const { error } = await supabase.from("map_save_points").delete().eq("id", sp.id);
     if (error) return toast.error("Erro ao excluir: " + error.message);
