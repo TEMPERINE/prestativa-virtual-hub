@@ -14,6 +14,7 @@ import { Route as DownloadRouteImport } from './routes/download'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as RecordingMeetingIdRouteImport } from './routes/recording.$meetingId'
 import { Route as AuthenticatedOnboardingRouteImport } from './routes/_authenticated/onboarding'
 import { Route as AuthenticatedOfficeRouteImport } from './routes/_authenticated/office'
 import { Route as AuthenticatedMeetingsRouteImport } from './routes/_authenticated/meetings'
@@ -50,6 +51,11 @@ const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const RecordingMeetingIdRoute = RecordingMeetingIdRouteImport.update({
+  id: '/recording/$meetingId',
+  path: '/recording/$meetingId',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthenticatedOnboardingRoute = AuthenticatedOnboardingRouteImport.update({
@@ -135,6 +141,7 @@ export interface FileRoutesByFullPath {
   '/meetings': typeof AuthenticatedMeetingsRoute
   '/office': typeof AuthenticatedOfficeRoute
   '/onboarding': typeof AuthenticatedOnboardingRoute
+  '/recording/$meetingId': typeof RecordingMeetingIdRoute
   '/admin/contas': typeof AuthenticatedAdminContasRoute
   '/admin/espacos': typeof AuthenticatedAdminEspacosRoute
   '/admin/personagens': typeof AuthenticatedAdminPersonagensRoute
@@ -154,6 +161,7 @@ export interface FileRoutesByTo {
   '/meetings': typeof AuthenticatedMeetingsRoute
   '/office': typeof AuthenticatedOfficeRoute
   '/onboarding': typeof AuthenticatedOnboardingRoute
+  '/recording/$meetingId': typeof RecordingMeetingIdRoute
   '/admin/contas': typeof AuthenticatedAdminContasRoute
   '/admin/espacos': typeof AuthenticatedAdminEspacosRoute
   '/admin/personagens': typeof AuthenticatedAdminPersonagensRoute
@@ -175,6 +183,7 @@ export interface FileRoutesById {
   '/_authenticated/meetings': typeof AuthenticatedMeetingsRoute
   '/_authenticated/office': typeof AuthenticatedOfficeRoute
   '/_authenticated/onboarding': typeof AuthenticatedOnboardingRoute
+  '/recording/$meetingId': typeof RecordingMeetingIdRoute
   '/_authenticated/admin/contas': typeof AuthenticatedAdminContasRoute
   '/_authenticated/admin/espacos': typeof AuthenticatedAdminEspacosRoute
   '/_authenticated/admin/personagens': typeof AuthenticatedAdminPersonagensRoute
@@ -196,6 +205,7 @@ export interface FileRouteTypes {
     | '/meetings'
     | '/office'
     | '/onboarding'
+    | '/recording/$meetingId'
     | '/admin/contas'
     | '/admin/espacos'
     | '/admin/personagens'
@@ -215,6 +225,7 @@ export interface FileRouteTypes {
     | '/meetings'
     | '/office'
     | '/onboarding'
+    | '/recording/$meetingId'
     | '/admin/contas'
     | '/admin/espacos'
     | '/admin/personagens'
@@ -235,6 +246,7 @@ export interface FileRouteTypes {
     | '/_authenticated/meetings'
     | '/_authenticated/office'
     | '/_authenticated/onboarding'
+    | '/recording/$meetingId'
     | '/_authenticated/admin/contas'
     | '/_authenticated/admin/espacos'
     | '/_authenticated/admin/personagens'
@@ -252,6 +264,7 @@ export interface RootRouteChildren {
   AuthRoute: typeof AuthRoute
   DownloadRoute: typeof DownloadRoute
   SobreRoute: typeof SobreRoute
+  RecordingMeetingIdRoute: typeof RecordingMeetingIdRoute
   ApiPublicLivekitEgressRoute: typeof ApiPublicLivekitEgressRoute
 }
 
@@ -290,6 +303,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/recording/$meetingId': {
+      id: '/recording/$meetingId'
+      path: '/recording/$meetingId'
+      fullPath: '/recording/$meetingId'
+      preLoaderRoute: typeof RecordingMeetingIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authenticated/onboarding': {
@@ -426,6 +446,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthRoute: AuthRoute,
   DownloadRoute: DownloadRoute,
   SobreRoute: SobreRoute,
+  RecordingMeetingIdRoute: RecordingMeetingIdRoute,
   ApiPublicLivekitEgressRoute: ApiPublicLivekitEgressRoute,
 }
 export const routeTree = rootRouteImport
