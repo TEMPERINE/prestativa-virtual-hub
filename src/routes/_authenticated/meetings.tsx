@@ -347,6 +347,7 @@ function MeetingsPage() {
                   key={m.id}
                   meeting={m}
                   participants={participantsByMeeting[m.id] ?? []}
+                  profilesById={profiles}
                   hostProfile={m.host_id ? profiles[m.host_id] : undefined}
                   receivedFromSenderId={receivedShares.get(m.id) ?? null}
                   receivedFromProfile={(() => {
