@@ -10,7 +10,11 @@ import {
   Search, Star, Download, Check, X, AlertCircle, CheckCircle2, Send, Mail,
 } from "lucide-react";
 import { generateMeetingAi } from "@/lib/meetings/ai.functions";
-import { getRecordingUrl } from "@/lib/meetings/recording.functions";
+import { getRecordingUrl, deleteMeeting } from "@/lib/meetings/recording.functions";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent,
   DropdownMenuItem, DropdownMenuCheckboxItem, DropdownMenuSeparator, DropdownMenuLabel,
@@ -43,6 +47,7 @@ type MeetingRow = {
   host_id: string | null;
   recording_path: string | null;
   recording_started_at?: string | null;
+  recorded_by?: string | null;
 
   recording_duration_seconds: number | null;
   transcript: string | null;
@@ -86,6 +91,7 @@ function MeetingsPage() {
   const [userId, setUserId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [shareTarget, setShareTarget] = useState<MeetingRow | null>(null);
+  const [deletable, setDeletable] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     let cancelled = false;
@@ -98,7 +104,7 @@ function MeetingsPage() {
       const [{ data: ms }, { data: fs }, { data: fis }, { data: favs }, { data: shares }] = await Promise.all([
         supabase
           .from("meetings" as never)
-          .select("id, workspace_id, zone_id, zone_label, title, started_at, ended_at, host_id, recording_path, recording_started_at, recording_duration_seconds, transcript, summary, ai_status, ai_error")
+          .select("id, workspace_id, zone_id, zone_label, title, started_at, ended_at, host_id, recording_path, recording_started_at, recorded_by, recording_duration_seconds, transcript, summary, ai_status, ai_error")
           .or("recording_path.not.is.null,recording_started_at.not.is.null")
           .order("started_at", { ascending: false })
           .limit(200),
@@ -131,6 +137,26 @@ function MeetingsPage() {
           (byMeeting[p.meeting_id] ??= []).push(p);
         }
         setParticipantsByMeeting(byMeeting);
+
+        // Permissão de exclusão (apenas para exibir o botão — o servidor revalida).
+        if (uid) {
+          const wsIds = Array.from(new Set(meetingList.map((m) => m.workspace_id)));
+          const [{ data: eg }, adm, mst, ...wsAdm] = await Promise.all([
+            sb.from("meeting_egress").select("meeting_id, started_by").in("meeting_id", ids),
+            sb.rpc("has_role", { _user_id: uid, _role: "admin" }),
+            sb.rpc("has_role", { _user_id: uid, _role: "master" }),
+            ...wsIds.map((w) => sb.rpc("is_workspace_admin", { _workspace_id: w, _user_id: uid })),
+          ]);
+          const globalAdmin = !!adm.data || !!mst.data;
+          const adminWs = new Set(wsIds.filter((_, i) => !!wsAdm[i]?.data));
+          const startedByMe = new Set(
+            ((eg ?? []) as { meeting_id: string; started_by: string }[])
+              .filter((e) => e.started_by === uid).map((e) => e.meeting_id),
+          );
+          if (!cancelled) setDeletable(new Set(meetingList.filter((m) =>
+            globalAdmin || adminWs.has(m.workspace_id) || m.recorded_by === uid || startedByMe.has(m.id),
+          ).map((m) => m.id)));
+        }
 
         const userIds = Array.from(
           new Set([
@@ -362,6 +388,12 @@ function MeetingsPage() {
                   onToggleFolder={(folderId, isMember) => toggleMembership(m.id, folderId, isMember)}
                   onCreateFolder={createFolder}
                   onShare={() => setShareTarget(m)}
+                  canDelete={deletable.has(m.id)}
+                  onDeleted={() => {
+                    setMeetings((prev) => prev.filter((row) => row.id !== m.id));
+                    setSelected("all");
+                    window.scrollTo({ top: 0 });
+                  }}
                   onAiUpdated={(transcript, summary) => {
                     setMeetings((prev) =>
                       prev.map((row) =>
@@ -576,6 +608,8 @@ function MeetingCard({
   onCreateFolder,
   onShare,
   onAiUpdated,
+  canDelete,
+  onDeleted,
 }: {
   meeting: MeetingRow;
   participants: ParticipantRow[];
@@ -592,6 +626,8 @@ function MeetingCard({
   onCreateFolder: () => void;
   onShare: () => void;
   onAiUpdated: (transcript: string, summary: string) => void;
+  canDelete: boolean;
+  onDeleted: () => void;
 }) {
   const start = new Date(meeting.started_at);
   const end = meeting.ended_at ? new Date(meeting.ended_at) : null;
@@ -703,6 +739,7 @@ function MeetingCard({
                   <Send className="w-4 h-4" />
                 </button>
               )}
+              {canDelete && <DeleteMeetingButton meetingId={meeting.id} onDeleted={onDeleted} />}
               <DropdownMenu>
                 <DropdownMenuTrigger className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground border rounded px-2 py-1">
                   <FolderInput className="w-3 h-3" />
@@ -1320,5 +1357,68 @@ function SendRecordingDialog({
         </div>
       </DialogContent>
     </Dialog>
+  );
+}
+
+const DELETE_ERRORS: Record<string, string> = {
+  FORBIDDEN: "Você não tem permissão para excluir esta reunião.",
+  NOT_FOUND: "Esta reunião não existe mais.",
+  RECORDING_ACTIVE: "A gravação ainda está em andamento. Aguarde terminar para excluir.",
+  STORAGE_DELETE_FAILED: "Não consegui apagar o arquivo da gravação. Nada foi excluído — tente de novo em instantes.",
+  DB_DELETE_FAILED: "O arquivo foi apagado, mas não consegui remover os dados da reunião. Tente de novo.",
+};
+
+function DeleteMeetingButton({ meetingId, onDeleted }: { meetingId: string; onDeleted: () => void }) {
+  const del = useServerFn(deleteMeeting);
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const run = async () => {
+    setBusy(true);
+    try {
+      const res = await del({ data: { meetingId } });
+      if (res.ok) {
+        setOpen(false);
+        toast.success("Reunião excluída permanentemente.");
+        onDeleted();
+      } else {
+        toast.error(DELETE_ERRORS[res.code] ?? "Não foi possível excluir a reunião. Tente de novo.");
+      }
+    } catch (e) {
+      console.error("[deleteMeeting]", e);
+      toast.error("Não foi possível excluir a reunião. Tente de novo.");
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <>
+      <button
+        onClick={() => setOpen(true)}
+        title="Excluir reunião"
+        className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-destructive"
+      >
+        <Trash2 className="w-4 h-4" />
+      </button>
+      <AlertDialog open={open} onOpenChange={(v) => !busy && setOpen(v)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir esta reunião?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta ação é permanente e não pode ser desfeita. A gravação, transcrição, resumo e demais dados associados serão excluídos.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={busy}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={busy}
+              onClick={(e) => { e.preventDefault(); void run(); }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : "Excluir permanentemente"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }
