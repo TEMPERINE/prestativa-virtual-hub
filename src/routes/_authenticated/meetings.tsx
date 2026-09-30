@@ -1073,9 +1073,16 @@ function RecordingPlayer({
           className="w-full rounded-md bg-black aspect-video"
           preload="metadata"
         />
+      ) : failed ? (
+        <div className="text-xs text-muted-foreground inline-flex items-center gap-2">
+          <span>Não consegui abrir a gravação agora.</span>
+          <button onClick={() => void load()} className="text-primary hover:underline">
+            Tentar de novo
+          </button>
+        </div>
       ) : (
         <div className="text-xs text-muted-foreground inline-flex items-center gap-1">
-          {loading ? <><Loader2 className="w-3 h-3 animate-spin" /> Carregando gravação…</> : "Gravação indisponível."}
+          <Loader2 className="w-3 h-3 animate-spin" /> Carregando gravação…
         </div>
       )}
     </div>
