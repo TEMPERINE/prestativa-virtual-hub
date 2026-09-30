@@ -77,3 +77,27 @@ export async function downloadRecording(
   if (error || !data) throw new Error("CLOUD_DOWNLOAD_FAILED");
   return { bytes: await data.arrayBuffer(), mime: data.type || "video/webm" };
 }
+
+/**
+ * Exclui definitivamente um objeto do S3/R2 e confirma via HEAD (404 = removido).
+ * Lança erro se a exclusão não puder ser confirmada.
+ */
+export async function deleteS3ObjectConfirmed(key: string): Promise<void> {
+  const s3 = readS3Config();
+  if (!s3.ok) throw new Error("STORAGE_NOT_CONFIGURED");
+  const client = s3Client(s3.cfg);
+  const url = s3ObjectUrl(s3.cfg, key);
+  const del = await client.fetch(url, { method: "DELETE" });
+  if (!del.ok && del.status !== 404) {
+    throw new Error(`S3 delete failed [${del.status}]: ${(await del.text()).slice(0, 300)}`);
+  }
+  const head = await client.fetch(url, { method: "HEAD" });
+  if (head.status !== 404) throw new Error(`S3 delete not confirmed [HEAD ${head.status}]`);
+}
+
+/** Exclui um arquivo do storage do Lovable Cloud (gravações V1 WebM). */
+export async function deleteCloudObject(path: string): Promise<void> {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { error } = await supabaseAdmin.storage.from(CLOUD_BUCKET).remove([path]);
+  if (error) throw new Error(`Cloud delete failed: ${error.message}`);
+}
