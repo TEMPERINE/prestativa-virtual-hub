@@ -1028,15 +1028,18 @@ function RecordingPlayer({
   const getUrlFn = useServerFn(getRecordingUrl);
   const [url, setUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [failed, setFailed] = useState(false);
 
   const load = async () => {
     if (url || loading) return;
     setLoading(true);
+    setFailed(false);
     try {
       const r = await getUrlFn({ data: { meetingId } });
       if (r.ok) setUrl(r.url);
+      else setFailed(true);
     } catch {
-      /* sem URL: player fica oculto */
+      setFailed(true);
     } finally {
       setLoading(false);
     }
