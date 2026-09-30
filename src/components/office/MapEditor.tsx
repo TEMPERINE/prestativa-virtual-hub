@@ -25,6 +25,7 @@ import { useOfficeTheme } from "@/hooks/useOfficeTheme";
 import { getCurrentWorkspaceId, subscribeCurrentWorkspaceId } from "@/lib/workspace/current";
 import { useWorkspaceTier } from "@/lib/workspace/useWorkspaceTier";
 import { toast } from "sonner";
+import { MapSavePoints } from "./MapSavePoints";
 import { appPrompt, appConfirm } from "@/components/ui/app-dialogs";
 
 import { ArrowLeft, Eraser, Square, Download, Trash2, Eye, EyeOff, Undo, Plus, X, Briefcase, Users, MapPin, Hand, Zap, ZapOff, Lock, Map as MapIcon, Boxes, LayoutGrid, Upload, Loader2, Palette, Check } from "lucide-react";
@@ -843,6 +844,7 @@ export function MapEditor() {
           >
             {showEffective ? <Eye size={12} /> : <EyeOff size={12} />} Bloqueio do jogo
           </button>
+          <MapSavePoints overrides={overrides} onLoad={(o) => setOverrides(o)} />
           <button onClick={exportJson} className="text-xs px-2 py-1 rounded bg-muted inline-flex items-center gap-1">
             <Download size={12} /> Export
           </button>
