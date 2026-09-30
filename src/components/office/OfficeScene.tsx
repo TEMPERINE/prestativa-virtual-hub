@@ -93,6 +93,7 @@ import { OnboardingWizard } from "@/components/onboarding/OnboardingWizard";
 import { useMeetingTracker } from "@/lib/meetings/useMeetingTracker";
 import { useMeetingRecorder } from "@/lib/meetings/useMeetingRecorder";
 import { useServerRecorder } from "@/lib/meetings/useServerRecorder";
+import { RecordingNameDialog } from "@/components/office/RecordingNameDialog";
 import { getCurrentWorkspaceId } from "@/lib/workspace/current";
 import { useWorkspaceTier } from "@/lib/workspace/useWorkspaceTier";
 
