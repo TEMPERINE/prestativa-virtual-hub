@@ -28,6 +28,11 @@ export const REMOTE_MOTION = {
    * (1 - absorbRate)·|v| ≥ 0 até alcançar a base — sem ré.
    */
   aheadAbsorbRate: 0.6,
+  /**
+   * STOP com visual à frente da posição final: recuo residual lento (ms),
+   * sem salto visível. A causa principal (STOP atrasado) é evitada na origem.
+   */
+  stopSettleTauMs: 160,
   /** Offset residual abaixo disso é zerado (termina exatamente na posição). */
   epsilon: 1e-5,
 } as const;
@@ -144,6 +149,10 @@ export class RemoteMotionPredictor {
     let dx = cur.x - a.x;
     let dy = cur.y - a.y;
     if (Math.hypot(dx, dy) > REMOTE_MOTION.largeDrift) base.tau = REMOTE_MOTION.fastCorrectionTauMs;
+    if (!moving && prev.moving) {
+      const ps = Math.hypot(prev.vx, prev.vy);
+      if (ps > 0 && (dx * prev.vx + dy * prev.vy) / ps > 0) base.tau = REMOTE_MOTION.stopSettleTauMs;
+    }
     const speed = Math.hypot(base.vx, base.vy);
     if (moving && speed > 0) {
       // Separa a parte "à frente" ao longo de v: absorvida sem inverter.
