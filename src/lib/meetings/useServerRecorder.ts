@@ -123,6 +123,7 @@ export function useServerRecorder(opts: {
           ALREADY_RECORDING: "Esta reunião já está sendo gravada.",
           NOT_CONNECTED: "Você não está conectado à sala.",
           NOT_PARTICIPANT: "Você não participa desta reunião.",
+          NOT_ALLOWED_TO_RECORD: "Seu perfil não permite iniciar gravações.",
         };
         toast.error(msg[r.code] ?? "Não foi possível iniciar a gravação.");
       } catch {
