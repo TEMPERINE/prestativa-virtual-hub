@@ -117,10 +117,10 @@ function setup() {
       return [];
     },
   };
-  const events: string[] = [];
-  const lm = new LocalMedia(adapter, { emit: (e: { type?: string }) => events.push(String(e.type ?? e)) } as never);
+
+  const lm = new LocalMedia(adapter);
   const room = new Room();
-  return { lm, room, created, sender, events };
+  return { lm, room, created, sender };
 }
 
 /** O que o VU meter usa: MediaStreamTrack atual quando status ON. */
@@ -132,7 +132,7 @@ function vuTrack(lm: LocalMedia): FakeMST | null {
 describe("Mic privacy lifecycle (stopOnMute)", () => {
   it("20 ciclos OFF→ON: mesma publicação, captura parada no OFF, nova captura no ON", async () => {
     const { lm, room, created, sender } = setup();
-    await lm.setRoom(room as never);
+    await lm.attachRoom(room);
     await lm.setMicrophoneEnabled(true);
     const track = created[0];
     expect(room.micPubs()).toBe(1);
@@ -165,7 +165,7 @@ describe("Mic privacy lifecycle (stopOnMute)", () => {
 
   it("parada voluntária não é tratada como perda de hardware", async () => {
     const { lm, room, created } = setup();
-    await lm.setRoom(room as never);
+    await lm.attachRoom(room);
     await lm.setMicrophoneEnabled(true);
     await lm.setMicrophoneEnabled(false);
     // mesmo um "ended" tardio da track parada é ignorado
@@ -180,7 +180,7 @@ describe("Mic privacy lifecycle (stopOnMute)", () => {
 
   it("perda real com mic ON gera erro e descarta a track", async () => {
     const { lm, room, created } = setup();
-    await lm.setRoom(room as never);
+    await lm.attachRoom(room);
     await lm.setMicrophoneEnabled(true);
     created[0].mediaStreamTrack.hardwareLoss();
     await new Promise((r) => setTimeout(r, 0));
@@ -195,7 +195,7 @@ describe("Mic privacy lifecycle (stopOnMute)", () => {
 
   it("troca de dispositivo com mic OFF vale na retomada; com ON é imediata", async () => {
     const { lm, room, created, sender } = setup();
-    await lm.setRoom(room as never);
+    await lm.attachRoom(room);
     await lm.setMicrophoneEnabled(true);
     await lm.setMicrophoneEnabled(false);
     await lm.setMicrophoneDevice("usb");
@@ -211,7 +211,7 @@ describe("Mic privacy lifecycle (stopOnMute)", () => {
 
   it("OFF→ON rápidos concorrentes não duplicam publicação", async () => {
     const { lm, room, created } = setup();
-    await lm.setRoom(room as never);
+    await lm.attachRoom(room);
     await lm.setMicrophoneEnabled(true);
     await Promise.all(
       Array.from({ length: 20 }, (_, i) => lm.setMicrophoneEnabled(i % 2 === 1)),
