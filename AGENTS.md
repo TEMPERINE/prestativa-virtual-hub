@@ -3,3 +3,4 @@
 - Gravação de reunião no RTC V2 é server-side (LiveKit RoomComposite Egress + template `/recording/$meetingId`, estado em `meeting_egress`, webhook `/api/public/livekit-egress`); nunca getDisplayMedia/MediaRecorder no V2 — gravação não pode depender do navegador de quem iniciou.
 - Motor RTC = só VITE_RTC_ENGINE (src/lib/rtc/rtc-engine.ts), igual em preview e produção, padrão v2; sem regra por hostname — rollback = VITE_RTC_ENGINE=v1 + republicar, V1 mantido até limpeza separada.
 - Gravações: src/lib/meetings/recording-storage.server.ts decide backend (Egress `complete` com mesmo file_path → S3/R2 externo; senão Lovable Cloud WebM) e só o servidor assina/baixa — credenciais S3 nunca vão ao navegador.
+- RTC v2 mic: OFF = mute com `stopOnMute` do LiveKit (captura real parada, mesma track/publicação) e `voluntaryStop` em local-media.ts separa parada voluntária de perda de device — evita indicador de captura aceso e publicações duplicadas.
