@@ -1,0 +1,1 @@
+REVOKE EXECUTE ON FUNCTION public.workspace_members_guard_profile() FROM public, anon, authenticated;
