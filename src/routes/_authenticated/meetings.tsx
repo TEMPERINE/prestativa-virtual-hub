@@ -23,6 +23,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
+import { UNDO_WINDOW_MS, canSubmitSelection, confirmQuestion, selectionLabel, sentToast } from "@/lib/meetings/share-flow";
 import { appPrompt, appConfirm } from "@/components/ui/app-dialogs";
 
 
@@ -1233,13 +1234,15 @@ function SendRecordingDialog({
   const [members, setMembers] = useState<MemberPick[]>([]);
   const [loading, setLoading] = useState(false);
   const [q, setQ] = useState("");
-  const [sendingId, setSendingId] = useState<string | null>(null);
-  const [sentIds, setSentIds] = useState<Set<string>>(new Set());
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [confirming, setConfirming] = useState(false);
+  const [sending, setSending] = useState(false);
 
   useEffect(() => {
     if (!meeting) return;
     setQ("");
-    setSentIds(new Set());
+    setSelected(new Set());
+    setConfirming(false);
     setLoading(true);
     (async () => {
       const { data: mems } = await sb
@@ -1272,66 +1275,92 @@ function SendRecordingDialog({
     return members.filter((m) => m.display_name.toLowerCase().includes(t));
   }, [members, q]);
 
-  const send = async (recipientId: string) => {
-    if (!meeting) return;
-    setSendingId(recipientId);
-    const { error } = await sb.rpc("meeting_share_recording", {
-      _meeting_id: meeting.id,
-      _recipient_id: recipientId,
+  const selectedNames = members.filter((m) => selected.has(m.user_id)).map((m) => m.display_name);
+
+  const toggle = (id: string) =>
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
     });
-    setSendingId(null);
+
+  const confirmSend = async () => {
+    if (!meeting || !canSubmitSelection(selected)) return;
+    const meetingId = meeting.id;
+    const count = selected.size;
+    setSending(true);
+    const { data, error } = await sb.rpc("meeting_share_recording_batch", {
+      _meeting_id: meetingId,
+      _recipient_ids: Array.from(selected),
+    });
+    setSending(false);
     if (error) {
-      toast.error(error.message ?? "Não foi possível enviar.");
+      console.error("[share]", error);
+      toast.error("Não foi possível enviar a reunião. Nada foi enviado — tente de novo.");
       return;
     }
-    setSentIds((prev) => new Set(prev).add(recipientId));
-    toast.success("Gravação enviada.");
+    const batchId = (data as { batch_id: string; created: string[] }).batch_id;
+    setConfirming(false);
+    onClose();
+    toast.success(sentToast(count), {
+      duration: UNDO_WINDOW_MS,
+      action: {
+        label: "Desfazer",
+        onClick: async () => {
+          const { error: undoErr } = await sb.rpc("meeting_undo_share_batch", {
+            _meeting_id: meetingId,
+            _batch_id: batchId,
+          });
+          if (undoErr) toast.error("Não foi possível desfazer o envio.");
+          else toast.success("Envio desfeito.");
+        },
+      },
+    });
   };
 
   return (
-    <Dialog open={!!meeting} onOpenChange={(o) => { if (!o) onClose(); }}>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
-          <DialogTitle className="inline-flex items-center gap-2">
-            <Send className="w-4 h-4" /> Enviar gravação
-          </DialogTitle>
-          <DialogDescription>
-            Selecione alguém do espaço para receber esta gravação em
-            <span className="font-medium"> Gravações recebidas</span>.
-          </DialogDescription>
-        </DialogHeader>
-        <div className="relative">
-          <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
-          <input
-            autoFocus
-            type="search"
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder="Buscar membro…"
-            className="pl-8 pr-3 py-1.5 text-sm rounded-md border bg-background w-full focus:outline-none focus:ring-2 focus:ring-primary/40"
-          />
-        </div>
-        <div className="max-h-72 overflow-auto -mx-1 px-1">
-          {loading ? (
-            <div className="py-6 text-center text-sm text-muted-foreground inline-flex items-center gap-2 justify-center w-full">
-              <Loader2 className="w-3 h-3 animate-spin" /> Carregando membros…
-            </div>
-          ) : filtered.length === 0 ? (
-            <div className="py-6 text-center text-sm text-muted-foreground">
-              Nenhum membro encontrado.
-            </div>
-          ) : (
-            <ul className="space-y-1">
-              {filtered.map((m) => {
-                const sent = sentIds.has(m.user_id);
-                const sending = sendingId === m.user_id;
-                return (
+    <>
+      <Dialog open={!!meeting && !confirming} onOpenChange={(o) => { if (!o) onClose(); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="inline-flex items-center gap-2">
+              <Send className="w-4 h-4" /> Enviar reunião
+            </DialogTitle>
+            <DialogDescription>
+              Escolha uma ou mais pessoas do espaço. Elas vão receber a reunião em
+              <span className="font-medium"> Gravações recebidas</span>.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="relative">
+            <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+            <input
+              autoFocus
+              type="search"
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="Buscar colaborador…"
+              className="pl-8 pr-3 py-1.5 text-sm rounded-md border bg-background w-full focus:outline-none focus:ring-2 focus:ring-primary/40"
+            />
+          </div>
+          <div className="max-h-72 overflow-auto -mx-1 px-1">
+            {loading ? (
+              <div className="py-6 text-center text-sm text-muted-foreground inline-flex items-center gap-2 justify-center w-full">
+                <Loader2 className="w-3 h-3 animate-spin" /> Carregando colaboradores…
+              </div>
+            ) : filtered.length === 0 ? (
+              <div className="py-6 text-center text-sm text-muted-foreground">Nenhum colaborador encontrado.</div>
+            ) : (
+              <ul className="space-y-1">
+                {filtered.map((m) => (
                   <li key={m.user_id}>
-                    <button
-                      onClick={() => !sent && !sending && send(m.user_id)}
-                      disabled={sent || sending}
-                      className="w-full flex items-center gap-3 px-2 py-2 rounded-md hover:bg-muted text-left disabled:opacity-60"
-                    >
+                    <label className="w-full flex items-center gap-3 px-2 py-2 rounded-md hover:bg-muted cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={selected.has(m.user_id)}
+                        onChange={() => toggle(m.user_id)}
+                        className="w-4 h-4 accent-primary"
+                      />
                       <div
                         className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-semibold shrink-0"
                         style={{ background: m.avatar_color }}
@@ -1339,24 +1368,55 @@ function SendRecordingDialog({
                         {m.display_name.slice(0, 1).toUpperCase()}
                       </div>
                       <span className="flex-1 text-sm truncate">{m.display_name}</span>
-                      {sent ? (
-                        <span className="inline-flex items-center gap-1 text-xs text-emerald-600">
-                          <Check className="w-3 h-3" /> Enviado
-                        </span>
-                      ) : sending ? (
-                        <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
-                      ) : (
-                        <Send className="w-3.5 h-3.5 text-muted-foreground" />
-                      )}
-                    </button>
+                    </label>
                   </li>
-                );
-              })}
+                ))}
+              </ul>
+            )}
+          </div>
+          <div className="flex items-center justify-between gap-2 pt-2 border-t">
+            <span className="text-xs text-muted-foreground">{selectionLabel(selected.size)}</span>
+            <button
+              onClick={() => setConfirming(true)}
+              disabled={!canSubmitSelection(selected)}
+              className="px-3 py-1.5 rounded-md bg-primary text-primary-foreground text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Enviar
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!meeting && confirming} onOpenChange={(o) => { if (!o && !sending) setConfirming(false); }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Enviar esta reunião?</DialogTitle>
+            <DialogDescription>{confirmQuestion(selectedNames)}</DialogDescription>
+          </DialogHeader>
+          {selectedNames.length > 1 && (
+            <ul className="text-sm max-h-40 overflow-auto list-disc pl-5">
+              {selectedNames.map((n) => <li key={n}>{n}</li>)}
             </ul>
           )}
-        </div>
-      </DialogContent>
-    </Dialog>
+          <div className="flex justify-end gap-2 pt-2">
+            <button
+              onClick={() => setConfirming(false)}
+              disabled={sending}
+              className="px-3 py-1.5 rounded-md border text-sm hover:bg-muted"
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={confirmSend}
+              disabled={sending}
+              className="px-3 py-1.5 rounded-md bg-primary text-primary-foreground text-sm font-medium inline-flex items-center gap-1.5 disabled:opacity-60"
+            >
+              {sending && <Loader2 className="w-3 h-3 animate-spin" />} Confirmar envio
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
 
