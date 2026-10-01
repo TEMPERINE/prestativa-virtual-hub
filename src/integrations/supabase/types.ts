@@ -1070,6 +1070,13 @@ export type Database = {
         Args: { _user_id: string; _workspace_id: string }
         Returns: boolean
       }
+      meeting_access_status: {
+        Args: { _meeting_id: string }
+        Returns: {
+          kind: string
+          user_id: string
+        }[]
+      }
       meeting_join: {
         Args: { _workspace_id: string; _zone_id: string; _zone_label: string }
         Returns: string
