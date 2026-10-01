@@ -938,7 +938,11 @@ export function OfficeScene({
     let ny = cur.y + dy;
     if (collides({ x: nx, y: cur.y })) nx = cur.x;
     if (collides({ x: nx, y: ny })) ny = cur.y;
-    if (nx === cur.x && ny === cur.y) return false;
+    if (nx === cur.x && ny === cur.y) {
+      // Bloqueado por parede: para imediatamente para os remotos.
+      if (IS_RTC_V2) rtcV2Ref.current?.reportMotion(cur.x, cur.y, 0, 0);
+      return false;
+    }
     const np = { x: nx, y: ny };
     // Bloqueio por porta/elemento: se o passo cruza a fronteira de uma zona
     // trancada (por ex. porta fechada), reverte o movimento.
@@ -950,6 +954,7 @@ export function OfficeScene({
         lastGatedToastRef.current = now;
         toast("Porta fechada", { description: "Aperte X para abrir." });
       }
+      if (IS_RTC_V2) rtcV2Ref.current?.reportMotion(cur.x, cur.y, 0, 0);
       return false;
     }
     posRef.current = np;
@@ -2359,6 +2364,8 @@ export function OfficeScene({
       // a página o personagem volte exatamente onde parou — sem cair no spawn.
       if (keysDown.current.size === 0) {
         const cur = posRef.current;
+        // STOP imediato no V2 (sem esperar o idle de 150 ms → evita overshoot remoto).
+        if (IS_RTC_V2) rtcV2Ref.current?.reportMotion(cur.x, cur.y, 0, 0);
         sendPos(cur.x, cur.y, callZoneAt(cur), facingRef.current, true);
       }
     };
@@ -2697,7 +2704,12 @@ export function OfficeScene({
       ref={sceneRef}
       tabIndex={0}
       className="relative w-screen h-screen overflow-hidden bg-black outline-none flex items-stretch"
-      onMouseDown={() => sceneRef.current?.focus()}
+      onMouseDown={(e) => {
+        // Eventos de portais (menus/popovers) borbulham pela árvore React até
+        // aqui; roubar o foco fecha o popover antes do clique executar.
+        if (!sceneRef.current?.contains(e.target as Node)) return;
+        sceneRef.current.focus();
+      }}
     >
       {/* Extended scenery — park on the left */}
       <div
@@ -3784,15 +3796,6 @@ export function OfficeScene({
                 canEditCharacter={tierCaps.canChangeSprite}
                 onEditProfile={() => setEditProfOpen(true)}
                 onGoToMyDesk={teleportToMyClaim}
-                onGoToLobby={() => {
-                  if (callZoneAt(posRef.current) === "lobby") { toast.info("Você já está no saguão."); return; }
-                  const target = randomCorridorPoint();
-                  posRef.current = target;
-                  setPos(target);
-                  setZone("lobby");
-                  sendPos(target.x, target.y, "lobby", facingRef.current);
-                  toast.success("✨ Te levei ao saguão.");
-                }}
                 onRestartOnboarding={() => setForceOnboarding(true)}
                 onSignOut={signOut}
                 onStatusChanged={refreshMe}
