@@ -469,14 +469,14 @@ describe("LocalMedia — Etapa 14B (mic lifecycle)", () => {
     expect(room.mics()).toEqual([a.mics[1]]);
   });
 
-  it("11b. track ended enquanto OFF → ON readquire", async () => {
+  it("11b. track ended enquanto OFF (stopOnMute) → ON reusa track; unmute do SDK readquire", async () => {
     const { a, room, lm } = await setup();
     await lm.setMicrophoneEnabled(true);
     await lm.setMicrophoneEnabled(false);
-    a.mics[0].stopped = true; // captura morreu silenciosamente
+    a.mics[0].stopped = true; // parada voluntária (stopOnMute) — não é perda
     await lm.setMicrophoneEnabled(true);
-    expect(a.calls.mic).toBe(2);
-    expect(room.mics()).toEqual([a.mics[1]]);
+    expect(a.calls.mic).toBe(1);
+    expect(room.mics()).toEqual([a.mics[0]]);
   });
 
   it("12. falha de reacquire gera MIC_ERROR sem quebrar Room", async () => {
