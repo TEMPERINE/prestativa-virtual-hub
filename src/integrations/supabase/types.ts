@@ -400,18 +400,21 @@ export type Database = {
           meeting_id: string
           recipient_id: string
           sender_id: string
+          share_batch_id: string | null
         }
         Insert: {
           created_at?: string
           meeting_id: string
           recipient_id: string
           sender_id: string
+          share_batch_id?: string | null
         }
         Update: {
           created_at?: string
           meeting_id?: string
           recipient_id?: string
           sender_id?: string
+          share_batch_id?: string | null
         }
         Relationships: [
           {
@@ -1099,6 +1102,14 @@ export type Database = {
       meeting_share_recording: {
         Args: { _meeting_id: string; _recipient_id: string }
         Returns: undefined
+      }
+      meeting_share_recording_batch: {
+        Args: { _meeting_id: string; _recipient_ids: string[] }
+        Returns: Json
+      }
+      meeting_undo_share_batch: {
+        Args: { _batch_id: string; _meeting_id: string }
+        Returns: number
       }
       release_office_session: {
         Args: { _generation: number; _session_id: string }
