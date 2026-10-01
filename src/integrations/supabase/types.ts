@@ -950,18 +950,21 @@ export type Database = {
       workspace_members: {
         Row: {
           joined_at: string
+          member_profile: string
           role: Database["public"]["Enums"]["workspace_role"]
           user_id: string
           workspace_id: string
         }
         Insert: {
           joined_at?: string
+          member_profile?: string
           role?: Database["public"]["Enums"]["workspace_role"]
           user_id: string
           workspace_id: string
         }
         Update: {
           joined_at?: string
+          member_profile?: string
           role?: Database["public"]["Enums"]["workspace_role"]
           user_id?: string
           workspace_id?: string
@@ -1030,6 +1033,10 @@ export type Database = {
       }
       can_read_meeting_participants: {
         Args: { _meeting_id: string; _user_id: string }
+        Returns: boolean
+      }
+      can_record_meeting: {
+        Args: { _user_id: string; _workspace_id: string }
         Returns: boolean
       }
       claim_office_session: {
