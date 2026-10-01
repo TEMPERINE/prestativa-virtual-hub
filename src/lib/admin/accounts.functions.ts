@@ -10,6 +10,8 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
+import { normalizeMemberProfile, type MemberProfile } from "@/lib/meetings/record-permission";
+
 type Plan = "essencial" | "pro" | "premium";
 
 async function ensureAdmin(ctx: { supabase: any; userId: string }) {
@@ -39,7 +41,7 @@ export const adminListAccounts = createServerFn({ method: "GET" })
       supabaseAdmin.from("user_roles").select("user_id, role").in("user_id", ids),
       supabaseAdmin
         .from("workspace_members")
-        .select("user_id, workspace_id, role, workspaces:workspace_id(name)")
+        .select("user_id, workspace_id, role, member_profile, workspaces:workspace_id(name)")
         .in("user_id", ids),
     ]);
 
@@ -65,7 +67,7 @@ export const adminListAccounts = createServerFn({ method: "GET" })
     });
     (members ?? []).forEach((m: any) => {
       const row = byId.get(m.user_id);
-      if (row) row.workspaces = [...(row.workspaces ?? []), { id: m.workspace_id, name: m.workspaces?.name, role: m.role }];
+      if (row) row.workspaces = [...(row.workspaces ?? []), { id: m.workspace_id, name: m.workspaces?.name, role: m.role, member_profile: m.member_profile ?? "operational" }];
     });
 
     return { accounts: Array.from(byId.values()) };
@@ -80,6 +82,7 @@ export const adminCreateAccount = createServerFn({ method: "POST" })
     plan: Plan;
     workspaceId?: string | null;
     workspaceRole?: "owner" | "admin" | "member";
+    memberProfile?: MemberProfile;
     groupId?: string | null;
   }) => {
     if (!input.email || !/^\S+@\S+\.\S+$/.test(input.email)) throw new Error("Email inválido");
@@ -114,7 +117,12 @@ export const adminCreateAccount = createServerFn({ method: "POST" })
       await supabaseAdmin
         .from("workspace_members")
         .upsert(
-          { workspace_id: data.workspaceId, user_id: newId, role: data.workspaceRole ?? "member" },
+          {
+            workspace_id: data.workspaceId,
+            user_id: newId,
+            role: data.workspaceRole ?? "member",
+            member_profile: normalizeMemberProfile(data.workspaceRole ?? "member", data.memberProfile),
+          },
           { onConflict: "workspace_id,user_id" },
         );
     }
@@ -212,6 +220,7 @@ export const adminAssignToWorkspace = createServerFn({ method: "POST" })
     userId: string;
     workspaceId: string;
     role?: "owner" | "admin" | "member";
+    memberProfile?: MemberProfile;
   }) => input)
   .handler(async ({ context, data }) => {
     await ensureAdmin(context as any);
@@ -219,7 +228,12 @@ export const adminAssignToWorkspace = createServerFn({ method: "POST" })
     const { error } = await supabaseAdmin
       .from("workspace_members")
       .upsert(
-        { workspace_id: data.workspaceId, user_id: data.userId, role: data.role ?? "member" },
+        {
+          workspace_id: data.workspaceId,
+          user_id: data.userId,
+          role: data.role ?? "member",
+          member_profile: normalizeMemberProfile(data.role ?? "member", data.memberProfile),
+        },
         { onConflict: "workspace_id,user_id" },
       );
     if (error) throw new Error(error.message);
@@ -264,4 +278,24 @@ export const adminListWorkspaces = createServerFn({ method: "GET" })
       .order("name");
     if (error) throw new Error(error.message);
     return { workspaces: data ?? [] };
+  });
+
+/** Troca Operacional ↔ Estratégico sem alterar o Papel no espaço. */
+export const adminSetMemberProfile = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { userId: string; workspaceId: string; memberProfile: MemberProfile }) => {
+    if (!["operational", "strategic"].includes(input.memberProfile)) throw new Error("Perfil inválido");
+    return input;
+  })
+  .handler(async ({ context, data }) => {
+    await ensureAdmin(context as any);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error } = await (supabaseAdmin as any)
+      .from("workspace_members")
+      .update({ member_profile: data.memberProfile })
+      .eq("workspace_id", data.workspaceId)
+      .eq("user_id", data.userId)
+      .eq("role", "member");
+    if (error) throw new Error(error.message);
+    return { ok: true };
   });

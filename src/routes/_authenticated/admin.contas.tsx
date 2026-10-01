@@ -17,6 +17,7 @@ import {
   adminCreateGroup,
   adminDeleteGroup,
   adminSetAccountGroup,
+  adminSetMemberProfile,
 } from "@/lib/admin/accounts.functions";
 import { appPrompt, appConfirm } from "@/components/ui/app-dialogs";
 
@@ -28,6 +29,7 @@ export const Route = createFileRoute("/_authenticated/admin/contas")({
 });
 
 type Plan = "essencial" | "pro" | "premium";
+const ROLE_LABEL: Record<string, string> = { member: "Membro", admin: "Admin", owner: "Dono" };
 
 type Account = {
   id: string;
@@ -36,7 +38,7 @@ type Account = {
   plan?: Plan;
   group_id?: string | null;
   roles?: string[];
-  workspaces?: Array<{ id: string; name?: string; role: string }>;
+  workspaces?: Array<{ id: string; name?: string; role: string; member_profile?: string }>;
   created_at: string;
   last_sign_in_at: string | null;
 };
@@ -55,6 +57,7 @@ function AdminContasPage() {
   const resetPwFn = useServerFn(adminResetPassword);
   const deleteFn = useServerFn(adminDeleteAccount);
   const assignFn = useServerFn(adminAssignToWorkspace);
+  const setProfileFn = useServerFn(adminSetMemberProfile);
   const unassignFn = useServerFn(adminRemoveFromWorkspace);
   const listGroupsFn = useServerFn(adminListGroups);
   const createGroupFn = useServerFn(adminCreateGroup);
@@ -75,6 +78,7 @@ function AdminContasPage() {
   const [plan, setPlan] = useState<Plan>("essencial");
   const [wsId, setWsId] = useState<string>("");
   const [wsRole, setWsRole] = useState<"owner" | "admin" | "member">("member");
+  const [memberProfile, setMemberProfile] = useState<"operational" | "strategic">("operational");
   const [groupId, setGroupId] = useState<string>("");
 
   const checkAdmin = async () => {
@@ -119,11 +123,12 @@ function AdminContasPage() {
           plan,
           workspaceId: wsId || null,
           workspaceRole: wsRole,
+          memberProfile: wsRole === "member" ? memberProfile : undefined,
           groupId: groupId || null,
         },
       });
       toast.success("Conta criada!");
-      setEmail(""); setPassword(""); setDisplayName(""); setWsId("");
+      setEmail(""); setPassword(""); setDisplayName(""); setWsId(""); setMemberProfile("operational");
       load();
     } catch (e: any) {
       toast.error(e?.message ?? "Falha ao criar conta.");
@@ -179,10 +184,20 @@ function AdminContasPage() {
   };
 
 
-  const assign = async (userId: string, workspaceId: string, role: "owner" | "admin" | "member") => {
+  const changeProfile = async (userId: string, workspaceId: string, memberProfile: "operational" | "strategic") => {
+    try {
+      await setProfileFn({ data: { userId, workspaceId, memberProfile } });
+      setAccounts((prev) => prev.map((a) => a.id === userId
+        ? { ...a, workspaces: (a.workspaces ?? []).map((w) => w.id === workspaceId ? { ...w, member_profile: memberProfile } : w) }
+        : a));
+      toast.success(memberProfile === "strategic" ? "Perfil alterado para Estratégico." : "Perfil alterado para Operacional.");
+    } catch (e: any) { toast.error(e?.message ?? "Erro."); }
+  };
+
+  const assign = async (userId: string, workspaceId: string, role: "owner" | "admin" | "member", memberProfile?: "operational" | "strategic") => {
     if (!workspaceId) return;
     try {
-      await assignFn({ data: { userId, workspaceId, role } });
+      await assignFn({ data: { userId, workspaceId, role, memberProfile: role === "member" ? memberProfile : undefined } });
       toast.success("Acesso ao espaço concedido.");
       load();
     } catch (e: any) { toast.error(e?.message ?? "Erro."); }
@@ -317,6 +332,20 @@ function AdminContasPage() {
                 { value: "admin", label: "Admin" },
                 { value: "owner", label: "Dono" },
               ]} />
+            {wsRole === "member" && (
+              <div>
+                <SelectField label="Perfil do membro" value={memberProfile} onChange={(v) => setMemberProfile(v as any)}
+                  options={[
+                    { value: "operational", label: "Operacional" },
+                    { value: "strategic", label: "Estratégico" },
+                  ]} />
+                <p className="text-[11px] text-muted-foreground mt-1">
+                  {memberProfile === "operational"
+                    ? "Participa normalmente do escritório e das reuniões, mas não pode iniciar gravações."
+                    : "Possui os mesmos acessos do Membro e também pode iniciar gravações."}
+                </p>
+              </div>
+            )}
           </div>
           <button type="submit" disabled={busy}
             className="px-4 py-2 rounded-lg gradient-primary text-primary-foreground text-sm font-medium inline-flex items-center gap-2 hover:opacity-90 shadow-glow disabled:opacity-50">
@@ -392,7 +421,21 @@ function AdminContasPage() {
                             )}
                             {(a.workspaces ?? []).map((w) => (
                               <span key={w.id} className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-full bg-muted">
-                                {w.name ?? w.id.slice(0, 6)} · {w.role}
+                                {w.name ?? w.id.slice(0, 6)} · {ROLE_LABEL[w.role] ?? w.role}
+                                {w.role === "member" && (
+                                  <>
+                                    {" · "}
+                                    <select
+                                      aria-label="Perfil do membro"
+                                      value={w.member_profile === "strategic" ? "strategic" : "operational"}
+                                      onChange={(e) => changeProfile(a.id, w.id, e.target.value as any)}
+                                      className="bg-transparent text-xs underline decoration-dotted cursor-pointer outline-none"
+                                    >
+                                      <option value="operational">Operacional</option>
+                                      <option value="strategic">Estratégico</option>
+                                    </select>
+                                  </>
+                                )}
                                 <button onClick={() => unassign(a.id, w.id)} className="hover:text-red-500">
                                   <X size={10} />
                                 </button>
@@ -401,7 +444,7 @@ function AdminContasPage() {
                           </div>
                           <AssignControl
                             workspaces={workspaces.filter((w) => !(a.workspaces ?? []).some((aw) => aw.id === w.id))}
-                            onAssign={(workspaceId, role) => assign(a.id, workspaceId, role)}
+                            onAssign={(workspaceId, role, mp) => assign(a.id, workspaceId, role, mp)}
                           />
                         </div>
                       </div>
@@ -448,8 +491,9 @@ function SelectField({ label, value, onChange, options }: {
 
 function AssignControl({ workspaces, onAssign }: {
   workspaces: Workspace[];
-  onAssign: (workspaceId: string, role: "owner" | "admin" | "member") => void;
+  onAssign: (workspaceId: string, role: "owner" | "admin" | "member", memberProfile?: "operational" | "strategic") => void;
 }) {
+  const [mp, setMp] = useState<"operational" | "strategic">("operational");
   const [wsId, setWsId] = useState("");
   const [role, setRole] = useState<"owner" | "admin" | "member">("member");
   if (workspaces.length === 0) return null;
@@ -468,7 +512,14 @@ function AssignControl({ workspaces, onAssign }: {
             <option value="admin">Admin</option>
             <option value="owner">Dono</option>
           </select>
-          <button onClick={() => { onAssign(wsId, role); setWsId(""); }}
+          {role === "member" && (
+            <select value={mp} onChange={(e) => setMp(e.target.value as any)} aria-label="Perfil do membro"
+              className="rounded-lg border bg-background px-2 py-1 text-xs">
+              <option value="operational">Operacional</option>
+              <option value="strategic">Estratégico</option>
+            </select>
+          )}
+          <button onClick={() => { onAssign(wsId, role, mp); setWsId(""); setMp("operational"); }}
             className="text-xs px-2 py-1 rounded bg-primary text-primary-foreground hover:opacity-90">
             Conceder
           </button>
