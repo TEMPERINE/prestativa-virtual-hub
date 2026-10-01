@@ -32,6 +32,13 @@ export const startServerRecording = createServerFn({ method: "POST" })
       .maybeSingle();
     if (!meeting || meeting.ended_at) return { ok: false as const, code: "MEETING_NOT_ACTIVE" };
 
+    // Permissão central (Membro Operacional não grava) — antes de qualquer Egress/registro.
+    const { data: allowed } = await context.supabase.rpc("can_record_meeting", {
+      _user_id: context.userId,
+      _workspace_id: meeting.workspace_id,
+    });
+    if (!allowed) return { ok: false as const, code: "NOT_ALLOWED_TO_RECORD" };
+
     const roomName = roomNameFor(meeting.workspace_id, { kind: "PRIVATE_ROOM", zoneId: meeting.zone_id });
     if (!roomName) return { ok: false as const, code: "NO_ROOM" };
 
@@ -120,6 +127,11 @@ export const stopServerRecording = createServerFn({ method: "POST" })
       .in("status", ["starting", "active", "ending"])
       .maybeSingle();
     if (!row?.egress_id) return { ok: false as const, code: "NOT_RECORDING" };
+    const { data: mtg } = await db.from("meetings").select("workspace_id").eq("id", data.meetingId).maybeSingle();
+    const { data: allowed } = mtg
+      ? await context.supabase.rpc("can_record_meeting", { _user_id: context.userId, _workspace_id: mtg.workspace_id })
+      : { data: false };
+    if (!allowed) return { ok: false as const, code: "NOT_ALLOWED_TO_RECORD" };
     await db.from("meeting_egress").update({ status: "ending", stopped_by: context.userId }).eq("id", row.id);
     try {
       const lk = srv.readLiveKit();
