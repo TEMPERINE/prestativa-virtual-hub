@@ -1,0 +1,1 @@
+REVOKE EXECUTE ON FUNCTION public.can_read_meeting_participants(uuid, uuid) FROM PUBLIC, anon;

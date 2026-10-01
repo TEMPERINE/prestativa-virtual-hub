@@ -1028,6 +1028,10 @@ export type Database = {
         Args: { _plan: Database["public"]["Enums"]["account_plan"] }
         Returns: number
       }
+      can_read_meeting_participants: {
+        Args: { _meeting_id: string; _user_id: string }
+        Returns: boolean
+      }
       claim_office_session: {
         Args: { _session_id: string; _workspace_id: string }
         Returns: {
