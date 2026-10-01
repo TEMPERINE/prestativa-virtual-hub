@@ -19,3 +19,24 @@ export function confirmQuestion(names: string[]): string {
 export function sentToast(n: number): string {
   return n === 1 ? "Reunião enviada para 1 colaborador." : `Reunião enviada para ${n} colaboradores.`;
 }
+
+/** Quem já possui a reunião: participou (meeting_participants) ou já recebeu. */
+export type AccessKind = "participant" | "shared";
+
+export function buildAccessMap(rows: Array<{ user_id: string; kind: string }>): Map<string, AccessKind> {
+  const m = new Map<string, AccessKind>();
+  for (const r of rows) {
+    if (r.kind === "participant") m.set(r.user_id, "participant"); // participação prevalece
+    else if (r.kind === "shared" && !m.has(r.user_id)) m.set(r.user_id, "shared");
+  }
+  return m;
+}
+
+export function accessBadge(kind: AccessKind): string {
+  return kind === "participant" ? "Já possui • Participou" : "Já possui • Recebida";
+}
+
+/** Só conta/envia quem ainda não possui a reunião. */
+export function validSelection(selected: ReadonlySet<string>, access: ReadonlyMap<string, AccessKind>): Set<string> {
+  return new Set([...selected].filter((id) => !access.has(id)));
+}

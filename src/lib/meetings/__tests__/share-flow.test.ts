@@ -44,3 +44,34 @@ describe("Enviar reunião — fluxo", () => {
     expect(dialog).not.toMatch(/deleteMeeting|meeting_participants/);
   });
 });
+
+import { accessBadge, buildAccessMap, validSelection } from "../share-flow";
+
+describe("Enviar reunião — quem já possui", () => {
+  const access = buildAccessMap([
+    { user_id: "dani", kind: "participant" },
+    { user_id: "tracy", kind: "shared" },
+    { user_id: "dani", kind: "shared" },
+  ]);
+  it("participante e quem já recebeu ficam marcados com o badge certo", () => {
+    expect(accessBadge(access.get("dani")!)).toBe("Já possui • Participou");
+    expect(accessBadge(access.get("tracy")!)).toBe("Já possui • Recebida");
+  });
+  it("não podem ser selecionados nem contam no contador", () => {
+    const v = validSelection(new Set(["dani", "tracy", "yasmin", "leo"]), access);
+    expect([...v].sort()).toEqual(["leo", "yasmin"]);
+  });
+  it("linha esmaecida e checkbox desabilitado na tela", () => {
+    expect(dialog).toContain("disabled={!!has}");
+    expect(dialog).toContain("opacity-50 cursor-not-allowed");
+    expect(dialog).toContain("!access.has(id) && setSelected");
+  });
+  it("busca não esconde quem já possui", () => {
+    const f = dialog.slice(dialog.indexOf("const filtered"), dialog.indexOf("const validSelected"));
+    expect(f).not.toContain("access");
+  });
+  it("só envia selecionados válidos e o aviso usa os criados de fato", () => {
+    expect(dialog).toContain("_recipient_ids: Array.from(validSelected)");
+    expect(dialog).toContain("sentToast(created.length)");
+  });
+});

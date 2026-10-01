@@ -23,7 +23,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { UNDO_WINDOW_MS, canSubmitSelection, confirmQuestion, selectionLabel, sentToast } from "@/lib/meetings/share-flow";
+import { UNDO_WINDOW_MS, accessBadge, buildAccessMap, validSelection, type AccessKind, canSubmitSelection, confirmQuestion, selectionLabel, sentToast } from "@/lib/meetings/share-flow";
 import { appPrompt, appConfirm } from "@/components/ui/app-dialogs";
 
 
@@ -1237,9 +1237,16 @@ function SendRecordingDialog({
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [confirming, setConfirming] = useState(false);
   const [sending, setSending] = useState(false);
+  const [access, setAccess] = useState<Map<string, AccessKind>>(new Map());
 
   useEffect(() => {
     if (!meeting) return;
+    setAccess(new Map());
+    void sb.rpc("meeting_access_status", { _meeting_id: meeting.id }).then(
+      ({ data }: { data: Array<{ user_id: string; kind: string }> | null }) => {
+        setAccess(buildAccessMap(data ?? []));
+      },
+    );
     setQ("");
     setSelected(new Set());
     setConfirming(false);
@@ -1275,10 +1282,11 @@ function SendRecordingDialog({
     return members.filter((m) => m.display_name.toLowerCase().includes(t));
   }, [members, q]);
 
-  const selectedNames = members.filter((m) => selected.has(m.user_id)).map((m) => m.display_name);
+  const validSelected = useMemo(() => validSelection(selected, access), [selected, access]);
+  const selectedNames = members.filter((m) => validSelected.has(m.user_id)).map((m) => m.display_name);
 
   const toggle = (id: string) =>
-    setSelected((prev) => {
+    !access.has(id) && setSelected((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
       else next.add(id);
@@ -1286,13 +1294,12 @@ function SendRecordingDialog({
     });
 
   const confirmSend = async () => {
-    if (!meeting || !canSubmitSelection(selected)) return;
+    if (!meeting || !canSubmitSelection(validSelected)) return;
     const meetingId = meeting.id;
-    const count = selected.size;
     setSending(true);
     const { data, error } = await sb.rpc("meeting_share_recording_batch", {
       _meeting_id: meetingId,
-      _recipient_ids: Array.from(selected),
+      _recipient_ids: Array.from(validSelected),
     });
     setSending(false);
     if (error) {
@@ -1300,10 +1307,14 @@ function SendRecordingDialog({
       toast.error("Não foi possível enviar a reunião. Nada foi enviado — tente de novo.");
       return;
     }
-    const batchId = (data as { batch_id: string; created: string[] }).batch_id;
+    const { batch_id: batchId, created } = data as { batch_id: string; created: string[] };
     setConfirming(false);
     onClose();
-    toast.success(sentToast(count), {
+    if (created.length === 0) {
+      toast.info("Essas pessoas já tinham acesso a esta reunião.");
+      return;
+    }
+    toast.success(sentToast(created.length), {
       duration: UNDO_WINDOW_MS,
       action: {
         label: "Desfazer",
@@ -1352,12 +1363,18 @@ function SendRecordingDialog({
               <div className="py-6 text-center text-sm text-muted-foreground">Nenhum colaborador encontrado.</div>
             ) : (
               <ul className="space-y-1">
-                {filtered.map((m) => (
+                {filtered.map((m) => {
+                  const has = access.get(m.user_id);
+                  return (
                   <li key={m.user_id}>
-                    <label className="w-full flex items-center gap-3 px-2 py-2 rounded-md hover:bg-muted cursor-pointer">
+                    <label
+                      aria-disabled={!!has}
+                      className={`w-full flex items-center gap-3 px-2 py-2 rounded-md ${has ? "opacity-50 cursor-not-allowed" : "hover:bg-muted cursor-pointer"}`}
+                    >
                       <input
                         type="checkbox"
-                        checked={selected.has(m.user_id)}
+                        disabled={!!has}
+                        checked={!has && selected.has(m.user_id)}
                         onChange={() => toggle(m.user_id)}
                         className="w-4 h-4 accent-primary"
                       />
@@ -1368,17 +1385,23 @@ function SendRecordingDialog({
                         {m.display_name.slice(0, 1).toUpperCase()}
                       </div>
                       <span className="flex-1 text-sm truncate">{m.display_name}</span>
+                      {has && (
+                        <span className="text-[11px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground whitespace-nowrap">
+                          {accessBadge(has)}
+                        </span>
+                      )}
                     </label>
                   </li>
-                ))}
+                  );
+                })}
               </ul>
             )}
           </div>
           <div className="flex items-center justify-between gap-2 pt-2 border-t">
-            <span className="text-xs text-muted-foreground">{selectionLabel(selected.size)}</span>
+            <span className="text-xs text-muted-foreground">{selectionLabel(validSelected.size)}</span>
             <button
               onClick={() => setConfirming(true)}
-              disabled={!canSubmitSelection(selected)}
+              disabled={!canSubmitSelection(validSelected)}
               className="px-3 py-1.5 rounded-md bg-primary text-primary-foreground text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Enviar
