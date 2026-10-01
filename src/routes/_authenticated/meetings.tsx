@@ -734,7 +734,7 @@ function MeetingCard({
               {meeting.recording_path && (
                 <button
                   onClick={onShare}
-                  title="Enviar gravação para alguém do espaço"
+                  title="Enviar reunião"
                   className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground"
                 >
                   <Send className="w-4 h-4" />
