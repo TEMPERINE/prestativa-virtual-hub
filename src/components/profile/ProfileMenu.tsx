@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { SpritePreview } from "./SpritePreview";
-import { LogOut, User as UserIcon, Shirt, Home, MapPin, RefreshCcw, StickyNote, Video, DoorOpen } from "lucide-react";
+import { LogOut, User as UserIcon, Shirt, MapPin, RefreshCcw, StickyNote, Video, DoorOpen } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 
 type Status = "available" | "busy" | "away";
@@ -32,7 +32,6 @@ type Props = {
   onEditCharacter: () => void;
   onEditProfile: () => void;
   onGoToMyDesk: () => void;
-  onGoToLobby: () => void;
   onRestartOnboarding: () => void;
   onSignOut: () => void;
   onStatusChanged: () => void;
@@ -64,7 +63,15 @@ export function ProfileMenu(p: Props) {
           />
         </button>
       </PopoverTrigger>
-      <PopoverContent align="end" className="w-72 p-0 z-[200]">
+      <PopoverContent
+        align="end"
+        className="w-72 p-0 z-[200]"
+        // Portal: eventos borbulham pela árvore React até a cena; consome aqui.
+        onPointerDown={(e) => e.stopPropagation()}
+        onMouseDown={(e) => e.stopPropagation()}
+        onClick={(e) => e.stopPropagation()}
+        onKeyDown={(e) => e.stopPropagation()}
+      >
         <div className="p-3 flex items-center gap-3 border-b">
           <div className="w-12 h-12 rounded-full overflow-hidden flex items-end justify-center" style={{ background: `${p.me.avatar_color}22` }}>
             <SpritePreview spriteId={p.me.sprite_id ?? "marcio"} size={48} />
@@ -102,7 +109,6 @@ export function ProfileMenu(p: Props) {
           <MenuItem icon={<UserIcon className="w-4 h-4" />} label="Editar perfil" onClick={() => { setOpen(false); p.onEditProfile(); }} />
           <MenuItem icon={<MapPin className="w-4 h-4" />} label="Ir até minha mesa" hint="Ctrl+D" disabled={!p.hasClaim} onClick={() => { setOpen(false); p.onGoToMyDesk(); }} />
           <MenuItem icon={<DoorOpen className="w-4 h-4" />} label="Deixar mesa" disabled={!p.hasClaim} onClick={() => { setOpen(false); p.onLeaveDesk(); }} />
-          <MenuItem icon={<Home className="w-4 h-4" />} label="Me leve ao saguão" onClick={() => { setOpen(false); p.onGoToLobby(); }} />
           <MenuItem icon={<StickyNote className="w-4 h-4" />} label="Recadinhos guardados" onClick={() => { setOpen(false); p.onOpenSavedNotes(); }} />
           <Link
             to="/meetings"
