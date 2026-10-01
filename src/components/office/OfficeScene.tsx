@@ -93,6 +93,7 @@ import { OnboardingWizard } from "@/components/onboarding/OnboardingWizard";
 import { useMeetingTracker } from "@/lib/meetings/useMeetingTracker";
 import { useMeetingRecorder } from "@/lib/meetings/useMeetingRecorder";
 import { useServerRecorder } from "@/lib/meetings/useServerRecorder";
+import { useCanRecordMeeting } from "@/lib/meetings/useCanRecordMeeting";
 import { RecordingNameDialog } from "@/components/office/RecordingNameDialog";
 import { getCurrentWorkspaceId } from "@/lib/workspace/current";
 import { useWorkspaceTier } from "@/lib/workspace/useWorkspaceTier";
@@ -326,6 +327,7 @@ export function OfficeScene({
   // Capacidades por nível do espaço atual — controlam botões de gravar,
   // teleporte e troca de personagem.
   const { caps: tierCaps } = useWorkspaceTier(getCurrentWorkspaceId());
+  const canRecordMeeting = useCanRecordMeeting(getCurrentWorkspaceId());
   const tierCapsRef = useRef(tierCaps);
   tierCapsRef.current = tierCaps;
   const sceneRef = useRef<HTMLDivElement | null>(null);
@@ -3667,7 +3669,17 @@ export function OfficeScene({
 
             {/* Botão de gravação — aparece em qualquer zona privada (não-lobby).
                 Se não houver reunião ativa ainda, criamos sob demanda via meeting_join. */}
-            {isPrivateZone && tierCaps.canRecordMeetings && (
+            {/* Quem não pode gravar (Membro Operacional) ainda vê o indicador. */}
+            {isPrivateZone && tierCaps.canRecordMeetings && !canRecordMeeting && recorder.isRecording && (
+              <span
+                title="Esta reunião está sendo gravada"
+                className="inline-flex items-center gap-1.5 h-8 px-2.5 rounded-md text-xs font-medium bg-red-500/15 text-red-600 ring-1 ring-red-500/40"
+              >
+                <Circle className="w-2.5 h-2.5 fill-current" />
+                Gravando
+              </span>
+            )}
+            {isPrivateZone && tierCaps.canRecordMeetings && canRecordMeeting && (
               <button
                 onClick={async () => {
                   // eslint-disable-next-line @typescript-eslint/no-explicit-any
