@@ -1371,23 +1371,39 @@ export function OfficeScene({
       syncPresentIds();
     });
 
+    const applyClaimChange = (payload: any) => {
+      const row = (payload.new && Object.keys(payload.new).length ? payload.new : payload.old) as
+        { zone_id?: string; user_id?: string; workspace_id?: string } | null;
+      if (!row?.zone_id) return;
+      // DELETE não aceita filtro no realtime: descarta eventos de outros espaços.
+      if (_wsChan && row.workspace_id && row.workspace_id !== _wsChan) return;
+      setClaims((prev) => {
+        const next = { ...prev };
+        if (payload.eventType === "DELETE") delete next[row.zone_id!];
+        else if (row.user_id) next[row.zone_id!] = row.user_id;
+        return next;
+      });
+    };
     const claimsCh = supabase
       .channel(`claims-room:${wsSuffix}:${realtimeChannelSuffix}`)
       .on(
         "postgres_changes",
         _wsChan
-          ? { event: "*", schema: "public", table: "workspace_claims", filter: `workspace_id=eq.${_wsChan}` }
-          : { event: "*", schema: "public", table: "workspace_claims" },
-        (payload) => {
-          const row = (payload.new ?? payload.old) as { zone_id: string; user_id: string };
-          if (!row) return;
-          setClaims((prev) => {
-            const next = { ...prev };
-            if (payload.eventType === "DELETE") delete next[row.zone_id];
-            else next[row.zone_id] = row.user_id;
-            return next;
-          });
-        }
+          ? { event: "INSERT", schema: "public", table: "workspace_claims", filter: `workspace_id=eq.${_wsChan}` }
+          : { event: "INSERT", schema: "public", table: "workspace_claims" },
+        applyClaimChange,
+      )
+      .on(
+        "postgres_changes",
+        _wsChan
+          ? { event: "UPDATE", schema: "public", table: "workspace_claims", filter: `workspace_id=eq.${_wsChan}` }
+          : { event: "UPDATE", schema: "public", table: "workspace_claims" },
+        applyClaimChange,
+      )
+      .on(
+        "postgres_changes",
+        { event: "DELETE", schema: "public", table: "workspace_claims" },
+        applyClaimChange,
       );
 
     void (async () => {
@@ -1874,10 +1890,10 @@ export function OfficeScene({
   const claimZone = useCallback(async (zoneId: string) => {
     const uid = meIdRef.current;
     if (!uid) return;
-    // Release any previous claim by this user (one workstation per user).
-    await supabase.from("workspace_claims").delete().eq("user_id", uid);
     const _wsClaim = getCurrentWorkspaceId();
     if (!_wsClaim) { toast.error("Workspace inválido."); return; }
+    // Libera só a mesa anterior deste espaço (uma mesa por espaço).
+    await supabase.from("workspace_claims").delete().eq("user_id", uid).eq("workspace_id", _wsClaim);
     const { error } = await supabase
       .from("workspace_claims")
       .insert({ workspace_id: _wsClaim, zone_id: zoneId, user_id: uid });
@@ -1898,7 +1914,10 @@ export function OfficeScene({
   const releaseClaim = useCallback(async () => {
     const uid = meIdRef.current;
     if (!uid) return;
-    const { error } = await supabase.from("workspace_claims").delete().eq("user_id", uid);
+    const _wsRel = getCurrentWorkspaceId();
+    let relQ = supabase.from("workspace_claims").delete().eq("user_id", uid);
+    if (_wsRel) relQ = relQ.eq("workspace_id", _wsRel);
+    const { error } = await relQ;
     if (error) {
       toast.error("Não foi possível deixar a mesa.");
       return;
