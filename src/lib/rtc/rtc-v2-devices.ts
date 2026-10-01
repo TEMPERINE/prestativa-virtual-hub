@@ -41,6 +41,8 @@ type LkLocalTrack = {
   mediaStreamTrack: MediaStreamTrack;
   kind?: string;
   mute?(): Promise<unknown>;
+  /** LiveKit: para a MediaStreamTrack no mute (mic) e readquire no unmute. */
+  stopOnMute?: boolean;
   unmute?(): Promise<unknown>;
   setDeviceId?(id: ConstrainDOMString): Promise<boolean>;
   on?(e: string, fn: () => void): unknown;
@@ -78,6 +80,9 @@ function wrap(t: LkLocalTrack, source: LocalSource): V2LocalTrack {
     },
   };
   if (source === "microphone" && t.mute && t.unmute) {
+    // Privacy Fase 2: OFF real — mecanismo oficial do LiveKit (só microfone;
+    // câmera e tela não passam por aqui).
+    t.stopOnMute = true;
     base.mute = async () => void (await t.mute!());
     base.unmute = async () => void (await t.unmute!());
     base.isEnded = () => t.mediaStreamTrack?.readyState === "ended";

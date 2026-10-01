@@ -12,8 +12,11 @@
 //  - no máximo uma Room anexada → nunca publicação simultânea em duas Rooms;
 //  - screen share não tem intent: termina em qualquer troca de Room/contexto;
 //  - reattach da MESMA Room (reconnect de rede) é no-op;
-//  - Mic (Etapa 14B): OFF = mute oficial da track (captura preservada, nada é
-//    enviado); ON = unmute da MESMA track/publicação. Nova captura só quando
+//  - Mic (Privacy Fase 2): OFF = mute oficial com stopOnMute (LiveKit para a
+//    MediaStreamTrack → indicador do navegador apaga); ON = unmute da MESMA
+//    track/publicação, que readquire o device selecionado. `voluntaryStop`
+//    distingue essa parada voluntária de perda real do dispositivo.
+//    (Histórico 14B: ON = unmute da MESMA track/publicação.) Nova captura só quando
 //    não há track válida (nunca houve, ended, falhou). Troca de dispositivo usa
 //    o lifecycle da própria track (setDevice), sem unpublish/recreate.
 //  - Cam = OFF = unpublish + stop da captura;
@@ -84,6 +87,8 @@ interface DeviceSlot {
   track: LocalTrackLike | null;
   op: number;
   endedUnsub: (() => void) | null;
+  /** true enquanto a captura está parada por OFF voluntário (mute+stopOnMute). */
+  voluntaryStop: boolean;
 }
 
 function errMsg(e: unknown): string {
@@ -102,8 +107,8 @@ export class LocalMedia {
   private disposed = false;
   private listeners = new Set<(s: LocalMediaSnapshot) => void>();
   private slots: Record<Kind, DeviceSlot> = {
-    microphone: { intent: false, status: "off", error: null, track: null, op: 0, endedUnsub: null },
-    camera: { intent: false, status: "off", error: null, track: null, op: 0, endedUnsub: null },
+    microphone: { intent: false, status: "off", error: null, track: null, op: 0, endedUnsub: null, voluntaryStop: false },
+    camera: { intent: false, status: "off", error: null, track: null, op: 0, endedUnsub: null, voluntaryStop: false },
   };
   private screen = {
     status: "off" as DeviceStatus,
@@ -249,8 +254,11 @@ export class LocalMedia {
     );
   }
 
-  private trackValid(t: LocalTrackLike | null): boolean {
-    return !!t && !(t.isEnded?.() ?? false);
+  private trackValid(t: LocalTrackLike | null, slot?: DeviceSlot): boolean {
+    if (!t) return false;
+    // Parada voluntária: MediaStreamTrack "ended" é esperado; unmute readquire.
+    if (slot && slot.track === t && slot.voluntaryStop) return true;
+    return !(t.isEnded?.() ?? false);
   }
 
   /** Descarta a track do slot: stop + unpublish, sem referências antigas. */
@@ -259,6 +267,7 @@ export class LocalMedia {
     slot.track = null;
     slot.endedUnsub?.();
     slot.endedUnsub = null;
+    slot.voluntaryStop = false;
     if (t) {
       t.stop();
       await this.unpublish(t);
@@ -275,8 +284,10 @@ export class LocalMedia {
       slot.status = "off";
       slot.error = null;
       const t = slot.track;
-      if (this.canMute(kind, t) && this.trackValid(t)) {
-        // Mute oficial: publicação fica muted, nenhum áudio é enviado.
+      if (this.canMute(kind, t) && this.trackValid(t, slot)) {
+        // Mute oficial + stopOnMute: captura parada, publicação preservada.
+        // Marca ANTES do await: um "ended" durante o mute não é perda de device.
+        slot.voluntaryStop = true;
         this.emit();
         if (wasOn) emitTelemetry(this.telemetry, LocalMedia.EV[kind].off);
         try {
@@ -294,7 +305,7 @@ export class LocalMedia {
     }
     slot.intent = true;
     slot.error = null;
-    if (slot.track && !this.trackValid(slot.track)) await this.dropTrack(slot);
+    if (slot.track && !this.trackValid(slot.track, slot)) await this.dropTrack(slot);
     if (this.disposed || op !== slot.op || !slot.intent) return;
     if (slot.track) {
       const t = slot.track;
@@ -310,6 +321,9 @@ export class LocalMedia {
           return;
         }
         if (this.disposed || op !== slot.op || !slot.intent) return;
+        slot.voluntaryStop = false;
+        // Nova MediaStreamTrack após reaquisição → UI (VU meter) religa.
+        this.emit();
         if (wasOff) emitTelemetry(this.telemetry, LocalMedia.EV[kind].on);
       }
       await this.publish(t);
@@ -358,6 +372,8 @@ export class LocalMedia {
   private async onTrackEnded(kind: Kind, track: LocalTrackLike): Promise<void> {
     const slot = this.slots[kind];
     if (this.disposed || slot.track !== track) return;
+    // Parada voluntária (OFF) não é falha de hardware: mantém track/publicação.
+    if (slot.voluntaryStop || !slot.intent) return;
     slot.op++;
     const wasOn = slot.intent;
     await this.dropTrack(slot);
@@ -377,7 +393,7 @@ export class LocalMedia {
     if (this.disposed) return;
     const slot = this.slots.microphone;
     const t = slot.track;
-    if (!t || !this.trackValid(t)) {
+    if (!t || !this.trackValid(t, slot)) {
       if (t) await this.dropTrack(slot);
       if (slot.intent) {
         slot.intent = false;
