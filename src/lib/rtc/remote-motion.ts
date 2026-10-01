@@ -32,7 +32,7 @@ export const REMOTE_MOTION = {
    * STOP com visual à frente da posição final: recuo residual lento (ms),
    * sem salto visível. A causa principal (STOP atrasado) é evitada na origem.
    */
-  stopSettleTauMs: 320,
+  stopSettleTauMs: 160,
   /** Offset residual abaixo disso é zerado (termina exatamente na posição). */
   epsilon: 1e-5,
 } as const;
