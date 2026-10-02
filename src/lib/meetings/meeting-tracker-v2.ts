@@ -28,12 +28,18 @@ export interface MeetingRoomState {
   /**
    * RTC On Demand: participantes humanos remotos na Room. Quando informado,
    * a reunião só começa com >= 1 remoto (2 humanos). Já iniciada, permanece
-   * até a Room cair (o grace de 15s / gravação ficam no controlador de demanda).
+   * até a Room cair (continuidade de 15s é só administrativa: ADMIN_LEAVE_GRACE_MS).
    */
   remoteCount?: number;
 }
 
 export const RETRY_DELAYS_MS = [1000, 3000, 8000] as const;
+/**
+ * Continuidade ADMINISTRATIVA: ao perder a Room privada (sem trocar para outra
+ * zona), espera até 15s antes do leave; voltar à mesma zona continua o mesmo
+ * registro. Puramente histórico — nunca mantém LiveKit conectado.
+ */
+export const ADMIN_LEAVE_GRACE_MS = 15_000;
 
 export interface MeetingTrackerDeps {
   /** Retorna o id da participação/reunião ou null. Pode lançar. */
@@ -44,6 +50,8 @@ export interface MeetingTrackerDeps {
   /** Injetável em testes. */
   setTimeout?(fn: () => void, ms: number): unknown;
   clearTimeout?(h: unknown): void;
+  /** Sobrescreve ADMIN_LEAVE_GRACE_MS (0 = leave imediato). */
+  adminGraceMs?: number;
 }
 
 export class MeetingTrackerV2 {
@@ -156,6 +164,13 @@ export class MeetingTrackerV2 {
     for (;;) {
       const d = this.desired;
       if (this.joinedZone && this.joinedZone !== d) {
+        const graceMs = this.deps.adminGraceMs ?? ADMIN_LEAVE_GRACE_MS;
+        if (d === null && !this.disposed && graceMs > 0) {
+          const zone = this.joinedZone;
+          const expired = await this.sleep(graceMs, true);
+          if (!expired) continue; // algo mudou: reavalia (voltou, trocou ou dispose)
+          if (this.desired === zone) continue;
+        }
         const id = this.meetingId;
         this.joinedZone = null;
         this.setMeeting(null);
