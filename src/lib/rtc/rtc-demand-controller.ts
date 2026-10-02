@@ -99,13 +99,11 @@ export class RtcDemandController {
   private disposed = false;
   private listeners = new Set<(d: RtcDemand) => void>();
   private readonly timers: TimerApi;
-  private readonly graceMs: number;
   private readonly lobbyGraceMs: number;
 
   constructor(private readonly deps: DemandControllerDeps) {
     this.timers = deps.timers ?? defaultTimers;
     // Grace de mídia removido por privacidade: valores legados são ignorados/limitados.
-    this.graceMs = SOLO_GRACE_MS;
     this.lobbyGraceMs = Math.min(
       Math.max(0, deps.lobbyGraceMs ?? LOBBY_IDLE_GRACE_MS),
       MAX_LOBBY_DEBOUNCE_MS,
@@ -230,36 +228,6 @@ export class RtcDemandController {
   private clearLobbyGrace(): void {
     if (this.lobbyGrace != null) this.timers.clearTimeout(this.lobbyGrace);
     this.lobbyGrace = null;
-  }
-
-  /** @deprecated grace de mídia removido; mantido apenas por compatibilidade. */
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  private armGrace(zoneId: string, occupantCount: number): void {
-    emitTelemetry(this.deps.telemetry, "RTC_SOLO_GRACE_ARMED", {
-      zoneId,
-      metadata: { occupantCount, graceMs: this.graceMs },
-    });
-    this.grace = this.timers.setTimeout(() => {
-      this.grace = null;
-      if (this.disposed || !this.input) return;
-      const i = this.input;
-      const stillAlone =
-        i.context.kind === "PRIVATE_ROOM" &&
-        i.context.zoneId === zoneId &&
-        i.occupants < 2 &&
-        !i.recordingActive;
-      if (!stillAlone) return this.evaluate();
-      if (i.roomStatus === "RECONNECTING") {
-        // Reconexão nativa do LiveKit tem prioridade: tenta de novo depois.
-        this.armGrace(zoneId, i.occupants);
-        return;
-      }
-      emitTelemetry(this.deps.telemetry, "RTC_SOLO_GRACE_EXPIRED", {
-        zoneId,
-        metadata: { occupantCount: i.occupants },
-      });
-      this.set(NONE, "solo_grace_expired", i);
-    }, this.graceMs);
   }
 
   private cancelGrace(zoneId: string | null): void {
