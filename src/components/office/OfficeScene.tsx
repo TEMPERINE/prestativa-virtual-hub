@@ -1,3 +1,4 @@
+import { getRtcOnDemand } from "@/lib/rtc/rtc-demand-controller";
 import { MicLevelMeter } from "./MicLevelMeter";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { RemoteMotionPredictor, facingFromVector } from "@/lib/rtc/remote-motion";
@@ -75,6 +76,7 @@ import { useLiveKit, ACTIVE_RTC_ENGINE, type RtcV2HookConfig } from "@/lib/rtc/u
 
 // Motor RTC escolhido uma vez por execução (VITE_RTC_ENGINE; default v1).
 const IS_RTC_V2 = ACTIVE_RTC_ENGINE === "v2";
+const RTC_ON_DEMAND_ACTIVE = IS_RTC_V2 && getRtcOnDemand() !== "off";
 import { installAudioUnlockListeners, unlockAudioPlayback } from "@/lib/rtc/audio-unlock";
 import { RemoteVideoTiles, HiddenAudioPlayers } from "./RemoteVideoTiles";
 import { MeetingStage, type StageParticipant, type StageScreen } from "./MeetingStage";
