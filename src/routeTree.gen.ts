@@ -9,34 +9,33 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as SobreRouteImport } from './routes/sobre'
-import { Route as DownloadRouteImport } from './routes/download'
-import { Route as AuthRouteImport } from './routes/auth'
-import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as RecordingMeetingIdRouteImport } from './routes/recording.$meetingId'
-import { Route as AuthenticatedOnboardingRouteImport } from './routes/_authenticated/onboarding'
-import { Route as AuthenticatedOfficeRouteImport } from './routes/_authenticated/office'
-import { Route as AuthenticatedMeetingsRouteImport } from './routes/_authenticated/meetings'
+import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
+import { Route as AuthRouteImport } from './routes/auth'
+import { Route as DownloadRouteImport } from './routes/download'
+import { Route as SobreRouteImport } from './routes/sobre'
 import { Route as AuthenticatedAguardandoConviteRouteImport } from './routes/_authenticated/aguardando-convite'
-import { Route as AuthenticatedWorkspacesIndexRouteImport } from './routes/_authenticated/workspaces.index'
+import { Route as AuthenticatedMeetingsRouteImport } from './routes/_authenticated/meetings'
+import { Route as AuthenticatedOfficeRouteImport } from './routes/_authenticated/office'
+import { Route as AuthenticatedOnboardingRouteImport } from './routes/_authenticated/onboarding'
+import { Route as RecordingMeetingIdRouteImport } from './routes/recording.$meetingId'
 import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authenticated/admin.index'
-import { Route as ApiPublicLivekitEgressRouteImport } from './routes/api/public/livekit-egress'
-import { Route as AuthenticatedWorkspacesNewRouteImport } from './routes/_authenticated/workspaces.new'
-import { Route as AuthenticatedWorkspacesWorkspaceIdRouteImport } from './routes/_authenticated/workspaces.$workspaceId'
-import { Route as AuthenticatedOfficeEditorRouteImport } from './routes/_authenticated/office_.editor'
-import { Route as AuthenticatedAdminPersonagensRouteImport } from './routes/_authenticated/admin.personagens'
-import { Route as AuthenticatedAdminEspacosRouteImport } from './routes/_authenticated/admin.espacos'
 import { Route as AuthenticatedAdminContasRouteImport } from './routes/_authenticated/admin.contas'
+import { Route as AuthenticatedAdminEspacosRouteImport } from './routes/_authenticated/admin.espacos'
+import { Route as AuthenticatedAdminPersonagensRouteImport } from './routes/_authenticated/admin.personagens'
+import { Route as AuthenticatedOfficeEditorRouteImport } from './routes/_authenticated/office_.editor'
+import { Route as AuthenticatedWorkspacesIndexRouteImport } from './routes/_authenticated/workspaces.index'
+import { Route as AuthenticatedWorkspacesWorkspaceIdRouteImport } from './routes/_authenticated/workspaces.$workspaceId'
+import { Route as AuthenticatedWorkspacesNewRouteImport } from './routes/_authenticated/workspaces.new'
+import { Route as ApiPublicLivekitEgressRouteImport } from './routes/api/public/livekit-egress'
 
-const SobreRoute = SobreRouteImport.update({
-  id: '/sobre',
-  path: '/sobre',
+const IndexRoute = IndexRouteImport.update({
+  id: '/',
+  path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const DownloadRoute = DownloadRouteImport.update({
-  id: '/download',
-  path: '/download',
+const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
+  id: '/_authenticated',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthRoute = AuthRouteImport.update({
@@ -44,34 +43,15 @@ const AuthRoute = AuthRouteImport.update({
   path: '/auth',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
-  id: '/_authenticated',
+const DownloadRoute = DownloadRouteImport.update({
+  id: '/download',
+  path: '/download',
   getParentRoute: () => rootRouteImport,
 } as any)
-const IndexRoute = IndexRouteImport.update({
-  id: '/',
-  path: '/',
+const SobreRoute = SobreRouteImport.update({
+  id: '/sobre',
+  path: '/sobre',
   getParentRoute: () => rootRouteImport,
-} as any)
-const RecordingMeetingIdRoute = RecordingMeetingIdRouteImport.update({
-  id: '/recording/$meetingId',
-  path: '/recording/$meetingId',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AuthenticatedOnboardingRoute = AuthenticatedOnboardingRouteImport.update({
-  id: '/onboarding',
-  path: '/onboarding',
-  getParentRoute: () => AuthenticatedRouteRoute,
-} as any)
-const AuthenticatedOfficeRoute = AuthenticatedOfficeRouteImport.update({
-  id: '/office',
-  path: '/office',
-  getParentRoute: () => AuthenticatedRouteRoute,
-} as any)
-const AuthenticatedMeetingsRoute = AuthenticatedMeetingsRouteImport.update({
-  id: '/meetings',
-  path: '/meetings',
-  getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedAguardandoConviteRoute =
   AuthenticatedAguardandoConviteRouteImport.update({
@@ -79,44 +59,35 @@ const AuthenticatedAguardandoConviteRoute =
     path: '/aguardando-convite',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
-const AuthenticatedWorkspacesIndexRoute =
-  AuthenticatedWorkspacesIndexRouteImport.update({
-    id: '/workspaces/',
-    path: '/workspaces/',
-    getParentRoute: () => AuthenticatedRouteRoute,
-  } as any)
+const AuthenticatedMeetingsRoute = AuthenticatedMeetingsRouteImport.update({
+  id: '/meetings',
+  path: '/meetings',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedOfficeRoute = AuthenticatedOfficeRouteImport.update({
+  id: '/office',
+  path: '/office',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedOnboardingRoute = AuthenticatedOnboardingRouteImport.update({
+  id: '/onboarding',
+  path: '/onboarding',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const RecordingMeetingIdRoute = RecordingMeetingIdRouteImport.update({
+  id: '/recording/$meetingId',
+  path: '/recording/$meetingId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthenticatedAdminIndexRoute = AuthenticatedAdminIndexRouteImport.update({
   id: '/admin/',
   path: '/admin/',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
-const ApiPublicLivekitEgressRoute = ApiPublicLivekitEgressRouteImport.update({
-  id: '/api/public/livekit-egress',
-  path: '/api/public/livekit-egress',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AuthenticatedWorkspacesNewRoute =
-  AuthenticatedWorkspacesNewRouteImport.update({
-    id: '/workspaces/new',
-    path: '/workspaces/new',
-    getParentRoute: () => AuthenticatedRouteRoute,
-  } as any)
-const AuthenticatedWorkspacesWorkspaceIdRoute =
-  AuthenticatedWorkspacesWorkspaceIdRouteImport.update({
-    id: '/workspaces/$workspaceId',
-    path: '/workspaces/$workspaceId',
-    getParentRoute: () => AuthenticatedRouteRoute,
-  } as any)
-const AuthenticatedOfficeEditorRoute =
-  AuthenticatedOfficeEditorRouteImport.update({
-    id: '/office_/editor',
-    path: '/office/editor',
-    getParentRoute: () => AuthenticatedRouteRoute,
-  } as any)
-const AuthenticatedAdminPersonagensRoute =
-  AuthenticatedAdminPersonagensRouteImport.update({
-    id: '/admin/personagens',
-    path: '/admin/personagens',
+const AuthenticatedAdminContasRoute =
+  AuthenticatedAdminContasRouteImport.update({
+    id: '/admin/contas',
+    path: '/admin/contas',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const AuthenticatedAdminEspacosRoute =
@@ -125,12 +96,41 @@ const AuthenticatedAdminEspacosRoute =
     path: '/admin/espacos',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
-const AuthenticatedAdminContasRoute =
-  AuthenticatedAdminContasRouteImport.update({
-    id: '/admin/contas',
-    path: '/admin/contas',
+const AuthenticatedAdminPersonagensRoute =
+  AuthenticatedAdminPersonagensRouteImport.update({
+    id: '/admin/personagens',
+    path: '/admin/personagens',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedOfficeEditorRoute =
+  AuthenticatedOfficeEditorRouteImport.update({
+    id: '/office_/editor',
+    path: '/office/editor',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedWorkspacesIndexRoute =
+  AuthenticatedWorkspacesIndexRouteImport.update({
+    id: '/workspaces/',
+    path: '/workspaces/',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedWorkspacesWorkspaceIdRoute =
+  AuthenticatedWorkspacesWorkspaceIdRouteImport.update({
+    id: '/workspaces/$workspaceId',
+    path: '/workspaces/$workspaceId',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedWorkspacesNewRoute =
+  AuthenticatedWorkspacesNewRouteImport.update({
+    id: '/workspaces/new',
+    path: '/workspaces/new',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const ApiPublicLivekitEgressRoute = ApiPublicLivekitEgressRouteImport.update({
+  id: '/api/public/livekit-egress',
+  path: '/api/public/livekit-egress',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -270,25 +270,11 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/sobre': {
-      id: '/sobre'
-      path: '/sobre'
-      fullPath: '/sobre'
-      preLoaderRoute: typeof SobreRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/download': {
-      id: '/download'
-      path: '/download'
-      fullPath: '/download'
-      preLoaderRoute: typeof DownloadRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/auth': {
-      id: '/auth'
-      path: '/auth'
-      fullPath: '/auth'
-      preLoaderRoute: typeof AuthRouteImport
+    '/': {
+      id: '/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authenticated': {
@@ -298,32 +284,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedRouteRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/': {
-      id: '/'
-      path: '/'
-      fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
+    '/auth': {
+      id: '/auth'
+      path: '/auth'
+      fullPath: '/auth'
+      preLoaderRoute: typeof AuthRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/recording/$meetingId': {
-      id: '/recording/$meetingId'
-      path: '/recording/$meetingId'
-      fullPath: '/recording/$meetingId'
-      preLoaderRoute: typeof RecordingMeetingIdRouteImport
+    '/download': {
+      id: '/download'
+      path: '/download'
+      fullPath: '/download'
+      preLoaderRoute: typeof DownloadRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/_authenticated/onboarding': {
-      id: '/_authenticated/onboarding'
-      path: '/onboarding'
-      fullPath: '/onboarding'
-      preLoaderRoute: typeof AuthenticatedOnboardingRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
+    '/sobre': {
+      id: '/sobre'
+      path: '/sobre'
+      fullPath: '/sobre'
+      preLoaderRoute: typeof SobreRouteImport
+      parentRoute: typeof rootRouteImport
     }
-    '/_authenticated/office': {
-      id: '/_authenticated/office'
-      path: '/office'
-      fullPath: '/office'
-      preLoaderRoute: typeof AuthenticatedOfficeRouteImport
+    '/_authenticated/aguardando-convite': {
+      id: '/_authenticated/aguardando-convite'
+      path: '/aguardando-convite'
+      fullPath: '/aguardando-convite'
+      preLoaderRoute: typeof AuthenticatedAguardandoConviteRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/meetings': {
@@ -333,19 +319,26 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedMeetingsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
-    '/_authenticated/aguardando-convite': {
-      id: '/_authenticated/aguardando-convite'
-      path: '/aguardando-convite'
-      fullPath: '/aguardando-convite'
-      preLoaderRoute: typeof AuthenticatedAguardandoConviteRouteImport
+    '/_authenticated/office': {
+      id: '/_authenticated/office'
+      path: '/office'
+      fullPath: '/office'
+      preLoaderRoute: typeof AuthenticatedOfficeRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
-    '/_authenticated/workspaces/': {
-      id: '/_authenticated/workspaces/'
-      path: '/workspaces'
-      fullPath: '/workspaces/'
-      preLoaderRoute: typeof AuthenticatedWorkspacesIndexRouteImport
+    '/_authenticated/onboarding': {
+      id: '/_authenticated/onboarding'
+      path: '/onboarding'
+      fullPath: '/onboarding'
+      preLoaderRoute: typeof AuthenticatedOnboardingRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/recording/$meetingId': {
+      id: '/recording/$meetingId'
+      path: '/recording/$meetingId'
+      fullPath: '/recording/$meetingId'
+      preLoaderRoute: typeof RecordingMeetingIdRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/_authenticated/admin/': {
       id: '/_authenticated/admin/'
@@ -354,39 +347,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
-    '/api/public/livekit-egress': {
-      id: '/api/public/livekit-egress'
-      path: '/api/public/livekit-egress'
-      fullPath: '/api/public/livekit-egress'
-      preLoaderRoute: typeof ApiPublicLivekitEgressRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/_authenticated/workspaces/new': {
-      id: '/_authenticated/workspaces/new'
-      path: '/workspaces/new'
-      fullPath: '/workspaces/new'
-      preLoaderRoute: typeof AuthenticatedWorkspacesNewRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/workspaces/$workspaceId': {
-      id: '/_authenticated/workspaces/$workspaceId'
-      path: '/workspaces/$workspaceId'
-      fullPath: '/workspaces/$workspaceId'
-      preLoaderRoute: typeof AuthenticatedWorkspacesWorkspaceIdRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/office_/editor': {
-      id: '/_authenticated/office_/editor'
-      path: '/office/editor'
-      fullPath: '/office/editor'
-      preLoaderRoute: typeof AuthenticatedOfficeEditorRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/admin/personagens': {
-      id: '/_authenticated/admin/personagens'
-      path: '/admin/personagens'
-      fullPath: '/admin/personagens'
-      preLoaderRoute: typeof AuthenticatedAdminPersonagensRouteImport
+    '/_authenticated/admin/contas': {
+      id: '/_authenticated/admin/contas'
+      path: '/admin/contas'
+      fullPath: '/admin/contas'
+      preLoaderRoute: typeof AuthenticatedAdminContasRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/admin/espacos': {
@@ -396,12 +361,47 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminEspacosRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
-    '/_authenticated/admin/contas': {
-      id: '/_authenticated/admin/contas'
-      path: '/admin/contas'
-      fullPath: '/admin/contas'
-      preLoaderRoute: typeof AuthenticatedAdminContasRouteImport
+    '/_authenticated/admin/personagens': {
+      id: '/_authenticated/admin/personagens'
+      path: '/admin/personagens'
+      fullPath: '/admin/personagens'
+      preLoaderRoute: typeof AuthenticatedAdminPersonagensRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/office_/editor': {
+      id: '/_authenticated/office_/editor'
+      path: '/office/editor'
+      fullPath: '/office/editor'
+      preLoaderRoute: typeof AuthenticatedOfficeEditorRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/workspaces/': {
+      id: '/_authenticated/workspaces/'
+      path: '/workspaces'
+      fullPath: '/workspaces/'
+      preLoaderRoute: typeof AuthenticatedWorkspacesIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/workspaces/$workspaceId': {
+      id: '/_authenticated/workspaces/$workspaceId'
+      path: '/workspaces/$workspaceId'
+      fullPath: '/workspaces/$workspaceId'
+      preLoaderRoute: typeof AuthenticatedWorkspacesWorkspaceIdRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/workspaces/new': {
+      id: '/_authenticated/workspaces/new'
+      path: '/workspaces/new'
+      fullPath: '/workspaces/new'
+      preLoaderRoute: typeof AuthenticatedWorkspacesNewRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/api/public/livekit-egress': {
+      id: '/api/public/livekit-egress'
+      path: '/api/public/livekit-egress'
+      fullPath: '/api/public/livekit-egress'
+      preLoaderRoute: typeof ApiPublicLivekitEgressRouteImport
+      parentRoute: typeof rootRouteImport
     }
   }
 }
