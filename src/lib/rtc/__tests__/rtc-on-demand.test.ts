@@ -633,6 +633,28 @@ describe("Cliente parado reage só ao Presence remoto", () => {
     await B.rt.dispose();
   });
 
+  it("1/2/3. sala com 3: C sai → C perde a Room já; A e B seguem conectados", async () => {
+    const bus = phoenixBus(true);
+    const A = mk("a", bus.transport("a"));
+    const B = mk("b", bus.transport("b"));
+    const C = mk("c", bus.transport("c"));
+    for (const x of [A, B, C]) {
+      x.rt.start();
+      x.rt.setSelfPosition(REUNIAO.x, REUNIAO.y);
+    }
+    await settle(400);
+    for (const x of [A, B, C]) expect(x.rt.getSnapshot().roomStatus).toBe("CONNECTED");
+    C.rt.setSelfPosition(LOBBY.x, LOBBY.y);
+    await settle(50);
+    expect(C.rt.getSnapshot().room.connected?.kind).not.toBe("PRIVATE_ROOM");
+    await settle(400);
+    for (const x of [A, B]) {
+      expect(x.rt.getSnapshot().demand).toEqual({ kind: "PRIVATE", zoneId: "reuniao" });
+      expect(x.rt.getSnapshot().roomStatus).toBe("CONNECTED");
+    }
+    for (const x of [A, B, C]) await x.rt.dispose();
+  });
+
   it("track do próprio mediaLocation sem mudança real não dispara nova reavaliação em loop", async () => {
     const bus = phoenixBus(false);
     const A = mk("a", bus.transport("a"));
