@@ -498,3 +498,130 @@ describe("Wake de sala idle exclusivamente via Presence", () => {
     await B.dispose();
   });
 });
+
+// ─── Cliente parado reage a Presence remoto (semântica Phoenix) ──
+
+describe("Cliente parado reage só ao Presence remoto", () => {
+  /**
+   * Bus no estilo Phoenix: track() de uma chave ACRESCENTA o meta novo ao fim
+   * e só depois remove o antigo (diff de join antes do leave). O cliente
+   * remoto pode observar, por um instante ou de forma persistente (meta
+   * duplicado de outra aba/conexão), dois metas com a mesma generation.
+   */
+  function phoenixBus(keepStale: boolean) {
+    const state: Record<string, PresencePayload[]> = {};
+    const subs: Array<Parameters<PresenceTransport["open"]>[0]> = [];
+    const broadcast = () => {
+      const snap = Object.fromEntries(Object.entries(state).map(([k, v]) => [k, [...v]]));
+      for (const s of subs) queueMicrotask(() => s.onPresence("sync", snap));
+    };
+    const transport = (uid: string): PresenceTransport => ({
+      open(h) {
+        subs.push(h);
+        queueMicrotask(() => h.onSubscribed());
+        return {
+          track: (p) => {
+            const prev = state[uid] ?? [];
+            state[uid] = keepStale ? [...prev.slice(-1), p as PresencePayload] : [p as PresencePayload];
+            broadcast();
+          },
+          untrack: () => {
+            delete state[uid];
+            broadcast();
+          },
+          close: () => {},
+        };
+      },
+    });
+    return { transport };
+  }
+
+  function mk(uid: string, presenceTransport: PresenceTransport) {
+    const tokens: TokenV2Request[] = [];
+    const rt = new RtcV2Runtime(
+      { userId: uid, workspaceId: "ws", sessionId: uid, generation: 1 },
+      {
+        fetchToken: async (req) => {
+          tokens.push(req);
+          return { url: "wss://x", token: "t" };
+        },
+        roomFactory: () => new FakeRoom() as unknown as V2Room,
+        capture: {
+          createMicrophoneTrack: async () => fakeTrack("microphone"),
+          createCameraTrack: async () => fakeTrack("camera"),
+          createScreenTracks: async () => [],
+        },
+        movementTransport: {
+          open(h) {
+            queueMicrotask(() => h.onSubscribed(false));
+            return { send: () => {}, close: () => {} };
+          },
+        },
+        presenceTransport,
+        refreshMap: () => {},
+        onDemandMode: "private",
+        soloGraceMs: 15_000,
+      },
+    );
+    rt.setMap({ state: "READY", version: 1, map: null });
+    return { rt, tokens };
+  }
+
+  it("A parado em PRIVATE(X); B entra (meta obsoleto antes do novo) → A recalcula 2 e vai a PRIVATE", async () => {
+    const bus = phoenixBus(true);
+    const A = mk("a", bus.transport("a"));
+    A.rt.start();
+    A.rt.setSelfPosition(REUNIAO.x, REUNIAO.y);
+    await settle(400);
+    expect(A.rt.getSnapshot().demand).toEqual({ kind: "NONE" });
+
+    // B entra no LOBBY e depois na sala: o Presence de B passa a ter
+    // [LOBBY (obsoleto), PRIVATE:reuniao (novo)] com a mesma generation.
+    const B = mk("b", bus.transport("b"));
+    B.rt.start();
+    B.rt.setSelfPosition(LOBBY.x, LOBBY.y);
+    await settle(400);
+    B.rt.setSelfPosition(REUNIAO.x, REUNIAO.y);
+    await settle(400);
+
+    // A não se moveu: só o Presence remoto mudou.
+    expect(A.rt.getSnapshot().demand).toEqual({ kind: "PRIVATE", zoneId: "reuniao" });
+    expect(B.rt.getSnapshot().demand).toEqual({ kind: "PRIVATE", zoneId: "reuniao" });
+    expect(A.tokens.filter((t) => t.context === "PRIVATE_ROOM").length).toBe(1);
+    await A.rt.dispose();
+    await B.rt.dispose();
+  });
+
+  it("A e B em PRIVATE(X); B sai → A parado arma grace e após 15s vai a NONE", async () => {
+    const bus = phoenixBus(true);
+    const A = mk("a", bus.transport("a"));
+    const B = mk("b", bus.transport("b"));
+    A.rt.start();
+    B.rt.start();
+    A.rt.setSelfPosition(REUNIAO.x, REUNIAO.y);
+    B.rt.setSelfPosition(REUNIAO.x, REUNIAO.y);
+    await settle(400);
+    expect(A.rt.getSnapshot().demand).toEqual({ kind: "PRIVATE", zoneId: "reuniao" });
+
+    B.rt.setSelfPosition(LOBBY.x, LOBBY.y);
+    await settle(400);
+    expect(A.rt.demand.isGraceArmed()).toBe(true);
+    expect(A.rt.getSnapshot().demand.kind).toBe("PRIVATE");
+    await settle(15_000);
+    expect(A.rt.getSnapshot().demand).toEqual({ kind: "NONE" });
+    await A.rt.dispose();
+    await B.rt.dispose();
+  });
+
+  it("track do próprio mediaLocation sem mudança real não dispara nova reavaliação em loop", async () => {
+    const bus = phoenixBus(false);
+    const A = mk("a", bus.transport("a"));
+    A.rt.start();
+    A.rt.setSelfPosition(REUNIAO.x, REUNIAO.y);
+    await settle(400);
+    const rev = A.rt.presence.revision;
+    await settle(2000);
+    expect(A.rt.presence.revision).toBe(rev);
+    await A.rt.dispose();
+  });
+});
