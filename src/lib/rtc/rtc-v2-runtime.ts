@@ -42,7 +42,12 @@ import { RemoteMedia, type RemoteMediaSnapshot, type RemoteRoomLike } from "./re
 import { AudioDiagnostics, type DiagTimers } from "./rtc-audio-diagnostics";
 import { RtcTelemetry, type TelemetryAdapter } from "./rtc-telemetry";
 import { isMapVersionStaleError } from "./rtc-telemetry-types";
-import { SpatialSubscriptions, type SpatialRoomLike } from "./spatial-subscriptions";
+import {
+  SpatialSubscriptions,
+  computeNearby,
+  type Position,
+  type SpatialRoomLike,
+} from "./spatial-subscriptions";
 import { PrivacyGuard, type PrivacyGuardTimers } from "./privacy-guard";
 import {
   RtcDemandController,
@@ -106,6 +111,7 @@ export interface RtcV2Deps {
   onDemandMode?: RtcOnDemandMode;
   demandTimers?: TimerApi;
   soloGraceMs?: number;
+  lobbyGraceMs?: number;
 }
 
 export interface RtcV2Snapshot {
@@ -127,6 +133,8 @@ export interface RtcV2Snapshot {
   demand: RtcDemand;
   /** Sozinho numa sala privada sem LiveKit (estado neutro, não é erro). */
   awaitingPeer: boolean;
+  /** Fase 2: no corredor sem ninguém próximo e sem LiveKit (estado neutro). */
+  lobbyIdle: boolean;
   disposed: boolean;
 }
 
@@ -168,6 +176,9 @@ export class RtcV2Runtime {
   private selfPos: { x: number; y: number } | null = null;
   private idleTimer: unknown = null;
   private lastInRangeKey = "";
+  /** Fase 2: peers próximos no lobby (estado da histerese compartilhada). */
+  private lobbyNear = new Set<string>();
+  private lastNearKey = "";
   private snap: RtcV2Snapshot;
   private listeners = new Set<() => void>();
   private unsubs: Array<() => void> = [];
@@ -257,6 +268,7 @@ export class RtcV2Runtime {
       mode: deps.onDemandMode ?? "off",
       timers: deps.demandTimers ?? this.timers,
       graceMs: deps.soloGraceMs,
+      lobbyGraceMs: deps.lobbyGraceMs,
       telemetry: sink,
     });
     this.snap = this.build();
@@ -289,6 +301,7 @@ export class RtcV2Runtime {
       }),
       this.movement.subscribe((states) => {
         for (const [uid, st] of states) this.spatial.setRemotePosition(uid, { x: st.x, y: st.y });
+        this.reevaluateLobbyIfChanged();
         this.emit();
       }),
       this.presence.subscribe(() => {
@@ -358,6 +371,7 @@ export class RtcV2Runtime {
       this.movement.updateLocal(x, y, 0, 0);
       if (this.started) this.startMovement();
     }
+    this.reevaluateLobbyIfChanged();
     this.emitIfRangeChanged();
   }
 
@@ -430,13 +444,55 @@ export class RtcV2Runtime {
       // zoneId vem só do MEU contexto; outros servem apenas para contar.
       occupants = countOccupants(this.config.userId, ctx.zoneId, this.presence.getRoster().values(), live);
     }
+    const nearby = this.computeLobbyNearby();
+    const cs = this.context.getSnapshot();
     this.demand.update({
       context: ctx,
       occupants,
       recordingActive: this.recordingActive,
       roomStatus: this.rooms.getSnapshot().status,
+      nearbyLobbyPeers: nearby,
+      contextStable: this.selfPos != null && cs.state !== "CANDIDATE_PRIVATE_ROOM",
     });
     this.traceDemand(occupants);
+  }
+
+  /**
+   * Fase 2: quantos peers online do lobby estão no alcance, usando a MESMA
+   * histerese do SpatialSubscriptions. Posições vêm só do Movement (Broadcast);
+   * Presence só filtra quem está online e fora de sala privada.
+   */
+  private computeLobbyNearby(): number {
+    if (this.demand.mode !== "all" || this.context.getSnapshot().context.kind !== "LOBBY") {
+      this.lobbyNear.clear();
+      this.lastNearKey = "";
+      return 0;
+    }
+    const roster = this.presence.getRoster();
+    const remotes: Array<[string, Position]> = [];
+    for (const [uid, st] of this.movement.getRemoteStates()) {
+      if (uid === this.config.userId) continue;
+      if (roster.size > 0) {
+        const p = roster.get(uid);
+        if (!p) continue; // não está online
+        if (p.mediaLocation?.startsWith("PRIVATE:")) continue; // está numa sala
+      }
+      remotes.push([uid, { x: st.x, y: st.y }]);
+    }
+    this.lobbyNear = computeNearby(this.selfPos, remotes, this.lobbyNear);
+    this.lastNearKey = [...this.lobbyNear].sort().join(",");
+    return this.lobbyNear.size;
+  }
+
+  /** Reavalia só quando o conjunto de próximos muda (movimento a 60 FPS não gera churn). */
+  private reevaluateLobbyIfChanged(): void {
+    if (this.disposed || !this.started || this.demand.mode !== "all") return;
+    const before = this.lastNearKey;
+    const prev = new Set(this.lobbyNear);
+    this.computeLobbyNearby();
+    if (this.lastNearKey === before) return;
+    this.lobbyNear = prev; // reevaluateDemand recalcula a partir do estado anterior
+    this.reevaluateDemand();
   }
 
   private lastTraceOccupants = 1;
@@ -470,6 +526,8 @@ export class RtcV2Runtime {
         activeContext: fmt(r.connected),
         desiredContext: fmt(r.desired),
         soloGraceState: this.demand.isGraceArmed() ? "ARMED" : "IDLE",
+        nearbyLobbyPeerCount: this.lobbyNear.size,
+        lobbyGraceState: this.demand.isLobbyGraceArmed() ? "ARMED" : "IDLE",
         recordingActive: this.recordingActive,
       });
     } catch {
@@ -481,7 +539,7 @@ export class RtcV2Runtime {
     if (this.demand.mode === "off") return;
     this.rooms.setDesiredContext(demandToContext(d));
     const ctx = this.context.getSnapshot().context;
-    if (d.kind === "NONE" && ctx.kind === "PRIVATE_ROOM") void this.local.suspendCapture();
+    if (d.kind === "NONE" && ctx.kind !== "OFFLINE") void this.local.suspendCapture();
     else if (this.local.isCaptureSuspended()) void this.local.resumeCapture();
     this.emit();
     this.traceDemand();
@@ -628,6 +686,11 @@ export class RtcV2Runtime {
         this.demand.mode !== "off" &&
         this.demand.getDemand().kind === "NONE" &&
         this.context.getSnapshot().context.kind === "PRIVATE_ROOM",
+      lobbyIdle:
+        !!this.demand &&
+        this.demand.mode === "all" &&
+        this.demand.getDemand().kind === "NONE" &&
+        this.context.getSnapshot().context.kind === "LOBBY",
       disposed: this.disposed,
     };
   }

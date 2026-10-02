@@ -3747,6 +3747,7 @@ export function OfficeScene({
               let label = "Desconectado";
               let title = rtc.lastError ?? "";
               if (rtc.v2?.awaitingPeer) { dot = "bg-slate-400"; label = "Aguardando outro participante"; title = ""; }
+              else if (rtc.v2?.lobbyIdle) { dot = "bg-slate-400"; label = "Disponível"; title = ""; }
               else if (s === "connecting") { dot = "bg-amber-400 animate-pulse"; label = "Conectando…"; }
               else if (s === "reconnecting") { dot = "bg-amber-400 animate-pulse"; label = "Reconectando…"; }
               else if (s === "error") { dot = "bg-red-500"; label = "Erro de conexão"; title = rtc.lastError ?? "Falha no LiveKit"; }

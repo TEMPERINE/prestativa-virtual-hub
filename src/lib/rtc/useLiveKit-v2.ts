@@ -49,6 +49,8 @@ export interface RtcV2Controls {
   privacyKeepOff: () => void;
   /** RTC On Demand: sozinho em sala privada, sem LiveKit. */
   awaitingPeer: boolean;
+  /** Fase 2: corredor sem ninguém próximo, LiveKit desligado (neutro). */
+  lobbyIdle: boolean;
   /** Participantes humanos remotos na Room atual (meeting tracker). */
   remoteCount: number;
   setRecordingActive: (active: boolean) => void;
@@ -377,6 +379,7 @@ export function useLiveKitV2(
       privacyRestore: () => runtime.privacy.restore(),
       privacyKeepOff: () => runtime.privacy.keepOff(),
       awaitingPeer: snap.awaitingPeer,
+      lobbyIdle: snap.lobbyIdle,
       remoteCount: snap.remote.participants.length,
       setRecordingActive: (a) => runtime.setRecordingActive(a),
     };
