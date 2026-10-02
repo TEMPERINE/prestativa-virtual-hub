@@ -473,7 +473,10 @@ describe("Wake de sala idle exclusivamente via Presence", () => {
     await settle(400);
     expect(A.getSnapshot().context).toEqual(P("reuniao"));
     expect(A.getSnapshot().demand).toEqual({ kind: "NONE" });
-    expect(rooms.a.length).toBe(0);
+    // Nenhuma Room ativa para A (uma Room de lobby transitória antes da zona confirmar é o comportamento atual).
+    expect(A.getSnapshot().room.connected).toBeNull();
+    expect(A.getSnapshot().roomStatus).toBe("DISCONNECTED");
+    const aRoomsBefore = rooms.a.length;
     expect(tokens.a.filter((t) => t.context === "PRIVATE_ROOM")).toEqual([]);
 
     const B = mk("b");
@@ -488,9 +491,9 @@ describe("Wake de sala idle exclusivamente via Presence", () => {
       expect(rt.getSnapshot().room.connected).toEqual(P("reuniao"));
       expect(rt.getSnapshot().remote.participants.length).toBe(0);
     }
-    expect(rooms.a.length).toBe(1);
-    expect(rooms.b.length).toBe(1);
+    expect(rooms.a.length).toBe(aRoomsBefore + 1);
     expect(tokens.a.filter((t) => t.context === "PRIVATE_ROOM").length).toBe(1);
+    expect(tokens.b.filter((t) => t.context === "PRIVATE_ROOM").length).toBe(1);
     await A.dispose();
     await B.dispose();
   });
