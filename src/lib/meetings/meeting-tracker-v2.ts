@@ -25,6 +25,12 @@ import type { RoomManagerStatus } from "@/lib/rtc/livekit-room-manager";
 export interface MeetingRoomState {
   status: RoomManagerStatus | null;
   connected: MediaContext | null;
+  /**
+   * RTC On Demand: participantes humanos remotos na Room. Quando informado,
+   * a reunião só começa com >= 1 remoto (2 humanos). Já iniciada, permanece
+   * até a Room cair (o grace de 15s / gravação ficam no controlador de demanda).
+   */
+  remoteCount?: number;
 }
 
 export const RETRY_DELAYS_MS = [1000, 3000, 8000] as const;
@@ -68,7 +74,9 @@ export class MeetingTrackerV2 {
     const zone =
       s?.connected?.kind === "PRIVATE_ROOM" ? (s.connected as { zoneId: string }).zoneId : null;
     let next: string | null = null;
-    if (zone && s?.status === "CONNECTED") next = zone;
+    const canJoin =
+      s?.remoteCount === undefined || s.remoteCount > 0 || (zone !== null && zone === this.joinedZone);
+    if (zone && s?.status === "CONNECTED" && canJoin) next = zone;
     else if (zone && s?.status === "RECONNECTING" && zone === this.desired) next = zone;
     const wasConnected = this.connectedNow;
     this.connectedNow = next !== null && s?.status === "CONNECTED";
