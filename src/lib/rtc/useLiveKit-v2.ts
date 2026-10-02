@@ -3,6 +3,7 @@
  * contrato público de useLiveKit (RtcMeshState). Só coordena; a lógica está
  * nos módulos RTC v2. Um runtime por (usuário, workspace, sessão, generation).
  */
+import { loadMicPreference, reconcileAcquiredMic, saveMicPreference } from "./mic-preference";
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import type { RtcConnectionStatus, RtcMeshState } from "./useLiveKit-v1";
 import { RtcV2Runtime, createV2RoomFactory, type RtcV2Snapshot } from "./rtc-v2-runtime";
@@ -48,6 +49,8 @@ export interface RtcV2Controls {
   privacyKeepOff: () => void;
   /** RTC On Demand: sozinho em sala privada, sem LiveKit. */
   awaitingPeer: boolean;
+  /** Fase 2: corredor sem ninguém próximo, LiveKit desligado (neutro). */
+  lobbyIdle: boolean;
   /** Participantes humanos remotos na Room atual (meeting tracker). */
   remoteCount: number;
   setRecordingActive: (active: boolean) => void;
@@ -126,6 +129,15 @@ export function useLiveKitV2(
   const selectionRef = useRef(selection);
   selectionRef.current = selection;
 
+  // Último mic escolhido neste navegador (só o deviceId; mic continua OFF no login).
+  useEffect(() => {
+    if (!myId) return;
+    const saved = loadMicPreference(myId);
+    if (!saved || selectionRef.current.audioInput) return;
+    selectionRef.current = { ...selectionRef.current, audioInput: saved };
+    setSelection((s) => (s.audioInput ? s : { ...s, audioInput: saved }));
+  }, [myId]);
+
   const refreshDevices = useCallback(async () => {
     const d = await enumerateV2Devices();
     setVideoDevices(d.video);
@@ -183,7 +195,16 @@ export function useLiveKitV2(
           {
             fetchToken: (req) => tokenMod.getLiveKitTokenV2({ data: req }),
             roomFactory: factory,
-            capture: createV2CaptureAdapter(() => selectionRef.current),
+            capture: withMicPreference(
+              createV2CaptureAdapter(() => selectionRef.current),
+              (acquired) => {
+                const eff = reconcileAcquiredMic(myId, selectionRef.current.audioInput, acquired);
+                if (eff && eff !== selectionRef.current.audioInput) {
+                  selectionRef.current = { ...selectionRef.current, audioInput: eff };
+                  setSelection((s) => ({ ...s, audioInput: eff }));
+                }
+              },
+            ),
             movementTransport: movementMod.createSupabaseMovementTransport(
               supabase,
               cfg.workspaceId,
@@ -310,7 +331,8 @@ export function useLiveKitV2(
     const rt = runtimeRef.current;
     // Etapa 14B: troca a fonte na MESMA track/publicação (sem OFF/ON).
     if (rt) await rt.local.setMicrophoneDevice(deviceId);
-  }, []);
+    if (myId) saveMicPreference(myId, deviceId);
+  }, [myId]);
   const setAudioOutputDevice = useCallback(async (deviceId: string) => {
     setSelection((s) => ({ ...s, audioOutput: deviceId }));
     try {
@@ -357,6 +379,7 @@ export function useLiveKitV2(
       privacyRestore: () => runtime.privacy.restore(),
       privacyKeepOff: () => runtime.privacy.keepOff(),
       awaitingPeer: snap.awaitingPeer,
+      lobbyIdle: snap.lobbyIdle,
       remoteCount: snap.remote.participants.length,
       setRecordingActive: (a) => runtime.setRecordingActive(a),
     };
@@ -423,4 +446,24 @@ export function useLiveKitV2(
       v2,
     ],
   );
+}
+
+/** Após cada captura de mic bem-sucedida, informa o deviceId que realmente funcionou. */
+function withMicPreference(
+  base: ReturnType<typeof createV2CaptureAdapter>,
+  onAcquired: (deviceId: string | null) => void,
+): ReturnType<typeof createV2CaptureAdapter> {
+  return {
+    ...base,
+    async createMicrophoneTrack() {
+      const t = await base.createMicrophoneTrack();
+      try {
+        const mst = (t as { mediaStreamTrack?: MediaStreamTrack }).mediaStreamTrack;
+        onAcquired(mst?.getSettings?.().deviceId ?? null);
+      } catch {
+        /* preferência nunca quebra a captura */
+      }
+      return t;
+    },
+  };
 }

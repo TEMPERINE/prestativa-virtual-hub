@@ -33,6 +33,33 @@ export function spatialDistance(a: Position, b: Position): number {
   return Math.hypot(b.x - a.x, b.y - a.y);
 }
 
+/**
+ * Critério geométrico ÚNICO (histerese) — usado pelo SpatialSubscriptions e
+ * pela decisão de acordar o lobby (RTC On Demand). Nunca duplicar raios.
+ */
+export function withinSpatialRange(
+  dist: number,
+  wasInside: boolean,
+  connectR = CONNECT_RADIUS,
+  disconnectR = DISCONNECT_RADIUS,
+): boolean {
+  return wasInside ? dist <= disconnectR : dist <= connectR;
+}
+
+/** Conjunto de userIds próximos, aplicando a mesma histerese. Pura. */
+export function computeNearby(
+  local: Position | null,
+  remotes: Iterable<[string, Position]>,
+  prevInside: ReadonlySet<string>,
+): Set<string> {
+  const out = new Set<string>();
+  if (!local) return out;
+  for (const [uid, pos] of remotes) {
+    if (withinSpatialRange(spatialDistance(local, pos), prevInside.has(uid))) out.add(uid);
+  }
+  return out;
+}
+
 export interface SubscribablePublicationLike {
   readonly trackSid: string;
   readonly source?: string;
@@ -170,7 +197,7 @@ export class SpatialSubscriptions {
     const them = this.remote.get(userId);
     if (!me || !them) return false; // sem posição → fora, por segurança
     const d = spatialDistance(me, them);
-    return this.inside.has(userId) ? d <= this.disconnectR : d <= this.connectR;
+    return withinSpatialRange(d, this.inside.has(userId), this.connectR, this.disconnectR);
   }
 
   private reconcileParticipant(p: SpatialParticipantLike) {

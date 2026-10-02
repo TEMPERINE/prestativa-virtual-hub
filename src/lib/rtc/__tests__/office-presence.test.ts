@@ -83,6 +83,7 @@ describe("OfficePresence", () => {
     expect(Object.keys(p).sort()).toEqual([
       "generation",
       "joinedAt",
+      "presenceRevision",
       "sessionId",
       "userId",
       "workspaceId",

@@ -21,6 +21,25 @@ export interface PresencePayload {
   joinedAt: string;
   /** RTC On Demand: "LOBBY" | "PRIVATE:<zoneId>". Sem coordenadas. */
   mediaLocation?: string;
+  /**
+   * Contador monotônico da sessão: começa em 1 e só incrementa quando um
+   * estado publicado relevante muda (hoje: mediaLocation). Sem heartbeat,
+   * sem timer, nunca por movimento. Desempata metas com a mesma generation.
+   */
+  presenceRevision?: number;
+}
+
+/** Meta `a` deve substituir `cur` (mesmo userId)? Determinístico. */
+export function presenceMetaWins(a: PresencePayload, cur: PresencePayload | undefined): boolean {
+  if (!cur) return true;
+  if (a.generation !== cur.generation) return a.generation > cur.generation;
+  const ra = typeof a.presenceRevision === "number" ? a.presenceRevision : null;
+  const rc = typeof cur.presenceRevision === "number" ? cur.presenceRevision : null;
+  if (ra != null && rc != null && ra !== rc) return ra > rc;
+  if (ra != null && rc == null) return true;
+  if (ra == null && rc != null) return false;
+  // Fallback defensivo (metas antigas sem revision): ordem de chegada.
+  return true;
 }
 
 export type PresenceState = Record<string, PresencePayload[]>;
@@ -85,6 +104,7 @@ export class OfficePresence {
       generation: opts.self.generation,
       workspaceId: opts.self.workspaceId,
       joinedAt: opts.self.joinedAt ?? new Date().toISOString(),
+      presenceRevision: 1,
     };
     this.transport = opts.transport;
     this.cooldownMs = opts.rejoinCooldownMs ?? PRESENCE_REJOIN_COOLDOWN_MS;
@@ -108,6 +128,7 @@ export class OfficePresence {
     const next = loc ?? undefined;
     if (this.disposed || this.payload.mediaLocation === next) return;
     this.payload.mediaLocation = next;
+    this.payload.presenceRevision = (this.payload.presenceRevision ?? 1) + 1;
     if (this._status === "ONLINE" && this.handle) {
       const myEpoch = this.epoch;
       void Promise.resolve(this.handle.track({ ...this.payload })).catch((e) =>
@@ -192,10 +213,8 @@ export class OfficePresence {
       for (const m of metas ?? []) {
         if (!m || typeof m.userId !== "string") continue;
         const cur = next.get(m.userId);
-        // Empate de generation: o meta MAIS RECENTE vence (Phoenix acrescenta
-        // metas novos ao fim). Antes o primeiro (possivelmente obsoleto, sem
-        // mediaLocation atual) vencia e o cliente parado nunca via a mudança.
-        if (!cur || m.generation >= cur.generation) {
+        // generation > presenceRevision > ordem de chegada (só p/ metas antigos).
+        if (presenceMetaWins(m, cur)) {
           next.set(m.userId, {
             userId: m.userId,
             sessionId: m.sessionId,
@@ -203,6 +222,9 @@ export class OfficePresence {
             workspaceId: m.workspaceId,
             joinedAt: m.joinedAt,
             ...(typeof m.mediaLocation === "string" ? { mediaLocation: m.mediaLocation } : {}),
+            ...(typeof m.presenceRevision === "number"
+              ? { presenceRevision: m.presenceRevision }
+              : {}),
           });
         }
       }

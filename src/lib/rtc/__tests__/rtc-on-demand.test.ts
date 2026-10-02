@@ -45,7 +45,7 @@ describe("flag", () => {
     expect(parseRtcOnDemand(undefined)).toBe("off");
     expect(parseRtcOnDemand("lixo")).toBe("off");
     expect(parseRtcOnDemand("PRIVATE")).toBe("private");
-    expect(parseRtcOnDemand("all")).toBe("private"); // fallback Fase 1
+    expect(parseRtcOnDemand("all")).toBe("all");
   });
 });
 

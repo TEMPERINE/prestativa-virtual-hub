@@ -24,6 +24,8 @@ export interface RtcDemandTraceSnapshot {
   activeContext: string;
   desiredContext: string;
   soloGraceState: "ARMED" | "IDLE";
+  nearbyLobbyPeerCount?: number;
+  lobbyGraceState?: "ARMED" | "IDLE";
   recordingActive: boolean;
 }
 
