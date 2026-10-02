@@ -266,7 +266,11 @@ export class RtcV2Runtime {
     this.started = true;
     this.unsubs.push(
       this.demand.subscribe((d) => this.onDemand(d)),
-      this.context.subscribe(() => this.reevaluateDemand()),
+      this.context.subscribe((s) => {
+        // off: exatamente o caminho anterior (contexto → RoomManager).
+        if (this.demand.mode === "off") this.rooms.setDesiredContext(s.context);
+        else this.reevaluateDemand();
+      }),
       this.rooms.subscribe((s) => {
         this.onRooms(s);
         this.reevaluateDemand();
@@ -404,9 +408,9 @@ export class RtcV2Runtime {
 
   private reevaluateDemand(): void {
     if (this.disposed) return;
+    if (this.demand.mode === "off") return;
     const ctx = this.context.getSnapshot().context;
-    const on = this.demand.mode !== "off";
-    if (on) {
+    {
       this.presence.setMediaLocation(
         ctx.kind === "PRIVATE_ROOM" ? `PRIVATE:${ctx.zoneId}` : ctx.kind === "LOBBY" ? "LOBBY" : null,
       );
@@ -429,12 +433,11 @@ export class RtcV2Runtime {
       recordingActive: this.recordingActive,
       roomStatus: this.rooms.getSnapshot().status,
     });
-    if (!on) this.rooms.setDesiredContext(demandToContext(this.demand.getDemand()));
   }
 
   private onDemand(d: RtcDemand): void {
-    this.rooms.setDesiredContext(demandToContext(d));
     if (this.demand.mode === "off") return;
+    this.rooms.setDesiredContext(demandToContext(d));
     const ctx = this.context.getSnapshot().context;
     if (d.kind === "NONE" && ctx.kind === "PRIVATE_ROOM") void this.local.suspendCapture();
     else if (this.local.isCaptureSuspended()) void this.local.resumeCapture();
