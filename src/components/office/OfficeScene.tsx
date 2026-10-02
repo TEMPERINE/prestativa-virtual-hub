@@ -3586,19 +3586,19 @@ export function OfficeScene({
           role="alertdialog"
           translate="no"
           data-testid="privacy-guard-prompt"
-          aria-label="Dispositivos pausados por privacidade"
+          aria-label="Câmera pausada por privacidade"
           className="fixed bottom-24 left-1/2 z-50 w-[min(92vw,420px)] -translate-x-1/2 rounded-xl border border-border bg-card p-4 text-card-foreground shadow-lg"
         >
-          <p className="text-sm font-semibold">Dispositivos pausados por privacidade</p>
+          <p className="text-sm font-semibold">Câmera pausada por privacidade</p>
           <p className="mt-1 text-xs text-muted-foreground">
-            Seu microfone e/ou câmera foram desligados porque o Prestativa Office ficou em segundo plano.
+            Sua câmera foi desligada porque o Prestativa Office ficou em segundo plano.
           </p>
           <div className="mt-3 flex justify-end gap-2">
             <Button size="sm" variant="ghost" onClick={() => rtc.v2?.privacyKeepOff()}>
-              Manter desligados
+              Manter desligada
             </Button>
             <Button size="sm" onClick={() => void rtc.v2?.privacyRestore()}>
-              Reativar dispositivos
+              Reativar câmera
             </Button>
           </div>
         </div>

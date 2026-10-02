@@ -56,7 +56,8 @@ describe("MeetingStage não toca RTC", () => {
 describe("Privacy Guard prompt", () => {
   const scene = readFileSync("src/components/office/OfficeScene.tsx", "utf8");
   it("texto fixo exato e protegido contra tradução automática", () => {
-    expect(scene).toMatch(/>\s*Reativar dispositivos\s*</);
+    expect(scene).toMatch(/>\s*Reativar câmera\s*</);
+    expect(scene).not.toMatch(/Reativar o leão|Dispositivos pausados/);
     expect(scene).toMatch(/role="alertdialog"\s*\n\s*translate="no"/);
     expect(readFileSync("src/routes/__root.tsx", "utf8")).toContain('lang="pt-BR"');
   });

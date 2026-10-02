@@ -227,13 +227,8 @@ export class RtcV2Runtime {
     });
     this.privacy = new PrivacyGuard(
       {
-        isMicOn: () => this.local.getSnapshot().microphone.intent,
+        // Somente câmera: o guard não recebe acesso ao microfone nem ao screen share.
         isCamOn: () => this.local.getSnapshot().camera.intent,
-        isScreenSharing: () => {
-          const st = this.local.getSnapshot().screenShare.status;
-          return st === "on" || st === "starting";
-        },
-        setMic: (on) => this.local.setMicrophoneEnabled(on),
         setCam: (on) => this.local.setCameraEnabled(on),
       },
       { telemetry: sink, timers: deps.privacyTimers },
