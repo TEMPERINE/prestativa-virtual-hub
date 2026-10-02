@@ -195,7 +195,7 @@ function VideoEl({ stream, mirrored }: { stream: MediaStream; mirrored?: boolean
   );
 }
 
-function HiddenAudioPlayers({ streams }: { streams: Record<string, MediaStream> }) {
+export function HiddenAudioPlayers({ streams }: { streams: Record<string, MediaStream> }) {
   return (
     <div className="absolute -left-[9999px] top-0 w-px h-px overflow-hidden" aria-hidden>
       {Object.entries(streams).map(([peerId, stream]) => (

@@ -76,7 +76,12 @@ import { useLiveKit, ACTIVE_RTC_ENGINE, type RtcV2HookConfig } from "@/lib/rtc/u
 // Motor RTC escolhido uma vez por execução (VITE_RTC_ENGINE; default v1).
 const IS_RTC_V2 = ACTIVE_RTC_ENGINE === "v2";
 import { installAudioUnlockListeners, unlockAudioPlayback } from "@/lib/rtc/audio-unlock";
-import { RemoteVideoTiles } from "./RemoteVideoTiles";
+import { RemoteVideoTiles, HiddenAudioPlayers } from "./RemoteVideoTiles";
+import { MeetingStage, type StageParticipant, type StageScreen } from "./MeetingStage";
+import { MEETING_UI_V2, resolveMeetingDisplayMode, type MeetingDisplayMode } from "@/lib/meeting-ui/layout";
+import {
+  createFollowRequestCenter, getNotificationsOptIn, playFollowChime, primeNotificationSound,
+} from "@/lib/notifications/follow-requests";
 import { CamPreviewAndPicker } from "./CamPreviewAndPicker";
 import { DeviceMenu } from "./DeviceMenu";
 import prestativaIcon from "@/assets/virtual-office-logo.png.asset.json";
@@ -2717,6 +2722,55 @@ export function OfficeScene({
     await supabase.auth.signOut();
     window.location.href = "/auth";
   };
+
+  // ===== Meeting UI V2 (somente composição visual; não toca RTC) =====
+  const inPrivateRoomVisual = IS_RTC_V2
+    ? rtc.v2?.room?.status === "CONNECTED" && rtc.v2?.room?.connected?.kind === "PRIVATE_ROOM"
+    : isPrivateZone && audibleConnectedPeers.length > 0;
+  const remoteScreenEntries = Object.entries(audibleScreenStreams).filter(([, s]) =>
+    s.getVideoTracks().some((t) => t.readyState === "live"),
+  );
+  const hasScreenShareVisual = !!rtc.localScreenStream || remoteScreenEntries.length > 0;
+  const meetingDisplayMode: MeetingDisplayMode = resolveMeetingDisplayMode({
+    inPrivateRoom: inPrivateRoomVisual,
+    hasScreenShare: hasScreenShareVisual,
+  });
+  const [viewOfficeDuringMeeting, setViewOfficeDuringMeeting] = useState(false);
+  useEffect(() => {
+    if (meetingDisplayMode === "office") setViewOfficeDuringMeeting(false);
+  }, [meetingDisplayMode]);
+  const meetingStageActive = MEETING_UI_V2 && meetingDisplayMode !== "office" && !viewOfficeDuringMeeting;
+  const stageParticipants: StageParticipant[] = (() => {
+    const list: StageParticipant[] = [];
+    const hasLive = (s: MediaStream | null) =>
+      !!s && s.getVideoTracks().some((t) => t.enabled && t.readyState === "live");
+    if (me) {
+      list.push({
+        id: me.id,
+        profile: { id: me.id, display_name: me.display_name, avatar_color: me.avatar_color },
+        stream: rtc.localVideoStream,
+        hasVideo: rtc.camOn && hasLive(rtc.localVideoStream),
+        micOn: rtc.micOn,
+        speaking: rtc.micOn && !!rtc.selfSpeaking,
+        isSelf: true,
+      });
+    }
+    for (const peerId of audibleConnectedPeers) {
+      const p = profiles[peerId] ?? { id: peerId, display_name: "Convidado", avatar_color: "#475569" };
+      const stream = audibleStreams[peerId] ?? null;
+      list.push({ id: peerId, profile: p, stream, hasVideo: hasLive(stream), micOn: true, speaking: !!rtc.speakingPeers[peerId] });
+    }
+    return list;
+  })();
+  const stageScreens: StageScreen[] = [
+    ...(rtc.localScreenStream ? [{ key: "__local__", label: "Sua tela", stream: rtc.localScreenStream, isLocal: true }] : []),
+    ...remoteScreenEntries.map(([id, stream]) => ({
+      key: id,
+      label: `Tela de ${profiles[id]?.display_name ?? "Convidado"}`,
+      stream,
+      isLocal: false,
+    })),
+  ];
 
   return (
     <div
