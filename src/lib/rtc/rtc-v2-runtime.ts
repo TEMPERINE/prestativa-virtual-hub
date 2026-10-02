@@ -18,6 +18,8 @@
 import type { MapOverrides } from "@/lib/map-overrides";
 import type { MapSyncState } from "@/lib/map-sync";
 import { meetingZoneAtPoint } from "./canonical-zones";
+import { findZoneById } from "@/lib/office-map";
+import { RtcDemandTrace, shortId } from "./rtc-demand-trace";
 import {
   LiveKitRoomManager,
   type RoomLike,
@@ -162,6 +164,7 @@ export class RtcV2Runtime {
   readonly privacy: PrivacyGuard;
   readonly demand: RtcDemandController;
   private recordingActive = false;
+  private readonly demandTrace = new RtcDemandTrace();
   private selfPos: { x: number; y: number } | null = null;
   private idleTimer: unknown = null;
   private lastInRangeKey = "";
