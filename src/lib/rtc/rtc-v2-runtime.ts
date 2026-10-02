@@ -460,7 +460,7 @@ export class RtcV2Runtime {
       const d = this.demand.getDemand();
       this.demandTrace.record({
         client: shortId(this.config.userId),
-        myZone: { id: zoneId, name: zoneId ? (findZoneById(zoneId)?.name ?? null) : null },
+        myZone: { id: zoneId, name: zoneId ? (findZoneById(zoneId)?.label ?? null) : null },
         myMediaLocation: myLoc,
         remoteMediaLocations: remote,
         presenceOccupantCount: presenceCount,
