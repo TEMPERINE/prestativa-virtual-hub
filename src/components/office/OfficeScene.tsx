@@ -3279,7 +3279,7 @@ export function OfficeScene({
           </div>
         )}
 
-        <ScreenShareViewer
+        {!meetingStageActive && <ScreenShareViewer
           localStream={rtc.localScreenStream}
           remoteStreams={audibleScreenStreams}
           profiles={profiles}
@@ -3321,7 +3321,7 @@ export function OfficeScene({
             }
             return list;
           })()}
-        />
+        />}
         </div>
         </div>
         {/* /Camera transform layer */}
@@ -3543,6 +3543,8 @@ export function OfficeScene({
       {IS_RTC_V2 && rtc.v2?.privacy.promptVisible && (
         <div
           role="alertdialog"
+          translate="no"
+          data-testid="privacy-guard-prompt"
           aria-label="Dispositivos pausados por privacidade"
           className="fixed bottom-24 left-1/2 z-50 w-[min(92vw,420px)] -translate-x-1/2 rounded-xl border border-border bg-card p-4 text-card-foreground shadow-lg"
         >
@@ -3590,6 +3592,20 @@ export function OfficeScene({
       />
 
       {/* Remote video/audio tiles */}
+      {meetingStageActive ? (
+        <>
+          {/* Áudio continua pelos mesmos players; vídeo só no MeetingStage */}
+          <HiddenAudioPlayers streams={audibleStreams} />
+          <MeetingStage
+            mode={meetingDisplayMode === "presentation" ? "presentation" : "meeting"}
+            participants={stageParticipants}
+            screens={stageScreens}
+            raisedHands={raisedHands}
+            onStopLocalShare={() => { rtc.toggleScreen().catch(() => {}); }}
+            onViewOffice={() => setViewOfficeDuringMeeting(true)}
+          />
+        </>
+      ) : (
       <RemoteVideoTiles
         myId={me?.id ?? null}
         myProfile={me ? { id: me.id, display_name: me.display_name, avatar_color: me.avatar_color } : null}
@@ -3603,6 +3619,16 @@ export function OfficeScene({
         connectedPeers={audibleConnectedPeers}
         raisedHands={raisedHands}
       />
+      )}
+      {MEETING_UI_V2 && viewOfficeDuringMeeting && meetingDisplayMode !== "office" && (
+        <button
+          type="button"
+          onClick={() => setViewOfficeDuringMeeting(false)}
+          className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[115] px-4 py-2 rounded-full bg-primary text-primary-foreground text-sm font-medium shadow-lg"
+        >
+          Voltar para reunião
+        </button>
+      )}
 
       {/* HUD de atalhos de reunião — aparece ao entrar numa call e ao usar um atalho */}
       {audibleConnectedPeers.length > 0 && (
