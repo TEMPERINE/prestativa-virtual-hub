@@ -82,7 +82,7 @@ import { RemoteVideoTiles, HiddenAudioPlayers } from "./RemoteVideoTiles";
 import { MeetingStage, type StageParticipant, type StageScreen } from "./MeetingStage";
 import { MEETING_UI_V2, resolveMeetingDisplayMode, type MeetingDisplayMode } from "@/lib/meeting-ui/layout";
 import {
-  createFollowRequestCenter, getNotificationsOptIn, playFollowChime, primeNotificationSound,
+  createFollowRequestCenter, presenterFromService, playFollowChime, primeNotificationSound, type FollowRequestCenter,
 } from "@/lib/notifications/follow-requests";
 import { CamPreviewAndPicker } from "./CamPreviewAndPicker";
 import { DeviceMenu } from "./DeviceMenu";
@@ -97,6 +97,10 @@ import { SavedNotesDialog } from "@/components/profile/SavedNotesDialog";
 import { EditCharacterModal } from "@/components/profile/EditCharacterModal";
 import { EditProfileModal } from "@/components/profile/EditProfileModal";
 import { OnboardingWizard } from "@/components/onboarding/OnboardingWizard";
+import { NotificationsPrompt } from "@/components/onboarding/NotificationsPrompt";
+import { FollowRequestsOverlay } from "@/components/office/FollowRequestsOverlay";
+import { createWebNotificationAdapter } from "@/lib/notifications/web-notification-adapter";
+import { setNotificationService, isNotificationSetupDone, type OfficeNotificationService } from "@/lib/notifications/notification-service";
 import { useMeetingTracker } from "@/lib/meetings/useMeetingTracker";
 import { useMeetingRecorder } from "@/lib/meetings/useMeetingRecorder";
 import { useServerRecorder } from "@/lib/meetings/useServerRecorder";
@@ -2183,33 +2187,23 @@ export function OfficeScene({
   acceptLeadRef.current = acceptLead;
   const declineLeadRef = useRef(declineLead);
   declineLeadRef.current = declineLead;
-  const followCenterRef = useRef<ReturnType<typeof createFollowRequestCenter> | null>(null);
-  if (!followCenterRef.current) {
-    const center = createFollowRequestCenter({
-      showToast: (req) => {
-        toast(`${req.fromName} chamou você`, {
-          id: `follow-${req.fromUid}`, // mesmo remetente atualiza o toast existente
-          description: `Quer seguir ${req.fromName} pelo escritório?`,
-          duration: 20000,
-          position: "top-right",
-          action: { label: "Seguir", onClick: () => { center.resolve(req.fromUid); acceptLeadRef.current(req.fromUid); } },
-          cancel: { label: "Agora não", onClick: () => { center.resolve(req.fromUid); declineLeadRef.current(req.fromUid); } },
-        });
-      },
-      playSound: () => playFollowChime(),
-      isHidden: () => typeof document !== "undefined" && document.visibilityState === "hidden",
-      notificationPermission: () => (typeof Notification === "undefined" ? "unsupported" : Notification.permission),
-      notificationsOptIn: getNotificationsOptIn,
-      showSystemNotification: (req) => {
-        const n = new Notification("Prestativa Office", {
-          body: `${req.fromName} chamou você para segui-lo.`,
-          tag: `follow-${req.fromUid}`,
-        });
-        n.onclick = () => { window.focus(); n.close(); }; // só traz o Office; não segue
-      },
-    });
-    followCenterRef.current = center;
+  const notifServiceRef = useRef<OfficeNotificationService | null>(null);
+  if (!notifServiceRef.current) {
+    notifServiceRef.current = createWebNotificationAdapter();
+    setNotificationService(notifServiceRef.current);
   }
+  const followCenterRef = useRef<FollowRequestCenter | null>(null);
+  if (!followCenterRef.current) {
+    // Popup persistente (30s) + indicador vêm do FollowRequestsOverlay.
+    followCenterRef.current = createFollowRequestCenter(
+      presenterFromService(notifServiceRef.current, () => playFollowChime()),
+    );
+  }
+  useEffect(() => () => followCenterRef.current?.dispose(), []);
+  const [showNotifPrompt, setShowNotifPrompt] = useState(false);
+  useEffect(() => {
+    if (me?.id && me.onboarded_at && !isNotificationSetupDone(me.id)) setShowNotifPrompt(true);
+  }, [me?.id, me?.onboarded_at]);
   useEffect(() => {
     const prime = () => primeNotificationSound();
     window.addEventListener("pointerdown", prime);
@@ -4086,6 +4080,21 @@ export function OfficeScene({
           userId={me.id}
           initialName={me.display_name || (myEmail.split("@")[0] ?? "")}
           onDone={() => { setForceOnboarding(false); refreshMe(); }}
+          notificationService={notifServiceRef.current ?? undefined}
+        />
+      )}
+      {me && me.onboarded_at && !forceOnboarding && showNotifPrompt && (
+        <NotificationsPrompt
+          userId={me.id}
+          notificationService={notifServiceRef.current ?? undefined}
+          onDone={() => setShowNotifPrompt(false)}
+        />
+      )}
+      {followCenterRef.current && (
+        <FollowRequestsOverlay
+          center={followCenterRef.current}
+          onFollow={(uid) => acceptLeadRef.current(uid)}
+          onDecline={(uid) => declineLeadRef.current(uid)}
         />
       )}
     </div>

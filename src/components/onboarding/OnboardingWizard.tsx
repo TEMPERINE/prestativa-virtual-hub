@@ -4,6 +4,9 @@ import { SPRITES, groupSpritesByGender } from "@/lib/sprite-catalog";
 import { SpritePreview } from "@/components/profile/SpritePreview";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import { NotificationsStep } from "./NotificationsStep";
+import { createWebNotificationAdapter } from "@/lib/notifications/web-notification-adapter";
+import { markNotificationSetupDone, type OfficeNotificationService } from "@/lib/notifications/notification-service";
 
 const SWATCHES = ["#E94B8C", "#9b5cf6", "#22c55e", "#f59e0b", "#0ea5e9", "#ef4444", "#14b8a6", "#a855f7"];
 const TAGLINES = ["Bora codar! 💻", "Café primeiro ☕", "Foco total 🎯", "Bom dia, time! ☀️", "Energia lá em cima ⚡", "Modo zen 🧘"];
@@ -13,9 +16,13 @@ type Props = {
   userId: string;
   initialName: string;
   onDone: () => void;
+  notificationService?: OfficeNotificationService;
 };
 
-export function OnboardingWizard({ userId, initialName, onDone }: Props) {
+const LAST = 4;
+
+export function OnboardingWizard({ userId, initialName, onDone, notificationService }: Props) {
+  const [service] = useState(() => notificationService ?? createWebNotificationAdapter());
   const [step, setStep] = useState(0);
   const [spriteId, setSpriteId] = useState(SPRITES[0].id);
   const [name, setName] = useState(initialName);
@@ -38,18 +45,19 @@ export function OnboardingWizard({ userId, initialName, onDone }: Props) {
     }).eq("id", userId);
     setSaving(false);
     if (error) { toast.error("Falha ao salvar perfil."); return; }
+    markNotificationSetupDone(userId);
     toast.success(`Bem-vindo(a), ${trimmed}! 🎉`);
     onDone();
   };
 
-  const next = () => setStep((s) => Math.min(3, s + 1));
+  const next = () => setStep((s) => Math.min(LAST, s + 1));
   const prev = () => setStep((s) => Math.max(0, s - 1));
 
   return (
     <div className="fixed inset-0 z-[200] bg-background/95 backdrop-blur-sm flex items-center justify-center p-6 overflow-y-auto">
       <div className="w-full max-w-2xl glass-panel rounded-2xl shadow-soft p-8">
         <div className="flex items-center gap-2 mb-6">
-          {[0, 1, 2, 3].map((i) => (
+          {[0, 1, 2, 3, 4].map((i) => (
             <div key={i} className="flex-1 h-1.5 rounded-full transition-all" style={{ background: i <= step ? color : "hsl(var(--muted))" }} />
           ))}
         </div>
@@ -165,9 +173,11 @@ export function OnboardingWizard({ userId, initialName, onDone }: Props) {
           </div>
         )}
 
+        {step === 4 && <NotificationsStep service={service} />}
+
         <div className="flex items-center justify-between mt-8">
           <Button variant="ghost" onClick={prev} disabled={step === 0}>Voltar</Button>
-          {step < 3 ? (
+          {step < LAST ? (
             <Button onClick={next} style={{ background: color }}>Próximo</Button>
           ) : (
             <Button onClick={finish} disabled={saving} style={{ background: color }}>{saving ? "Salvando…" : "Entrar no espaço 🚀"}</Button>
