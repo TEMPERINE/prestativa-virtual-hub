@@ -1,9 +1,11 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { SpritePreview } from "./SpritePreview";
-import { LogOut, User as UserIcon, Shirt, MapPin, RefreshCcw, StickyNote, Video, DoorOpen } from "lucide-react";
+import { Bell, BellOff, LogOut, User as UserIcon, Shirt, MapPin, RefreshCcw, StickyNote, Video, DoorOpen } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { disableOfficeNotifications, enableOfficeNotifications, getNotificationsOptIn } from "@/lib/notifications/follow-requests";
+import { toast } from "sonner";
 
 type Status = "available" | "busy" | "away";
 const STATUS_LABEL: Record<Status, string> = {
@@ -41,6 +43,8 @@ type Props = {
 
 export function ProfileMenu(p: Props) {
   const [open, setOpen] = useState(false);
+  const [notifOn, setNotifOn] = useState(false);
+  useEffect(() => { setNotifOn(getNotificationsOptIn()); }, [open]);
   const status: Status = (p.me.status ?? "available") as Status;
 
   const setStatus = async (s: Status) => {
@@ -109,6 +113,17 @@ export function ProfileMenu(p: Props) {
           <MenuItem icon={<UserIcon className="w-4 h-4" />} label="Editar perfil" onClick={() => { setOpen(false); p.onEditProfile(); }} />
           <MenuItem icon={<MapPin className="w-4 h-4" />} label="Ir até minha mesa" hint="Ctrl+D" disabled={!p.hasClaim} onClick={() => { setOpen(false); p.onGoToMyDesk(); }} />
           <MenuItem icon={<DoorOpen className="w-4 h-4" />} label="Deixar mesa" disabled={!p.hasClaim} onClick={() => { setOpen(false); p.onLeaveDesk(); }} />
+          <MenuItem
+            icon={notifOn ? <Bell className="w-4 h-4" /> : <BellOff className="w-4 h-4" />}
+            label={notifOn ? "Notificações do Office: ligadas" : "Notificações do Office: desligadas"}
+            hint="Alertas quando alguém chamar você"
+            onClick={async () => {
+              if (notifOn) { disableOfficeNotifications(); setNotifOn(false); return; }
+              const perm = await enableOfficeNotifications();
+              setNotifOn(true);
+              if (perm !== "granted") toast.info("Alertas do sistema bloqueados pelo navegador — você continua recebendo o aviso e o som dentro do Office.");
+            }}
+          />
           <MenuItem icon={<StickyNote className="w-4 h-4" />} label="Recadinhos guardados" onClick={() => { setOpen(false); p.onOpenSavedNotes(); }} />
           <Link
             to="/meetings"

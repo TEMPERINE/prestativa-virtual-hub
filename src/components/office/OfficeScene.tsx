@@ -76,7 +76,12 @@ import { useLiveKit, ACTIVE_RTC_ENGINE, type RtcV2HookConfig } from "@/lib/rtc/u
 // Motor RTC escolhido uma vez por execução (VITE_RTC_ENGINE; default v1).
 const IS_RTC_V2 = ACTIVE_RTC_ENGINE === "v2";
 import { installAudioUnlockListeners, unlockAudioPlayback } from "@/lib/rtc/audio-unlock";
-import { RemoteVideoTiles } from "./RemoteVideoTiles";
+import { RemoteVideoTiles, HiddenAudioPlayers } from "./RemoteVideoTiles";
+import { MeetingStage, type StageParticipant, type StageScreen } from "./MeetingStage";
+import { MEETING_UI_V2, resolveMeetingDisplayMode, type MeetingDisplayMode } from "@/lib/meeting-ui/layout";
+import {
+  createFollowRequestCenter, getNotificationsOptIn, playFollowChime, primeNotificationSound,
+} from "@/lib/notifications/follow-requests";
 import { CamPreviewAndPicker } from "./CamPreviewAndPicker";
 import { DeviceMenu } from "./DeviceMenu";
 import prestativaIcon from "@/assets/virtual-office-logo.png.asset.json";
@@ -2170,6 +2175,49 @@ export function OfficeScene({
     void ch.send({ type: "broadcast", event: "join-decline", payload: { from: me, to: fromUid } });
   }, []);
 
+  // Alertas de "chamar para seguir": evento de negócio → apresentação web.
+  // Não chama RTC/mídia/movimento; "Seguir" executa o acceptLead existente.
+  const acceptLeadRef = useRef(acceptLead);
+  acceptLeadRef.current = acceptLead;
+  const declineLeadRef = useRef(declineLead);
+  declineLeadRef.current = declineLead;
+  const followCenterRef = useRef<ReturnType<typeof createFollowRequestCenter> | null>(null);
+  if (!followCenterRef.current) {
+    const center = createFollowRequestCenter({
+      showToast: (req) => {
+        toast(`${req.fromName} chamou você`, {
+          id: `follow-${req.fromUid}`, // mesmo remetente atualiza o toast existente
+          description: `Quer seguir ${req.fromName} pelo escritório?`,
+          duration: 20000,
+          position: "top-right",
+          action: { label: "Seguir", onClick: () => { center.resolve(req.fromUid); acceptLeadRef.current(req.fromUid); } },
+          cancel: { label: "Agora não", onClick: () => { center.resolve(req.fromUid); declineLeadRef.current(req.fromUid); } },
+        });
+      },
+      playSound: () => playFollowChime(),
+      isHidden: () => typeof document !== "undefined" && document.visibilityState === "hidden",
+      notificationPermission: () => (typeof Notification === "undefined" ? "unsupported" : Notification.permission),
+      notificationsOptIn: getNotificationsOptIn,
+      showSystemNotification: (req) => {
+        const n = new Notification("Prestativa Office", {
+          body: `${req.fromName} chamou você para segui-lo.`,
+          tag: `follow-${req.fromUid}`,
+        });
+        n.onclick = () => { window.focus(); n.close(); }; // só traz o Office; não segue
+      },
+    });
+    followCenterRef.current = center;
+  }
+  useEffect(() => {
+    const prime = () => primeNotificationSound();
+    window.addEventListener("pointerdown", prime);
+    window.addEventListener("keydown", prime);
+    return () => {
+      window.removeEventListener("pointerdown", prime);
+      window.removeEventListener("keydown", prime);
+    };
+  }, []);
+
   // Lead channel — separate from positions so we can subscribe independently
   // once we know our user id (the broadcast handlers need stable closures).
   useEffect(() => {
@@ -2180,12 +2228,10 @@ export function OfficeScene({
       .on("broadcast", { event: "lead-request" }, ({ payload }) => {
         const p = payload as { from?: string; to?: string; fromName?: string };
         if (!p?.from || p.to !== uid) return;
-        const from = p.from;
-        toast(`${p.fromName ?? "Alguém"} pediu para te conduzir`, {
-          description: "Aceite para seguir essa pessoa até onde ela for.",
-          duration: 20000,
-          action: { label: "Aceitar", onClick: () => acceptLead(from) },
-          cancel: { label: "Recusar", onClick: () => declineLead(from) },
+        followCenterRef.current?.receive({
+          fromUid: p.from,
+          fromName: p.fromName ?? profilesRef.current[p.from]?.display_name ?? "Alguém",
+          at: Date.now(),
         });
       })
       .on("broadcast", { event: "lead-accept" }, ({ payload }) => {
@@ -2718,6 +2764,55 @@ export function OfficeScene({
     window.location.href = "/auth";
   };
 
+  // ===== Meeting UI V2 (somente composição visual; não toca RTC) =====
+  const inPrivateRoomVisual = IS_RTC_V2
+    ? rtc.v2?.room?.status === "CONNECTED" && rtc.v2?.room?.connected?.kind === "PRIVATE_ROOM"
+    : isPrivateZone && audibleConnectedPeers.length > 0;
+  const remoteScreenEntries = Object.entries(audibleScreenStreams).filter(([, s]) =>
+    s.getVideoTracks().some((t) => t.readyState === "live"),
+  );
+  const hasScreenShareVisual = !!rtc.localScreenStream || remoteScreenEntries.length > 0;
+  const meetingDisplayMode: MeetingDisplayMode = resolveMeetingDisplayMode({
+    inPrivateRoom: inPrivateRoomVisual,
+    hasScreenShare: hasScreenShareVisual,
+  });
+  const [viewOfficeDuringMeeting, setViewOfficeDuringMeeting] = useState(false);
+  useEffect(() => {
+    if (meetingDisplayMode === "office") setViewOfficeDuringMeeting(false);
+  }, [meetingDisplayMode]);
+  const meetingStageActive = MEETING_UI_V2 && meetingDisplayMode !== "office" && !viewOfficeDuringMeeting;
+  const stageParticipants: StageParticipant[] = (() => {
+    const list: StageParticipant[] = [];
+    const hasLive = (s: MediaStream | null) =>
+      !!s && s.getVideoTracks().some((t) => t.enabled && t.readyState === "live");
+    if (me) {
+      list.push({
+        id: me.id,
+        profile: { id: me.id, display_name: me.display_name, avatar_color: me.avatar_color },
+        stream: rtc.localVideoStream,
+        hasVideo: rtc.camOn && hasLive(rtc.localVideoStream),
+        micOn: rtc.micOn,
+        speaking: rtc.micOn && !!rtc.selfSpeaking,
+        isSelf: true,
+      });
+    }
+    for (const peerId of audibleConnectedPeers) {
+      const p = profiles[peerId] ?? { id: peerId, display_name: "Convidado", avatar_color: "#475569" };
+      const stream = audibleStreams[peerId] ?? null;
+      list.push({ id: peerId, profile: p, stream, hasVideo: hasLive(stream), micOn: true, speaking: !!rtc.speakingPeers[peerId] });
+    }
+    return list;
+  })();
+  const stageScreens: StageScreen[] = [
+    ...(rtc.localScreenStream ? [{ key: "__local__", label: "Sua tela", stream: rtc.localScreenStream, isLocal: true }] : []),
+    ...remoteScreenEntries.map(([id, stream]) => ({
+      key: id,
+      label: `Tela de ${profiles[id]?.display_name ?? "Convidado"}`,
+      stream,
+      isLocal: false,
+    })),
+  ];
+
   return (
     <div
       ref={sceneRef}
@@ -3225,7 +3320,7 @@ export function OfficeScene({
           </div>
         )}
 
-        <ScreenShareViewer
+        {!meetingStageActive && <ScreenShareViewer
           localStream={rtc.localScreenStream}
           remoteStreams={audibleScreenStreams}
           profiles={profiles}
@@ -3267,7 +3362,7 @@ export function OfficeScene({
             }
             return list;
           })()}
-        />
+        />}
         </div>
         </div>
         {/* /Camera transform layer */}
@@ -3489,6 +3584,8 @@ export function OfficeScene({
       {IS_RTC_V2 && rtc.v2?.privacy.promptVisible && (
         <div
           role="alertdialog"
+          translate="no"
+          data-testid="privacy-guard-prompt"
           aria-label="Dispositivos pausados por privacidade"
           className="fixed bottom-24 left-1/2 z-50 w-[min(92vw,420px)] -translate-x-1/2 rounded-xl border border-border bg-card p-4 text-card-foreground shadow-lg"
         >
@@ -3536,6 +3633,20 @@ export function OfficeScene({
       />
 
       {/* Remote video/audio tiles */}
+      {meetingStageActive ? (
+        <>
+          {/* Áudio continua pelos mesmos players; vídeo só no MeetingStage */}
+          <HiddenAudioPlayers streams={audibleStreams} />
+          <MeetingStage
+            mode={meetingDisplayMode === "presentation" ? "presentation" : "meeting"}
+            participants={stageParticipants}
+            screens={stageScreens}
+            raisedHands={raisedHands}
+            onStopLocalShare={() => { rtc.toggleScreen().catch(() => {}); }}
+            onViewOffice={() => setViewOfficeDuringMeeting(true)}
+          />
+        </>
+      ) : (
       <RemoteVideoTiles
         myId={me?.id ?? null}
         myProfile={me ? { id: me.id, display_name: me.display_name, avatar_color: me.avatar_color } : null}
@@ -3549,6 +3660,16 @@ export function OfficeScene({
         connectedPeers={audibleConnectedPeers}
         raisedHands={raisedHands}
       />
+      )}
+      {MEETING_UI_V2 && viewOfficeDuringMeeting && meetingDisplayMode !== "office" && (
+        <button
+          type="button"
+          onClick={() => setViewOfficeDuringMeeting(false)}
+          className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[115] px-4 py-2 rounded-full bg-primary text-primary-foreground text-sm font-medium shadow-lg"
+        >
+          Voltar para reunião
+        </button>
+      )}
 
       {/* HUD de atalhos de reunião — aparece ao entrar numa call e ao usar um atalho */}
       {audibleConnectedPeers.length > 0 && (
