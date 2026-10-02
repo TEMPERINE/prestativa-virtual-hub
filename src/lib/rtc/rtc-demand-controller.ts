@@ -18,8 +18,10 @@ export const SOLO_GRACE_MS = 15_000;
 
 export function parseRtcOnDemand(raw?: string | null): RtcOnDemandMode {
   const v = (raw ?? "").toString().trim().toLowerCase();
-  // "all" fica reservado para a Fase 2 (lobby); por ora comporta-se como "private".
-  if (v === "private" || v === "all") return v;
+  if (v === "private") return "private";
+  // "all" é reservado para a Fase 2 (lobby). Fallback explícito e seguro:
+  // vira "private" (lobby segue o comportamento atual, nada parcial).
+  if (v === "all") return "private";
   return DEFAULT_RTC_ON_DEMAND;
 }
 

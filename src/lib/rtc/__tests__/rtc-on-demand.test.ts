@@ -45,7 +45,7 @@ describe("flag", () => {
     expect(parseRtcOnDemand(undefined)).toBe("off");
     expect(parseRtcOnDemand("lixo")).toBe("off");
     expect(parseRtcOnDemand("PRIVATE")).toBe("private");
-    expect(parseRtcOnDemand("all")).toBe("all");
+    expect(parseRtcOnDemand("all")).toBe("private"); // fallback Fase 1
   });
 });
 
@@ -407,5 +407,94 @@ describe("Runtime On Demand (off)", () => {
     expect(h.rt.getSnapshot().awaitingPeer).toBe(false);
     for (const p of h.tracked) expect(p.mediaLocation).toBeUndefined();
     await h.rt.dispose();
+  });
+});
+
+// ─── Wake vindo só do Presence (dois clientes) ─────────────────
+
+describe("Wake de sala idle exclusivamente via Presence", () => {
+  it("A sozinha (NONE, sem Room) → B entra → ambos PRIVATE(X) e só então conectam", async () => {
+    FakeRoom.all = [];
+    const state: Record<string, PresencePayload[]> = {};
+    const subs: Array<Parameters<PresenceTransport["open"]>[0]> = [];
+    const bus = (uid: string): PresenceTransport => ({
+      open(h) {
+        subs.push(h);
+        queueMicrotask(() => h.onSubscribed());
+        return {
+          track: (p) => {
+            state[uid] = [p as PresencePayload];
+            const snap = { ...state };
+            for (const s of subs) queueMicrotask(() => s.onPresence("sync", snap));
+          },
+          untrack: () => {},
+          close: () => {},
+        };
+      },
+    });
+    const tokens: Record<string, TokenV2Request[]> = { a: [], b: [] };
+    const rooms: Record<string, FakeRoom[]> = { a: [], b: [] };
+    const mk = (uid: "a" | "b") => {
+      const rt = new RtcV2Runtime(
+        { userId: uid, workspaceId: "ws", sessionId: uid, generation: 1 },
+        {
+          fetchToken: async (req) => {
+            tokens[uid].push(req);
+            return { url: "wss://x", token: "t" };
+          },
+          roomFactory: () => {
+            const r = new FakeRoom();
+            rooms[uid].push(r);
+            return r as unknown as V2Room;
+          },
+          capture: {
+            createMicrophoneTrack: async () => fakeTrack("microphone"),
+            createCameraTrack: async () => fakeTrack("camera"),
+            createScreenTracks: async () => [],
+          },
+          movementTransport: {
+            open(h) {
+              queueMicrotask(() => h.onSubscribed(false));
+              return { send: () => {}, close: () => {} };
+            },
+          },
+          presenceTransport: bus(uid),
+          refreshMap: () => {},
+          onDemandMode: "private",
+        },
+      );
+      rt.setMap({ state: "READY", version: 1, map: null });
+      return rt;
+    };
+
+    const A = mk("a");
+    A.start();
+    A.setSelfPosition(REUNIAO.x, REUNIAO.y);
+    await settle(400);
+    expect(A.getSnapshot().context).toEqual(P("reuniao"));
+    expect(A.getSnapshot().demand).toEqual({ kind: "NONE" });
+    // Nenhuma Room ativa para A (uma Room de lobby transitória antes da zona confirmar é o comportamento atual).
+    expect(A.getSnapshot().room.connected).toBeNull();
+    expect(A.getSnapshot().roomStatus).toBe("DISCONNECTED");
+    const aRoomsBefore = rooms.a.length;
+    expect(tokens.a.filter((t) => t.context === "PRIVATE_ROOM")).toEqual([]);
+
+    const B = mk("b");
+    B.start();
+    B.setSelfPosition(REUNIAO.x, REUNIAO.y);
+    await settle(400);
+
+    // Nenhum evento LiveKit (remoteParticipants vazio): só Presence acordou a sala.
+    for (const rt of [A, B]) {
+      expect(rt.getSnapshot().demand).toEqual({ kind: "PRIVATE", zoneId: "reuniao" });
+      expect(rt.getSnapshot().roomStatus).toBe("CONNECTED");
+      expect(rt.getSnapshot().room.connected).toEqual(P("reuniao"));
+      expect(rt.getSnapshot().remote.participants.length).toBe(0);
+    }
+    expect(rooms.a.length).toBe(aRoomsBefore + 1);
+    expect(tokens.a.filter((t) => t.context === "PRIVATE_ROOM").length).toBe(1);
+    expect(tokens.b.filter((t) => t.context === "PRIVATE_ROOM").length).toBe(1);
+    await A.dispose();
+    await B.dispose();
   });
 });
