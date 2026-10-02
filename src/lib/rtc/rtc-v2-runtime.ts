@@ -41,6 +41,7 @@ import { AudioDiagnostics, type DiagTimers } from "./rtc-audio-diagnostics";
 import { RtcTelemetry, type TelemetryAdapter } from "./rtc-telemetry";
 import { isMapVersionStaleError } from "./rtc-telemetry-types";
 import { SpatialSubscriptions, type SpatialRoomLike } from "./spatial-subscriptions";
+import { PrivacyGuard, type PrivacyGuardTimers } from "./privacy-guard";
 
 /** Room composta usada pelo V2 (uma única Room LiveKit por trás). */
 export interface V2Room extends RoomLike, PublishTargetLike {
@@ -91,6 +92,7 @@ export interface RtcV2Deps {
   motionIdleMs?: number;
   /** Timers do diagnóstico de áudio (testes). */
   diagTimers?: DiagTimers;
+  privacyTimers?: PrivacyGuardTimers;
 }
 
 export interface RtcV2Snapshot {
@@ -142,6 +144,7 @@ export class RtcV2Runtime {
   private started = false;
   private movementStarted = false;
   private disposed = false;
+  readonly privacy: PrivacyGuard;
   private selfPos: { x: number; y: number } | null = null;
   private idleTimer: unknown = null;
   private lastInRangeKey = "";
@@ -222,6 +225,19 @@ export class RtcV2Runtime {
       getRoomName: () => this.rooms.getSnapshot().roomName,
       timers: deps.diagTimers,
     });
+    this.privacy = new PrivacyGuard(
+      {
+        isMicOn: () => this.local.getSnapshot().microphone.intent,
+        isCamOn: () => this.local.getSnapshot().camera.intent,
+        isScreenSharing: () => {
+          const st = this.local.getSnapshot().screenShare.status;
+          return st === "on" || st === "starting";
+        },
+        setMic: (on) => this.local.setMicrophoneEnabled(on),
+        setCam: (on) => this.local.setCameraEnabled(on),
+      },
+      { telemetry: sink, timers: deps.privacyTimers },
+    );
     this.snap = this.build();
   }
 
@@ -235,6 +251,7 @@ export class RtcV2Runtime {
       this.rooms.subscribe((s) => this.onRooms(s)),
       this.local.subscribe(() => {
         this.audioDiag.onLocalMediaChange();
+        this.privacy.onLocalMediaChange();
         this.emit();
       }),
       this.remote.subscribe(() => this.emit()),
@@ -265,6 +282,7 @@ export class RtcV2Runtime {
     this.unsubs = [];
     this.detachRoom();
     this.audioDiag.dispose();
+    this.privacy.dispose();
     this.context.dispose();
     await Promise.allSettled([
       this.local.dispose(),
@@ -329,9 +347,11 @@ export class RtcV2Runtime {
   }
 
   toggleMic(): Promise<void> {
+    this.privacy.noteManualToggle();
     return this.local.setMicrophoneEnabled(!this.local.getSnapshot().microphone.intent);
   }
   toggleCam(): Promise<void> {
+    this.privacy.noteManualToggle();
     return this.local.setCameraEnabled(!this.local.getSnapshot().camera.intent);
   }
   toggleScreen(): Promise<void> {
