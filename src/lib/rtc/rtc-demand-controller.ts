@@ -26,7 +26,9 @@ export function parseRtcOnDemand(raw?: string | null): RtcOnDemandMode {
 }
 
 export function getRtcOnDemand(): RtcOnDemandMode {
-  const raw = import.meta?.env?.VITE_RTC_ON_DEMAND;
+  // Acesso direto (sem "?.") — o Vite só injeta VITE_* nesse padrão; com
+  // optional chaining a flag ficava inerte e caía sempre no default.
+  const raw = import.meta.env.VITE_RTC_ON_DEMAND;
   return parseRtcOnDemand(typeof raw === "string" ? raw : undefined);
 }
 

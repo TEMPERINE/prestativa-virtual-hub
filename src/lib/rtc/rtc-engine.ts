@@ -17,6 +17,8 @@ export function parseRtcEngine(raw?: string | null | undefined): RtcEngine {
 }
 
 export function getRtcEngine(): RtcEngine {
-  const raw = import.meta?.env?.VITE_RTC_ENGINE;
+  // Acesso direto (sem "?.") — o Vite só injeta VITE_* nesse padrão; com
+  // optional chaining a flag ficava inerte e caía sempre no default.
+  const raw = import.meta.env.VITE_RTC_ENGINE;
   return parseRtcEngine(typeof raw === "string" ? raw : undefined);
 }
