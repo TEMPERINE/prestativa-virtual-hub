@@ -75,54 +75,50 @@ describe("RtcDemandController", () => {
     up({ occupants: countOccupants("me", "A", [{ userId: "u2", mediaLocation: "PRIVATE:A" }]) });
     expect(c.getDemand()).toEqual({ kind: "PRIVATE", zoneId: "A" });
   });
-  it("5/6. queda 2→1 arma grace; entrada cancela", () => {
+  it("5/6. queda 2→1 => NONE imediatamente (sem grace de mídia)", () => {
     const { c, up, events } = ctl();
     up({ occupants: 2 });
     up({ occupants: 1 });
-    expect(c.isGraceArmed()).toBe(true);
-    expect(c.getDemand().kind).toBe("PRIVATE");
-    vi.advanceTimersByTime(10_000);
-    up({ occupants: 2 });
     expect(c.isGraceArmed()).toBe(false);
-    vi.advanceTimersByTime(20_000);
-    expect(c.getDemand().kind).toBe("PRIVATE");
-    expect(events).toContain("RTC_SOLO_GRACE_ARMED");
-    expect(events).toContain("RTC_SOLO_GRACE_CANCELLED");
-  });
-  it("7. grace expira => NONE", () => {
-    const { c, up, events } = ctl();
-    up({ occupants: 2 });
-    up({ occupants: 1 });
-    vi.advanceTimersByTime(15_000);
     expect(c.getDemand()).toEqual({ kind: "NONE" });
-    expect(events).toContain("RTC_SOLO_GRACE_EXPIRED");
-    expect(events.filter((e) => e === "RTC_DEMAND_CHANGED").length).toBe(2);
+    expect(events).not.toContain("RTC_SOLO_GRACE_ARMED");
+    up({ occupants: 2 });
+    expect(c.getDemand().kind).toBe("PRIVATE");
   });
-  it("13/14. gravação impede idle; fim reavalia com grace", () => {
+  it("7/10. graceMs legado é ignorado: nenhum timer de mídia em private", () => {
+    const { c, up } = ctl();
+    up({ occupants: 3 });
+    up({ occupants: 1 });
+    expect(vi.getTimerCount()).toBe(0);
+    expect(c.getDemand()).toEqual({ kind: "NONE" });
+  });
+  it("13/14. gravação mantém quem FICOU; fim => NONE imediato", () => {
     const { c, up } = ctl();
     up({ occupants: 2 });
     up({ occupants: 1, recordingActive: true });
     vi.advanceTimersByTime(60_000);
     expect(c.getDemand().kind).toBe("PRIVATE");
     up({ occupants: 1, recordingActive: false });
-    expect(c.isGraceArmed()).toBe(true);
-    vi.advanceTimersByTime(15_000);
     expect(c.getDemand().kind).toBe("NONE");
+  });
+  it("8. gravação ativa não mantém acesso de quem saiu fisicamente da zona", () => {
+    const { c, up } = ctl();
+    up({ occupants: 2, recordingActive: true });
+    up({ context: { kind: "LOBBY" }, occupants: 1, recordingActive: true });
+    expect(c.getDemand()).toEqual({ kind: "LOBBY" });
+    up({ context: P("B"), occupants: 1, recordingActive: true });
+    expect(c.getDemand()).toEqual({ kind: "PRIVATE", zoneId: "B" });
   });
   it("gravação ativa sozinho mantém PRIVATE", () => {
     const { c, up } = ctl();
     up({ recordingActive: true });
     expect(c.getDemand().kind).toBe("PRIVATE");
   });
-  it("21. RECONNECTING não expira o grace", () => {
+  it("21. RECONNECTING da sala com 2+ não altera demanda", () => {
     const { c, up } = ctl();
     up({ occupants: 2, roomStatus: "CONNECTED" });
-    up({ occupants: 1, roomStatus: "RECONNECTING" });
-    vi.advanceTimersByTime(45_000);
+    up({ occupants: 2, roomStatus: "RECONNECTING" });
     expect(c.getDemand().kind).toBe("PRIVATE");
-    up({ occupants: 1, roomStatus: "CONNECTED" });
-    vi.advanceTimersByTime(15_000);
-    expect(c.getDemand().kind).toBe("NONE");
   });
   it("lobby segue comportamento atual", () => {
     const { c, up } = ctl();
@@ -225,17 +221,43 @@ describe("MeetingTrackerV2 com remoteCount", () => {
     await t.whenIdle();
     expect(joins).toEqual([]);
   });
-  it("11/12. segundo participante inicia; queda temporária mantém; Room cai => leave", async () => {
+  it("11/12. segundo participante inicia; Room cai => leave só após 15s administrativos", async () => {
     const { t, joins, leaves } = mk();
     t.observe({ status: "CONNECTED", connected: P("A"), remoteCount: 1 });
     await t.whenIdle();
     expect(joins).toEqual(["A"]);
-    t.observe({ status: "CONNECTED", connected: P("A"), remoteCount: 0 });
-    await t.whenIdle();
-    expect(leaves).toEqual([]);
     t.observe({ status: "DISCONNECTED", connected: null, remoteCount: 0 });
+    await settle(14_000);
+    expect(leaves).toEqual([]);
+    await settle(1_100);
     await t.whenIdle();
     expect(leaves).toEqual(["m-A"]);
+  });
+  it("7. volta em <15s continua o MESMO registro (sem novo join) e sem mídia no intervalo", async () => {
+    const { t, joins, leaves } = mk();
+    t.observe({ status: "CONNECTED", connected: P("A"), remoteCount: 1 });
+    await t.whenIdle();
+    t.observe({ status: "DISCONNECTED", connected: null, remoteCount: 0 });
+    await settle(8_000);
+    t.observe({ status: "CONNECTED", connected: P("A"), remoteCount: 1 });
+    await settle(20_000);
+    await t.whenIdle();
+    expect(joins).toEqual(["A"]);
+    expect(leaves).toEqual([]);
+    expect(t.getMeetingId()).toBe("m-A");
+  });
+  it("trocar para outra sala faz leave imediato; dispose também", async () => {
+    const { t, leaves } = mk();
+    t.observe({ status: "CONNECTED", connected: P("A"), remoteCount: 1 });
+    await t.whenIdle();
+    t.observe({ status: "CONNECTED", connected: P("B"), remoteCount: 1 });
+    await settle(0);
+    await t.whenIdle();
+    expect(leaves).toEqual(["m-A"]);
+    t.observe({ status: "DISCONNECTED", connected: null });
+    await settle(0);
+    await t.dispose();
+    expect(leaves).toEqual(["m-A", "m-B"]);
   });
   it("sem remoteCount mantém regra atual", async () => {
     const { t, joins } = mk();
@@ -355,7 +377,7 @@ describe("Runtime On Demand (private)", () => {
     await h.rt.dispose();
   });
 
-  it("19/20. screen share para quando grace expira e não religa", async () => {
+  it("19/20. ficou sozinho: Room cai na hora e screen share termina", async () => {
     const h = runtime("private");
     h.rt.start();
     h.rt.setSelfPosition(REUNIAO.x, REUNIAO.y);
@@ -364,9 +386,7 @@ describe("Runtime On Demand (private)", () => {
     await settle(50);
     const stop = vi.spyOn(h.rt.local, "detachRoom");
     h.others([]);
-    await settle(14_000);
-    expect(h.rt.getSnapshot().roomStatus).toBe("CONNECTED");
-    await settle(2_000);
+    await settle(100);
     expect(h.rt.getSnapshot().roomStatus).toBe("DISCONNECTED");
     expect(stop).toHaveBeenCalled(); // detachRoom encerra screen share
     expect(h.rt.getSnapshot().local.screenShare.status).toBe("off");
@@ -592,7 +612,7 @@ describe("Cliente parado reage só ao Presence remoto", () => {
     await B.rt.dispose();
   });
 
-  it("A e B em PRIVATE(X); B sai → A parado arma grace e após 15s vai a NONE", async () => {
+  it("4/5/6. A e B em PRIVATE(X); B sai → B desconecta e A vai a NONE imediatamente", async () => {
     const bus = phoenixBus(true);
     const A = mk("a", bus.transport("a"));
     const B = mk("b", bus.transport("b"));
@@ -605,12 +625,34 @@ describe("Cliente parado reage só ao Presence remoto", () => {
 
     B.rt.setSelfPosition(LOBBY.x, LOBBY.y);
     await settle(400);
-    expect(A.rt.demand.isGraceArmed()).toBe(true);
-    expect(A.rt.getSnapshot().demand.kind).toBe("PRIVATE");
-    await settle(15_000);
+    expect(A.rt.demand.isGraceArmed()).toBe(false);
     expect(A.rt.getSnapshot().demand).toEqual({ kind: "NONE" });
+    expect(A.rt.getSnapshot().roomStatus).toBe("DISCONNECTED");
+    expect(B.rt.getSnapshot().room.connected?.kind).not.toBe("PRIVATE_ROOM");
     await A.rt.dispose();
     await B.rt.dispose();
+  });
+
+  it("1/2/3. sala com 3: C sai → C perde a Room já; A e B seguem conectados", async () => {
+    const bus = phoenixBus(true);
+    const A = mk("a", bus.transport("a"));
+    const B = mk("b", bus.transport("b"));
+    const C = mk("c", bus.transport("c"));
+    for (const x of [A, B, C]) {
+      x.rt.start();
+      x.rt.setSelfPosition(REUNIAO.x, REUNIAO.y);
+    }
+    await settle(400);
+    for (const x of [A, B, C]) expect(x.rt.getSnapshot().roomStatus).toBe("CONNECTED");
+    C.rt.setSelfPosition(LOBBY.x, LOBBY.y);
+    await settle(50);
+    expect(C.rt.getSnapshot().room.connected?.kind).not.toBe("PRIVATE_ROOM");
+    await settle(400);
+    for (const x of [A, B]) {
+      expect(x.rt.getSnapshot().demand).toEqual({ kind: "PRIVATE", zoneId: "reuniao" });
+      expect(x.rt.getSnapshot().roomStatus).toBe("CONNECTED");
+    }
+    for (const x of [A, B, C]) await x.rt.dispose();
   });
 
   it("track do próprio mediaLocation sem mudança real não dispara nova reavaliação em loop", async () => {

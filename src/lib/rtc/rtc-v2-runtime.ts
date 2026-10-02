@@ -110,6 +110,7 @@ export interface RtcV2Deps {
   /** RTC On Demand (VITE_RTC_ON_DEMAND). Padrão "off" = comportamento atual. */
   onDemandMode?: RtcOnDemandMode;
   demandTimers?: TimerApi;
+  /** @deprecated ignorado — não existe grace de mídia. */
   soloGraceMs?: number;
   lobbyGraceMs?: number;
 }

@@ -14,8 +14,14 @@ import type { RoomManagerStatus } from "./livekit-room-manager";
 
 export type RtcOnDemandMode = "off" | "private" | "all";
 export const DEFAULT_RTC_ON_DEMAND: RtcOnDemandMode = "off";
-export const SOLO_GRACE_MS = 15_000;
-export const LOBBY_IDLE_GRACE_MS = 15_000;
+/**
+ * Sem grace de mídia: sala privada que cai para 1 vai a NONE na hora.
+ * (A continuidade de 15s é só administrativa — MeetingTrackerV2.)
+ */
+export const SOLO_GRACE_MS = 0;
+/** Lobby: só debounce técnico contra jitter de posição (não perceptível). */
+export const LOBBY_IDLE_GRACE_MS = 750;
+export const MAX_LOBBY_DEBOUNCE_MS = 1_000;
 
 export function parseRtcOnDemand(raw?: string | null): RtcOnDemandMode {
   const v = (raw ?? "").toString().trim().toLowerCase();
@@ -93,13 +99,15 @@ export class RtcDemandController {
   private disposed = false;
   private listeners = new Set<(d: RtcDemand) => void>();
   private readonly timers: TimerApi;
-  private readonly graceMs: number;
   private readonly lobbyGraceMs: number;
 
   constructor(private readonly deps: DemandControllerDeps) {
     this.timers = deps.timers ?? defaultTimers;
-    this.graceMs = deps.graceMs ?? SOLO_GRACE_MS;
-    this.lobbyGraceMs = deps.lobbyGraceMs ?? LOBBY_IDLE_GRACE_MS;
+    // Grace de mídia removido por privacidade: valores legados são ignorados/limitados.
+    this.lobbyGraceMs = Math.min(
+      Math.max(0, deps.lobbyGraceMs ?? LOBBY_IDLE_GRACE_MS),
+      MAX_LOBBY_DEBOUNCE_MS,
+    );
   }
 
   get mode(): RtcOnDemandMode {
@@ -163,12 +171,7 @@ export class RtcDemandController {
       );
       return;
     }
-    const cur = this.demand;
-    if (cur.kind === "PRIVATE" && cur.zoneId === zoneId) {
-      // Conectado e ficou sozinho: grace antes de soltar.
-      if (this.grace == null) this.armGrace(zoneId, i.occupants);
-      return;
-    }
+    // Ficou sozinho: solta a Room imediatamente (sem grace de mídia).
     this.cancelGrace(zoneId);
     this.set(NONE, "alone", i);
   }
@@ -225,34 +228,6 @@ export class RtcDemandController {
   private clearLobbyGrace(): void {
     if (this.lobbyGrace != null) this.timers.clearTimeout(this.lobbyGrace);
     this.lobbyGrace = null;
-  }
-
-  private armGrace(zoneId: string, occupantCount: number): void {
-    emitTelemetry(this.deps.telemetry, "RTC_SOLO_GRACE_ARMED", {
-      zoneId,
-      metadata: { occupantCount, graceMs: this.graceMs },
-    });
-    this.grace = this.timers.setTimeout(() => {
-      this.grace = null;
-      if (this.disposed || !this.input) return;
-      const i = this.input;
-      const stillAlone =
-        i.context.kind === "PRIVATE_ROOM" &&
-        i.context.zoneId === zoneId &&
-        i.occupants < 2 &&
-        !i.recordingActive;
-      if (!stillAlone) return this.evaluate();
-      if (i.roomStatus === "RECONNECTING") {
-        // Reconexão nativa do LiveKit tem prioridade: tenta de novo depois.
-        this.armGrace(zoneId, i.occupants);
-        return;
-      }
-      emitTelemetry(this.deps.telemetry, "RTC_SOLO_GRACE_EXPIRED", {
-        zoneId,
-        metadata: { occupantCount: i.occupants },
-      });
-      this.set(NONE, "solo_grace_expired", i);
-    }, this.graceMs);
   }
 
   private cancelGrace(zoneId: string | null): void {
