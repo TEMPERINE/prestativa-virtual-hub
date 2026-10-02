@@ -110,8 +110,10 @@ export function createV2CaptureAdapter(getSelection: () => DeviceSelection): Cap
           "microphone",
         );
       } catch (e) {
-        if ((e as { name?: string })?.name === "OverconstrainedError") {
-          return wrap(await lk.createLocalAudioTrack({}), "microphone");
+        const name = (e as { name?: string })?.name;
+        // Mic salvo sumiu/mudou de id: UMA tentativa no dispositivo padrão (sem loop).
+        if (name === "OverconstrainedError" || (id && name === "NotFoundError")) {
+          return wrap(await lk.createLocalAudioTrack(V2_AUDIO_CAPTURE), "microphone");
         }
         throw e;
       }

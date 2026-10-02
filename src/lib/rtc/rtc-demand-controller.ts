@@ -15,13 +15,12 @@ import type { RoomManagerStatus } from "./livekit-room-manager";
 export type RtcOnDemandMode = "off" | "private" | "all";
 export const DEFAULT_RTC_ON_DEMAND: RtcOnDemandMode = "off";
 export const SOLO_GRACE_MS = 15_000;
+export const LOBBY_IDLE_GRACE_MS = 15_000;
 
 export function parseRtcOnDemand(raw?: string | null): RtcOnDemandMode {
   const v = (raw ?? "").toString().trim().toLowerCase();
   if (v === "private") return "private";
-  // "all" é reservado para a Fase 2 (lobby). Fallback explícito e seguro:
-  // vira "private" (lobby segue o comportamento atual, nada parcial).
-  if (v === "all") return "private";
+  if (v === "all") return "all";
   return DEFAULT_RTC_ON_DEMAND;
 }
 
@@ -41,6 +40,10 @@ export interface DemandInput {
   occupants: number;
   recordingActive: boolean;
   roomStatus: RoomManagerStatus | null;
+  /** Fase 2 ("all"): peers online no lobby dentro do critério espacial. */
+  nearbyLobbyPeers?: number;
+  /** Fase 2: false enquanto a zona ainda está sendo classificada. */
+  contextStable?: boolean;
 }
 
 export function demandToContext(d: RtcDemand): MediaContext {
@@ -71,6 +74,7 @@ export interface DemandControllerDeps {
   mode: RtcOnDemandMode;
   timers?: TimerApi;
   graceMs?: number;
+  lobbyGraceMs?: number;
   telemetry?: RtcTelemetrySink;
 }
 
@@ -85,14 +89,17 @@ export class RtcDemandController {
   private demand: RtcDemand = NONE;
   private input: DemandInput | null = null;
   private grace: unknown = null;
+  private lobbyGrace: unknown = null;
   private disposed = false;
   private listeners = new Set<(d: RtcDemand) => void>();
   private readonly timers: TimerApi;
   private readonly graceMs: number;
+  private readonly lobbyGraceMs: number;
 
   constructor(private readonly deps: DemandControllerDeps) {
     this.timers = deps.timers ?? defaultTimers;
     this.graceMs = deps.graceMs ?? SOLO_GRACE_MS;
+    this.lobbyGraceMs = deps.lobbyGraceMs ?? LOBBY_IDLE_GRACE_MS;
   }
 
   get mode(): RtcOnDemandMode {
@@ -103,6 +110,9 @@ export class RtcDemandController {
   }
   isGraceArmed(): boolean {
     return this.grace != null;
+  }
+  isLobbyGraceArmed(): boolean {
+    return this.lobbyGrace != null;
   }
   subscribe(fn: (d: RtcDemand) => void): () => void {
     this.listeners.add(fn);
@@ -118,6 +128,7 @@ export class RtcDemandController {
   dispose(): void {
     this.disposed = true;
     this.clearGrace();
+    this.clearLobbyGrace();
     this.listeners.clear();
   }
 
@@ -125,6 +136,11 @@ export class RtcDemandController {
     const i = this.input;
     if (!i) return;
     const ctx = i.context;
+    if (ctx.kind !== "LOBBY") this.cancelLobbyGrace("context");
+    if (this.deps.mode === "all" && ctx.kind === "LOBBY") {
+      this.cancelGrace(null);
+      return this.evaluateLobby(i);
+    }
     if (this.deps.mode === "off" || ctx.kind !== "PRIVATE_ROOM") {
       this.cancelGrace(ctx.kind === "PRIVATE_ROOM" ? ctx.zoneId : null);
       const next: RtcDemand =
@@ -155,6 +171,60 @@ export class RtcDemandController {
     }
     this.cancelGrace(zoneId);
     this.set(NONE, "alone", i);
+  }
+
+  /** Fase 2: lobby só conecta com alguém próximo; afastamento usa grace. */
+  private evaluateLobby(i: DemandInput): void {
+    const nearby = i.nearbyLobbyPeers ?? 0;
+    const cur = this.demand;
+    if (i.contextStable === false && cur.kind !== "LOBBY") {
+      // Classificação inicial da zona: nunca conectar preventivamente.
+      this.set(NONE, "classifying", i);
+      return;
+    }
+    if (nearby >= 1) {
+      this.cancelLobbyGrace("peer_nearby", nearby);
+      this.set({ kind: "LOBBY" }, "peer_nearby", i);
+      return;
+    }
+    if (cur.kind === "LOBBY") {
+      if (this.lobbyGrace == null) this.armLobbyGrace();
+      return;
+    }
+    this.set(NONE, "lobby_alone", i);
+  }
+
+  private armLobbyGrace(): void {
+    emitTelemetry(this.deps.telemetry, "RTC_LOBBY_GRACE_ARMED", {
+      metadata: { nearbyPeerCount: 0, graceMs: this.lobbyGraceMs },
+    });
+    this.lobbyGrace = this.timers.setTimeout(() => {
+      this.lobbyGrace = null;
+      if (this.disposed || !this.input) return;
+      const i = this.input;
+      if (i.context.kind !== "LOBBY" || (i.nearbyLobbyPeers ?? 0) >= 1) return this.evaluate();
+      if (i.roomStatus === "RECONNECTING") {
+        this.armLobbyGrace();
+        return;
+      }
+      emitTelemetry(this.deps.telemetry, "RTC_LOBBY_GRACE_EXPIRED", {
+        metadata: { nearbyPeerCount: 0 },
+      });
+      this.set(NONE, "lobby_grace_expired", i);
+    }, this.lobbyGraceMs);
+  }
+
+  private cancelLobbyGrace(reason: string, nearby = 0): void {
+    if (this.lobbyGrace == null) return;
+    this.clearLobbyGrace();
+    emitTelemetry(this.deps.telemetry, "RTC_LOBBY_GRACE_CANCELLED", {
+      metadata: { nearbyPeerCount: nearby, reason },
+    });
+  }
+
+  private clearLobbyGrace(): void {
+    if (this.lobbyGrace != null) this.timers.clearTimeout(this.lobbyGrace);
+    this.lobbyGrace = null;
   }
 
   private armGrace(zoneId: string, occupantCount: number): void {
@@ -212,6 +282,16 @@ export class RtcDemandController {
         occupantCount: i.occupants,
       },
     });
+    if (this.deps.mode === "all" && (from.kind === "LOBBY" || next.kind === "LOBBY")) {
+      emitTelemetry(this.deps.telemetry, "RTC_LOBBY_DEMAND_CHANGED", {
+        metadata: {
+          from: from.kind === "PRIVATE" ? `PRIVATE:${from.zoneId}` : from.kind,
+          to: next.kind === "PRIVATE" ? `PRIVATE:${next.zoneId}` : next.kind,
+          reason,
+          nearbyPeerCount: i.nearbyLobbyPeers ?? 0,
+        },
+      });
+    }
     for (const l of this.listeners) l(next);
   }
 }
