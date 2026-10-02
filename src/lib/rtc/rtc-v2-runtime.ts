@@ -433,6 +433,45 @@ export class RtcV2Runtime {
       recordingActive: this.recordingActive,
       roomStatus: this.rooms.getSnapshot().status,
     });
+    this.traceDemand(occupants);
+  }
+
+  private lastTraceOccupants = 1;
+  private traceDemand(occupants?: number): void {
+    if (!this.demandTrace.on) return;
+    try {
+      if (occupants != null) this.lastTraceOccupants = occupants;
+      const ctx = this.context.getSnapshot();
+      const r = this.rooms.getSnapshot();
+      const fmt = (c: MediaContext | null) =>
+        !c ? "NONE" : c.kind === "PRIVATE_ROOM" ? `PRIVATE:${c.zoneId}` : c.kind;
+      const zoneId = ctx.context.kind === "PRIVATE_ROOM" ? ctx.context.zoneId : null;
+      const myLoc = zoneId ? `PRIVATE:${zoneId}` : ctx.context.kind === "LOBBY" ? "LOBBY" : null;
+      const remote: Record<string, string | null> = {};
+      let presenceCount = 1;
+      for (const o of this.presence.getRoster().values()) {
+        if (o.userId === this.config.userId) continue;
+        remote[shortId(o.userId)] = o.mediaLocation ?? null;
+        if (myLoc && zoneId && o.mediaLocation === myLoc) presenceCount++;
+      }
+      const d = this.demand.getDemand();
+      this.demandTrace.record({
+        client: shortId(this.config.userId),
+        myZone: { id: zoneId, name: zoneId ? (findZoneById(zoneId)?.name ?? null) : null },
+        myMediaLocation: myLoc,
+        remoteMediaLocations: remote,
+        presenceOccupantCount: presenceCount,
+        livekitRemoteCount: this.remote.getSnapshot().participants.length,
+        occupantCount: this.lastTraceOccupants,
+        rtcDemand: d.kind === "PRIVATE" ? `PRIVATE:${d.zoneId}` : d.kind,
+        activeContext: fmt(r.connected),
+        desiredContext: fmt(r.desired),
+        soloGraceState: this.demand.isGraceArmed() ? "ARMED" : "IDLE",
+        recordingActive: this.recordingActive,
+      });
+    } catch {
+      /* trace nunca altera comportamento */
+    }
   }
 
   private onDemand(d: RtcDemand): void {
@@ -442,6 +481,7 @@ export class RtcV2Runtime {
     if (d.kind === "NONE" && ctx.kind === "PRIVATE_ROOM") void this.local.suspendCapture();
     else if (this.local.isCaptureSuspended()) void this.local.resumeCapture();
     this.emit();
+    this.traceDemand();
   }
   currentRoom(): V2Room | null {
     return this.attached;
