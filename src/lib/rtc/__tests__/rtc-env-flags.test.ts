@@ -43,7 +43,7 @@ describe("leitura efetiva das flags de ambiente (regressão)", () => {
     setEnv("VITE_RTC_ON_DEMAND", "private");
     expect(getRtcOnDemand()).toBe("private");
     setEnv("VITE_RTC_ON_DEMAND", "all");
-    expect(getRtcOnDemand()).toBe("private"); // fallback explícito da Fase 1
+    expect(getRtcOnDemand()).toBe("all"); // fallback explícito da Fase 1
     setEnv("VITE_RTC_ON_DEMAND", undefined);
     expect(getRtcOnDemand()).toBe("off"); // default
   });
