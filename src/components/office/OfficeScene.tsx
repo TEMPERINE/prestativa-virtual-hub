@@ -3486,6 +3486,27 @@ export function OfficeScene({
         />
       )}
 
+      {IS_RTC_V2 && rtc.v2?.privacy.promptVisible && (
+        <div
+          role="alertdialog"
+          aria-label="Dispositivos pausados por privacidade"
+          className="fixed bottom-24 left-1/2 z-50 w-[min(92vw,420px)] -translate-x-1/2 rounded-xl border border-border bg-card p-4 text-card-foreground shadow-lg"
+        >
+          <p className="text-sm font-semibold">Dispositivos pausados por privacidade</p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Seu microfone e/ou câmera foram desligados porque o Prestativa Office ficou em segundo plano.
+          </p>
+          <div className="mt-3 flex justify-end gap-2">
+            <Button size="sm" variant="ghost" onClick={() => rtc.v2?.privacyKeepOff()}>
+              Manter desligados
+            </Button>
+            <Button size="sm" onClick={() => void rtc.v2?.privacyRestore()}>
+              Reativar dispositivos
+            </Button>
+          </div>
+        </div>
+      )}
+
       {IS_RTC_V2 && serverRecorder.completed && (
         <RecordingNameDialog
           meetingId={serverRecorder.completed.meetingId}

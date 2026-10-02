@@ -18,6 +18,7 @@ import type { RemoteAvatarState } from "./movement-realtime";
 import type { PresencePayload } from "./office-presence";
 import type { MediaContext } from "./media-context";
 import type { RoomManagerStatus } from "./livekit-room-manager";
+import type { PrivacyGuardSnapshot } from "./privacy-guard";
 
 export interface RtcV2HookConfig {
   workspaceId: string;
@@ -40,6 +41,10 @@ export interface RtcV2Controls {
   retry: () => void;
   /** LocalAudioTrack (LiveKit) atual com mic ON, só para o medidor visual. */
   localMicTrack: unknown | null;
+  /** Fase 3 — Privacy Guard. */
+  privacy: PrivacyGuardSnapshot;
+  privacyRestore: () => Promise<void>;
+  privacyKeepOff: () => void;
 }
 
 export function mapRoomStatus(
@@ -216,6 +221,20 @@ export function useLiveKitV2(
     };
   }, [runtime]);
 
+  // Fase 3: visibilidade da página → Privacy Guard (sem window.blur).
+  useEffect(() => {
+    if (!runtime) return;
+    const h = () => runtime.privacy.setVisibility(document.visibilityState === "hidden");
+    h();
+    document.addEventListener("visibilitychange", h);
+    return () => document.removeEventListener("visibilitychange", h);
+  }, [runtime]);
+  const privacySnap = useSyncExternalStore(
+    runtime?.privacy.subscribe ?? noopSubscribe,
+    runtime?.privacy.getSnapshot ?? nullSnapshot,
+    nullSnapshot,
+  );
+
   const snap: RtcV2Snapshot | null = useSyncExternalStore(
     runtime?.subscribe ?? noopSubscribe,
     runtime?.getSnapshot ?? nullSnapshot,
@@ -327,8 +346,11 @@ export function useLiveKitV2(
         snap.local.microphone.status === "on"
           ? ((runtime.local.getTrack("microphone") as { lk?: unknown } | null)?.lk ?? null)
           : null,
+      privacy: privacySnap ?? { suspended: false, promptVisible: false, saved: null },
+      privacyRestore: () => runtime.privacy.restore(),
+      privacyKeepOff: () => runtime.privacy.keepOff(),
     };
-  }, [runtime, snap]);
+  }, [runtime, snap, privacySnap]);
 
   const connectionStatus = mapRoomStatus(snap?.roomStatus ?? null, snap?.context ?? null);
 
