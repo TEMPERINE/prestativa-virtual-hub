@@ -274,10 +274,54 @@ export class LocalMedia {
     }
   }
 
+  // ---------- RTC On Demand: captura suspensa sem audiência ----------
+  private suspended = false;
+
+  isCaptureSuspended(): boolean {
+    return this.suspended;
+  }
+
+  /**
+   * Para a captura física de mic/câmera (sem audiência), preservando intent,
+   * dispositivo selecionado e sem tocar em screen share.
+   */
+  async suspendCapture(): Promise<void> {
+    if (this.disposed || this.suspended) return;
+    this.suspended = true;
+    const ops: Promise<void>[] = [];
+    for (const k of ["microphone", "camera"] as Kind[]) {
+      const slot = this.slots[k];
+      slot.op++;
+      if (slot.status !== "error") slot.status = "off";
+      ops.push(this.dropTrack(slot));
+    }
+    this.emit();
+    await Promise.all(ops);
+  }
+
+  /** Restaura via lifecycle normal os intents que estavam ON. */
+  async resumeCapture(): Promise<void> {
+    if (this.disposed || !this.suspended) return;
+    this.suspended = false;
+    this.emit();
+    await Promise.all(
+      (["microphone", "camera"] as Kind[])
+        .filter((k) => this.slots[k].intent)
+        .map((k) => this.setDevice(k, true)),
+    );
+  }
+
   private async setDevice(kind: Kind, on: boolean): Promise<void> {
     if (this.disposed) return;
     const slot = this.slots[kind];
     const op = ++slot.op;
+    if (on && this.suspended) {
+      // Sem audiência: registra a intenção; captura acontece no resume.
+      slot.intent = true;
+      slot.error = null;
+      this.emit();
+      return;
+    }
     if (!on) {
       const wasOn = slot.intent || (slot.track !== null && slot.status !== "off");
       slot.intent = false;
