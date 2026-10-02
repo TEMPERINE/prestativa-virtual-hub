@@ -1,9 +1,10 @@
 /**
  * RTC v2 — Fase 3: Privacy Guard.
  *
- * Suspensão LOCAL de mic/câmera quando a aba fica oculta por ≥ 30s.
- * Não toca em Room, MediaContext, presença, movimento, Egress ou reunião:
- * só chama setMicrophoneEnabled/setCameraEnabled(false) do lifecycle da Fase 2.
+ * Suspensão LOCAL somente da CÂMERA quando a aba fica oculta por ≥ 30s.
+ * O microfone NUNCA é tocado (segue só a intenção do usuário) e screen share
+ * não bloqueia nem é afetado. Não toca em Room, MediaContext, presença,
+ * movimento, Egress ou reunião: só chama setCam(false) do lifecycle atual.
  * Estado separado: `saved` (o que estava ON antes) ≠ intent atual ≠ suspensão.
  */
 import { emitTelemetry, type RtcTelemetrySink } from "./rtc-telemetry-types";
@@ -11,10 +12,7 @@ import { emitTelemetry, type RtcTelemetrySink } from "./rtc-telemetry-types";
 export const PRIVACY_GUARD_DELAY_MS = 30_000;
 
 export interface PrivacyGuardMedia {
-  isMicOn(): boolean;
   isCamOn(): boolean;
-  isScreenSharing(): boolean;
-  setMic(on: boolean): Promise<void>;
   setCam(on: boolean): Promise<void>;
 }
 
@@ -28,7 +26,7 @@ export interface PrivacyGuardSnapshot {
   suspended: boolean;
   /** Mostrar aviso (suspenso + página visível). */
   promptVisible: boolean;
-  saved: { mic: boolean; cam: boolean } | null;
+  saved: { cam: boolean } | null;
 }
 
 const defaultTimers: PrivacyGuardTimers = {
@@ -39,9 +37,7 @@ const defaultTimers: PrivacyGuardTimers = {
 export class PrivacyGuard {
   private hidden = false;
   private timer: unknown = null;
-  /** 30s expiraram com screen share ativo → suspender quando o share acabar. */
-  private waitingShareEnd = false;
-  private saved: { mic: boolean; cam: boolean } | null = null;
+  private saved: { cam: boolean } | null = null;
   private disposed = false;
   private snap: PrivacyGuardSnapshot = { suspended: false, promptVisible: false, saved: null };
   private listeners = new Set<() => void>();
@@ -67,35 +63,25 @@ export class PrivacyGuard {
       this.timer = this.timers.setTimeout(() => this.onTimeout(), this.delay);
       emitTelemetry(this.telemetry, "PRIVACY_GUARD_ARMED");
     } else {
-      if (this.timer !== null || this.waitingShareEnd) {
+      if (this.timer !== null) {
         this.clearTimer();
-        this.waitingShareEnd = false;
         emitTelemetry(this.telemetry, "PRIVACY_GUARD_CANCELLED");
       }
     }
     this.emit();
   }
 
-  /** Chamado a cada mudança da mídia local (detecta fim de screen share). */
-  onLocalMediaChange(): void {
-    if (this.disposed) return;
-    if (this.waitingShareEnd && this.hidden && !this.media.isScreenSharing()) {
-      this.waitingShareEnd = false;
-      void this.suspend();
-    }
-  }
+  /** Mantido por compatibilidade; screen share não influencia mais o guard. */
+  onLocalMediaChange(): void {}
 
-  /** Reativar: liga só o que estava ON antes da suspensão. */
+  /** Reativar câmera: religa somente a câmera (nunca o mic). */
   async restore(): Promise<void> {
     const s = this.saved;
     if (!s || this.disposed) return;
     this.saved = null;
     this.emit();
-    emitTelemetry(this.telemetry, "PRIVACY_GUARD_RESTORED", { metadata: { mic: s.mic, cam: s.cam } });
-    const ops: Promise<void>[] = [];
-    if (s.mic && !this.media.isMicOn()) ops.push(this.media.setMic(true));
-    if (s.cam && !this.media.isCamOn()) ops.push(this.media.setCam(true));
-    await Promise.allSettled(ops);
+    emitTelemetry(this.telemetry, "PRIVACY_GUARD_RESTORED", { metadata: { cam: s.cam } });
+    if (s.cam && !this.media.isCamOn()) await this.media.setCam(true).catch(() => {});
   }
 
   keepOff(): void {
@@ -122,7 +108,6 @@ export class PrivacyGuard {
   dispose(): void {
     if (this.disposed) return;
     this.clearTimer();
-    this.waitingShareEnd = false;
     this.saved = null;
     this.disposed = true;
     this.listeners.clear();
@@ -132,25 +117,15 @@ export class PrivacyGuard {
   private onTimeout(): void {
     this.timer = null;
     if (this.disposed || !this.hidden) return;
-    if (this.media.isScreenSharing()) {
-      this.waitingShareEnd = true;
-      emitTelemetry(this.telemetry, "PRIVACY_GUARD_SKIPPED_SCREEN_SHARE");
-      return;
-    }
     void this.suspend();
   }
 
   private async suspend(): Promise<void> {
-    const mic = this.media.isMicOn();
-    const cam = this.media.isCamOn();
-    if (!mic && !cam) return; // nada a fazer, sem aviso
-    this.saved = { mic, cam };
-    emitTelemetry(this.telemetry, "PRIVACY_GUARD_SUSPENDED", { metadata: { mic, cam } });
+    if (!this.media.isCamOn()) return; // câmera já OFF: nenhuma operação, sem aviso
+    this.saved = { cam: true };
+    emitTelemetry(this.telemetry, "PRIVACY_GUARD_SUSPENDED", { metadata: { cam: true } });
     this.emit();
-    const ops: Promise<void>[] = [];
-    if (mic) ops.push(this.media.setMic(false));
-    if (cam) ops.push(this.media.setCam(false));
-    await Promise.allSettled(ops);
+    await this.media.setCam(false).catch(() => {});
   }
 
   private clearTimer(): void {
