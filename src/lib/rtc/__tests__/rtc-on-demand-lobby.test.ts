@@ -537,8 +537,9 @@ describe("preferência do microfone", () => {
   it("27. mic salvo sumiu: preferência passa a ser o que realmente funcionou", () => {
     const s = memStore();
     saveMicPreference("u1", "gone", s);
-    expect(reconcileAcquiredMic("u1", "gone", "builtin", s)).toBe("builtin");
-    expect(loadMicPreference("u1", s)).toBe("builtin");
+    // fallback momentâneo não apaga a escolha do usuário
+    expect(reconcileAcquiredMic("u1", "gone", "builtin", s)).toBe("gone");
+    expect(loadMicPreference("u1", s)).toBe("gone");
     // sem informação do device: mantém preferência
     expect(reconcileAcquiredMic("u1", "builtin", null, s)).toBe("builtin");
   });
