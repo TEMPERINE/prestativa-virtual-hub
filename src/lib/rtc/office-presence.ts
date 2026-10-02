@@ -192,7 +192,10 @@ export class OfficePresence {
       for (const m of metas ?? []) {
         if (!m || typeof m.userId !== "string") continue;
         const cur = next.get(m.userId);
-        if (!cur || m.generation > cur.generation) {
+        // Empate de generation: o meta MAIS RECENTE vence (Phoenix acrescenta
+        // metas novos ao fim). Antes o primeiro (possivelmente obsoleto, sem
+        // mediaLocation atual) vencia e o cliente parado nunca via a mudança.
+        if (!cur || m.generation >= cur.generation) {
           next.set(m.userId, {
             userId: m.userId,
             sessionId: m.sessionId,
@@ -204,8 +207,25 @@ export class OfficePresence {
         }
       }
     }
+    // Só notifica mudança relevante (entra/sai/mediaLocation/sessão) — evita
+    // loop Presence → demand → track próprio → Presence sem alteração real.
+    const sig = (r: Map<string, PresencePayload>) =>
+      [...r.values()]
+        .map((p) => `${p.userId}|${p.sessionId}|${p.generation}|${p.mediaLocation ?? ""}`)
+        .sort()
+        .join(";");
+    const changed = sig(next) !== sig(this.roster);
     this.roster = next;
-    this.notify();
+    if (changed) {
+      this._revision++;
+      this.notify();
+    }
+  }
+
+  private _revision = 0;
+  /** Incrementa a cada mudança relevante do roster. */
+  get revision(): number {
+    return this._revision;
   }
 
   private setStatus(s: PresenceStatus): void {
