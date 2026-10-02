@@ -105,7 +105,7 @@ export function createV2CaptureAdapter(getSelection: () => DeviceSelection): Cap
       try {
         return wrap(
           await lk.createLocalAudioTrack(
-            id ? { ...V2_AUDIO_CAPTURE, deviceId: { ideal: id } } : V2_AUDIO_CAPTURE,
+            id ? { ...V2_AUDIO_CAPTURE, deviceId: { exact: id } } : V2_AUDIO_CAPTURE,
           ),
           "microphone",
         );
@@ -124,13 +124,15 @@ export function createV2CaptureAdapter(getSelection: () => DeviceSelection): Cap
       try {
         return wrap(
           await lk.createLocalVideoTrack(
-            id ? { ...V2_VIDEO_CAPTURE, deviceId: { ideal: id } } : V2_VIDEO_CAPTURE,
+            id ? { ...V2_VIDEO_CAPTURE, deviceId: { exact: id } } : V2_VIDEO_CAPTURE,
           ),
           "camera",
         );
       } catch (e) {
-        if ((e as { name?: string })?.name === "OverconstrainedError") {
-          return wrap(await lk.createLocalVideoTrack({}), "camera");
+        const name = (e as { name?: string })?.name;
+        // Câmera salva ausente: UMA tentativa no padrão (preferência mantida).
+        if (name === "OverconstrainedError" || (id && name === "NotFoundError")) {
+          return wrap(await lk.createLocalVideoTrack(V2_VIDEO_CAPTURE), "camera");
         }
         throw e;
       }

@@ -3,7 +3,13 @@
  * contrato público de useLiveKit (RtcMeshState). Só coordena; a lógica está
  * nos módulos RTC v2. Um runtime por (usuário, workspace, sessão, generation).
  */
-import { loadMicPreference, reconcileAcquiredMic, saveMicPreference } from "./mic-preference";
+import {
+  loadCameraPreference,
+  loadMicPreference,
+  reconcileAcquiredMic,
+  saveCameraPreference,
+  saveMicPreference,
+} from "./mic-preference";
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import type { RtcConnectionStatus, RtcMeshState } from "./useLiveKit-v1";
 import { RtcV2Runtime, createV2RoomFactory, type RtcV2Snapshot } from "./rtc-v2-runtime";
@@ -132,10 +138,17 @@ export function useLiveKitV2(
   // Último mic escolhido neste navegador (só o deviceId; mic continua OFF no login).
   useEffect(() => {
     if (!myId) return;
-    const saved = loadMicPreference(myId);
-    if (!saved || selectionRef.current.audioInput) return;
-    selectionRef.current = { ...selectionRef.current, audioInput: saved };
-    setSelection((s) => (s.audioInput ? s : { ...s, audioInput: saved }));
+    const mic = loadMicPreference(myId);
+    const cam = loadCameraPreference(myId);
+    const cur = selectionRef.current;
+    const next = {
+      ...cur,
+      audioInput: cur.audioInput ?? mic,
+      videoInput: cur.videoInput ?? cam,
+    };
+    if (next.audioInput === cur.audioInput && next.videoInput === cur.videoInput) return;
+    selectionRef.current = next;
+    setSelection((s) => ({ ...s, audioInput: s.audioInput ?? mic, videoInput: s.videoInput ?? cam }));
   }, [myId]);
 
   const refreshDevices = useCallback(async () => {
@@ -318,12 +331,13 @@ export function useLiveKitV2(
   const setVideoDevice = useCallback(async (deviceId: string) => {
     setSelection((s) => ({ ...s, videoInput: deviceId }));
     selectionRef.current = { ...selectionRef.current, videoInput: deviceId };
+    if (myId) saveCameraPreference(myId, deviceId);
     const rt = runtimeRef.current;
     if (rt && rt.local.getSnapshot().camera.intent) {
       await rt.local.setCameraEnabled(false);
       await rt.local.setCameraEnabled(true);
     }
-  }, []);
+  }, [myId]);
   const setAudioInputDevice = useCallback(async (deviceId: string) => {
     runtimeRef.current?.audioDiag.noteDeviceChange(selectionRef.current.audioInput, deviceId);
     setSelection((s) => ({ ...s, audioInput: deviceId }));
