@@ -24,6 +24,8 @@ import {
   micPreferenceKey,
   reconcileAcquiredMic,
   saveMicPreference,
+  saveCameraPreference,
+  loadCameraPreference,
   type KeyValueStore,
 } from "../mic-preference";
 
@@ -534,7 +536,7 @@ describe("preferência do microfone", () => {
     expect([...s.data.keys()]).toEqual([micPreferenceKey("u1")]);
     expect([...s.data.values()].join()).not.toMatch(/on|true/i);
   });
-  it("27. mic salvo sumiu: preferência passa a ser o que realmente funcionou", () => {
+  it("27. mic salvo ausente: fallback não sobrescreve a última escolha", () => {
     const s = memStore();
     saveMicPreference("u1", "gone", s);
     // fallback momentâneo não apaga a escolha do usuário
@@ -542,6 +544,12 @@ describe("preferência do microfone", () => {
     expect(loadMicPreference("u1", s)).toBe("gone");
     // sem informação do device: mantém preferência
     expect(reconcileAcquiredMic("u1", "builtin", null, s)).toBe("builtin");
+  });
+  it("câmera: última escolha guardada por usuário, sem estado ligado", () => {
+    const s = memStore();
+    saveCameraPreference("u1", "cam-usb", s);
+    expect(loadCameraPreference("u1", s)).toBe("cam-usb");
+    expect(loadCameraPreference("u2", s)).toBeNull();
   });
   it("28. novo login continua mic OFF (preferência não guarda intent)", async () => {
     const w = world();
