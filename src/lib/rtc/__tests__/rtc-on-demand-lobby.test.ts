@@ -83,24 +83,39 @@ describe("RtcDemandController (all)", () => {
     expect(c.getDemand()).toEqual({ kind: "LOBBY" });
     expect(events).toContain("RTC_LOBBY_DEMAND_CHANGED");
   });
-  it("10/11/12. afastar arma grace; retorno cancela; expira => NONE", () => {
+  it("10/11/12. afastar: só debounce técnico (<=1s); retorno cancela; NONE em até 1s", () => {
     const { c, up, events } = ctl();
     up({ nearbyLobbyPeers: 1 });
     up({ nearbyLobbyPeers: 0 });
     expect(c.isLobbyGraceArmed()).toBe(true);
-    expect(c.getDemand().kind).toBe("LOBBY");
-    vi.advanceTimersByTime(10_000);
-    up({ nearbyLobbyPeers: 1 });
+    vi.advanceTimersByTime(300);
+    up({ nearbyLobbyPeers: 1 }); // jitter
     expect(c.isLobbyGraceArmed()).toBe(false);
+    expect(c.getDemand().kind).toBe("LOBBY");
     up({ nearbyLobbyPeers: 0 });
-    vi.advanceTimersByTime(15_000);
+    vi.advanceTimersByTime(1_000);
     expect(c.getDemand()).toEqual({ kind: "NONE" });
-    for (const e of [
-      "RTC_LOBBY_GRACE_ARMED",
-      "RTC_LOBBY_GRACE_CANCELLED",
-      "RTC_LOBBY_GRACE_EXPIRED",
-    ])
+    for (const e of ["RTC_LOBBY_GRACE_ARMED", "RTC_LOBBY_GRACE_CANCELLED", "RTC_LOBBY_GRACE_EXPIRED"])
       expect(events).toContain(e);
+  });
+  it("lobbyGraceMs legado de 15s é limitado a 1s (sem grace perceptível)", () => {
+    const c = new RtcDemandController({ mode: "all", lobbyGraceMs: 15_000 });
+    const up = (n: number) =>
+      c.update({ context: { kind: "LOBBY" }, occupants: 1, recordingActive: false, roomStatus: null, nearbyLobbyPeers: n });
+    up(1);
+    up(0);
+    vi.advanceTimersByTime(1_000);
+    expect(c.getDemand()).toEqual({ kind: "NONE" });
+  });
+  it("9. corredor: B além do DISCONNECT_RADIUS => A e B NONE em até 1s", async () => {
+    const w = world();
+    await w.enter("A", L(0.5));
+    await w.enter("B", L(0.52));
+    await w.move("B", L(0.6));
+    await settle(1_000);
+    expect([w.demand("A"), w.demand("B")]).toEqual(["NONE", "NONE"]);
+    expect(w.clients.A.rt.getSnapshot().roomStatus).toBe("DISCONNECTED");
+    await w.disposeAll();
   });
   it("classificação inicial instável nunca conecta lobby", () => {
     const { c, up } = ctl();
