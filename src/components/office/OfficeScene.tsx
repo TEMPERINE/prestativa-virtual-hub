@@ -2175,6 +2175,49 @@ export function OfficeScene({
     void ch.send({ type: "broadcast", event: "join-decline", payload: { from: me, to: fromUid } });
   }, []);
 
+  // Alertas de "chamar para seguir": evento de negócio → apresentação web.
+  // Não chama RTC/mídia/movimento; "Seguir" executa o acceptLead existente.
+  const acceptLeadRef = useRef(acceptLead);
+  acceptLeadRef.current = acceptLead;
+  const declineLeadRef = useRef(declineLead);
+  declineLeadRef.current = declineLead;
+  const followCenterRef = useRef<ReturnType<typeof createFollowRequestCenter> | null>(null);
+  if (!followCenterRef.current) {
+    const center = createFollowRequestCenter({
+      showToast: (req) => {
+        toast(`${req.fromName} chamou você`, {
+          id: `follow-${req.fromUid}`, // mesmo remetente atualiza o toast existente
+          description: `Quer seguir ${req.fromName} pelo escritório?`,
+          duration: 20000,
+          position: "top-right",
+          action: { label: "Seguir", onClick: () => { center.resolve(req.fromUid); acceptLeadRef.current(req.fromUid); } },
+          cancel: { label: "Agora não", onClick: () => { center.resolve(req.fromUid); declineLeadRef.current(req.fromUid); } },
+        });
+      },
+      playSound: () => playFollowChime(),
+      isHidden: () => typeof document !== "undefined" && document.visibilityState === "hidden",
+      notificationPermission: () => (typeof Notification === "undefined" ? "unsupported" : Notification.permission),
+      notificationsOptIn: getNotificationsOptIn,
+      showSystemNotification: (req) => {
+        const n = new Notification("Prestativa Office", {
+          body: `${req.fromName} chamou você para segui-lo.`,
+          tag: `follow-${req.fromUid}`,
+        });
+        n.onclick = () => { window.focus(); n.close(); }; // só traz o Office; não segue
+      },
+    });
+    followCenterRef.current = center;
+  }
+  useEffect(() => {
+    const prime = () => primeNotificationSound();
+    window.addEventListener("pointerdown", prime);
+    window.addEventListener("keydown", prime);
+    return () => {
+      window.removeEventListener("pointerdown", prime);
+      window.removeEventListener("keydown", prime);
+    };
+  }, []);
+
   // Lead channel — separate from positions so we can subscribe independently
   // once we know our user id (the broadcast handlers need stable closures).
   useEffect(() => {
@@ -2185,12 +2228,10 @@ export function OfficeScene({
       .on("broadcast", { event: "lead-request" }, ({ payload }) => {
         const p = payload as { from?: string; to?: string; fromName?: string };
         if (!p?.from || p.to !== uid) return;
-        const from = p.from;
-        toast(`${p.fromName ?? "Alguém"} pediu para te conduzir`, {
-          description: "Aceite para seguir essa pessoa até onde ela for.",
-          duration: 20000,
-          action: { label: "Aceitar", onClick: () => acceptLead(from) },
-          cancel: { label: "Recusar", onClick: () => declineLead(from) },
+        followCenterRef.current?.receive({
+          fromUid: p.from,
+          fromName: p.fromName ?? profilesRef.current[p.from]?.display_name ?? "Alguém",
+          at: Date.now(),
         });
       })
       .on("broadcast", { event: "lead-accept" }, ({ payload }) => {
