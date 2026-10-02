@@ -43,6 +43,8 @@ type Props = {
 
 export function ProfileMenu(p: Props) {
   const [open, setOpen] = useState(false);
+  const [notifOn, setNotifOn] = useState(false);
+  useEffect(() => { setNotifOn(getNotificationsOptIn()); }, [open]);
   const status: Status = (p.me.status ?? "available") as Status;
 
   const setStatus = async (s: Status) => {
