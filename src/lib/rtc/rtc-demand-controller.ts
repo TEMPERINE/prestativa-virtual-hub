@@ -14,8 +14,14 @@ import type { RoomManagerStatus } from "./livekit-room-manager";
 
 export type RtcOnDemandMode = "off" | "private" | "all";
 export const DEFAULT_RTC_ON_DEMAND: RtcOnDemandMode = "off";
-export const SOLO_GRACE_MS = 15_000;
-export const LOBBY_IDLE_GRACE_MS = 15_000;
+/**
+ * Sem grace de mídia: sala privada que cai para 1 vai a NONE na hora.
+ * (A continuidade de 15s é só administrativa — MeetingTrackerV2.)
+ */
+export const SOLO_GRACE_MS = 0;
+/** Lobby: só debounce técnico contra jitter de posição (não perceptível). */
+export const LOBBY_IDLE_GRACE_MS = 750;
+export const MAX_LOBBY_DEBOUNCE_MS = 1_000;
 
 export function parseRtcOnDemand(raw?: string | null): RtcOnDemandMode {
   const v = (raw ?? "").toString().trim().toLowerCase();
@@ -98,8 +104,12 @@ export class RtcDemandController {
 
   constructor(private readonly deps: DemandControllerDeps) {
     this.timers = deps.timers ?? defaultTimers;
-    this.graceMs = deps.graceMs ?? SOLO_GRACE_MS;
-    this.lobbyGraceMs = deps.lobbyGraceMs ?? LOBBY_IDLE_GRACE_MS;
+    // Grace de mídia removido por privacidade: valores legados são ignorados/limitados.
+    this.graceMs = SOLO_GRACE_MS;
+    this.lobbyGraceMs = Math.min(
+      Math.max(0, deps.lobbyGraceMs ?? LOBBY_IDLE_GRACE_MS),
+      MAX_LOBBY_DEBOUNCE_MS,
+    );
   }
 
   get mode(): RtcOnDemandMode {
@@ -163,12 +173,7 @@ export class RtcDemandController {
       );
       return;
     }
-    const cur = this.demand;
-    if (cur.kind === "PRIVATE" && cur.zoneId === zoneId) {
-      // Conectado e ficou sozinho: grace antes de soltar.
-      if (this.grace == null) this.armGrace(zoneId, i.occupants);
-      return;
-    }
+    // Ficou sozinho: solta a Room imediatamente (sem grace de mídia).
     this.cancelGrace(zoneId);
     this.set(NONE, "alone", i);
   }
@@ -227,6 +232,8 @@ export class RtcDemandController {
     this.lobbyGrace = null;
   }
 
+  /** @deprecated grace de mídia removido; mantido apenas por compatibilidade. */
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   private armGrace(zoneId: string, occupantCount: number): void {
     emitTelemetry(this.deps.telemetry, "RTC_SOLO_GRACE_ARMED", {
       zoneId,

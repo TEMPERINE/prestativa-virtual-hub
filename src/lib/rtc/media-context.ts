@@ -191,7 +191,13 @@ export class MediaContextController {
     this.cancelCandidate();
     const token = ++this.token;
     this.timer = this.timers.setTimeout(() => this.confirm(token), this.confirmMs);
+    // Saí fisicamente da sala privada atual: o contexto deixa de ser ela já,
+    // sem esperar a confirmação da nova zona (privacidade de mídia).
+    const leftPrivate =
+      this.snap.context.kind === "PRIVATE_ROOM" &&
+      (this.snap.context as { zoneId: string }).zoneId !== zoneId;
     this.commit({
+      ...(leftPrivate ? { context: LOBBY } : {}),
       state: "CANDIDATE_PRIVATE_ROOM",
       desired: { kind: "PRIVATE_ROOM", zoneId },
       candidate: { zoneId, mapVersion, token },
