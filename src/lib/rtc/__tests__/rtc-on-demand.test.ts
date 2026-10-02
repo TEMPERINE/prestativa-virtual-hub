@@ -139,14 +139,15 @@ describe("RtcDemandController", () => {
 // ─── LocalMedia idle ───────────────────────────────────────────
 
 function fakeTrack(source: "microphone" | "camera") {
-  return {
+  const t = {
     source,
     stopped: false,
     stop() {
-      this.stopped = true;
+      t.stopped = true;
     },
     onEnded: () => () => {},
-  } as unknown as LocalTrackLike & { stopped: boolean };
+  };
+  return t as unknown as LocalTrackLike & { stopped: boolean };
 }
 
 function media() {
