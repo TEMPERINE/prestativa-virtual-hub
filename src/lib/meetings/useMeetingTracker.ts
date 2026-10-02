@@ -25,6 +25,8 @@ type Args = {
   enabled: boolean;
   /** V2: estado da Room vindo do LiveKitRoomManager (fonte de verdade). */
   v2Room?: MeetingRoomState | null;
+  /** RTC On Demand: remotos humanos na Room (undefined = regra atual). */
+  v2RemoteCount?: number;
   /** V2: label para o zoneId efetivamente conectado. */
   labelFor?: (zoneId: string) => string;
 };
@@ -127,7 +129,7 @@ function useMeetingTrackerV1({ zoneId, zoneLabel, isMeetingZone, peerCount, enab
  * V2 — join/leave derivados exclusivamente da Room privada realmente
  * CONNECTED (ver meeting-tracker-v2.ts). Falhas só são logadas.
  */
-function useMeetingTrackerV2({ enabled, v2Room, labelFor }: Args) {
+function useMeetingTrackerV2({ enabled, v2Room, v2RemoteCount, labelFor }: Args) {
   const [activeMeetingId, setActiveMeetingId] = useState<string | null>(null);
   const labelRef = useRef(labelFor);
   labelRef.current = labelFor;
@@ -168,8 +170,8 @@ function useMeetingTrackerV2({ enabled, v2Room, labelFor }: Args) {
   const status = v2Room?.status ?? null;
   const connected = v2Room?.connected ?? null;
   useEffect(() => {
-    tracker?.observe({ status, connected });
-  }, [tracker, status, connected]);
+    tracker?.observe({ status, connected, remoteCount: v2RemoteCount });
+  }, [tracker, status, connected, v2RemoteCount]);
 
   return { activeMeetingId };
 }

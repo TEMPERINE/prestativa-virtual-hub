@@ -1,3 +1,4 @@
+import { getRtcOnDemand } from "@/lib/rtc/rtc-demand-controller";
 import { MicLevelMeter } from "./MicLevelMeter";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { RemoteMotionPredictor, facingFromVector } from "@/lib/rtc/remote-motion";
@@ -75,6 +76,7 @@ import { useLiveKit, ACTIVE_RTC_ENGINE, type RtcV2HookConfig } from "@/lib/rtc/u
 
 // Motor RTC escolhido uma vez por execução (VITE_RTC_ENGINE; default v1).
 const IS_RTC_V2 = ACTIVE_RTC_ENGINE === "v2";
+const RTC_ON_DEMAND_ACTIVE = IS_RTC_V2 && getRtcOnDemand() !== "off";
 import { installAudioUnlockListeners, unlockAudioPlayback } from "@/lib/rtc/audio-unlock";
 import { RemoteVideoTiles, HiddenAudioPlayers } from "./RemoteVideoTiles";
 import { MeetingStage, type StageParticipant, type StageScreen } from "./MeetingStage";
@@ -2646,6 +2648,7 @@ export function OfficeScene({
     peerCount: desiredPeers.length,
     enabled: !!me?.id,
     v2Room: rtc.v2?.room ?? null,
+    v2RemoteCount: RTC_ON_DEMAND_ACTIVE ? (rtc.v2?.remoteCount ?? 0) : undefined,
     labelFor: meetingLabelFor,
   });
 
@@ -2664,6 +2667,11 @@ export function OfficeScene({
       v2RoomRef.current?.connected?.kind === "PRIVATE_ROOM",
   });
   const recorder = IS_RTC_V2 ? serverRecorder : legacyRecorder;
+  // RTC On Demand: gravação ativa mantém a Room mesmo com 1 humano.
+  const v2SetRecording = rtc.v2?.setRecordingActive;
+  useEffect(() => {
+    v2SetRecording?.(IS_RTC_V2 && !!serverRecorder.isRecording);
+  }, [v2SetRecording, serverRecorder.isRecording]);
 
 
 
@@ -3738,7 +3746,8 @@ export function OfficeScene({
               let dot = "bg-slate-400";
               let label = "Desconectado";
               let title = rtc.lastError ?? "";
-              if (s === "connecting") { dot = "bg-amber-400 animate-pulse"; label = "Conectando…"; }
+              if (rtc.v2?.awaitingPeer) { dot = "bg-slate-400"; label = "Aguardando outro participante"; title = ""; }
+              else if (s === "connecting") { dot = "bg-amber-400 animate-pulse"; label = "Conectando…"; }
               else if (s === "reconnecting") { dot = "bg-amber-400 animate-pulse"; label = "Reconectando…"; }
               else if (s === "error") { dot = "bg-red-500"; label = "Erro de conexão"; title = rtc.lastError ?? "Falha no LiveKit"; }
               else if (s === "connected") {

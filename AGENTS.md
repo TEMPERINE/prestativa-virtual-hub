@@ -7,3 +7,4 @@
 - Privacy Guard (src/lib/rtc/privacy-guard.ts) recebe do runtime só isCamOn/setCam — mic e screen share ficam fora do seu alcance por construção, evitando cortar a fala de quem troca de aba.
 - Meeting UI V2 (grid/apresentação/roster) fica atrás de VITE_MEETING_UI_V2 (src/lib/meeting-ui/layout.ts), independente de VITE_RTC_ENGINE; é só composição visual e cada stream vai a um único <video> por vez — rollback visual sem tocar RTC.
 - Pedidos de "seguir" passam por createFollowRequestCenter (src/lib/notifications/follow-requests.ts), separado da apresentação (toast/som/Notification) — permite futuro alerta nativo no app desktop sem mudar o fluxo.
+- RTC On Demand (VITE_RTC_ON_DEMAND, padrão off) decide só o destino em src/lib/rtc/rtc-demand-controller.ts (zoneId vem apenas do meu contexto; Presence.mediaLocation só conta ocupantes) e o runtime repassa ao RoomManager — o RoomManager segue único dono de connect/disconnect.

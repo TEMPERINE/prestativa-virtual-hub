@@ -19,6 +19,7 @@ import type { PresencePayload } from "./office-presence";
 import type { MediaContext } from "./media-context";
 import type { RoomManagerStatus } from "./livekit-room-manager";
 import type { PrivacyGuardSnapshot } from "./privacy-guard";
+import { getRtcOnDemand } from "./rtc-demand-controller";
 
 export interface RtcV2HookConfig {
   workspaceId: string;
@@ -45,6 +46,11 @@ export interface RtcV2Controls {
   privacy: PrivacyGuardSnapshot;
   privacyRestore: () => Promise<void>;
   privacyKeepOff: () => void;
+  /** RTC On Demand: sozinho em sala privada, sem LiveKit. */
+  awaitingPeer: boolean;
+  /** Participantes humanos remotos na Room atual (meeting tracker). */
+  remoteCount: number;
+  setRecordingActive: (active: boolean) => void;
 }
 
 export function mapRoomStatus(
@@ -189,6 +195,7 @@ export function useLiveKitV2(
             ),
             telemetryAdapter: telemetryMod.createSupabaseTelemetryAdapter(supabase),
             refreshMap: () => void mapMod.getMapSync().load(),
+            onDemandMode: getRtcOnDemand(),
           },
         );
         const sync = mapMod.getMapSync();
@@ -349,6 +356,9 @@ export function useLiveKitV2(
       privacy: privacySnap ?? { suspended: false, promptVisible: false, saved: null },
       privacyRestore: () => runtime.privacy.restore(),
       privacyKeepOff: () => runtime.privacy.keepOff(),
+      awaitingPeer: snap.awaitingPeer,
+      remoteCount: snap.remote.participants.length,
+      setRecordingActive: (a) => runtime.setRecordingActive(a),
     };
   }, [runtime, snap, privacySnap]);
 
@@ -356,8 +366,13 @@ export function useLiveKitV2(
 
   return useMemo(
     () => ({
-      micOn: snap?.local.microphone.status === "on",
-      camOn: snap?.local.camera.status === "on",
+      // Captura suspensa (On Demand) mantém a intenção visível ao usuário.
+      micOn:
+        snap?.local.microphone.status === "on" ||
+        (!!snap?.local.captureSuspended && snap.local.microphone.intent),
+      camOn:
+        snap?.local.camera.status === "on" ||
+        (!!snap?.local.captureSuspended && snap.local.camera.intent),
       screenOn: snap?.local.screenShare.status === "on",
       toggleMic,
       toggleCam,

@@ -42,6 +42,13 @@ import { RtcTelemetry, type TelemetryAdapter } from "./rtc-telemetry";
 import { isMapVersionStaleError } from "./rtc-telemetry-types";
 import { SpatialSubscriptions, type SpatialRoomLike } from "./spatial-subscriptions";
 import { PrivacyGuard, type PrivacyGuardTimers } from "./privacy-guard";
+import {
+  RtcDemandController,
+  countOccupants,
+  demandToContext,
+  type RtcDemand,
+  type RtcOnDemandMode,
+} from "./rtc-demand-controller";
 
 /** Room composta usada pelo V2 (uma única Room LiveKit por trás). */
 export interface V2Room extends RoomLike, PublishTargetLike {
@@ -93,6 +100,10 @@ export interface RtcV2Deps {
   /** Timers do diagnóstico de áudio (testes). */
   diagTimers?: DiagTimers;
   privacyTimers?: PrivacyGuardTimers;
+  /** RTC On Demand (VITE_RTC_ON_DEMAND). Padrão "off" = comportamento atual. */
+  onDemandMode?: RtcOnDemandMode;
+  demandTimers?: TimerApi;
+  soloGraceMs?: number;
 }
 
 export interface RtcV2Snapshot {
@@ -110,6 +121,10 @@ export interface RtcV2Snapshot {
   selfSpeaking: boolean;
   avatars: ReadonlyMap<string, RemoteAvatarState>;
   online: ReadonlyMap<string, PresencePayload>;
+  /** RTC On Demand: destino desejado de conexão. */
+  demand: RtcDemand;
+  /** Sozinho numa sala privada sem LiveKit (estado neutro, não é erro). */
+  awaitingPeer: boolean;
   disposed: boolean;
 }
 
@@ -145,6 +160,8 @@ export class RtcV2Runtime {
   private movementStarted = false;
   private disposed = false;
   readonly privacy: PrivacyGuard;
+  readonly demand: RtcDemandController;
+  private recordingActive = false;
   private selfPos: { x: number; y: number } | null = null;
   private idleTimer: unknown = null;
   private lastInRangeKey = "";
@@ -233,6 +250,12 @@ export class RtcV2Runtime {
       },
       { telemetry: sink, timers: deps.privacyTimers },
     );
+    this.demand = new RtcDemandController({
+      mode: deps.onDemandMode ?? "off",
+      timers: deps.demandTimers ?? this.timers,
+      graceMs: deps.soloGraceMs,
+      telemetry: sink,
+    });
     this.snap = this.build();
   }
 
@@ -242,19 +265,33 @@ export class RtcV2Runtime {
     if (this.started || this.disposed) return;
     this.started = true;
     this.unsubs.push(
-      this.context.subscribe((s) => this.rooms.setDesiredContext(s.context)),
-      this.rooms.subscribe((s) => this.onRooms(s)),
+      this.demand.subscribe((d) => this.onDemand(d)),
+      this.context.subscribe((s) => {
+        // off: exatamente o caminho anterior (contexto → RoomManager).
+        if (this.demand.mode === "off") this.rooms.setDesiredContext(s.context);
+        else this.reevaluateDemand();
+      }),
+      this.rooms.subscribe((s) => {
+        this.onRooms(s);
+        this.reevaluateDemand();
+      }),
       this.local.subscribe(() => {
         this.audioDiag.onLocalMediaChange();
         this.privacy.onLocalMediaChange();
         this.emit();
       }),
-      this.remote.subscribe(() => this.emit()),
+      this.remote.subscribe(() => {
+        this.reevaluateDemand();
+        this.emit();
+      }),
       this.movement.subscribe((states) => {
         for (const [uid, st] of states) this.spatial.setRemotePosition(uid, { x: st.x, y: st.y });
         this.emit();
       }),
-      this.presence.subscribe(() => this.onPresence()),
+      this.presence.subscribe(() => {
+        this.onPresence();
+        this.reevaluateDemand();
+      }),
     );
     this.presence.start();
     if (this.selfPos) this.startMovement();
@@ -278,6 +315,7 @@ export class RtcV2Runtime {
     this.detachRoom();
     this.audioDiag.dispose();
     this.privacy.dispose();
+    this.demand.dispose();
     this.context.dispose();
     await Promise.allSettled([
       this.local.dispose(),
@@ -357,6 +395,53 @@ export class RtcV2Runtime {
   }
   retry(): void {
     this.rooms.retry();
+  }
+
+  /** Gravação Egress ativa mantém a Room mesmo com 1 humano. */
+  setRecordingActive(active: boolean): void {
+    if (this.disposed || this.recordingActive === active) return;
+    this.recordingActive = active;
+    this.reevaluateDemand();
+  }
+
+  // ─── RTC On Demand ─────────────────────────────────────────
+
+  private reevaluateDemand(): void {
+    if (this.disposed) return;
+    if (this.demand.mode === "off") return;
+    const ctx = this.context.getSnapshot().context;
+    {
+      this.presence.setMediaLocation(
+        ctx.kind === "PRIVATE_ROOM" ? `PRIVATE:${ctx.zoneId}` : ctx.kind === "LOBBY" ? "LOBBY" : null,
+      );
+    }
+    let occupants = 1;
+    if (ctx.kind === "PRIVATE_ROOM") {
+      const r = this.rooms.getSnapshot();
+      const live =
+        r.connected?.kind === "PRIVATE_ROOM" &&
+        r.connected.zoneId === ctx.zoneId &&
+        (r.status === "CONNECTED" || r.status === "RECONNECTING")
+          ? this.remote.getSnapshot().participants.length
+          : 0;
+      // zoneId vem só do MEU contexto; outros servem apenas para contar.
+      occupants = countOccupants(this.config.userId, ctx.zoneId, this.presence.getRoster().values(), live);
+    }
+    this.demand.update({
+      context: ctx,
+      occupants,
+      recordingActive: this.recordingActive,
+      roomStatus: this.rooms.getSnapshot().status,
+    });
+  }
+
+  private onDemand(d: RtcDemand): void {
+    if (this.demand.mode === "off") return;
+    this.rooms.setDesiredContext(demandToContext(d));
+    const ctx = this.context.getSnapshot().context;
+    if (d.kind === "NONE" && ctx.kind === "PRIVATE_ROOM") void this.local.suspendCapture();
+    else if (this.local.isCaptureSuspended()) void this.local.resumeCapture();
+    this.emit();
   }
   currentRoom(): V2Room | null {
     return this.attached;
@@ -494,6 +579,12 @@ export class RtcV2Runtime {
       selfSpeaking: this.selfSpeaking,
       avatars: new Map(this.movement.getRemoteStates()),
       online: new Map(this.presence.getRoster()),
+      demand: this.demand?.getDemand() ?? { kind: "NONE" },
+      awaitingPeer:
+        !!this.demand &&
+        this.demand.mode !== "off" &&
+        this.demand.getDemand().kind === "NONE" &&
+        this.context.getSnapshot().context.kind === "PRIVATE_ROOM",
       disposed: this.disposed,
     };
   }
