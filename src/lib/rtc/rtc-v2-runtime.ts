@@ -41,6 +41,7 @@ import { AudioDiagnostics, type DiagTimers } from "./rtc-audio-diagnostics";
 import { RtcTelemetry, type TelemetryAdapter } from "./rtc-telemetry";
 import { isMapVersionStaleError } from "./rtc-telemetry-types";
 import { SpatialSubscriptions, type SpatialRoomLike } from "./spatial-subscriptions";
+import { PrivacyGuard, type PrivacyGuardTimers } from "./privacy-guard";
 
 /** Room composta usada pelo V2 (uma única Room LiveKit por trás). */
 export interface V2Room extends RoomLike, PublishTargetLike {
@@ -91,6 +92,7 @@ export interface RtcV2Deps {
   motionIdleMs?: number;
   /** Timers do diagnóstico de áudio (testes). */
   diagTimers?: DiagTimers;
+  privacyTimers?: PrivacyGuardTimers;
 }
 
 export interface RtcV2Snapshot {
