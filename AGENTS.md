@@ -4,5 +4,6 @@
 - Motor RTC = só VITE_RTC_ENGINE (src/lib/rtc/rtc-engine.ts), igual em preview e produção, padrão v2; sem regra por hostname — rollback = VITE_RTC_ENGINE=v1 + republicar, V1 mantido até limpeza separada.
 - Gravações: src/lib/meetings/recording-storage.server.ts decide backend (Egress `complete` com mesmo file_path → S3/R2 externo; senão Lovable Cloud WebM) e só o servidor assina/baixa — credenciais S3 nunca vão ao navegador.
 - RTC v2 mic: OFF = mute com `stopOnMute` do LiveKit (captura real parada, mesma track/publicação) e `voluntaryStop` em local-media.ts separa parada voluntária de perda de device — evita indicador de captura aceso e publicações duplicadas.
+- Privacy Guard (src/lib/rtc/privacy-guard.ts) recebe do runtime só isCamOn/setCam — mic e screen share ficam fora do seu alcance por construção, evitando cortar a fala de quem troca de aba.
 - Meeting UI V2 (grid/apresentação/roster) fica atrás de VITE_MEETING_UI_V2 (src/lib/meeting-ui/layout.ts), independente de VITE_RTC_ENGINE; é só composição visual e cada stream vai a um único <video> por vez — rollback visual sem tocar RTC.
 - Pedidos de "seguir" passam por createFollowRequestCenter (src/lib/notifications/follow-requests.ts), separado da apresentação (toast/som/Notification) — permite futuro alerta nativo no app desktop sem mudar o fluxo.
