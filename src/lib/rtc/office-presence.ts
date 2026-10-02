@@ -19,6 +19,8 @@ export interface PresencePayload {
   generation: number;
   workspaceId: string;
   joinedAt: string;
+  /** RTC On Demand: "LOBBY" | "PRIVATE:<zoneId>". Sem coordenadas. */
+  mediaLocation?: string;
 }
 
 export type PresenceState = Record<string, PresencePayload[]>;
@@ -100,6 +102,18 @@ export class OfficePresence {
   }
   getTrackedPayload(): Readonly<PresencePayload> {
     return this.payload;
+  }
+  /** Atualiza só o contexto de mídia (troca de zona). Um track() por mudança. */
+  setMediaLocation(loc: string | null): void {
+    const next = loc ?? undefined;
+    if (this.disposed || this.payload.mediaLocation === next) return;
+    this.payload.mediaLocation = next;
+    if (this._status === "ONLINE" && this.handle) {
+      const myEpoch = this.epoch;
+      void Promise.resolve(this.handle.track({ ...this.payload })).catch((e) =>
+        this.fail(myEpoch, e instanceof Error ? e.message : String(e)),
+      );
+    }
   }
   subscribe(fn: () => void): () => void {
     this.listeners.add(fn);
@@ -185,6 +199,7 @@ export class OfficePresence {
             generation: m.generation,
             workspaceId: m.workspaceId,
             joinedAt: m.joinedAt,
+            ...(typeof m.mediaLocation === "string" ? { mediaLocation: m.mediaLocation } : {}),
           });
         }
       }

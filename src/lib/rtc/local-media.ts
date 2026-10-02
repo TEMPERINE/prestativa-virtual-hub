@@ -76,6 +76,8 @@ export interface LocalMediaSnapshot {
   screenShare: ScreenState;
   roomAttached: boolean;
   disposed: boolean;
+  /** RTC On Demand: captura parada por falta de audiência (intents preservados). */
+  captureSuspended?: boolean;
 }
 
 type Kind = "microphone" | "camera";
@@ -145,6 +147,7 @@ export class LocalMedia {
       screenShare: { status: this.screen.status, error: this.screen.error },
       roomAttached: this.room !== null,
       disposed: this.disposed,
+      captureSuspended: this.suspended,
     };
   }
 
