@@ -108,7 +108,6 @@ import { useServerRecorder } from "@/lib/meetings/useServerRecorder";
 import { useMeetingIdleGuard } from "@/lib/meetings/useMeetingIdleGuard";
 import { MeetingReturnPosition } from "@/lib/meetings/meeting-inactivity-controller";
 import { MeetingIdleWarning } from "@/components/office/MeetingIdleWarning";
-import { stopServerRecording } from "@/lib/meetings/egress.functions";
 import { emitTelemetry } from "@/lib/rtc/rtc-telemetry-types";
 import { useCanRecordMeeting } from "@/lib/meetings/useCanRecordMeeting";
 import { RecordingNameDialog } from "@/components/office/RecordingNameDialog";
