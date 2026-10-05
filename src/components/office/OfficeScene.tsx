@@ -108,7 +108,6 @@ import { useServerRecorder } from "@/lib/meetings/useServerRecorder";
 import { useMeetingIdleGuard } from "@/lib/meetings/useMeetingIdleGuard";
 import { MeetingReturnPosition } from "@/lib/meetings/meeting-inactivity-controller";
 import { MeetingIdleWarning } from "@/components/office/MeetingIdleWarning";
-import { stopServerRecording } from "@/lib/meetings/egress.functions";
 import { emitTelemetry } from "@/lib/rtc/rtc-telemetry-types";
 import { useCanRecordMeeting } from "@/lib/meetings/useCanRecordMeeting";
 import { RecordingNameDialog } from "@/components/office/RecordingNameDialog";
@@ -2679,7 +2678,6 @@ export function OfficeScene({
   useEffect(() => {
     returnPosRef.current.observe(pos, v2InPrivate);
   }, [pos.x, pos.y, v2InPrivate]); // eslint-disable-line react-hooks/exhaustive-deps
-  const stopRecordingFn = useServerFn(stopServerRecording);
   const idleRoom = rtc.v2?.room ?? null;
   const idlePrivateZone =
     idleRoom?.status === "CONNECTED" && idleRoom.connected?.kind === "PRIVATE_ROOM"
@@ -2695,6 +2693,7 @@ export function OfficeScene({
     speaking: rtc.speakingPeers,
     selfSpeaking: rtc.selfSpeaking,
     screenShareActive: rtc.screenOn || Object.keys(rtc.remoteScreenStreams).length > 0,
+    recordingActive: IS_RTC_V2 && !!serverRecorder.isRecording,
     avatars: rtc.v2?.avatars ?? null,
     selfMotionKey: `${pos.x.toFixed(4)},${pos.y.toFixed(4)}`,
     telemetry: rtc.v2?.telemetry ?? null,
@@ -2702,14 +2701,7 @@ export function OfficeScene({
     playSound: () => void playFollowChime(),
     onEject: (zoneId) => {
       const tel = rtcV2Ref.current?.telemetry ?? null;
-      // 1) Gravação: caminho server-side existente; falha nunca prende ninguém.
-      if (activeMeetingId && serverRecorder.isRecording) {
-        void stopRecordingFn({ data: { meetingId: activeMeetingId } })
-          .then((r) => {
-            if (!r?.ok) emitTelemetry(tel, "MEETING_IDLE_RECORDING_STOP_FAILED", { zoneId, metadata: { reason: r?.code ?? "unknown" } });
-          })
-          .catch(() => emitTelemetry(tel, "MEETING_IDLE_RECORDING_STOP_FAILED", { zoneId, metadata: { reason: "error" } }));
-      }
+      // Gravação ativa suspende o guard (nunca chega aqui gravando); o guard nunca para Egress.
       // 2) Histórico: encerramento explícito, sem grace administrativo.
       endMeetingNow?.();
       // 3) Só o MEU avatar volta à última posição segura (fallback: spawn).

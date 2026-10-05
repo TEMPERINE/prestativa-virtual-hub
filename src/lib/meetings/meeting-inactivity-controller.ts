@@ -22,7 +22,8 @@ export type MeetingIdleCancelReason =
   | "screen_share"
   | "continue_button"
   | "participant_change"
-  | "warn_expired";
+  | "warn_expired"
+  | "recording";
 
 export const IDLE_TIMEOUT_MS = 5 * 60_000;
 export const WARNING_DURATION_MS = 30_000;
@@ -67,6 +68,12 @@ export interface MeetingIdleContext {
   /** Identities humanas na Room, incluindo eu. */
   participants: readonly string[];
   screenShareActive: boolean;
+  /**
+   * Gravação (Egress) ativa nesta Room = evidência explícita de reunião ativa.
+   * Suspende o guard: não acumula idle, não avisa, não ejeta. O guard nunca
+   * tenta parar a gravação.
+   */
+  recordingActive?: boolean;
 }
 
 export interface MeetingIdleSnapshot {
@@ -109,6 +116,7 @@ export class MeetingInactivityController {
   private participants = new Set<string>();
   private coordinatorId: string | null = null;
   private screenShare = false;
+  private recording = false;
   private lastActivityAt: number;
   private warningId: string | null = null;
   private deadlineAt: number | null = null;
@@ -158,6 +166,7 @@ export class MeetingInactivityController {
     if (this.state === "DISABLED" || this.zoneId !== ctx.zoneId) {
       this.reset(ctx.zoneId!, key, ctx.participants, now);
       this.screenShare = ctx.screenShareActive;
+      this.recording = !!ctx.recordingActive;
       this.emit();
       this.schedule();
       return;
@@ -194,8 +203,19 @@ export class MeetingInactivityController {
       if (ctx.screenShareActive) this.activity("screen_share");
       else this.lastActivityAt = now; // fim do share → nova janela
     }
+    const rec = !!ctx.recordingActive;
+    if (rec !== this.recording) {
+      this.recording = rec;
+      this.lastActivityAt = now; // início ou fim da gravação → nova janela completa
+      if (rec && this.state === "WARNING") this.activity("recording");
+    }
     this.emit();
     this.schedule();
+  }
+
+  /** Atividade contínua (screen share ou gravação) suspende o guard. */
+  private suspended(): boolean {
+    return this.screenShare || this.recording;
   }
 
   /** speaking (LiveKit) de alguém da Room — inclusive eu. */
@@ -267,13 +287,15 @@ export class MeetingInactivityController {
     if (this.disposed || this.state === "DISABLED" || this.state === "EJECTING") return;
     const now = this.now();
     this.checkSpeaking();
-    if (this.screenShare) this.lastActivityAt = now;
+    if (this.suspended()) this.lastActivityAt = now;
     if (this.state === "ACTIVE") {
-      if (this.isCoordinator() && now - this.lastActivityAt >= IDLE_TIMEOUT_MS) {
+      if (!this.suspended() && this.isCoordinator() && now - this.lastActivityAt >= IDLE_TIMEOUT_MS) {
         this.startWarning(now);
       }
     } else if (this.state === "WARNING" && this.deadlineAt !== null) {
-      if (this.isCoordinator() && now >= this.deadlineAt) {
+      if (this.suspended()) {
+        this.cancelWarning(this.recording ? "recording" : "screen_share");
+      } else if (this.isCoordinator() && now >= this.deadlineAt) {
         this.expire();
       } else if (!this.isCoordinator() && now >= this.deadlineAt + FOLLOWER_STALE_MS) {
         // Coordenador não confirmou: fecha localmente e reinicia (nunca ejeta sozinho).
@@ -313,6 +335,7 @@ export class MeetingInactivityController {
     this.warningId = null;
     this.deadlineAt = null;
     this.screenShare = false;
+    this.recording = false;
     this.speakingSince.clear();
     this.clear();
     this.emit();
@@ -409,6 +432,7 @@ export class MeetingInactivityController {
   }
 
   private doEject() {
+    if (this.suspended()) return; // nunca ejeta com gravação/screen share ativos
     const zone = this.zoneId!;
     this.state = "EJECTING";
     this.clear();

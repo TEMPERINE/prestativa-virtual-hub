@@ -34,6 +34,8 @@ export interface MeetingIdleGuardArgs {
   speaking: Record<string, boolean>;
   selfSpeaking: boolean;
   screenShareActive: boolean;
+  /** Gravação server-side ativa na Room (estado de meeting_egress). */
+  recordingActive: boolean;
   avatars: ReadonlyMap<string, RemoteAvatarState> | null;
   /** Muda quando EU me movo (ex.: `${x},${y}`). */
   selfMotionKey: string;
@@ -135,8 +137,9 @@ export function useMeetingIdleGuard(a: MeetingIdleGuardArgs) {
       zoneId: a.privateZoneId,
       participants: [a.selfId, ...a.remoteIdentities],
       screenShareActive: a.screenShareActive,
+      recordingActive: a.recordingActive,
     });
-  }, [snap === null, a.selfId, a.privateConnected, a.privateZoneId, rosterKey, a.screenShareActive]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [snap === null, a.selfId, a.privateConnected, a.privateZoneId, rosterKey, a.screenShareActive, a.recordingActive]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Fala (speaking do LiveKit; nunca áudio bruto).
   useEffect(() => {

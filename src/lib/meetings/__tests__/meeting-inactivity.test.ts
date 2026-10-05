@@ -219,3 +219,41 @@ describe("isolamento (estático)", () => {
     expect(src("useMeetingIdleGuard.ts")).not.toMatch(/new Notification\(/);
   });
 });
+
+describe("Meeting Idle Guard — gravação ativa suspende o guard", () => {
+  it("recording ativa impede warning, mesmo após > 5 min", () => {
+    const n = net(["a", "b"]); n.updateAll({ recordingActive: true });
+    for (let i = 0; i < 6; i++) { n.clock.advance(IDLE_TIMEOUT_MS); n.tickAll(); }
+    expect(n.sent).toHaveLength(0);
+    expect(n.warnings).toEqual({});
+    expect(n.ctrls.a.getSnapshot().state).toBe("ACTIVE");
+  });
+  it("fim da gravação inicia nova janela completa de 5 min", () => {
+    const n = net(["a", "b"]); n.updateAll({ recordingActive: true });
+    n.clock.advance(IDLE_TIMEOUT_MS * 2); n.tickAll();
+    n.updateAll({ recordingActive: false });
+    n.clock.advance(IDLE_TIMEOUT_MS - 1); n.tickAll();
+    expect(n.sent).toHaveLength(0);
+    n.clock.advance(1); n.tickAll();
+    expect(n.ctrls.a.getSnapshot().state).toBe("WARNING");
+  });
+  it("nenhum EJECT enquanto recordingActive=true (inclusive se começar durante warning)", () => {
+    const n = net(["a", "b"]); n.updateAll();
+    n.clock.advance(IDLE_TIMEOUT_MS); n.tickAll();
+    expect(n.ctrls.a.getSnapshot().state).toBe("WARNING");
+    n.updateAll({ recordingActive: true });
+    n.clock.advance(IDLE_TIMEOUT_MS * 3); n.tickAll();
+    expect(n.ejects).toEqual({});
+    expect(n.sent.some((s) => s.e.type === "MEETING_IDLE_EJECT")).toBe(false);
+    expect(n.ctrls.a.getSnapshot().state).toBe("ACTIVE");
+    expect(n.ctrls.b.getSnapshot().state).toBe("ACTIVE");
+  });
+  it("Idle Guard nunca tenta parar gravação", () => {
+    for (const f of ["src/lib/meetings/meeting-inactivity-controller.ts", "src/lib/meetings/useMeetingIdleGuard.ts"]) {
+      const s = readFileSync(resolve(process.cwd(), f), "utf8");
+      expect(s).not.toMatch(/stopServerRecording|stopRecording|egress\.functions|RECORDING_STOP_FAILED/);
+    }
+    const scene = readFileSync(resolve(process.cwd(), "src/components/office/OfficeScene.tsx"), "utf8");
+    expect(scene).not.toMatch(/MEETING_IDLE_RECORDING_STOP_FAILED/);
+  });
+});
