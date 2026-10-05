@@ -161,9 +161,10 @@ export class MeetingTrackerV2 {
   private kick(): void {
     if (this.running) return;
     this.running = true;
-    this.idle = this.loop().finally(() => {
-      this.running = false;
+    const p: Promise<void> = this.loop().finally(() => {
+      if (this.idle === p) this.running = false;
     });
+    this.idle = p;
   }
 
   private setMeeting(id: string | null): void {
@@ -237,6 +238,8 @@ export class MeetingTrackerV2 {
         }
         continue;
       }
+      // Libera já: um observe() no mesmo tick precisa poder reiniciar o loop.
+      this.running = false;
       return;
     }
   }
