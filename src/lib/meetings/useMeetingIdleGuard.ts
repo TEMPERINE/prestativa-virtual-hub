@@ -54,7 +54,7 @@ export function useMeetingIdleGuard(a: MeetingIdleGuardArgs) {
   // Canal efêmero (só existe enquanto a flag está ligada e há sessão).
   useEffect(() => {
     if (!active || !a.workspaceId) return;
-    let channel: { send: (m: unknown) => unknown } | null = null;
+    let channel: { send: (m: { type: "broadcast"; event: string; payload: unknown }) => unknown } | null = null;
     let remove: (() => void) | null = null;
     let alive = true;
     void import("@/integrations/supabase/client").then(({ supabase }) => {
