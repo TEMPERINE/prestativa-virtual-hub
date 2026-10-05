@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ACTIVE_RTC_ENGINE } from "@/lib/rtc/useLiveKit";
 import { MeetingTrackerV2, type MeetingRoomState } from "./meeting-tracker-v2";
 import { supabase } from "@/integrations/supabase/client";
@@ -173,8 +173,12 @@ function useMeetingTrackerV2({ enabled, v2Room, v2RemoteCount, labelFor }: Args)
     tracker?.observe({ status, connected, remoteCount: v2RemoteCount });
   }, [tracker, status, connected, v2RemoteCount]);
 
-  return { activeMeetingId };
+  const endMeetingNow = useCallback(() => tracker?.endNow(), [tracker]);
+  return { activeMeetingId, endMeetingNow };
 }
 
-export const useMeetingTracker: (args: Args) => { activeMeetingId: string | null } =
+export const useMeetingTracker: (args: Args) => {
+  activeMeetingId: string | null;
+  endMeetingNow?: () => void;
+} =
   ACTIVE_RTC_ENGINE === "v2" ? useMeetingTrackerV2 : useMeetingTrackerV1;

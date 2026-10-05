@@ -60,6 +60,8 @@ export interface RtcV2Controls {
   /** Participantes humanos remotos na Room atual (meeting tracker). */
   remoteCount: number;
   setRecordingActive: (active: boolean) => void;
+  /** Sink de telemetria do runtime (camadas isoladas, ex.: Meeting Idle Guard). */
+  telemetry: import("./rtc-telemetry-types").RtcTelemetrySink | null;
 }
 
 export function mapRoomStatus(
@@ -396,6 +398,7 @@ export function useLiveKitV2(
       lobbyIdle: snap.lobbyIdle,
       remoteCount: snap.remote.participants.length,
       setRecordingActive: (a) => runtime.setRecordingActive(a),
+      telemetry: runtime.telemetry,
     };
   }, [runtime, snap, privacySnap]);
 
