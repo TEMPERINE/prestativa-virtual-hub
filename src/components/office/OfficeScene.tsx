@@ -68,6 +68,7 @@ function appleEmojiUrl(emoji: string): string | null {
 }
 const REACTION_DURATION_MS = 3000;
 import { toast } from "sonner";
+import { useServerFn } from "@tanstack/react-start";
 import { LogOut, Mic, MicOff, Video, VideoOff, MonitorUp, Users, Pencil, User as UserIcon, MessageCircle, StickyNote, X as XIcon, Plus, Minus, Locate, ChevronLeft, ChevronRight, Footprints, UserPlus, Hand, Circle, Square, Loader2, Smile } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import EmojiPicker, { EmojiStyle, Theme as EmojiTheme } from "emoji-picker-react";
