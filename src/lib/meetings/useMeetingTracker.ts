@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ACTIVE_RTC_ENGINE } from "@/lib/rtc/useLiveKit";
 import { MeetingTrackerV2, type MeetingRoomState } from "./meeting-tracker-v2";
 import { supabase } from "@/integrations/supabase/client";
