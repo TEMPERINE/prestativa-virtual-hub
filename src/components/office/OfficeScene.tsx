@@ -2679,7 +2679,6 @@ export function OfficeScene({
   useEffect(() => {
     returnPosRef.current.observe(pos, v2InPrivate);
   }, [pos.x, pos.y, v2InPrivate]); // eslint-disable-line react-hooks/exhaustive-deps
-  const stopRecordingFn = useServerFn(stopServerRecording);
   const idleRoom = rtc.v2?.room ?? null;
   const idlePrivateZone =
     idleRoom?.status === "CONNECTED" && idleRoom.connected?.kind === "PRIVATE_ROOM"
