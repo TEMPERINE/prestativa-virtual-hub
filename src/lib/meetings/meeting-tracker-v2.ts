@@ -66,6 +66,9 @@ export class MeetingTrackerV2 {
   private disposed = false;
   private idle: Promise<void> = Promise.resolve();
   private wake: (() => void) | null = null;
+  /** Encerramento explícito (idle_timeout): zona bloqueada até a Room sair dela. */
+  private blockedZone: string | null = null;
+  private skipGrace = false;
 
   constructor(private readonly deps: MeetingTrackerDeps) {}
 
@@ -79,8 +82,12 @@ export class MeetingTrackerV2 {
 
   observe(s: MeetingRoomState | null): void {
     if (this.disposed) return;
-    const zone =
+    let zone =
       s?.connected?.kind === "PRIVATE_ROOM" ? (s.connected as { zoneId: string }).zoneId : null;
+    if (this.blockedZone !== null) {
+      if (zone === this.blockedZone) zone = null;
+      else this.blockedZone = null;
+    }
     let next: string | null = null;
     const canJoin =
       s?.remoteCount === undefined || s.remoteCount > 0 || (zone !== null && zone === this.joinedZone);
@@ -96,6 +103,24 @@ export class MeetingTrackerV2 {
     } else if (wasConnected && !this.connectedNow) {
       this.interrupt();
     }
+    this.kick();
+  }
+
+  /**
+   * Encerramento EXPLÍCITO (ex.: Meeting Inactivity Guard → idle_timeout):
+   * leave imediato, sem o grace administrativo de 15s. A mesma zona fica
+   * bloqueada até a Room deixar de estar nela — voltar depois = nova reunião.
+   * Nunca toca mídia/Room.
+   */
+  endNow(): void {
+    if (this.disposed) return;
+    const z = this.joinedZone ?? this.desired;
+    if (!z) return;
+    this.blockedZone = z;
+    this.skipGrace = true;
+    this.desired = null;
+    this.connectedNow = false;
+    this.interrupt();
     this.kick();
   }
 
@@ -165,13 +190,14 @@ export class MeetingTrackerV2 {
       const d = this.desired;
       if (this.joinedZone && this.joinedZone !== d) {
         const graceMs = this.deps.adminGraceMs ?? ADMIN_LEAVE_GRACE_MS;
-        if (d === null && !this.disposed && graceMs > 0) {
+        if (d === null && !this.disposed && graceMs > 0 && !this.skipGrace) {
           const zone = this.joinedZone;
           const expired = await this.sleep(graceMs, true);
           if (!expired) continue; // algo mudou: reavalia (voltou, trocou ou dispose)
           if (this.desired === zone) continue;
         }
         const id = this.meetingId;
+        this.skipGrace = false;
         this.joinedZone = null;
         this.setMeeting(null);
         if (id) await this.doLeave(id);
