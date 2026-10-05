@@ -104,6 +104,11 @@ import { setNotificationService, isNotificationSetupDone, type OfficeNotificatio
 import { useMeetingTracker } from "@/lib/meetings/useMeetingTracker";
 import { useMeetingRecorder } from "@/lib/meetings/useMeetingRecorder";
 import { useServerRecorder } from "@/lib/meetings/useServerRecorder";
+import { useMeetingIdleGuard } from "@/lib/meetings/useMeetingIdleGuard";
+import { MeetingReturnPosition } from "@/lib/meetings/meeting-inactivity-controller";
+import { MeetingIdleWarning } from "@/components/office/MeetingIdleWarning";
+import { stopServerRecording } from "@/lib/meetings/egress.functions";
+import { emitTelemetry } from "@/lib/rtc/rtc-telemetry-types";
 import { useCanRecordMeeting } from "@/lib/meetings/useCanRecordMeeting";
 import { RecordingNameDialog } from "@/components/office/RecordingNameDialog";
 import { getCurrentWorkspaceId } from "@/lib/workspace/current";
@@ -2635,7 +2640,7 @@ export function OfficeScene({
     (zoneId: string) => (currentZoneRef.current.id === zoneId ? currentZoneRef.current.label : zoneId),
     [],
   );
-  const { activeMeetingId } = useMeetingTracker({
+  const { activeMeetingId, endMeetingNow } = useMeetingTracker({
     zoneId: currentZone.id,
     zoneLabel: currentZone.label,
     isMeetingZone: isPrivateZone,
@@ -2666,6 +2671,64 @@ export function OfficeScene({
   useEffect(() => {
     v2SetRecording?.(IS_RTC_V2 && !!serverRecorder.isRecording);
   }, [v2SetRecording, serverRecorder.isRecording]);
+
+  // ---- Meeting Inactivity Guard (camada isolada; VITE_MEETING_IDLE_GUARD) ----
+  const returnPosRef = useRef(new MeetingReturnPosition());
+  const v2InPrivate = rtc.v2?.context.kind === "PRIVATE_ROOM";
+  useEffect(() => {
+    returnPosRef.current.observe(pos, v2InPrivate);
+  }, [pos.x, pos.y, v2InPrivate]); // eslint-disable-line react-hooks/exhaustive-deps
+  const stopRecordingFn = useServerFn(stopServerRecording);
+  const idleRoom = rtc.v2?.room ?? null;
+  const idlePrivateZone =
+    idleRoom?.status === "CONNECTED" && idleRoom.connected?.kind === "PRIVATE_ROOM"
+      ? idleRoom.connected.zoneId
+      : null;
+  const meetingIdle = useMeetingIdleGuard({
+    enabled: IS_RTC_V2 && !!rtc.v2,
+    selfId: me?.id ?? null,
+    workspaceId: getCurrentWorkspaceId(),
+    privateZoneId: idlePrivateZone,
+    privateConnected: !!idlePrivateZone,
+    remoteIdentities: idlePrivateZone ? rtc.connectedPeers : [],
+    speaking: rtc.speakingPeers,
+    selfSpeaking: rtc.selfSpeaking,
+    screenShareActive: rtc.screenOn || Object.keys(rtc.remoteScreenStreams).length > 0,
+    avatars: rtc.v2?.avatars ?? null,
+    selfMotionKey: `${pos.x.toFixed(4)},${pos.y.toFixed(4)}`,
+    telemetry: rtc.v2?.telemetry ?? null,
+    notifications: notifServiceRef.current,
+    playSound: () => void playFollowChime(),
+    onEject: (zoneId) => {
+      const tel = rtcV2Ref.current?.telemetry ?? null;
+      // 1) Gravação: caminho server-side existente; falha nunca prende ninguém.
+      if (activeMeetingId && serverRecorder.isRecording) {
+        void stopRecordingFn({ data: { meetingId: activeMeetingId } })
+          .then((r) => {
+            if (!r?.ok) emitTelemetry(tel, "MEETING_IDLE_RECORDING_STOP_FAILED", { zoneId, metadata: { reason: r?.code ?? "unknown" } });
+          })
+          .catch(() => emitTelemetry(tel, "MEETING_IDLE_RECORDING_STOP_FAILED", { zoneId, metadata: { reason: "error" } }));
+      }
+      // 2) Histórico: encerramento explícito, sem grace administrativo.
+      endMeetingNow?.();
+      // 3) Só o MEU avatar volta à última posição segura (fallback: spawn).
+      const uid = meIdRef.current;
+      let spawn: Point = SPAWN;
+      const myClaim = uid ? Object.entries(claimsRef.current).find(([, u]) => u === uid)?.[0] : undefined;
+      if (myClaim) {
+        const sp = spawnPointForZone(myClaim);
+        if (sp) spawn = { x: sp.x, y: sp.y };
+      }
+      const { point, fallback } = returnPosRef.current.resolve(spawn);
+      if (fallback) emitTelemetry(tel, "MEETING_IDLE_RETURN_POSITION_FALLBACK", { zoneId });
+      // Caminho existente: setPos → efeito RTC (announceJump) + sendPos persiste.
+      lastMotionAtRef.current = 0;
+      posRef.current = point;
+      setPos(point);
+      sendPos(point.x, point.y, callZoneAt(point), facingRef.current, true);
+      toast.message("Reunião encerrada por inatividade.");
+    },
+  });
 
 
 
@@ -3606,6 +3669,9 @@ export function OfficeScene({
         </div>
       )}
 
+      {meetingIdle.warning && (
+        <MeetingIdleWarning deadlineAt={meetingIdle.warning.deadlineAt} onContinue={meetingIdle.continueMeeting} />
+      )}
       {IS_RTC_V2 && serverRecorder.completed && (
         <RecordingNameDialog
           meetingId={serverRecorder.completed.meetingId}
