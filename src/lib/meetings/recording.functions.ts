@@ -22,13 +22,22 @@ export const getRecordingUrl = createServerFn({ method: "POST" })
     if (!meeting?.recording_path) return { ok: false as const, code: "NO_RECORDING" };
 
     const sb = context.supabase;
-    const [part, wsAdmin, admin, master] = await Promise.all([
+    const [part, wsAdmin, admin, master, share] = await Promise.all([
       sb.rpc("is_meeting_participant", { _meeting_id: meeting.id, _user_id: context.userId }),
       sb.rpc("is_workspace_admin", { _workspace_id: meeting.workspace_id, _user_id: context.userId }),
       sb.rpc("has_role", { _user_id: context.userId, _role: "admin" }),
       sb.rpc("has_role", { _user_id: context.userId, _role: "master" }),
+      // RLS: só retorna linha se recipient_id = auth.uid().
+      sb.from("meeting_recording_shares").select("meeting_id")
+        .eq("meeting_id", meeting.id).eq("recipient_id", context.userId).limit(1),
     ]);
-    if (!part.data && !wsAdmin.data && !admin.data && !master.data) {
+    const { canViewRecording } = await import("./recording-access");
+    if (!canViewRecording({
+      isParticipant: !!part.data,
+      isShareRecipient: (share.data?.length ?? 0) > 0,
+      isWorkspaceAdmin: !!wsAdmin.data,
+      isGlobalAdmin: !!admin.data || !!master.data,
+    })) {
       return { ok: false as const, code: "FORBIDDEN" };
     }
 

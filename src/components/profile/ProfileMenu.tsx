@@ -69,7 +69,8 @@ export function ProfileMenu(p: Props) {
       </PopoverTrigger>
       <PopoverContent
         align="end"
-        className="w-72 p-0 z-[200]"
+        collisionPadding={8}
+        className="w-72 p-0 z-[200] max-h-[var(--radix-popover-content-available-height)] overflow-y-auto"
         // Portal: eventos borbulham pela árvore React até a cena; consome aqui.
         onPointerDown={(e) => e.stopPropagation()}
         onMouseDown={(e) => e.stopPropagation()}
