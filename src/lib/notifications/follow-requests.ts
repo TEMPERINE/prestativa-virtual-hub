@@ -60,9 +60,12 @@ export function presenterFromService(
     showSystemNotification: (req, onClick) =>
       svc.notify({
         title: "Prestativa Office",
-        body: `${req.fromName} chamou você para segui-lo.`,
+        body: `${req.fromName} está chamando você para se juntar a ele.`,
         tag: `follow-${req.fromUid}`,
-        onClick,
+        requireInteraction: true,
+        silent: false,
+        // Só foca e reabre o pedido — nunca aceita/teletransporta.
+        onClick: () => { try { svc.focusApp(); } catch { /* ignore */ } onClick?.(); },
       }),
   };
 }
