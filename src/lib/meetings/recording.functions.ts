@@ -22,7 +22,7 @@ export const getRecordingUrl = createServerFn({ method: "POST" })
     if (!meeting?.recording_path) return { ok: false as const, code: "NO_RECORDING" };
 
     const sb = context.supabase;
-    const [part, wsAdmin, admin, master, share] = await Promise.all([
+    const [part, wsAdmin, admin, master, share, member] = await Promise.all([
       sb.rpc("is_meeting_participant", { _meeting_id: meeting.id, _user_id: context.userId }),
       sb.rpc("is_workspace_admin", { _workspace_id: meeting.workspace_id, _user_id: context.userId }),
       sb.rpc("has_role", { _user_id: context.userId, _role: "admin" }),
@@ -30,9 +30,11 @@ export const getRecordingUrl = createServerFn({ method: "POST" })
       // RLS: só retorna linha se recipient_id = auth.uid().
       sb.from("meeting_recording_shares").select("meeting_id")
         .eq("meeting_id", meeting.id).eq("recipient_id", context.userId).limit(1),
+      sb.rpc("is_workspace_member", { _workspace_id: meeting.workspace_id, _user_id: context.userId }),
     ]);
     const { canViewRecording } = await import("./recording-access");
     if (!canViewRecording({
+      isActiveMember: !!member.data,
       isParticipant: !!part.data,
       isShareRecipient: (share.data?.length ?? 0) > 0,
       isWorkspaceAdmin: !!wsAdmin.data,
