@@ -10,6 +10,10 @@ export type OfficeNotification = {
   title: string;
   body: string;
   tag?: string;
+  /** Permanece visível até o usuário interagir (quando suportado). */
+  requireInteraction?: boolean;
+  /** false = usa o som de notificação do sistema operacional. */
+  silent?: boolean;
   /** Deve só focar o app e mostrar o pedido — nunca executar ações. */
   onClick?: () => void;
 };

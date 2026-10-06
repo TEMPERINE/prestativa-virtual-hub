@@ -2205,6 +2205,15 @@ export function OfficeScene({
     );
   }
   useEffect(() => () => followCenterRef.current?.dispose(), []);
+  useEffect(() => {
+    // Ao voltar ao Office, chamados recebidos em segundo plano reabrem como popup.
+    const back = () => {
+      if (document.visibilityState === "visible" && document.hasFocus()) followCenterRef.current?.onAppVisible();
+    };
+    document.addEventListener("visibilitychange", back);
+    window.addEventListener("focus", back);
+    return () => { document.removeEventListener("visibilitychange", back); window.removeEventListener("focus", back); };
+  }, []);
   const [showNotifPrompt, setShowNotifPrompt] = useState(false);
   useEffect(() => {
     if (me?.id && me.onboarded_at && !isNotificationSetupDone(me.id)) setShowNotifPrompt(true);

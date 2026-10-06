@@ -36,11 +36,22 @@ export function createWebNotificationAdapter(): OfficeNotificationService {
     requestPermission: enableOfficeNotifications,
     isOptedIn: getNotificationsOptIn,
     setOptedIn: setOptIn,
-    isAppHidden: () => typeof document !== "undefined" && document.visibilityState === "hidden",
+    // Outra aba, Chrome minimizado ou outro programa em foco = segundo plano.
+    isAppHidden: () =>
+      typeof document !== "undefined" &&
+      (document.visibilityState === "hidden" || (typeof document.hasFocus === "function" && !document.hasFocus())),
     focusApp: () => { try { window.focus(); } catch { /* ignore */ } },
     notify(n) {
       if (permission() !== "granted") return;
-      const note = new Notification(n.title, { body: n.body, tag: n.tag });
+      const opts: NotificationOptions & { requireInteraction?: boolean } = {
+        body: n.body,
+        tag: n.tag,
+        silent: n.silent ?? false,
+        requireInteraction: n.requireInteraction ?? false,
+      };
+      let note: Notification;
+      try { note = new Notification(n.title, opts); }
+      catch { note = new Notification(n.title, { body: n.body, tag: n.tag }); }
       note.onclick = () => {
         try { window.focus(); } catch { /* ignore */ }
         note.close();
