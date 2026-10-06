@@ -18,7 +18,8 @@ const body = '{"event":"egress_ended","egressInfo":{"egressId":"EG_x","status":"
 describe("webhook LiveKit — assinatura sobre corpo RAW", () => {
   it("assinatura válida (Authorization puro, Bearer ou Authorize) é aceita", async () => {
     const jwt = await sign(body);
-    for (const h of [{ authorization: jwt }, { authorization: `Bearer ${jwt}` }, { authorize: jwt }]) {
+    const hs: Record<string, string>[] = [{ authorization: jwt }, { authorization: `Bearer ${jwt}` }, { authorize: jwt }];
+    for (const h of hs) {
       const { token } = extractWebhookToken(new Headers(h));
       const ev = await new WebhookReceiver(KEY, SECRET).receive(body, token);
       expect(ev.event).toBe("egress_ended");
