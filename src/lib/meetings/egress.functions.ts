@@ -138,8 +138,50 @@ export const stopServerRecording = createServerFn({ method: "POST" })
       const sdk = await import("livekit-server-sdk");
       const info = await new sdk.EgressClient(lk.host, lk.apiKey, lk.apiSecret).stopEgress(row.egress_id);
       await srv.applyEgressInfo(info);
-    } catch {
-      /* webhook confirma o estado final */
+      return { ok: true as const };
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.error("[egress-stop]", JSON.stringify({ egressId: row.egress_id, error: msg.slice(0, 300) }));
+      // Estado real do LiveKit decide: COMPLETE/FAILED reconciliam na hora; nunca fica preso em "ending".
+      try {
+        const real = await srv.reconcileEgressState(row.egress_id);
+        if (real === "complete" || real === "failed" || real === "ending") return { ok: true as const, reconciled: real };
+        return { ok: false as const, code: "EGRESS_STOP_FAILED", state: real };
+      } catch (e2) {
+        const m2 = e2 instanceof Error ? e2.message : String(e2);
+        console.error("[egress-reconcile]", JSON.stringify({ egressId: row.egress_id, error: m2.slice(0, 300) }));
+        return { ok: false as const, code: "EGRESS_STOP_FAILED" };
+      }
     }
-    return { ok: true as const };
+  });
+
+/** Reconciliação pontual de gravação presa (starting/active/ending há tempo anormal). */
+export const reconcileMeetingRecording = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => StartInput.parse(d))
+  .handler(async ({ data, context }) => {
+    const { data: isPart } = await context.supabase.rpc("is_meeting_participant", {
+      _meeting_id: data.meetingId,
+      _user_id: context.userId,
+    });
+    if (!isPart) return { ok: false as const, code: "NOT_PARTICIPANT" };
+    const srv = await import("./egress.server");
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const db = supabaseAdmin as any;
+    const { data: row } = await db
+      .from("meeting_egress")
+      .select("egress_id, status, updated_at")
+      .eq("meeting_id", data.meetingId)
+      .in("status", ["starting", "active", "ending"])
+      .maybeSingle();
+    if (!row?.egress_id) return { ok: true as const, state: "none" };
+    const staleMs = row.status === "active" ? 4 * 3600_000 : 2 * 60_000;
+    if (Date.now() - new Date(row.updated_at).getTime() < staleMs) return { ok: true as const, state: row.status };
+    try {
+      return { ok: true as const, state: await srv.reconcileEgressState(row.egress_id) };
+    } catch (e) {
+      console.error("[egress-reconcile]", JSON.stringify({ egressId: row.egress_id, error: String(e).slice(0, 300) }));
+      return { ok: false as const, code: "RECONCILE_FAILED" };
+    }
   });
