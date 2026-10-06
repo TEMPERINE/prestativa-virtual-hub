@@ -127,6 +127,15 @@ export function createFollowRequestCenter(
       const r = presenter.playSound();
       if (r && typeof (r as Promise<void>).catch === "function") (r as Promise<void>).catch(() => {});
     } catch { /* som bloqueado não perde o pedido */ }
+    if (away) {
+      try {
+        console.info("[office-notify] background-request", {
+          optIn: presenter.notificationsOptIn(),
+          permission: presenter.notificationPermission(),
+          willNotify: presenter.notificationsOptIn() && presenter.notificationPermission() === "granted",
+        });
+      } catch { /* ignore */ }
+    }
     if (
       away &&
       presenter.notificationsOptIn() &&
