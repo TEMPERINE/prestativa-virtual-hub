@@ -81,6 +81,8 @@ export function createFollowRequestCenter(
   const listeners = new Set<() => void>();
   let snapshot: FollowRequestEntry[] = [];
   let revealed: string | null = null;
+  /** Chamados recebidos com o Office em segundo plano — reabrem ao voltar. */
+  const awayRequests = new Set<string>();
 
   const emit = () => {
     snapshot = [...entries.values()].sort((a, b) => b.at - a.at);
@@ -116,6 +118,9 @@ export function createFollowRequestCenter(
     try { presenter.showToast?.(req, isUpdate); } catch { /* ignore */ }
     emit();
     const last = lastAlert.get(req.fromUid) ?? -Infinity;
+    let away = false;
+    try { away = presenter.isHidden(); } catch { /* ignore */ }
+    if (away) awayRequests.add(req.fromUid);
     if (req.at - last < FOLLOW_COALESCE_MS) return; // coalesce: sem som/notificação repetidos
     lastAlert.set(req.fromUid, req.at);
     try {
@@ -123,7 +128,7 @@ export function createFollowRequestCenter(
       if (r && typeof (r as Promise<void>).catch === "function") (r as Promise<void>).catch(() => {});
     } catch { /* som bloqueado não perde o pedido */ }
     if (
-      presenter.isHidden() &&
+      away &&
       presenter.notificationsOptIn() &&
       presenter.notificationPermission() === "granted"
     ) {
@@ -144,8 +149,20 @@ export function createFollowRequestCenter(
     emit();
   }
 
+  /** Usuário voltou ao Office: reabre como popup o que chegou em segundo plano. */
+  function onAppVisible() {
+    const uids = [...awayRequests];
+    awayRequests.clear();
+    for (const uid of uids) {
+      const e = entries.get(uid);
+      if (e) showPending({ fromUid: e.fromUid, fromName: e.fromName, at: e.at });
+    }
+    if (uids.length) emit();
+  }
+
   /** Seguir / Agora não / Dispensar: encerra o chamado. */
   function resolve(fromUid: string) {
+    awayRequests.delete(fromUid);
     clearTimer(fromUid);
     if (entries.delete(fromUid)) emit();
   }
@@ -153,6 +170,7 @@ export function createFollowRequestCenter(
   function dispose() {
     for (const uid of [...timers.keys()]) clearTimer(uid);
     entries.clear();
+    awayRequests.clear();
     listeners.clear();
     snapshot = [];
   }
@@ -160,6 +178,7 @@ export function createFollowRequestCenter(
   return {
     receive,
     resolve,
+    onAppVisible,
     reveal,
     dispose,
     /** Popups visíveis. */
