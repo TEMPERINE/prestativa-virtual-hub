@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { startServerRecording, stopServerRecording } from "./egress.functions";
+import { reconcileMeetingRecording, startServerRecording, stopServerRecording } from "./egress.functions";
 import type { RecorderState } from "./useMeetingRecorder";
 
 /**
@@ -31,6 +31,8 @@ export function useServerRecorder(opts: {
   /** Egress que EU iniciei e vi rodando nesta sessão — só esses geram o pedido de nome. */
   const mineRef = useRef<Set<string>>(new Set());
   const askedRef = useRef<Set<string>>(new Set());
+  const reconciledRef = useRef<Set<string>>(new Set());
+  const reconcileFn = useServerFn(reconcileMeetingRecording);
   const uidRef = useRef<string | null>(null);
 
   useEffect(() => {
@@ -63,6 +65,11 @@ export function useServerRecorder(opts: {
 
     const running = list.find((r) => ["starting", "active", "ending"].includes(r.status));
     setActive(running ? { startedAt: Date.parse(running.started_at ?? running.created_at) } : null);
+    // Reconciliação pontual (uma vez por gravação): servidor só consulta o LiveKit se o estado estiver velho.
+    if (running && !reconciledRef.current.has(running.id)) {
+      reconciledRef.current.add(running.id);
+      void reconcileFn({ data: { meetingId } }).catch(() => {});
+    }
 
     for (const r of list) {
       if (r.started_by && r.started_by === uidRef.current) {
