@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useRef, useState, useSyncExternalStore, type ReactNode, type RefObject } from "react";
 import { createPortal } from "react-dom";
 
-const TargetContext = createContext<HTMLDivElement | null>(null);
+const TargetContext = createContext<HTMLDivElement | null | undefined>(undefined);
 const listeners = new Set<() => void>();
 let active = false;
 function setActive(value: boolean) {
@@ -18,6 +18,7 @@ export function useOfficeToastActive() {
 /** Visual-only portal: notice owners retain their timers, state and actions. */
 export function OfficeNotice({ children, priority = 30 }: { children: ReactNode; priority?: number }) {
   const target = useContext(TargetContext);
+  if (target === undefined) return <>{children}</>;
   if (!target) return null;
   return createPortal(
     <div className="office-notice pointer-events-auto w-full" style={{ order: priority }} onPointerDown={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()}>
