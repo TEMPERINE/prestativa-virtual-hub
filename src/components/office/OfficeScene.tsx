@@ -2473,6 +2473,17 @@ export function OfficeScene({
     };
   }, [setLocalFacing, sendReaction, sendConfetti, teleportToMyClaim, sendPos]);
 
+  // Ao abrir um painel: solta teclas presas (para no lugar). Não mexe em posição/RTC.
+  useEffect(() => {
+    if (!isMovementInputBlocked(panel)) return;
+    if (keysDown.current.size === 0 && !lastDir.current) return;
+    keysDown.current.clear();
+    lastDir.current = null;
+    const cur = posRef.current;
+    if (IS_RTC_V2) rtcV2Ref.current?.reportMotion(cur.x, cur.y, 0, 0);
+    sendPos(cur.x, cur.y, callZoneAt(cur), facingRef.current, true);
+  }, [panel, sendPos]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // movement + animation loop
   useEffect(() => {
     let raf = 0;
