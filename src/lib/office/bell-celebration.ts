@@ -96,7 +96,8 @@ export function createCelebrationCenter(deps: {
       if (this.cooldownRemaining(userId) > 0) return false;
       lastSent.set(userId, now());
       seen.add(c.celebrationId);
-      deps.show({ ...c, missed: false });
+      if (deps.isBackground()) pending = { c, at: now() };
+      else deps.show({ ...c, missed: false });
       return true;
     },
     receive(payload: unknown): "shown" | "pending" | "duplicate" | "ignored" {
@@ -110,9 +111,10 @@ export function createCelebrationCenter(deps: {
     },
     /** Chamado quando o Office volta ao foco. */
     onForeground(): boolean {
+      if (deps.isBackground()) return false;
       const p = pending; pending = null;
-      if (!p || now() - p.at > CELEBRATION_PENDING_TTL_MS) return false;
-      deps.show({ ...p.c, missed: true });
+      if (!p) return false;
+      deps.show({ ...p.c, missed: false });
       return true;
     },
   };

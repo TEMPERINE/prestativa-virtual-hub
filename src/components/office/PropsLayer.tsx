@@ -7,7 +7,7 @@ import { publishProps, publishFrames } from "@/lib/prop-gates";
 import { getCurrentWorkspaceId, subscribeCurrentWorkspaceId } from "@/lib/workspace/current";
 import { toast } from "sonner";
 import { BellPopover } from "./BellPopover";
-import { OfficeCelebrationToast } from "./OfficeCelebrationToast";
+import { OfficeCelebrationPopup } from "./OfficeCelebrationPopup";
 import {
   CELEBRATION_EVENT, buildCelebration, createCelebrationCenter, type CelebrationReason, type ShownCelebration,
 } from "@/lib/office/bell-celebration";
@@ -87,21 +87,19 @@ export function PropsLayer({ selfX, selfY, focusedRect = null }: Props) {
 
   // ---- Celebração do sino ----
   const [bellMenuFor, setBellMenuFor] = useState<string | null>(null);
-  const [celebration, setCelebration] = useState<(ShownCelebration & { senderName: string }) | null>(null);
-  const nameCacheRef = useRef<Record<string, string>>({});
-  const resolveName = useCallback(async (uid: string): Promise<string> => {
-    if (nameCacheRef.current[uid]) return nameCacheRef.current[uid];
-    const { data } = await supabase.from("profiles").select("display_name").eq("id", uid).maybeSingle();
-    const name = (data?.display_name as string | undefined)?.trim() || "Alguém";
-    nameCacheRef.current[uid] = name;
-    return name;
+  const [celebration, setCelebration] = useState<(ShownCelebration & { senderName: string; spriteId: string | null }) | null>(null);
+  const resolveSender = useCallback(async (uid: string) => {
+    const { data } = await supabase.from("profiles").select("display_name, sprite_id").eq("id", uid).maybeSingle();
+    return { senderName: data?.display_name?.trim() || "Alguém", spriteId: data?.sprite_id ?? null };
   }, []);
   const centerRef = useRef<ReturnType<typeof createCelebrationCenter> | null>(null);
   if (!centerRef.current) {
     centerRef.current = createCelebrationCenter({
       workspaceId: () => getCurrentWorkspaceId(),
       isBackground: () => typeof document !== "undefined" && (document.visibilityState === "hidden" || !document.hasFocus()),
-      show: (c) => { void resolveName(c.senderId).then((senderName) => setCelebration({ ...c, senderName })); },
+      show: (c) => { void resolveSender(c.senderId).then((sender) => {
+        if (getCurrentWorkspaceId() === c.workspaceId) setCelebration({ ...c, ...sender });
+      }); },
     });
   }
   useEffect(() => {
@@ -336,7 +334,8 @@ export function PropsLayer({ selfX, selfY, focusedRect = null }: Props) {
     const { data: u } = await supabase.auth.getUser();
     const uid = u.user?.id;
     if (!ws || !uid) { toast.error("Não foi possível identificar você. Recarregue o Office."); return; }
-    const center = centerRef.current!;
+    const center = centerRef.current;
+    if (!center) return;
     const remaining = center.cooldownRemaining(uid);
     if (remaining > 0) {
       toast.info(`Calma, o sino ainda está balançando! Tente de novo em ${Math.ceil(remaining / 1000)} s.`);
@@ -543,11 +542,12 @@ export function PropsLayer({ selfX, selfY, focusedRect = null }: Props) {
       })()}
 
       {celebration && (
-        <OfficeCelebrationToast
+        <OfficeCelebrationPopup
+          key={celebration.celebrationId}
           id={celebration.celebrationId}
           senderName={celebration.senderName}
           message={celebration.message}
-          missed={celebration.missed}
+          spriteId={celebration.spriteId}
           onClose={closeCelebration}
         />
       )}
