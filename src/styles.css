@@ -158,7 +158,7 @@
   right: auto !important;
   top: var(--office-toast-top) !important;
   transform: translateX(-50%) !important;
-  z-index: 250;
+  z-index: 350;
 }
 [data-sonner-toaster].office-sonner [data-sonner-toast] {
   border-radius: var(--radius-sm);

@@ -79,7 +79,7 @@ export function OfficeToastLayer({ children, sceneRef, showTeam }: {
   return (
     <TargetContext.Provider value={target}>
       {children}
-      <div ref={layerRef} data-office-toast-layer className="office-toast-layer pointer-events-none fixed z-[250]">
+      <div ref={layerRef} data-office-toast-layer className="office-toast-layer pointer-events-none fixed z-[350]">
         <div ref={setTarget} className="flex w-full flex-col gap-2" />
       </div>
     </TargetContext.Provider>

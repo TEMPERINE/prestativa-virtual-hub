@@ -19,6 +19,8 @@ export function FollowRequestsOverlay({ center, onFollow, onDecline }: Props) {
   const pending = entries.filter((e) => e.status === "pending");
   const missed = entries.filter((e) => e.status === "missed");
 
+  if (pending.length === 0 && missed.length === 0) return null;
+
   return (
     <OfficeNotice priority={10}>
     <div className="flex w-full flex-col gap-2" translate="no">
