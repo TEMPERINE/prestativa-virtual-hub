@@ -22,9 +22,9 @@ export function FollowRequestsOverlay({ center, onFollow, onDecline }: Props) {
   if (pending.length === 0 && missed.length === 0) return null;
 
   return (
-    <OfficeNotice priority={10}>
-    <div className="flex w-full flex-col gap-2" translate="no">
+    <>
       {pending.map((e) => (
+        <OfficeNotice key={e.fromUid} kind="action">
         <div
           key={e.fromUid}
           role="alertdialog"
@@ -43,9 +43,11 @@ export function FollowRequestsOverlay({ center, onFollow, onDecline }: Props) {
             </div>
           </div>
         </div>
+        </OfficeNotice>
       ))}
 
       {missed.length > 0 && (
+        <OfficeNotice kind="action">
         <div className="flex flex-col items-end gap-2 w-full">
           <Button
             variant="outline"
@@ -69,8 +71,8 @@ export function FollowRequestsOverlay({ center, onFollow, onDecline }: Props) {
             </div>
           )}
         </div>
+        </OfficeNotice>
       )}
-    </div>
-    </OfficeNotice>
+    </>
   );
 }
