@@ -29,7 +29,7 @@ export function OfficeCelebrationToast({ id, senderName, message, missed, onClos
         onPointerDown={(e) => e.stopPropagation()}
         className={`pointer-events-auto relative cursor-pointer max-w-md w-full rounded-2xl border bg-card text-card-foreground shadow-2xl px-4 py-3 animate-in fade-in slide-in-from-top-4 duration-300 ${missed ? "opacity-90" : "border-primary/40"}`}
       >
-        {!missed && <ConfettiBurst facing="down" burstKey={id.length + Date.now() % 100000} />}
+        {!missed && <ConfettiBurst facing="down" burstKey={parseInt(id.replace(/[^0-9a-f]/gi, "").slice(0, 8) || "1", 16)} />}
         <button
           type="button"
           aria-label="Fechar comemoração"
