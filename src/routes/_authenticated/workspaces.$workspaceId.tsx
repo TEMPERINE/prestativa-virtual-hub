@@ -8,6 +8,8 @@ import { toast } from "sonner";
 import { useOfficeSession } from "@/lib/rtc/useOfficeSession";
 import { officeGateView } from "@/lib/rtc/office-session-binding";
 import { Button } from "@/components/ui/button";
+import { MeetingsPanel } from "@/components/meetings/MeetingsPanel";
+import { parseOfficePanel, type OfficePanel } from "@/lib/office/overlay";
 
 export const Route = createFileRoute("/_authenticated/workspaces/$workspaceId")({
   head: () => ({
@@ -16,12 +18,37 @@ export const Route = createFileRoute("/_authenticated/workspaces/$workspaceId")(
       { name: "description", content: "Trabalhe junto com a equipe da Prestativa em tempo real." },
     ],
   }),
+  // ?panel= abre ferramentas SOBRE o Office sem remontar a cena (Back fecha o painel).
+  validateSearch: (search: Record<string, unknown>): { panel?: OfficePanel } => {
+    const panel = parseOfficePanel(search.panel);
+    return panel ? { panel } : {};
+  },
   component: WorkspaceScenePage,
 });
 
 function WorkspaceScenePage() {
   const { workspaceId } = Route.useParams();
   const navigate = useNavigate();
+  const { panel } = Route.useSearch();
+  const setPanel = useCallback((p: OfficePanel | null) => {
+    if (p) {
+      navigate({ to: ".", search: { panel: p } });
+    } else if (typeof window !== "undefined" && window.history.length > 1 && window.history.state?.__TSR_index > 0) {
+      window.history.back();
+    } else {
+      navigate({ to: ".", search: {}, replace: true });
+    }
+  }, [navigate]);
+  useEffect(() => {
+    if (panel !== "meetings") return;
+    const onEsc = (e: KeyboardEvent) => {
+      if (e.key !== "Escape" || e.defaultPrevented) return;
+      if (document.querySelector('[role="dialog"], [role="alertdialog"], [role="menu"]')) return;
+      setPanel(null);
+    };
+    window.addEventListener("keydown", onEsc);
+    return () => window.removeEventListener("keydown", onEsc);
+  }, [panel, setPanel]);
   const [authorized, setAuthorized] = useState<null | boolean>(null);
   const [sceneHydrated, setSceneHydrated] = useState(false);
   const [ready, setReady] = useState(false);
@@ -131,6 +158,8 @@ function WorkspaceScenePage() {
       <div style={{ visibility: ready ? "visible" : "hidden" }}>
         <OfficeScene
           onHydrated={handleHydrated}
+          panel={panel ?? null}
+          onPanelChange={setPanel}
           rtcSession={
             session.sessionId && session.generation !== null
               ? {
@@ -143,6 +172,13 @@ function WorkspaceScenePage() {
           }
         />
       </div>
+      {panel === "meetings" && (
+        <div className="fixed inset-0 z-[300] flex items-center justify-center bg-background/40 backdrop-blur-sm p-4">
+          <div className="w-full h-full max-w-7xl rounded-2xl overflow-hidden border shadow-2xl bg-background">
+            <MeetingsPanel embedded onBack={() => setPanel(null)} />
+          </div>
+        </div>
+      )}
       {!ready && (
         <PreloadScreen
           canFinish={sceneHydrated}
