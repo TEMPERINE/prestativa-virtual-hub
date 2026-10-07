@@ -23,6 +23,7 @@ import { SPRITES, getSprite, SPRITE_FRAMES as FRAMES, type Facing } from "@/lib/
 import { ensureFrameOffsets, getFrameOffsets, subscribeFrameOffsets } from "@/lib/sprite-alignment";
 import { AlignedSprite } from "@/components/sprites/AlignedSprite";
 import { PropsLayer } from "./PropsLayer";
+import { OfficeToastLayer, OfficeNotice } from "./OfficeToastLayer";
 import { isMoveGated } from "@/lib/prop-gates";
 
 const WALK_FRAME_MS = 110;
@@ -2929,6 +2930,7 @@ export function OfficeScene({
   ];
 
   return (
+    <OfficeToastLayer sceneRef={sceneRef} showTeam={showTeam}>
     <div
       ref={sceneRef}
       tabIndex={0}
@@ -3697,12 +3699,13 @@ export function OfficeScene({
       )}
 
       {IS_RTC_V2 && rtc.v2?.privacy.promptVisible && (
+        <OfficeNotice priority={20}>
         <div
           role="alertdialog"
           translate="no"
           data-testid="privacy-guard-prompt"
           aria-label="Câmera pausada por privacidade"
-          className="fixed bottom-24 left-1/2 z-50 w-[min(92vw,420px)] -translate-x-1/2 rounded-xl border border-border bg-card p-4 text-card-foreground shadow-lg"
+          className="w-full rounded-lg border border-border bg-card p-4 text-card-foreground shadow-lg"
         >
           <p className="text-sm font-semibold">Câmera pausada por privacidade</p>
           <p className="mt-1 text-xs text-muted-foreground">
@@ -3717,6 +3720,7 @@ export function OfficeScene({
             </Button>
           </div>
         </div>
+        </OfficeNotice>
       )}
 
       {meetingIdle.warning && (
@@ -3826,7 +3830,7 @@ export function OfficeScene({
 
 
       {/* Topbar — slim, sticky, sophisticated */}
-      <div className="absolute top-0 left-0 right-0 pointer-events-none z-[100]">
+      <div data-office-topbar className="absolute top-0 left-0 right-0 pointer-events-none z-[100]">
         <div
           className="pointer-events-auto flex items-center justify-between h-11 pl-3 pr-2 backdrop-blur-xl"
           style={{
@@ -4092,18 +4096,11 @@ export function OfficeScene({
 
       {/* Zone enter-toast (Gather style) */}
       {focusedZone && (
-        <div className="absolute bottom-20 left-1/2 -translate-x-1/2 pointer-events-none z-[100]">
-          <div
-            className="px-4 py-2 rounded-full text-sm font-medium shadow-soft backdrop-blur-sm"
-            style={{
-              background: "rgba(15,15,20,0.85)",
-              color: "white",
-              border: `1px solid ${focusedZone.accent}`,
-            }}
-          >
+        <OfficeNotice priority={40}>
+          <div className="w-full rounded-lg border bg-card px-4 py-3 text-sm font-medium text-card-foreground shadow-lg">
             Você entrou em <strong>{focusedZone.label}</strong>
           </div>
-        </div>
+        </OfficeNotice>
       )}
 
       {/* Team panel side toggle — always visible on right edge */}
@@ -4119,7 +4116,7 @@ export function OfficeScene({
 
       {/* Team panel */}
       {showTeam && (
-        <div className="absolute right-4 top-24 bottom-4 w-72 pointer-events-auto z-[80]">
+        <div data-office-team className="absolute right-4 top-24 bottom-4 w-72 pointer-events-auto z-[80]">
           <div className="glass-panel rounded-2xl shadow-soft h-full flex flex-col overflow-hidden">
             <div className="px-4 py-3 border-b">
               <div className="text-sm font-semibold">Equipe</div>
@@ -4215,6 +4212,7 @@ export function OfficeScene({
         />
       )}
     </div>
+    </OfficeToastLayer>
   );
 }
 

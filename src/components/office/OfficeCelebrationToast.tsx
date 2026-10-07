@@ -1,6 +1,7 @@
 import { useEffect } from "react";
-import { createPortal } from "react-dom";
 import { X } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { OfficeNotice } from "./OfficeToastLayer";
 import { ConfettiBurst } from "./ConfettiBurst";
 import { CELEBRATION_TOAST_MS } from "@/lib/office/bell-celebration";
 
@@ -19,33 +20,34 @@ export function OfficeCelebrationToast({ id, senderName, message, missed, onClos
     return () => window.clearTimeout(t);
   }, [id, missed, onClose]);
 
-  if (typeof document === "undefined") return null;
-  return createPortal(
-    <div className="pointer-events-none fixed inset-x-0 top-4 z-[250] flex justify-center px-4">
+  return (
+    <OfficeNotice priority={30}>
       <div
         role="status"
         aria-live="polite"
         onClick={onClose}
         onPointerDown={(e) => e.stopPropagation()}
-        className={`pointer-events-auto relative cursor-pointer max-w-md w-full rounded-2xl border bg-card text-card-foreground shadow-2xl px-4 py-3 animate-in fade-in slide-in-from-top-4 duration-300 ${missed ? "opacity-90" : "border-primary/40"}`}
+        className={`relative cursor-pointer w-full rounded-lg border bg-card text-card-foreground shadow-lg px-4 py-3 ${missed ? "opacity-90" : "border-primary/40"}`}
       >
         {!missed && <ConfettiBurst facing="down" burstKey={parseInt(id.replace(/[^0-9a-f]/gi, "").slice(0, 8) || "1", 16)} />}
-        <button
+        <Button
+          variant="ghost"
+          size="icon"
           type="button"
           aria-label="Fechar comemoração"
           onClick={(e) => { e.stopPropagation(); onClose(); }}
-          className="absolute right-2 top-2 rounded p-1 text-muted-foreground hover:bg-muted"
+          className="absolute right-2 top-2 h-6 w-6 text-muted-foreground"
         >
           <X className="h-4 w-4" />
-        </button>
+        </Button>
         <div className="flex items-start gap-3 pr-6">
           <div className={`text-3xl leading-none ${missed ? "" : "origin-top animate-[bell-wiggle_0.6s_ease-in-out_3]"}`} aria-hidden>
-            {missed ? "🎉" : "🔔"}
+            {missed ? null : "🔔"}
           </div>
           <div className="min-w-0">
             {missed ? (
               <>
-                <div className="text-sm font-semibold">Você perdeu uma comemoração</div>
+                <div className="text-sm font-semibold">🎉 Teve comemoração por aqui!</div>
                 <div className="text-sm text-muted-foreground break-words">
                   {senderName} tocou o sino: {message}
                 </div>
@@ -62,7 +64,6 @@ export function OfficeCelebrationToast({ id, senderName, message, missed, onClos
         </div>
         <style>{`@keyframes bell-wiggle{0%,100%{transform:rotate(0)}25%{transform:rotate(-18deg)}75%{transform:rotate(18deg)}}`}</style>
       </div>
-    </div>,
-    document.body,
+    </OfficeNotice>
   );
 }

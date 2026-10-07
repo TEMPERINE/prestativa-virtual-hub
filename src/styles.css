@@ -141,6 +141,40 @@
 }
 
 /* Magic teleport effect */
+/* Office-only notice geometry; other routes keep the global Sonner defaults. */
+.office-toast-layer {
+  top: var(--office-notice-top, 56px);
+  left: var(--office-notice-center, 50%);
+  width: var(--office-notice-width, min(420px, calc(100vw - 24px)));
+  transform: translateX(-50%);
+}
+.office-notice {
+  animation: office-notice-in 200ms ease-out;
+}
+[data-sonner-toaster].office-sonner {
+  --width: var(--office-toast-width) !important;
+  width: var(--office-toast-width) !important;
+  left: var(--office-toast-center) !important;
+  right: auto !important;
+  top: var(--office-toast-top) !important;
+  transform: translateX(-50%) !important;
+  z-index: 350;
+}
+[data-sonner-toaster].office-sonner [data-sonner-toast] {
+  border-radius: var(--radius-sm);
+  transition-duration: 200ms;
+  overflow-wrap: anywhere;
+}
+@keyframes office-notice-in {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .office-notice { animation: none; }
+  .office-sonner [data-sonner-toast] { transition: none !important; }
+}
+
+/* Magic teleport effect */
 @keyframes tp-halo-out {
   0% { opacity: 0; transform: translate(-50%, -50%) scale(0.4); }
   60% { opacity: 1; transform: translate(-50%, -50%) scale(1.1); }

@@ -1,11 +1,15 @@
 import { Toaster as Sonner } from "sonner";
+import { useOfficeToastActive } from "@/components/office/OfficeToastLayer";
 
 type ToasterProps = React.ComponentProps<typeof Sonner>;
 
 const Toaster = ({ ...props }: ToasterProps) => {
+  const officeActive = useOfficeToastActive();
   return (
     <Sonner
-      className="toaster group"
+      className={`toaster group${officeActive ? " office-sonner" : ""}`}
+      expand={officeActive}
+      gap={officeActive ? 8 : undefined}
       toastOptions={{
         classNames: {
           toast:

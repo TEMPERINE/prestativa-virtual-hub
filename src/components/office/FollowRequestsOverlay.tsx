@@ -2,6 +2,7 @@ import { useState, useSyncExternalStore } from "react";
 import { BellRing } from "lucide-react";
 import type { FollowRequestCenter } from "@/lib/notifications/follow-requests";
 import { Button } from "@/components/ui/button";
+import { OfficeNotice } from "./OfficeToastLayer";
 
 type Props = {
   center: FollowRequestCenter;
@@ -18,14 +19,17 @@ export function FollowRequestsOverlay({ center, onFollow, onDecline }: Props) {
   const pending = entries.filter((e) => e.status === "pending");
   const missed = entries.filter((e) => e.status === "missed");
 
+  if (pending.length === 0 && missed.length === 0) return null;
+
   return (
-    <div className="fixed top-4 right-4 z-[150] flex flex-col items-end gap-2 w-[min(92vw,340px)]" translate="no">
+    <OfficeNotice priority={10}>
+    <div className="flex w-full flex-col gap-2" translate="no">
       {pending.map((e) => (
         <div
           key={e.fromUid}
           role="alertdialog"
           aria-label={`${e.fromName} chamou você`}
-          className="w-full rounded-xl border bg-card text-card-foreground shadow-lg p-4 animate-in fade-in slide-in-from-top-2"
+          className="w-full rounded-lg border bg-card text-card-foreground shadow-lg p-4"
         >
           <div className="flex items-start gap-3">
             <BellRing className="h-5 w-5 text-primary shrink-0 mt-0.5" />
@@ -43,19 +47,21 @@ export function FollowRequestsOverlay({ center, onFollow, onDecline }: Props) {
 
       {missed.length > 0 && (
         <div className="flex flex-col items-end gap-2 w-full">
-          <button
+          <Button
+            variant="outline"
+            size="sm"
             onClick={() => setOpen((o) => !o)}
-            className="flex items-center gap-1.5 rounded-full border bg-card px-3 py-1.5 text-xs font-medium shadow-sm hover:bg-muted"
+            className="gap-1.5 bg-card text-xs shadow-sm"
             aria-expanded={open}
           >
             <BellRing className="h-3.5 w-3.5 text-primary" />
             {missed.length} {missed.length === 1 ? "chamado" : "chamados"}
-          </button>
+          </Button>
           {open && (
-            <div className="w-full rounded-xl border bg-card shadow-lg p-2 space-y-1">
+            <div className="w-full rounded-lg border bg-card shadow-lg p-2 space-y-1">
               {missed.map((e) => (
-                <div key={e.fromUid} className="flex items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-muted/60">
-                  <span className="flex-1 text-sm truncate">{e.fromName} chamou você</span>
+                <div key={e.fromUid} className="flex flex-wrap items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-muted/60">
+                  <span className="w-full text-sm break-words">{e.fromName} chamou você</span>
                   <Button size="sm" className="h-7" onClick={() => { center.resolve(e.fromUid); onFollow(e.fromUid); setOpen(false); }}>Seguir</Button>
                   <Button size="sm" variant="ghost" className="h-7" onClick={() => center.resolve(e.fromUid)}>Dispensar</Button>
                 </div>
@@ -65,5 +71,6 @@ export function FollowRequestsOverlay({ center, onFollow, onDecline }: Props) {
         </div>
       )}
     </div>
+    </OfficeNotice>
   );
 }

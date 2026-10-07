@@ -1,0 +1,52 @@
+// @vitest-environment jsdom
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, expect, it, vi } from "vitest";
+import { createRef } from "react";
+import { OfficeNotice, OfficeToastLayer, useOfficeToastActive } from "./OfficeToastLayer";
+import { OfficeCelebrationToast } from "./OfficeCelebrationToast";
+
+afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
+
+it("keeps standalone notice controls usable outside Office", () => {
+  const click = vi.fn();
+  render(<OfficeNotice><button onClick={click}>Action</button></OfficeNotice>);
+  fireEvent.click(screen.getByText("Action"));
+  expect(click).toHaveBeenCalledTimes(1);
+});
+
+it("uses positive pending copy and retains close action", () => {
+  const close = vi.fn();
+  render(<OfficeCelebrationToast id="a" senderName="Dani" message="Meta alcançada" missed onClose={close} />);
+  expect(screen.getByText("🎉 Teve comemoração por aqui!")).toBeTruthy();
+  expect(screen.getByText("Dani tocou o sino: Meta alcançada")).toBeTruthy();
+  fireEvent.click(screen.getByLabelText("Fechar comemoração"));
+  expect(close).toHaveBeenCalledTimes(1);
+});
+
+it("measures useful Office width and resets global toast geometry on unmount", () => {
+  let resize: (() => void) | undefined;
+  vi.stubGlobal("ResizeObserver", class {
+    constructor(callback: () => void) { resize = callback; }
+    observe() {} disconnect() {}
+  });
+  vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (this: HTMLElement) {
+    if (this.hasAttribute("data-office-team")) return { left: 800, right: 1088, bottom: 900 } as DOMRect;
+    if (this.hasAttribute("data-office-topbar")) return { bottom: 44 } as DOMRect;
+    return { left: 0, right: 1100, top: 0, height: this.hasAttribute("data-scene") ? 900 : 100 } as DOMRect;
+  });
+  function Status() { return <span>{useOfficeToastActive() ? "active" : "inactive"}</span>; }
+  const sceneRef = createRef<HTMLDivElement>();
+  const { unmount } = render(<OfficeToastLayer sceneRef={sceneRef} showTeam>
+    <div ref={sceneRef} data-scene><div data-office-topbar /><div data-office-team /></div>
+    <OfficeNotice><p>Notice</p></OfficeNotice><Status />
+  </OfficeToastLayer>);
+  act(() => resize?.());
+  expect(screen.getByText("active")).toBeTruthy();
+  expect(document.documentElement.style.getPropertyValue("--office-toast-center")).toBe("394px");
+  expect(document.documentElement.style.getPropertyValue("--office-toast-width")).toBe("420px");
+  expect(document.documentElement.style.getPropertyValue("--office-toast-top")).toBe("164px");
+  expect(screen.getByText("Notice").closest("[data-office-toast-layer]")).toBeTruthy();
+  unmount();
+  expect(document.documentElement.style.getPropertyValue("--office-toast-center")).toBe("");
+  vi.restoreAllMocks();
+});
