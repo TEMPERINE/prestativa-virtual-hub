@@ -141,6 +141,10 @@ export function OfficeToastLayer({ children, sceneRef, showTeam }: {
       root.style.setProperty("--office-toast-center", `${center}px`);
       root.style.setProperty("--office-toast-width", `${width}px`);
       root.style.setProperty("--office-toast-top", `${top + (height > 0 ? height + 8 : 0)}px`);
+      root.style.setProperty("--office-celebration-left", `${left}px`);
+      root.style.setProperty("--office-celebration-top", `${top}px`);
+      root.style.setProperty("--office-celebration-width", `${available}px`);
+      root.style.setProperty("--office-celebration-height", `${Math.max(0, Math.min(window.innerHeight, bounds.bottom) - top)}px`);
     };
     update();
     setActive(true);
@@ -154,7 +158,7 @@ export function OfficeToastLayer({ children, sceneRef, showTeam }: {
       observer.disconnect();
       window.removeEventListener("resize", update);
       setActive(false);
-      ["--office-toast-center", "--office-toast-width", "--office-toast-top"].forEach((key) => root.style.removeProperty(key));
+      ["--office-toast-center", "--office-toast-width", "--office-toast-top", "--office-celebration-left", "--office-celebration-top", "--office-celebration-width", "--office-celebration-height"].forEach((key) => root.style.removeProperty(key));
     };
   }, [sceneRef, showTeam, target]);
 

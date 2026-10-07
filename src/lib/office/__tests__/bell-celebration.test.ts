@@ -38,16 +38,27 @@ describe("bell celebration", () => {
     s.c.receive(s.ev("a")); expect(s.c.receive(s.ev("a"))).toBe("duplicate");
     expect(s.show).toHaveBeenCalledTimes(1);
   });
-  it("fora de foco guarda pendente e mostra versão discreta ao voltar", () => {
+  it("fora de foco guarda pendente e mostra comemoração normal ao voltar", () => {
     const s = setup(); s.state.bg = true;
     expect(s.c.receive(s.ev("a"))).toBe("pending"); expect(s.show).not.toHaveBeenCalled();
     s.state.bg = false; expect(s.c.onForeground()).toBe(true);
-    expect(s.show.mock.calls[0][0]).toMatchObject({ missed: true, celebrationId: "a" });
+    expect(s.show.mock.calls[0][0]).toMatchObject({ missed: false, celebrationId: "a" });
     expect(s.c.onForeground()).toBe(false);
   });
-  it("pendente expira após alguns minutos", () => {
+  it("pendente não expira antes de ficar realmente visível", () => {
     const s = setup(); s.state.bg = true; s.c.receive(s.ev("a"));
     s.tick(CELEBRATION_PENDING_TTL_MS + 1); expect(s.c.onForeground()).toBe(false);
+    s.state.bg = false;
+    expect(s.c.onForeground()).toBe(true);
+    expect(s.show.mock.calls[0][0]).toMatchObject({ missed: false });
+  });
+  it("envio local que termina sem foco também aguarda retorno", () => {
+    const s = setup(); s.state.bg = true;
+    const e = buildCelebration({ workspaceId: "ws1", senderId: "u1", message: "oi", at: 0 });
+    if (!e) throw new Error("Expected valid celebration");
+    expect(s.c.trySend("u1", e)).toBe(true);
+    expect(s.show).not.toHaveBeenCalled();
+    s.state.bg = false; expect(s.c.onForeground()).toBe(true);
   });
   it("cooldown evita spam", () => {
     const s = setup(); const e = buildCelebration({ workspaceId: "ws1", senderId: "u1", message: "oi", at: 0 })!;

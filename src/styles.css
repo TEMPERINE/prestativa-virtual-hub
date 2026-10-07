@@ -88,6 +88,11 @@
   --gradient-primary: linear-gradient(135deg, oklch(0.66 0.21 1), oklch(0.78 0.16 358));
   --shadow-glow: 0 0 40px -8px oklch(0.66 0.21 1 / 0.45);
   --shadow-soft: 0 8px 30px -10px oklch(0.30 0.10 340 / 0.20);
+  --celebration-gold: oklch(0.84 0.16 87);
+  --celebration-teal: oklch(0.71 0.14 180);
+  --celebration-ink: oklch(0.28 0.06 67);
+  --celebration-overlay: oklch(0.18 0.02 340 / 0.20);
+  --celebration-shadow: 0 24px 70px oklch(0.20 0.04 340 / 0.24);
 }
 
 .dark {
@@ -172,6 +177,73 @@
 @media (prefers-reduced-motion: reduce) {
   .office-notice { animation: none; }
   .office-sonner [data-sonner-toast] { transition: none !important; }
+}
+
+.office-celebration-stage {
+  left: var(--office-celebration-left, 0px);
+  top: var(--office-celebration-top, 56px);
+  width: var(--office-celebration-width, 100vw);
+  height: var(--office-celebration-height, calc(100dvh - 56px));
+  display: grid;
+  place-items: center;
+  padding: 16px;
+}
+.office-celebration-backdrop {
+  background: var(--celebration-overlay);
+  backdrop-filter: blur(2px);
+  animation: celebration-appear 220ms ease-out;
+}
+.office-celebration-popup {
+  background: var(--card);
+  box-shadow: var(--celebration-shadow);
+  border: 1px solid color-mix(in oklab, var(--celebration-gold) 55%, var(--border));
+  width: min(520px, 100%);
+  max-height: 100%;
+  overflow: auto;
+  isolation: isolate;
+  animation: celebration-enter 320ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.office-celebration-ribbon {
+  height: 5px;
+  background: linear-gradient(90deg, var(--primary) 0% 34%, var(--celebration-gold) 34% 67%, var(--celebration-teal) 67%);
+  border-radius: 8px 8px 0 0;
+}
+.office-celebration-bell {
+  background: var(--celebration-gold);
+  color: var(--celebration-ink);
+  border: 3px solid var(--card);
+  transform: rotate(12deg);
+}
+.office-celebration-party { color: var(--celebration-teal); transform: rotate(-15deg); }
+.office-celebration-message { overflow-wrap: anywhere; }
+.office-celebration-footer { color: var(--celebration-teal); }
+.office-celebration-footer span { height: 2px; width: 32px; background: var(--celebration-gold); }
+.office-celebration-confetti span {
+  position: absolute;
+  top: -12px;
+  left: var(--lane);
+  width: 5px;
+  height: 9px;
+  border-radius: 1px;
+  background: var(--celebration-gold);
+  animation: celebration-confetti 3.4s ease-out both;
+  animation-delay: calc(var(--piece) * 40ms);
+}
+.office-celebration-confetti span:nth-child(3n) { background: var(--primary); }
+.office-celebration-confetti span:nth-child(3n + 1) { background: var(--celebration-teal); }
+@keyframes celebration-appear { from { opacity: 0; } to { opacity: 1; } }
+@keyframes celebration-enter {
+  from { opacity: 0; transform: translateY(12px) scale(0.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes celebration-confetti {
+  0% { opacity: 0; transform: translateY(0) rotate(var(--turn)); }
+  15% { opacity: 0.7; }
+  100% { opacity: 0; transform: translateY(280px) rotate(calc(var(--turn) + 180deg)); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .office-celebration-popup, .office-celebration-backdrop { animation: none; }
+  .office-celebration-confetti { display: none; }
 }
 
 /* Magic teleport effect */
