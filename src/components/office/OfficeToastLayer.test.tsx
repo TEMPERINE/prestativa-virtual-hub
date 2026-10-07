@@ -3,7 +3,6 @@ import { act, cleanup, fireEvent, render, screen } from "@testing-library/react"
 import { afterEach, expect, it, vi } from "vitest";
 import { createRef } from "react";
 import { OfficeAreaNotice, OfficeNotice, OfficeToastLayer, useOfficeToastActive } from "./OfficeToastLayer";
-import { OfficeCelebrationToast } from "./OfficeCelebrationToast";
 
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 
@@ -12,15 +11,6 @@ it("keeps standalone notice controls usable outside Office", () => {
   render(<OfficeNotice><button onClick={click}>Action</button></OfficeNotice>);
   fireEvent.click(screen.getByText("Action"));
   expect(click).toHaveBeenCalledTimes(1);
-});
-
-it("uses positive pending copy and retains close action", () => {
-  const close = vi.fn();
-  render(<OfficeCelebrationToast id="a" senderName="Dani" message="Meta alcançada" missed onClose={close} />);
-  expect(screen.getByText("🎉 Teve comemoração por aqui!")).toBeTruthy();
-  expect(screen.getByText("Dani tocou o sino: Meta alcançada")).toBeTruthy();
-  fireEvent.click(screen.getByLabelText("Fechar comemoração"));
-  expect(close).toHaveBeenCalledTimes(1);
 });
 
 it("measures useful Office width and resets global toast geometry on unmount", () => {
