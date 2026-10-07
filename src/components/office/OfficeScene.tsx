@@ -85,6 +85,7 @@ import { MEETING_UI_V2, resolveMeetingDisplayMode, type MeetingDisplayMode } fro
 import {
   createFollowRequestCenter, presenterFromService, playFollowChime, primeNotificationSound, type FollowRequestCenter,
 } from "@/lib/notifications/follow-requests";
+import { createJoinInviteCenter, type JoinInviteCenter } from "@/lib/notifications/join-invitations";
 import { CamPreviewAndPicker } from "./CamPreviewAndPicker";
 import { DeviceMenu } from "./DeviceMenu";
 import prestativaIcon from "@/assets/virtual-office-logo.png.asset.json";
@@ -2219,10 +2220,33 @@ export function OfficeScene({
     );
   }
   useEffect(() => () => followCenterRef.current?.dispose(), []);
+  const acceptJoinRef = useRef(acceptJoin);
+  acceptJoinRef.current = acceptJoin;
+  const declineJoinRef = useRef(declineJoin);
+  declineJoinRef.current = declineJoin;
+  const joinCenterRef = useRef<JoinInviteCenter | null>(null);
+  if (!joinCenterRef.current) {
+    joinCenterRef.current = createJoinInviteCenter({
+      service: () => notifServiceRef.current,
+      playSound: () => void playFollowChime(),
+      showPopup: (inv) => {
+        toast(`${inv.fromName} quer que você se junte a ele(a)`, {
+          id: `join-${inv.fromUid}`,
+          description: "Aceite para se teletransportar para o local dessa pessoa.",
+          duration: 20000,
+          action: { label: "Aceitar", onClick: () => { joinCenterRef.current?.resolve(inv.fromUid); acceptJoinRef.current(inv.fromUid, inv.fromPos); } },
+          cancel: { label: "Recusar", onClick: () => { joinCenterRef.current?.resolve(inv.fromUid); declineJoinRef.current(inv.fromUid); } },
+        });
+      },
+    });
+  }
   useEffect(() => {
     // Ao voltar ao Office, chamados recebidos em segundo plano reabrem como popup.
     const back = () => {
-      if (document.visibilityState === "visible" && document.hasFocus()) followCenterRef.current?.onAppVisible();
+      if (document.visibilityState === "visible" && document.hasFocus()) {
+        followCenterRef.current?.onAppVisible();
+        joinCenterRef.current?.onAppVisible();
+      }
     };
     document.addEventListener("visibilitychange", back);
     window.addEventListener("focus", back);
@@ -2278,13 +2302,11 @@ export function OfficeScene({
       .on("broadcast", { event: "join-request" }, ({ payload }) => {
         const p = payload as { from?: string; to?: string; fromName?: string; fromPos?: Point };
         if (!p?.from || p.to !== uid || !p.fromPos) return;
-        const from = p.from;
-        const fromPos = p.fromPos;
-        toast(`${p.fromName ?? "Alguém"} quer que você se junte a ele(a)`, {
-          description: "Aceite para se teletransportar para o local dessa pessoa.",
-          duration: 20000,
-          action: { label: "Aceitar", onClick: () => acceptJoin(from, fromPos) },
-          cancel: { label: "Recusar", onClick: () => declineJoin(from) },
+        joinCenterRef.current?.receive({
+          fromUid: p.from,
+          fromName: p.fromName ?? profilesRef.current[p.from]?.display_name ?? "Alguém",
+          fromPos: p.fromPos,
+          at: Date.now(),
         });
       })
       .on("broadcast", { event: "join-accept" }, ({ payload }) => {
