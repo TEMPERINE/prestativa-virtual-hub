@@ -5,6 +5,15 @@ import { getPropDef, subscribePropCatalog } from "@/lib/prop-catalog";
 import { loadCustomPropsFromCloud } from "@/lib/custom-props";
 import { publishProps, publishFrames } from "@/lib/prop-gates";
 import { getCurrentWorkspaceId, subscribeCurrentWorkspaceId } from "@/lib/workspace/current";
+import { toast } from "sonner";
+import { BellPopover } from "./BellPopover";
+import { OfficeCelebrationToast } from "./OfficeCelebrationToast";
+import {
+  CELEBRATION_EVENT, buildCelebration, createCelebrationCenter, type CelebrationReason, type ShownCelebration,
+} from "@/lib/office/bell-celebration";
+
+/** Props que abrem o popover de celebração em vez de tocar direto. */
+const CELEBRATION_PROP_DEFS = new Set(["bell-meta"]);
 
 const INTERACT_RADIUS = 0.1; // distância (em fração do mapa) para o avatar poder interagir
 
@@ -76,6 +85,35 @@ export function PropsLayer({ selfX, selfY, focusedRect = null }: Props) {
   // SNAPSHOT (último estado) para quem entrar depois.
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
+  // ---- Celebração do sino ----
+  const [bellMenuFor, setBellMenuFor] = useState<string | null>(null);
+  const [celebration, setCelebration] = useState<(ShownCelebration & { senderName: string }) | null>(null);
+  const nameCacheRef = useRef<Record<string, string>>({});
+  const resolveName = useCallback(async (uid: string): Promise<string> => {
+    if (nameCacheRef.current[uid]) return nameCacheRef.current[uid];
+    const { data } = await supabase.from("profiles").select("display_name").eq("id", uid).maybeSingle();
+    const name = (data?.display_name as string | undefined)?.trim() || "Alguém";
+    nameCacheRef.current[uid] = name;
+    return name;
+  }, []);
+  const centerRef = useRef<ReturnType<typeof createCelebrationCenter> | null>(null);
+  if (!centerRef.current) {
+    centerRef.current = createCelebrationCenter({
+      workspaceId: () => getCurrentWorkspaceId(),
+      isBackground: () => typeof document !== "undefined" && (document.visibilityState === "hidden" || !document.hasFocus()),
+      show: (c) => { void resolveName(c.senderId).then((senderName) => setCelebration({ ...c, senderName })); },
+    });
+  }
+  useEffect(() => {
+    const onBack = () => {
+      if (document.visibilityState === "visible" && document.hasFocus()) centerRef.current?.onForeground();
+    };
+    document.addEventListener("visibilitychange", onBack);
+    window.addEventListener("focus", onBack);
+    return () => { document.removeEventListener("visibilitychange", onBack); window.removeEventListener("focus", onBack); };
+  }, []);
+  const closeCelebration = useCallback(() => setCelebration(null), []);
+
   useEffect(() => {
     if (!wsId) { setFrames({}); channelRef.current = null; return; }
     let cancelled = false;
@@ -115,6 +153,9 @@ export function PropsLayer({ selfX, selfY, focusedRect = null }: Props) {
           setFrames((p) => ({ ...p, [propId]: tick }));
         },
       );
+      channel.on("broadcast", { event: CELEBRATION_EVENT }, (msg) => {
+        centerRef.current?.receive(msg.payload);
+      });
       // Compatibilidade retroativa: clientes antigos (ex.: app desktop com a
       // versão publicada) ainda sincronizam via UPDATE em prop_states. Escutar
       // postgres_changes garante interop nos dois sentidos até todo mundo
@@ -284,6 +325,31 @@ export function PropsLayer({ selfX, selfY, focusedRect = null }: Props) {
     });
   }, [frames, playAnimation]);
 
+  // Sino abre o popover; demais props seguem interação direta.
+  const requestInteract = useCallback((prop: PropInstance) => {
+    if (CELEBRATION_PROP_DEFS.has(prop.defId)) { setBellMenuFor(prop.id); return; }
+    triggerInteract(prop);
+  }, [triggerInteract]);
+
+  const celebrate = useCallback(async (prop: PropInstance, reason: CelebrationReason | null, message: string) => {
+    const ws = getCurrentWorkspaceId();
+    const { data: u } = await supabase.auth.getUser();
+    const uid = u.user?.id;
+    if (!ws || !uid) { toast.error("Não foi possível identificar você. Recarregue o Office."); return; }
+    const center = centerRef.current!;
+    const remaining = center.cooldownRemaining(uid);
+    if (remaining > 0) {
+      toast.info(`Calma, o sino ainda está balançando! Tente de novo em ${Math.ceil(remaining / 1000)} s.`);
+      return;
+    }
+    const c = buildCelebration({ workspaceId: ws, senderId: uid, reason, message, at: Date.now() });
+    if (!c) return;
+    setBellMenuFor(null);
+    center.trySend(uid, c);
+    triggerInteract(prop); // toca o sino para todos (comportamento atual)
+    void channelRef.current?.send({ type: "broadcast", event: CELEBRATION_EVENT, payload: c });
+  }, [triggerInteract]);
+
   // Dispara animação local quando o frame remoto muda em props animados.
   // Ignora ticks que nós mesmos originamos (já animados localmente).
   useEffect(() => {
@@ -335,11 +401,11 @@ export function PropsLayer({ selfX, selfY, focusedRect = null }: Props) {
       }
       if (!best) return;
       e.preventDefault();
-      triggerInteract(best.prop);
+      requestInteract(best.prop);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [triggerInteract]);
+  }, [requestInteract]);
 
   // Atalho global: Ctrl+X alterna qualquer prop com ação `gate-zone` cuja
   // zona alvo seja a zona onde o avatar está atualmente. Permite "trancar
@@ -440,7 +506,7 @@ export function PropsLayer({ selfX, selfY, focusedRect = null }: Props) {
             type="button"
             onClick={(e) => {
               e.stopPropagation();
-              triggerInteract(nearestInteractive);
+              requestInteract(nearestInteractive);
             }}
             className="absolute -translate-x-1/2 -translate-y-full flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-black/70 backdrop-blur-sm text-[11px] text-white/90 shadow-lg hover:bg-black/80 transition-colors"
             style={{
@@ -458,6 +524,33 @@ export function PropsLayer({ selfX, selfY, focusedRect = null }: Props) {
           </button>
         );
       })()}
+
+      {bellMenuFor && (() => {
+        const prop = propsList.find((p) => p.id === bellMenuFor);
+        const def = prop ? getPropDef(prop.defId) : undefined;
+        if (!prop || !def) return null;
+        const topPct = (prop.y - prop.w / def.aspectRatio) * 100;
+        return (
+          <BellPopover
+            key={prop.id}
+            leftPct={prop.x * 100}
+            topPct={topPct}
+            onClose={() => setBellMenuFor(null)}
+            onRingOnly={() => { setBellMenuFor(null); triggerInteract(prop); }}
+            onCelebrate={(r, m) => { void celebrate(prop, r, m); }}
+          />
+        );
+      })()}
+
+      {celebration && (
+        <OfficeCelebrationToast
+          id={celebration.celebrationId}
+          senderName={celebration.senderName}
+          message={celebration.message}
+          missed={celebration.missed}
+          onClose={closeCelebration}
+        />
+      )}
     </>
   );
 }
