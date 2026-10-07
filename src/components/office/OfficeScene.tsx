@@ -23,7 +23,7 @@ import { SPRITES, getSprite, SPRITE_FRAMES as FRAMES, type Facing } from "@/lib/
 import { ensureFrameOffsets, getFrameOffsets, subscribeFrameOffsets } from "@/lib/sprite-alignment";
 import { AlignedSprite } from "@/components/sprites/AlignedSprite";
 import { PropsLayer } from "./PropsLayer";
-import { OfficeToastLayer, OfficeNotice } from "./OfficeToastLayer";
+import { OfficeToastLayer, OfficeNotice, OfficeAreaNotice } from "./OfficeToastLayer";
 import { isMoveGated } from "@/lib/prop-gates";
 
 const WALK_FRAME_MS = 110;
@@ -3699,7 +3699,7 @@ export function OfficeScene({
       )}
 
       {IS_RTC_V2 && rtc.v2?.privacy.promptVisible && (
-        <OfficeNotice priority={20}>
+        <OfficeNotice kind="action">
         <div
           role="alertdialog"
           translate="no"
@@ -4095,13 +4095,7 @@ export function OfficeScene({
 
 
       {/* Zone enter-toast (Gather style) */}
-      {focusedZone && (
-        <OfficeNotice priority={40}>
-          <div className="w-full rounded-lg border bg-card px-4 py-3 text-sm font-medium text-card-foreground shadow-lg">
-            Você entrou em <strong>{focusedZone.label}</strong>
-          </div>
-        </OfficeNotice>
-      )}
+      <OfficeAreaNotice zoneId={focusedZone?.id} label={focusedZone?.label} />
 
       {/* Team panel side toggle — always visible on right edge */}
       <button

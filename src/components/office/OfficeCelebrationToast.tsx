@@ -21,7 +21,7 @@ export function OfficeCelebrationToast({ id, senderName, message, missed, onClos
   }, [id, missed, onClose]);
 
   return (
-    <OfficeNotice priority={30}>
+    <OfficeNotice kind="celebration">
       <div
         role="status"
         aria-live="polite"

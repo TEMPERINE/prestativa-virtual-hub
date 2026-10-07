@@ -1,10 +1,13 @@
 import { Toaster as Sonner } from "sonner";
+import type { ComponentProps } from "react";
 import { useOfficeToastActive } from "@/components/office/OfficeToastLayer";
 
-type ToasterProps = React.ComponentProps<typeof Sonner>;
+type ToasterProps = ComponentProps<typeof Sonner>;
 
 const Toaster = ({ ...props }: ToasterProps) => {
   const officeActive = useOfficeToastActive();
+  // OfficeToastLayer presents the same Sonner stream; do not consume it twice.
+  if (officeActive) return null;
   return (
     <Sonner
       className={`toaster group${officeActive ? " office-sonner" : ""}`}
