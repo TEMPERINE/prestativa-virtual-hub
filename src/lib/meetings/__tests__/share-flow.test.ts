@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { canSubmitSelection, confirmQuestion, selectionLabel, sentToast, UNDO_WINDOW_MS } from "../share-flow";
 
-const page = readFileSync("src/routes/_authenticated/meetings.tsx", "utf8");
+const page = readFileSync("src/components/meetings/MeetingsPanel.tsx", "utf8");
 const dialog = page.slice(page.indexOf("function SendRecordingDialog"), page.indexOf("const DELETE_ERRORS"));
 
 describe("Enviar reunião — regras", () => {

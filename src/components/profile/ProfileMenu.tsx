@@ -39,6 +39,8 @@ type Props = {
   onStatusChanged: () => void;
   onOpenSavedNotes: () => void;
   onLeaveDesk: () => void;
+  /** Abre Minhas reuniões como painel sobre o Office (sem sair dele). */
+  onOpenMeetings?: () => void;
 };
 
 export function ProfileMenu(p: Props) {
@@ -126,14 +128,18 @@ export function ProfileMenu(p: Props) {
             }}
           />
           <MenuItem icon={<StickyNote className="w-4 h-4" />} label="Recadinhos guardados" onClick={() => { setOpen(false); p.onOpenSavedNotes(); }} />
-          <Link
-            to="/meetings"
-            onClick={() => setOpen(false)}
-            className="w-full flex items-center gap-2 px-2 py-1.5 text-sm rounded hover:bg-muted text-left"
-          >
-            <Video className="w-4 h-4" />
-            <span className="flex-1">Minhas reuniões</span>
-          </Link>
+          {p.onOpenMeetings ? (
+            <MenuItem icon={<Video className="w-4 h-4" />} label="Minhas reuniões" onClick={() => { setOpen(false); p.onOpenMeetings?.(); }} />
+          ) : (
+            <Link
+              to="/meetings"
+              onClick={() => setOpen(false)}
+              className="w-full flex items-center gap-2 px-2 py-1.5 text-sm rounded hover:bg-muted text-left"
+            >
+              <Video className="w-4 h-4" />
+              <span className="flex-1">Minhas reuniões</span>
+            </Link>
+          )}
           <MenuItem icon={<RefreshCcw className="w-4 h-4" />} label="Refazer onboarding" onClick={() => { setOpen(false); p.onRestartOnboarding(); }} />
         </div>
 
