@@ -114,6 +114,7 @@ import { RecordingNameDialog } from "@/components/office/RecordingNameDialog";
 import { getCurrentWorkspaceId } from "@/lib/workspace/current";
 import { useWorkspaceTier } from "@/lib/workspace/useWorkspaceTier";
 
+import { isMovementInputBlocked, type OfficePanel } from "@/lib/office/overlay";
 type Profile = {
   id: string;
   display_name: string;
@@ -338,8 +339,18 @@ function nearbyWalkablePoint(anchor: Point, avoid: Point[] = [], preferredZoneId
 export function OfficeScene({
   onHydrated,
   rtcSession = null,
-}: { onHydrated?: () => void; rtcSession?: RtcV2HookConfig | null } = {}) {
+  panel = null,
+  onPanelChange,
+}: {
+  onHydrated?: () => void;
+  rtcSession?: RtcV2HookConfig | null;
+  panel?: OfficePanel | null;
+  onPanelChange?: (p: OfficePanel | null) => void;
+} = {}) {
   const officeTheme = useOfficeTheme();
+  // Painel aberto bloqueia só o input local de movimento (avatar/RTC intactos).
+  const panelRef = useRef(panel);
+  panelRef.current = panel;
   // Capacidades por nível do espaço atual — controlam botões de gravar,
   // teleporte e troca de personagem.
   const { caps: tierCaps } = useWorkspaceTier(getCurrentWorkspaceId());
@@ -465,7 +476,8 @@ export function OfficeScene({
   const [cursor, setCursor] = useState<{ x: number; y: number } | null>(null);
   const [openingNote, setOpeningNote] = useState<DeskNote | null>(null);
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
-  const [savedNotesOpen, setSavedNotesOpen] = useState(false);
+  const savedNotesOpen = panel === "notes";
+  const setSavedNotesOpen = (o: boolean) => onPanelChange?.(o ? "notes" : null);
   const [raisedHands, setRaisedHands] = useState<Record<string, boolean>>({});
   const handChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const handChannelReadyRef = useRef(false);
@@ -477,8 +489,10 @@ export function OfficeScene({
   const meIdRef = useRef<string | null>(null);
   const accessTokenRef = useRef<string | null>(null);
   const [myEmail, setMyEmail] = useState<string>("");
-  const [editCharOpen, setEditCharOpen] = useState(false);
-  const [editProfOpen, setEditProfOpen] = useState(false);
+  const editCharOpen = panel === "character";
+  const editProfOpen = panel === "profile";
+  const setEditCharOpen = (o: boolean) => onPanelChange?.(o ? "character" : null);
+  const setEditProfOpen = (o: boolean) => onPanelChange?.(o ? "profile" : null);
   const [forceOnboarding, setForceOnboarding] = useState(false);
 
   const refreshMe = useCallback(async () => {
