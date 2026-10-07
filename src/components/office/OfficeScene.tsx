@@ -2375,6 +2375,7 @@ export function OfficeScene({
   // keyboard input — standard 2D game movement (hold to walk, release to idle)
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
+      if (isMovementInputBlocked(panelRef.current)) return;
       const key = e.key.toLowerCase();
       // Ctrl/Cmd + D — teleport to claimed workspace
       if (key === "d" && (e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey) {
@@ -4047,6 +4048,7 @@ export function OfficeScene({
                 onSignOut={signOut}
                 onStatusChanged={refreshMe}
                 onOpenSavedNotes={() => setSavedNotesOpen(true)}
+                onOpenMeetings={() => onPanelChange?.("meetings")}
                 onLeaveDesk={releaseClaim}
               />
             )}
