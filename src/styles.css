@@ -88,6 +88,8 @@
   --gradient-primary: linear-gradient(135deg, oklch(0.66 0.21 1), oklch(0.78 0.16 358));
   --shadow-glow: 0 0 40px -8px oklch(0.66 0.21 1 / 0.45);
   --shadow-soft: 0 8px 30px -10px oklch(0.30 0.10 340 / 0.20);
+  --sprite-ground-shadow-scene: radial-gradient(ellipse at center, rgba(0,0,0,0.45) 0%, rgba(0,0,0,0.28) 45%, rgba(0,0,0,0) 72%);
+  --sprite-ground-shadow-preview: radial-gradient(ellipse at center, rgba(0,0,0,0.40) 0%, rgba(0,0,0,0.24) 45%, rgba(0,0,0,0) 72%);
   --celebration-gold: oklch(0.84 0.16 87);
   --celebration-teal: oklch(0.71 0.14 180);
   --celebration-ink: oklch(0.28 0.06 67);

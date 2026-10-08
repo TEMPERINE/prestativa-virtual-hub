@@ -41,7 +41,7 @@ type Props = {
   /** Override de estilo do wrapper (use com cuidado). */
   className?: string;
   style?: CSSProperties;
-  /** Drop shadow (filter) no sprite — default true em scene, false em preview. */
+   /** Legado: controla a intensidade da sombra de chão, nunca filtra a textura. */
   dropShadow?: boolean;
 };
 
@@ -53,8 +53,7 @@ const SHADOW_STYLES: Record<Mode, CSSProperties> = {
     width: "62%",
     height: "10%",
     transform: "translateX(-50%)",
-    background:
-      "radial-gradient(ellipse at center, rgba(0,0,0,0.45) 0%, rgba(0,0,0,0.28) 45%, rgba(0,0,0,0) 72%)",
+    background: "var(--sprite-ground-shadow-scene)",
     filter: "blur(1.5px)",
     pointerEvents: "none",
     zIndex: 0,
@@ -66,8 +65,7 @@ const SHADOW_STYLES: Record<Mode, CSSProperties> = {
     width: "52%",
     height: "8%",
     transform: "translateX(-50%)",
-    background:
-      "radial-gradient(ellipse at center, rgba(0,0,0,0.40) 0%, rgba(0,0,0,0.24) 45%, rgba(0,0,0,0) 72%)",
+    background: "var(--sprite-ground-shadow-preview)",
     filter: "blur(1.5px)",
     pointerEvents: "none",
     zIndex: 0,
@@ -90,6 +88,15 @@ function getSourceFacing(
   if (facing === "left" && mirrorLeftFromRight) return "right";
   if (facing === "right" && mirrorRightFromLeft) return "left";
   return facing;
+}
+
+/** Atlas sampling is independent of the head alignment, including mirrored facings. */
+export function spriteFramePlacement(frame: number, dx: number, dy: number, mirror: boolean) {
+  return {
+    backgroundPosition: `${(frame / (FRAMES - 1)) * 100}% 100%`,
+    // dx is in cell widths. Mirror flips the visual displacement, not the crop.
+    transform: `translate(calc(-50% + ${(mirror ? dx : -dx) * 100}%), ${-dy * 100}%)${mirror ? " scaleX(-1)" : ""}`,
+  };
 }
 
 export function AlignedSprite({
@@ -176,17 +183,17 @@ export function AlignedSprite({
           height: size,
           position: "relative",
           overflow: "hidden",
-          imageRendering: "pixelated",
+           imageRendering: "auto",
           ...style,
         };
 
 
-  const showDropShadow = dropShadow ?? mode === "scene";
+   const emphasizeGroundShadow = dropShadow ?? mode === "scene";
   const layers = mode === "scene" ? facings : [facing];
 
   return (
-    <div className={className} style={wrapperStyle}>
-      <div aria-hidden style={SHADOW_STYLES[mode]} />
+    <div className={className} style={wrapperStyle} data-aligned-sprite={sprite.id}>
+      <div aria-hidden data-sprite-shadow style={{ ...SHADOW_STYLES[mode], opacity: emphasizeGroundShadow ? 1 : 0.85 }} />
       {layers.map((f) => {
         const useMirror = shouldMirrorFacing(f, sprite.mirrorLeftFromRight, sprite.mirrorRightFromLeft);
         const srcFacing = getSourceFacing(f, sprite.mirrorLeftFromRight, sprite.mirrorRightFromLeft);
@@ -195,8 +202,7 @@ export function AlignedSprite({
         const offsets = getFrameOffsets(sheet);
         const off =
           offsets?.[displayFrame] ?? { dx: 0, dy: 0 };
-        const bgPosX = ((displayFrame + off.dx) / (FRAMES - 1)) * 100;
-        const dyPct = -off.dy * 100;
+         const placement = spriteFramePlacement(displayFrame, off.dx, off.dy, Boolean(useMirror));
         const active = f === facing;
 
         const layerStyle: CSSProperties =
@@ -205,16 +211,14 @@ export function AlignedSprite({
                 position: "absolute",
                 left: "50%",
                 bottom: 0,
-                transform: `translate(-50%, ${dyPct}%) ${useMirror ? "scaleX(-1)" : ""}`,
+                 ...placement,
                 height: `${(dim.h / refHPadded) * 100}%`,
                 width: `${(dim.w / refW) * 100}%`,
                 backgroundImage: `url(${sheet})`,
                 backgroundRepeat: "no-repeat",
                 backgroundSize: `${FRAMES * 100}% 100%`,
-                backgroundPosition: `${bgPosX}% 100%`,
                 imageRendering: "auto",
                 visibility: active ? "visible" : "hidden",
-                filter: showDropShadow ? "drop-shadow(0 2px 1px rgba(0,0,0,0.25))" : undefined,
                 zIndex: 1,
               }
             : {
@@ -223,16 +227,14 @@ export function AlignedSprite({
                 bottom: 0,
                 width: dim.w * (size / PREVIEW_REF_H),
                 height: dim.h * (size / PREVIEW_REF_H),
-                transform: `translate(-50%, ${dyPct}%) ${useMirror ? "scaleX(-1)" : ""}`,
+                 ...placement,
                 backgroundImage: `url(${sheet})`,
                 backgroundRepeat: "no-repeat",
                 backgroundSize: `${FRAMES * 100}% 100%`,
-                backgroundPosition: `${bgPosX}% 100%`,
                 imageRendering: "auto",
-                filter: showDropShadow ? "drop-shadow(0 2px 1px rgba(0,0,0,0.25))" : undefined,
                 zIndex: 1,
               };
-        return <div key={f} style={layerStyle} />;
+         return <div key={f} data-sprite-facing={f} data-sprite-frame={displayFrame} style={layerStyle} />;
       })}
     </div>
   );
