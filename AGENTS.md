@@ -16,3 +16,4 @@
 - Office tools (meetings, profile, character, notes) open as overlays via `?panel=` on `/workspaces/$workspaceId` (src/lib/office/overlay.ts); never navigate away from the workspace route from the Office — leaving it unmounts OfficeScene, Presence, session and RTC.
 - OfficeToastLayer presents existing notices and the Sonner stream only while Office is mounted; suspend the global Sonner viewport there to avoid duplicate timers, and prioritize all action notices ahead of the approximate three-item ordinary queue without changing RTC or invitation state.
 - Bell celebrations render through an independent OfficeCelebrationPopup portal using OfficeToastLayer's useful-area geometry, below action notices; only foreground-visible time consumes their lifespan, with avatars rendered by AlignedSprite and no media or movement ownership.
+- Alpha V5: alpha-v5.ts and scripts/alpha_v5.py stay byte-identical; sprites/v5/ unimported until approved — parity, no asset swap.
