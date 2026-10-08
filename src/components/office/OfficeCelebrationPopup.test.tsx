@@ -46,4 +46,27 @@ it("closes on the popup without blocking the background or trapping focus", () =
   expect(screen.getByRole("dialog").getAttribute("aria-modal")).toBe("false");
   fireEvent.click(screen.getByText("Vamos comemorar!"));
   expect(s.close).toHaveBeenCalledTimes(1);
+});it("renders above meeting/screen-share layers and follows the real fullscreen element", () => {
+  // Simula Meeting View / apresentação / screen share montados no body com z-index alto.
+  const share = document.createElement("div"); share.style.zIndex = "2147483600"; document.body.appendChild(share);
+  const stopShare = vi.fn(); share.addEventListener("click", stopShare);
+  setup();
+  const stage = document.querySelector("[data-office-celebration]") as HTMLElement;
+  expect(stage.parentElement).toBe(document.body);
+  expect(Number(stage.style.zIndex)).toBeGreaterThan(2147483600);
+  expect(stage.className).toContain("pointer-events-none");
+  // Fullscreen real: popup migra para dentro do elemento fullscreen.
+  const fs = document.createElement("div"); document.body.appendChild(fs);
+  const spy = vi.spyOn(document, "fullscreenElement", "get").mockReturnValue(fs);
+  act(() => { document.dispatchEvent(new Event("fullscreenchange")); });
+  expect(document.querySelector("[data-office-celebration]")!.parentElement).toBe(fs);
+  // Sair do fullscreen volta ao host global e continua visível.
+  spy.mockReturnValue(null);
+  act(() => { document.dispatchEvent(new Event("fullscreenchange")); });
+  expect(document.querySelector("[data-office-celebration]")!.parentElement).toBe(document.body);
+  expect(screen.getByRole("dialog")).toBeTruthy();
+  // Popup não aciona controles da reunião (não para screen share).
+  fireEvent.click(screen.getByLabelText("Fechar comemoração"));
+  expect(stopShare).not.toHaveBeenCalled();
+  share.remove(); fs.remove();
 });
