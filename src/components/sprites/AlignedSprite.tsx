@@ -12,7 +12,7 @@ import { ensureFrameOffsets, getFrameOffsets, subscribeFrameOffsets } from "@/li
  *   2. Sombra de referência no chão — âncora visual; a cabeça permanece
  *      travada no centro da sombra independente do frame.
  *   3. Espelhamento — skins novas usam só a sheet "left" e renderizam
- *      "right" espelhada, sem inverter o sinal do dx.
+ *      "right" espelhada, compensando a translação visual sem alterar o crop.
  *   4. Escala consistente entre skins via altura/largura de referência.
  *
  * Para adicionar nova skin: basta registrar em `sprite-catalog.ts`.
@@ -41,7 +41,7 @@ type Props = {
   /** Override de estilo do wrapper (use com cuidado). */
   className?: string;
   style?: CSSProperties;
-   /** Legado: controla a intensidade da sombra de chão, nunca filtra a textura. */
+   /** Legado: mantido por compatibilidade; a textura nunca recebe filtro. */
   dropShadow?: boolean;
 };
 
@@ -109,7 +109,6 @@ export function AlignedSprite({
   size = 96,
   className,
   style,
-  dropShadow,
 }: Props) {
   const sprite = getSprite(spriteId);
   const facings: Facing[] = ["down", "up", "left", "right"];
@@ -188,12 +187,11 @@ export function AlignedSprite({
         };
 
 
-   const emphasizeGroundShadow = dropShadow ?? mode === "scene";
   const layers = mode === "scene" ? facings : [facing];
 
   return (
     <div className={className} style={wrapperStyle} data-aligned-sprite={sprite.id}>
-      <div aria-hidden data-sprite-shadow style={{ ...SHADOW_STYLES[mode], opacity: emphasizeGroundShadow ? 1 : 0.85 }} />
+      <div aria-hidden data-sprite-shadow style={SHADOW_STYLES[mode]} />
       {layers.map((f) => {
         const useMirror = shouldMirrorFacing(f, sprite.mirrorLeftFromRight, sprite.mirrorRightFromLeft);
         const srcFacing = getSourceFacing(f, sprite.mirrorLeftFromRight, sprite.mirrorRightFromLeft);
