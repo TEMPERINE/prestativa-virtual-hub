@@ -14,6 +14,7 @@ import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as DownloadRouteImport } from './routes/download'
 import { Route as SobreRouteImport } from './routes/sobre'
+import { Route as SpriteCompareRouteImport } from './routes/sprite-compare'
 import { Route as AuthenticatedAguardandoConviteRouteImport } from './routes/_authenticated/aguardando-convite'
 import { Route as AuthenticatedMeetingsRouteImport } from './routes/_authenticated/meetings'
 import { Route as AuthenticatedOfficeRouteImport } from './routes/_authenticated/office'
@@ -51,6 +52,11 @@ const DownloadRoute = DownloadRouteImport.update({
 const SobreRoute = SobreRouteImport.update({
   id: '/sobre',
   path: '/sobre',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SpriteCompareRoute = SpriteCompareRouteImport.update({
+  id: '/sprite-compare',
+  path: '/sprite-compare',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthenticatedAguardandoConviteRoute =
@@ -137,6 +143,7 @@ export interface FileRoutesByFullPath {
   '/auth': typeof AuthRoute
   '/download': typeof DownloadRoute
   '/sobre': typeof SobreRoute
+  '/sprite-compare': typeof SpriteCompareRoute
   '/aguardando-convite': typeof AuthenticatedAguardandoConviteRoute
   '/meetings': typeof AuthenticatedMeetingsRoute
   '/office': typeof AuthenticatedOfficeRoute
@@ -157,6 +164,7 @@ export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/download': typeof DownloadRoute
   '/sobre': typeof SobreRoute
+  '/sprite-compare': typeof SpriteCompareRoute
   '/aguardando-convite': typeof AuthenticatedAguardandoConviteRoute
   '/meetings': typeof AuthenticatedMeetingsRoute
   '/office': typeof AuthenticatedOfficeRoute
@@ -179,6 +187,7 @@ export interface FileRoutesById {
   '/auth': typeof AuthRoute
   '/download': typeof DownloadRoute
   '/sobre': typeof SobreRoute
+  '/sprite-compare': typeof SpriteCompareRoute
   '/_authenticated/aguardando-convite': typeof AuthenticatedAguardandoConviteRoute
   '/_authenticated/meetings': typeof AuthenticatedMeetingsRoute
   '/_authenticated/office': typeof AuthenticatedOfficeRoute
@@ -201,6 +210,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/download'
     | '/sobre'
+    | '/sprite-compare'
     | '/aguardando-convite'
     | '/meetings'
     | '/office'
@@ -221,6 +231,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/download'
     | '/sobre'
+    | '/sprite-compare'
     | '/aguardando-convite'
     | '/meetings'
     | '/office'
@@ -242,6 +253,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/download'
     | '/sobre'
+    | '/sprite-compare'
     | '/_authenticated/aguardando-convite'
     | '/_authenticated/meetings'
     | '/_authenticated/office'
@@ -264,6 +276,7 @@ export interface RootRouteChildren {
   AuthRoute: typeof AuthRoute
   DownloadRoute: typeof DownloadRoute
   SobreRoute: typeof SobreRoute
+  SpriteCompareRoute: typeof SpriteCompareRoute
   RecordingMeetingIdRoute: typeof RecordingMeetingIdRoute
   ApiPublicLivekitEgressRoute: typeof ApiPublicLivekitEgressRoute
 }
@@ -303,6 +316,13 @@ declare module '@tanstack/react-router' {
       path: '/sobre'
       fullPath: '/sobre'
       preLoaderRoute: typeof SobreRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/sprite-compare': {
+      id: '/sprite-compare'
+      path: '/sprite-compare'
+      fullPath: '/sprite-compare'
+      preLoaderRoute: typeof SpriteCompareRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authenticated/aguardando-convite': {
@@ -446,6 +466,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthRoute: AuthRoute,
   DownloadRoute: DownloadRoute,
   SobreRoute: SobreRoute,
+  SpriteCompareRoute: SpriteCompareRoute,
   RecordingMeetingIdRoute: RecordingMeetingIdRoute,
   ApiPublicLivekitEgressRoute: ApiPublicLivekitEgressRoute,
 }
