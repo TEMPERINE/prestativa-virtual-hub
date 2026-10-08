@@ -1,8 +1,9 @@
 # Office notice UX
 ## Sprite rendering phase 1
-- [ ] Separate exact atlas frame selection from fine alignment; remove texture filters and preserve independent ground shadow.
-- [ ] Evaluate device pixel grid without quantizing logical movement or changing assets.
-- [ ] Compare five existing sprites idle/walking, actual Office size and enlarged edge crops; run tests and verify automatic type safety. Stop without publishing.
+- [x] Separate exact atlas frame selection from fine alignment; remove texture filters and preserve independent ground shadow.
+- [x] Evaluate device pixel grid without quantizing logical movement or changing assets (DPR 0.9/1/2; no snapping because ancestor zoom and smooth positioning remain fractional).
+- [x] Compare five existing sprites idle/walking in isolated real renderer, scene size and enlarged edge crops; 589 tests passed, automatic preview build OK. Stop without publishing; standalone typecheck result unavailable.
+- [ ] Homologate inside the live Office workspace — blocked on the user signing into the preview; requesting user has no matching account for automatic session minting.
 
 - [x] Central bell celebration popup with sender sprite and positive copy, separate from notices.
 - [x] Only display/count time in foreground; show pending normally on return.
