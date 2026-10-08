@@ -17,6 +17,14 @@ type Props = {
 export function OfficeCelebrationPopup({ id, senderName, spriteId, message, onClose }: Props) {
   const [visible, setVisible] = useState(false);
   const remaining = useRef(CELEBRATION_TOAST_MS);
+  // Global host: inside the fullscreen element when present (Top Layer), otherwise <body>.
+  const [host, setHost] = useState<Element | null>(null);
+  useEffect(() => {
+    const sync = () => setHost(document.fullscreenElement ?? document.body);
+    sync();
+    document.addEventListener("fullscreenchange", sync);
+    return () => document.removeEventListener("fullscreenchange", sync);
+  }, []);
   useEffect(() => {
     remaining.current = CELEBRATION_TOAST_MS;
     const update = () => setVisible(document.visibilityState === "visible" && document.hasFocus());
@@ -45,9 +53,9 @@ export function OfficeCelebrationPopup({ id, senderName, spriteId, message, onCl
     };
   }, [id, visible, onClose]);
 
-  if (!visible) return null;
+  if (!visible || !host) return null;
   return createPortal(
-    <div className="office-celebration-stage pointer-events-none fixed z-[340]" data-office-celebration>
+    <div className="office-celebration-stage pointer-events-none fixed" style={{ zIndex: 2147483640 }} data-office-celebration>
       <div className="office-celebration-backdrop absolute inset-0" aria-hidden="true" />
       <section
         role="dialog"
@@ -80,6 +88,6 @@ export function OfficeCelebrationPopup({ id, senderName, spriteId, message, onCl
           <div className="office-celebration-footer mt-7 flex items-center gap-2" aria-hidden="true"><span /><PartyPopper className="h-4 w-4" /><span /></div>
         </div>
       </section>
-    </div>, document.body,
+    </div>, host,
   );
 }
