@@ -57,11 +57,12 @@ it("closes on the popup without blocking the background or trapping focus", () =
   expect(stage.className).toContain("pointer-events-none");
   // Fullscreen real: popup migra para dentro do elemento fullscreen.
   const fs = document.createElement("div"); document.body.appendChild(fs);
-  const spy = vi.spyOn(document, "fullscreenElement", "get").mockReturnValue(fs);
+  let current: Element | null = fs;
+  Object.defineProperty(document, "fullscreenElement", { configurable: true, get: () => current });
   act(() => { document.dispatchEvent(new Event("fullscreenchange")); });
   expect(document.querySelector("[data-office-celebration]")!.parentElement).toBe(fs);
   // Sair do fullscreen volta ao host global e continua visível.
-  spy.mockReturnValue(null);
+  current = null;
   act(() => { document.dispatchEvent(new Event("fullscreenchange")); });
   expect(document.querySelector("[data-office-celebration]")!.parentElement).toBe(document.body);
   expect(screen.getByRole("dialog")).toBeTruthy();
