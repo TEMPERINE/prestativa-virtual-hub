@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Mic, MicOff, Minimize2, MonitorUp, VideoOff } from "lucide-react";
+import { GlobalMeetingControlsLayer } from "./GlobalMeetingControlsLayer";
+import type { StageControls } from "./MeetingStage";
 
 type Profile = { id: string; display_name: string; avatar_color: string };
 
@@ -20,12 +22,15 @@ export function ScreenShareViewer({
   profiles,
   onStopLocal,
   participants = [],
+  controls,
 }: {
   localStream: MediaStream | null;
   remoteStreams: Record<string, MediaStream>;
   profiles: Record<string, Profile>;
   onStopLocal: () => void;
   participants?: Participant[];
+  /** Mesmos estado/handlers da barra do Office; exibidos na camada global. */
+  controls?: StageControls;
   /** Mantido para compatibilidade — ignorado nesta versão (full screen sempre). */
   anchorRect?: unknown;
 }) {
@@ -140,7 +145,7 @@ export function ScreenShareViewer({
 
         {/* Faixa de participantes (estilo Meet) */}
         {participants.length > 0 && (
-          <div className="relative shrink-0 px-3 pb-3">
+          <div className={`relative shrink-0 px-3 ${controls ? "pb-24" : "pb-3"}`}>
             <div className="flex items-center gap-2 overflow-x-auto py-1">
               {participants.map((p) => (
                 <ParticipantTile key={p.id} p={p} />
@@ -152,7 +157,12 @@ export function ScreenShareViewer({
     );
 
     if (typeof document !== "undefined") {
-      return createPortal(overlay, document.body);
+      return (
+        <>
+          {createPortal(overlay, document.body)}
+          {controls && <GlobalMeetingControlsLayer controls={controls} />}
+        </>
+      );
     }
     return overlay;
   }
