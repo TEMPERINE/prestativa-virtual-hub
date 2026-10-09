@@ -44,6 +44,9 @@
 }
 
 :root {
+  --layer-dialog-backdrop: 50;
+  --layer-dialog-content: 50;
+  --layer-dropdown: 50;
   --radius: 0.875rem;
 
   /* Prestativa palette */
@@ -146,6 +149,14 @@
   .shadow-glow { box-shadow: var(--shadow-glow); }
   .shadow-soft { box-shadow: var(--shadow-soft); }
   .gradient-primary { background: var(--gradient-primary); }
+}
+
+/* Meeting portals leave the panel stacking context; raise scrim and content
+   together only while the embedded meetings panel is mounted. */
+body:has([data-office-meetings-panel]) {
+  --layer-dropdown: 330;
+  --layer-dialog-backdrop: 360;
+  --layer-dialog-content: 361;
 }
 
 /* Magic teleport effect */

@@ -18,3 +18,5 @@
 - OfficeToastLayer presents existing notices and the Sonner stream only while Office is mounted; suspend the global Sonner viewport there to avoid duplicate timers, and prioritize all action notices ahead of the approximate three-item ordinary queue without changing RTC or invitation state.
 - Bell celebrations render through an independent OfficeCelebrationPopup portal using OfficeToastLayer's useful-area geometry, below action notices; only foreground-visible time consumes their lifespan, with avatars rendered by AlignedSprite and no media or movement ownership.
 - Alpha V5: alpha-v5.ts and scripts/alpha_v5.py stay byte-identical; sprites/v5/ unimported until approved — parity, no asset swap.
+
+- Embedded meeting portals use body-scoped layer tokens above the Office meetings panel, with dialog content above its backdrop; defaults remain unchanged outside that panel to avoid cross-page stacking regressions.
