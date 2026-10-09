@@ -81,7 +81,7 @@ const IS_RTC_V2 = ACTIVE_RTC_ENGINE === "v2";
 const RTC_ON_DEMAND_ACTIVE = IS_RTC_V2 && getRtcOnDemand() !== "off";
 import { installAudioUnlockListeners, unlockAudioPlayback } from "@/lib/rtc/audio-unlock";
 import { RemoteVideoTiles, HiddenAudioPlayers } from "./RemoteVideoTiles";
-import { MeetingStage, type StageParticipant, type StageScreen } from "./MeetingStage";
+import { MeetingStage, type StageControls, type StageParticipant, type StageScreen } from "./MeetingStage";
 import { MEETING_UI_V2, resolveMeetingDisplayMode, type MeetingDisplayMode } from "@/lib/meeting-ui/layout";
 import {
   createFollowRequestCenter, presenterFromService, playFollowChime, primeNotificationSound, type FollowRequestCenter,
@@ -2897,6 +2897,17 @@ export function OfficeScene({
   useEffect(() => {
     if (meetingDisplayMode === "office") setViewOfficeDuringMeeting(false);
   }, [meetingDisplayMode]);
+  const meetingControls: StageControls = {
+    micOn: rtc.micOn,
+    camOn: rtc.camOn,
+    screenOn: rtc.screenOn,
+    canShare: currentZone.id !== "lobby",
+    handUp: !!(me && raisedHands[me.id]),
+    onToggleMic: () => { rtc.toggleMic().catch((e) => toast.error(describeMediaError(e, "microfone"))); },
+    onToggleCam: () => { rtc.toggleCam().catch((e) => toast.error(describeMediaError(e, "câmera"))); },
+    onToggleScreen: () => { rtc.toggleScreen().catch(() => toast.error("Não foi possível compartilhar a tela")); },
+    onToggleHand: toggleRaiseHand,
+  };
   const meetingStageActive = MEETING_UI_V2 && meetingDisplayMode !== "office" && !viewOfficeDuringMeeting;
   const stageParticipants: StageParticipant[] = (() => {
     const list: StageParticipant[] = [];
@@ -3443,6 +3454,7 @@ export function OfficeScene({
           remoteStreams={audibleScreenStreams}
           profiles={profiles}
           onStopLocal={() => { rtc.toggleScreen().catch(() => {}); }}
+          controls={meetingControls}
           participants={(() => {
             const list: Array<{
               id: string;
@@ -3767,17 +3779,7 @@ export function OfficeScene({
             raisedHands={raisedHands}
             onStopLocalShare={() => { rtc.toggleScreen().catch(() => {}); }}
             onViewOffice={() => setViewOfficeDuringMeeting(true)}
-            controls={{
-              micOn: rtc.micOn,
-              camOn: rtc.camOn,
-              screenOn: rtc.screenOn,
-              canShare: currentZone.id !== "lobby",
-              handUp: !!(me && raisedHands[me.id]),
-              onToggleMic: () => { rtc.toggleMic().catch((e) => toast.error(describeMediaError(e, "microfone"))); },
-              onToggleCam: () => { rtc.toggleCam().catch((e) => toast.error(describeMediaError(e, "câmera"))); },
-              onToggleScreen: () => { rtc.toggleScreen().catch(() => toast.error("Não foi possível compartilhar a tela")); },
-              onToggleHand: toggleRaiseHand,
-            }}
+            controls={meetingControls}
           />
         </>
       ) : (

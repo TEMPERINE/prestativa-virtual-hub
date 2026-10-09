@@ -5,6 +5,7 @@ import {
   MonitorUp, PanelBottom, PanelRight, Users, Video, VideoOff, X, Grid2x2, ChevronsDown, ChevronsUp,
 } from "lucide-react";
 import { clampPage, pageSlice, planGrid, type MeetingDisplayMode } from "@/lib/meeting-ui/layout";
+import { GlobalMeetingControlsLayer } from "./GlobalMeetingControlsLayer";
 
 type Profile = { id: string; display_name: string; avatar_color: string };
 export type StageParticipant = {
@@ -160,7 +161,7 @@ export function MeetingStage({ mode, participants, screens, raisedHands, onStopL
           </aside>
         )}
       </div>
-      {controls && <MeetingControlsBar c={controls} />}
+      {controls && <GlobalMeetingControlsLayer controls={controls} />}
     </div>
   );
 
