@@ -7,6 +7,8 @@ import { MeetingStage, type StageControls } from "./MeetingStage";
 afterEach(cleanup);
 class RO { observe() {} disconnect() {} }
 (globalThis as any).ResizeObserver = RO;
+Object.defineProperty(HTMLMediaElement.prototype, "play", { value: () => Promise.resolve(), configurable: true });
+Object.defineProperty(HTMLMediaElement.prototype, "srcObject", { value: null, writable: true, configurable: true });
 
 /** Simula o estado único do Office (rtc): a Meeting View só lê e chama os mesmos handlers. */
 function Harness({ spy, mode = "meeting", withScreen = false }: { spy: Record<string, any>; mode?: "meeting" | "presentation"; withScreen?: boolean }) {
