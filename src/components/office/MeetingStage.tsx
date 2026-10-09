@@ -6,6 +6,8 @@ import {
 } from "lucide-react";
 import { clampPage, pageSlice, planGrid, type MeetingDisplayMode } from "@/lib/meeting-ui/layout";
 import { GlobalMeetingControlsLayer } from "./GlobalMeetingControlsLayer";
+import { DeviceMenu } from "./DeviceMenu";
+import { MicLevelMeter } from "./MicLevelMeter";
 
 type Profile = { id: string; display_name: string; avatar_color: string };
 export type StageParticipant = {
@@ -30,6 +32,14 @@ export type StageControls = {
   onToggleCam: () => void;
   onToggleScreen: () => void;
   onToggleHand: () => void;
+  /** Opcionais: mesmas listas/seleções/handlers do Office (nenhuma captura nova). */
+  micTrack?: unknown | null;
+  audioInputs?: MediaDeviceInfo[];
+  selectedAudioInputId?: string | null;
+  onSelectAudioInput?: (id: string) => void;
+  videoInputs?: MediaDeviceInfo[];
+  selectedVideoId?: string | null;
+  onSelectVideo?: (id: string) => void;
 };
 
 type Props = {
@@ -169,32 +179,71 @@ export function MeetingStage({ mode, participants, screens, raisedHands, onStopL
 }
 
 export function MeetingControlsBar({ c }: { c: StageControls }) {
+  const [level, setLevel] = useState(0);
   const btn = (on: boolean, offDanger: boolean) =>
     `h-11 w-11 sm:h-12 sm:w-12 rounded-full flex items-center justify-center transition-colors ${
       on ? (offDanger ? "bg-muted text-foreground hover:bg-accent" : "bg-primary text-primary-foreground hover:opacity-90")
         : offDanger ? "bg-destructive text-destructive-foreground hover:opacity-90" : "bg-muted text-foreground hover:bg-accent"
     }`;
+  const chevron = "inline-flex items-center justify-center w-6 h-11 sm:h-12 rounded-full text-foreground/70 hover:text-foreground hover:bg-accent transition";
+  const voice = c.micOn && level > 0.08;
   return (
     <div
       data-testid="meeting-controls"
       role="toolbar"
       aria-label="Controles da reunião"
-      className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-2 sm:gap-3 px-3 py-2 rounded-full bg-card/90 border border-border shadow-2xl backdrop-blur-md"
+      className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-2 sm:gap-3 px-3 py-2 rounded-full bg-card/90 border border-border shadow-2xl backdrop-blur-md pointer-events-auto"
       style={{ zIndex: 2 }}
     >
-      <button type="button" aria-pressed={c.micOn} aria-label={c.micOn ? "Desligar microfone" : "Ligar microfone"} title={c.micOn ? "Desligar microfone (Alt+M)" : "Ligar microfone (Alt+M)"} onClick={c.onToggleMic} className={btn(c.micOn, true)}>
-        {c.micOn ? <Mic className="w-5 h-5" /> : <MicOff className="w-5 h-5" />}
-      </button>
-      <button type="button" aria-pressed={c.camOn} aria-label={c.camOn ? "Desligar câmera" : "Ligar câmera"} title={c.camOn ? "Desligar câmera (Alt+V)" : "Ligar câmera (Alt+V)"} onClick={c.onToggleCam} className={btn(c.camOn, true)}>
-        {c.camOn ? <Video className="w-5 h-5" /> : <VideoOff className="w-5 h-5" />}
-      </button>
+      <div className="flex items-center" data-testid="mic-group">
+        <button
+          type="button" aria-pressed={c.micOn} aria-label={c.micOn ? "Desligar microfone" : "Ligar microfone"}
+          title={c.micOn ? "Desligar microfone (Alt+M)" : "Ligar microfone (Alt+M)"} onClick={c.onToggleMic}
+          data-voice={voice ? "on" : "off"}
+          className={`${btn(c.micOn, true)} ${voice ? "ring-primary" : "ring-transparent"} ring-offset-2 ring-offset-card`}
+          style={{ boxShadow: voice ? `0 0 0 ${2 + Math.round(level * 6)}px var(--primary)` : undefined }}
+        >
+          {c.micOn ? <Mic className="w-5 h-5" /> : <MicOff className="w-5 h-5" />}
+        </button>
+        {c.micOn && c.micTrack !== undefined && (
+          <MicLevelMeter track={c.micTrack ?? null} onLevel={setLevel} />
+        )}
+        {c.onSelectAudioInput && (
+          <DeviceMenu
+            title="Selecionar microfone"
+            placement="up"
+            buttonClassName={chevron}
+            sections={[{ label: "Microfone", devices: c.audioInputs ?? [], selectedId: c.selectedAudioInputId ?? null, onSelect: c.onSelectAudioInput, fallbackLabel: "Microfone do sistema" }]}
+          />
+        )}
+      </div>
+      <div className="flex items-center" data-testid="cam-group">
+        <button type="button" aria-pressed={c.camOn} aria-label={c.camOn ? "Desligar câmera" : "Ligar câmera"} title={c.camOn ? "Desligar câmera (Alt+V)" : "Ligar câmera (Alt+V)"} onClick={c.onToggleCam} className={btn(c.camOn, true)}>
+          {c.camOn ? <Video className="w-5 h-5" /> : <VideoOff className="w-5 h-5" />}
+        </button>
+        {c.onSelectVideo && (
+          <DeviceMenu
+            title="Selecionar câmera"
+            placement="up"
+            buttonClassName={chevron}
+            sections={[{ label: "Câmera", devices: c.videoInputs ?? [], selectedId: c.selectedVideoId ?? null, onSelect: c.onSelectVideo, fallbackLabel: "Câmera do sistema" }]}
+          />
+        )}
+      </div>
       {c.canShare && (
         <button type="button" aria-pressed={c.screenOn} aria-label={c.screenOn ? "Parar compartilhamento" : "Compartilhar tela"} title={c.screenOn ? "Parar compartilhamento" : "Compartilhar tela"} onClick={c.onToggleScreen} className={btn(c.screenOn, false)}>
           <MonitorUp className="w-5 h-5" />
         </button>
       )}
-      <button type="button" aria-pressed={c.handUp} aria-label={c.handUp ? "Abaixar a mão" : "Levantar a mão"} title={c.handUp ? "Abaixar a mão (Alt+H)" : "Levantar a mão (Alt+H)"} onClick={c.onToggleHand} className={btn(c.handUp, false)}>
+      <button
+        type="button" aria-pressed={c.handUp} aria-label={c.handUp ? "Baixar a mão" : "Levantar a mão"}
+        title={c.handUp ? "Baixar a mão (Alt+H)" : "Levantar a mão (Alt+H)"} onClick={c.onToggleHand}
+        className={`h-11 sm:h-12 rounded-full flex items-center justify-center gap-1.5 transition-colors ${
+          c.handUp ? "px-4 bg-primary text-primary-foreground ring-2 ring-primary ring-offset-2 ring-offset-card animate-pulse" : "w-11 sm:w-12 bg-muted text-foreground hover:bg-accent"
+        }`}
+      >
         <Hand className="w-5 h-5" />
+        {c.handUp && <span className="text-xs font-semibold">Baixar a mão</span>}
       </button>
     </div>
   );
@@ -268,7 +317,7 @@ function Tile({ p, hand, large, onFocus }: { p: StageParticipant; hand: boolean;
         </div>
       )}
       {hand && (
-        <div className="absolute top-2 left-2 h-6 px-2 rounded-full flex items-center gap-1 bg-primary text-primary-foreground text-[10px] font-semibold"><Hand className="w-3.5 h-3.5" />MÃO</div>
+        <div data-testid="hand-badge" aria-label="Mão levantada" title="Mão levantada" className="absolute top-2 left-2 h-6 px-2 rounded-full flex items-center gap-1 bg-primary text-primary-foreground text-[10px] font-semibold shadow-md"><Hand className="w-3.5 h-3.5" />Mão levantada</div>
       )}
       {onFocus && (
         <button type="button" onClick={onFocus} title="Focar" className="absolute top-2 right-2 p-1 rounded-md bg-background/70 opacity-0 group-hover:opacity-100 transition-opacity">

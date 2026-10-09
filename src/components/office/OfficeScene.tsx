@@ -2907,6 +2907,13 @@ export function OfficeScene({
     onToggleCam: () => { rtc.toggleCam().catch((e) => toast.error(describeMediaError(e, "câmera"))); },
     onToggleScreen: () => { rtc.toggleScreen().catch(() => toast.error("Não foi possível compartilhar a tela")); },
     onToggleHand: toggleRaiseHand,
+    micTrack: rtc.v2 ? rtc.v2.localMicTrack : undefined,
+    audioInputs: rtc.audioInputDevices,
+    selectedAudioInputId: rtc.selectedAudioInputDeviceId,
+    onSelectAudioInput: (id) => { rtc.setAudioInputDevice(id).catch(() => toast.error("Falha ao trocar microfone")); },
+    videoInputs: rtc.videoDevices,
+    selectedVideoId: rtc.selectedVideoDeviceId,
+    onSelectVideo: (id) => { rtc.setVideoDevice(id).catch(() => toast.error("Falha ao trocar câmera")); },
   };
   const meetingStageActive = MEETING_UI_V2 && meetingDisplayMode !== "office" && !viewOfficeDuringMeeting;
   const stageParticipants: StageParticipant[] = (() => {
