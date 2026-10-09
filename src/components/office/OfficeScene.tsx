@@ -3767,6 +3767,17 @@ export function OfficeScene({
             raisedHands={raisedHands}
             onStopLocalShare={() => { rtc.toggleScreen().catch(() => {}); }}
             onViewOffice={() => setViewOfficeDuringMeeting(true)}
+            controls={{
+              micOn: rtc.micOn,
+              camOn: rtc.camOn,
+              screenOn: rtc.screenOn,
+              canShare: currentZone.id !== "lobby",
+              handUp: !!(me && raisedHands[me.id]),
+              onToggleMic: () => { rtc.toggleMic().catch((e) => toast.error(describeMediaError(e, "microfone"))); },
+              onToggleCam: () => { rtc.toggleCam().catch((e) => toast.error(describeMediaError(e, "câmera"))); },
+              onToggleScreen: () => { rtc.toggleScreen().catch(() => toast.error("Não foi possível compartilhar a tela")); },
+              onToggleHand: toggleRaiseHand,
+            }}
           />
         </>
       ) : (

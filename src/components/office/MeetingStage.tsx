@@ -18,6 +18,19 @@ export type StageParticipant = {
 };
 export type StageScreen = { key: string; label: string; stream: MediaStream; isLocal: boolean };
 
+/** Espelho do estado de mídia do Office; handlers são os mesmos da barra do Office. */
+export type StageControls = {
+  micOn: boolean;
+  camOn: boolean;
+  screenOn: boolean;
+  canShare: boolean;
+  handUp: boolean;
+  onToggleMic: () => void;
+  onToggleCam: () => void;
+  onToggleScreen: () => void;
+  onToggleHand: () => void;
+};
+
 type Props = {
   mode: Exclude<MeetingDisplayMode, "office">;
   participants: StageParticipant[];
@@ -25,14 +38,28 @@ type Props = {
   raisedHands: Record<string, boolean>;
   onStopLocalShare: () => void;
   onViewOffice: () => void;
+  controls?: StageControls;
 };
+
+/** Fullscreen real do navegador: renderizar dentro do elemento em tela cheia. */
+function useFullscreenHost(): Element | null {
+  const [host, setHost] = useState<Element | null>(null);
+  useEffect(() => {
+    const update = () => setHost(document.fullscreenElement ?? null);
+    update();
+    document.addEventListener("fullscreenchange", update);
+    return () => document.removeEventListener("fullscreenchange", update);
+  }, []);
+  return host;
+}
 
 /**
  * Meeting UI V2 — composição visual apenas. Consome as mesmas streams já
  * existentes; cada stream é anexada a no máximo um <video> visível por vez
  * (grid OU filmstrip OU foco, nunca dois layouts montados simultaneamente).
  */
-export function MeetingStage({ mode, participants, screens, raisedHands, onStopLocalShare, onViewOffice }: Props) {
+export function MeetingStage({ mode, participants, screens, raisedHands, onStopLocalShare, onViewOffice, controls }: Props) {
+  const fsHost = useFullscreenHost();
   const [rosterOpen, setRosterOpen] = useState(false);
   const [focusId, setFocusId] = useState<string | null>(null);
   const [strip, setStrip] = useState<"bottom" | "side">("bottom");
@@ -93,7 +120,7 @@ export function MeetingStage({ mode, participants, screens, raisedHands, onStopL
         </div>
       </div>
 
-      <div className="relative flex-1 min-h-0">
+      <div className={`relative flex-1 min-h-0 ${controls ? "mb-20" : ""}`}>
         {hasMain ? (
           <div className={`absolute inset-0 flex gap-3 p-3 ${strip === "side" ? "flex-row" : "flex-col"}`}>
             <div className="relative flex-1 min-h-0 min-w-0 rounded-xl overflow-hidden bg-card border border-border">
@@ -133,10 +160,43 @@ export function MeetingStage({ mode, participants, screens, raisedHands, onStopL
           </aside>
         )}
       </div>
+      {controls && <MeetingControlsBar c={controls} />}
     </div>
   );
 
-  return typeof document !== "undefined" ? createPortal(overlay, document.body) : overlay;
+  return typeof document !== "undefined" ? createPortal(overlay, fsHost ?? document.body) : overlay;
+}
+
+export function MeetingControlsBar({ c }: { c: StageControls }) {
+  const btn = (on: boolean, offDanger: boolean) =>
+    `h-11 w-11 sm:h-12 sm:w-12 rounded-full flex items-center justify-center transition-colors ${
+      on ? (offDanger ? "bg-muted text-foreground hover:bg-accent" : "bg-primary text-primary-foreground hover:opacity-90")
+        : offDanger ? "bg-destructive text-destructive-foreground hover:opacity-90" : "bg-muted text-foreground hover:bg-accent"
+    }`;
+  return (
+    <div
+      data-testid="meeting-controls"
+      role="toolbar"
+      aria-label="Controles da reunião"
+      className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-2 sm:gap-3 px-3 py-2 rounded-full bg-card/90 border border-border shadow-2xl backdrop-blur-md"
+      style={{ zIndex: 2 }}
+    >
+      <button type="button" aria-pressed={c.micOn} aria-label={c.micOn ? "Desligar microfone" : "Ligar microfone"} title={c.micOn ? "Desligar microfone (Alt+M)" : "Ligar microfone (Alt+M)"} onClick={c.onToggleMic} className={btn(c.micOn, true)}>
+        {c.micOn ? <Mic className="w-5 h-5" /> : <MicOff className="w-5 h-5" />}
+      </button>
+      <button type="button" aria-pressed={c.camOn} aria-label={c.camOn ? "Desligar câmera" : "Ligar câmera"} title={c.camOn ? "Desligar câmera (Alt+V)" : "Ligar câmera (Alt+V)"} onClick={c.onToggleCam} className={btn(c.camOn, true)}>
+        {c.camOn ? <Video className="w-5 h-5" /> : <VideoOff className="w-5 h-5" />}
+      </button>
+      {c.canShare && (
+        <button type="button" aria-pressed={c.screenOn} aria-label={c.screenOn ? "Parar compartilhamento" : "Compartilhar tela"} title={c.screenOn ? "Parar compartilhamento" : "Compartilhar tela"} onClick={c.onToggleScreen} className={btn(c.screenOn, false)}>
+          <MonitorUp className="w-5 h-5" />
+        </button>
+      )}
+      <button type="button" aria-pressed={c.handUp} aria-label={c.handUp ? "Abaixar a mão" : "Levantar a mão"} title={c.handUp ? "Abaixar a mão (Alt+H)" : "Levantar a mão (Alt+H)"} onClick={c.onToggleHand} className={btn(c.handUp, false)}>
+        <Hand className="w-5 h-5" />
+      </button>
+    </div>
+  );
 }
 
 function Grid({ participants, raisedHands, onFocus }: { participants: StageParticipant[]; raisedHands: Record<string, boolean>; onFocus: (id: string) => void }) {
