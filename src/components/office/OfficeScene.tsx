@@ -96,7 +96,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { ProfileMenu } from "@/components/profile/ProfileMenu";
-import { SpriteAvatar } from "@/components/profile/SpriteAvatar";
+import { SpriteAvatar as ProfileSpriteAvatar } from "@/components/profile/SpriteAvatar";
 import { SavedNotesDialog } from "@/components/profile/SavedNotesDialog";
 import { EditCharacterModal } from "@/components/profile/EditCharacterModal";
 import { EditProfileModal } from "@/components/profile/EditProfileModal";
@@ -4818,7 +4818,7 @@ function TeamRow({
       } transition cursor-pointer`}
     >
       <div className="relative shrink-0">
-        <SpriteAvatar spriteId={profile.sprite_id} size={32} offline={!online} />
+        <ProfileSpriteAvatar spriteId={profile.sprite_id} size={32} offline={!online} />
         <div
           className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-background ${
             online ? "bg-emerald-500" : "bg-muted-foreground/40"
