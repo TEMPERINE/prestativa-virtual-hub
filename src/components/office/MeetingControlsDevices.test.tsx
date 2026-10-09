@@ -7,6 +7,8 @@ import { MeetingStage, type StageControls, type StageParticipant } from "./Meeti
 afterEach(cleanup);
 class RO { observe() {} disconnect() {} }
 (globalThis as any).ResizeObserver = RO;
+Object.defineProperty(HTMLElement.prototype, "clientWidth", { get: () => 1200, configurable: true });
+Object.defineProperty(HTMLElement.prototype, "clientHeight", { get: () => 800, configurable: true });
 Object.defineProperty(HTMLMediaElement.prototype, "play", { value: () => Promise.resolve(), configurable: true });
 Object.defineProperty(HTMLMediaElement.prototype, "srcObject", { value: null, writable: true, configurable: true });
 
