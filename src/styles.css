@@ -136,6 +136,7 @@
 }
 
 @layer utilities {
+  .sprite-portrait [data-sprite-shadow] { display: none; }
   .glass-panel {
     background: color-mix(in oklab, var(--card) 80%, transparent);
     backdrop-filter: blur(14px);

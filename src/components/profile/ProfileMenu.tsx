@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { SpritePreview } from "./SpritePreview";
+import { SpriteAvatar } from "./SpriteAvatar";
+import { Button } from "@/components/ui/button";
 import { Bell, BellOff, LogOut, User as UserIcon, Shirt, MapPin, RefreshCcw, StickyNote, Video, DoorOpen } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { disableOfficeNotifications, enableOfficeNotifications, getNotificationsOptIn } from "@/lib/notifications/follow-requests";
@@ -57,17 +58,19 @@ export function ProfileMenu(p: Props) {
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <button
-          className="w-9 h-9 rounded-full flex items-center justify-center text-white font-semibold text-sm relative shadow-soft"
-          style={{ background: p.me.avatar_color }}
+        <Button
+          variant="ghost"
+          size="icon"
+          className="w-9 h-9 rounded-full p-0 relative shadow-soft"
           title="Meu perfil"
+          aria-label="Meu perfil"
         >
-          {p.me.display_name.charAt(0).toUpperCase()}
+          <SpriteAvatar spriteId={p.me.sprite_id} size={36} />
           <span
             className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-background"
             style={{ background: STATUS_COLOR[status] }}
           />
-        </button>
+        </Button>
       </PopoverTrigger>
       <PopoverContent
         align="end"
@@ -80,9 +83,7 @@ export function ProfileMenu(p: Props) {
         onKeyDown={(e) => e.stopPropagation()}
       >
         <div className="p-3 flex items-center gap-3 border-b">
-          <div className="w-12 h-12 rounded-full overflow-hidden flex items-end justify-center" style={{ background: `${p.me.avatar_color}22` }}>
-            <SpritePreview spriteId={p.me.sprite_id ?? "marcio"} size={48} />
-          </div>
+          <SpriteAvatar spriteId={p.me.sprite_id} size={48} />
           <div className="flex-1 min-w-0">
             <div className="font-semibold truncate" style={{ color: p.me.avatar_color }}>{p.me.display_name}</div>
             <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
