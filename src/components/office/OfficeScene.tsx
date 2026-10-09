@@ -4816,12 +4816,12 @@ function TeamRow({
         isMe ? "bg-primary/10" : "hover:bg-muted/60"
       } transition cursor-pointer`}
     >
-      <div className="relative">
+      <div className="relative shrink-0">
         <div
-          className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-semibold"
-          style={{ background: profile.avatar_color, opacity: online ? 1 : 0.4 }}
+          className="w-8 h-8 rounded-full overflow-hidden flex items-end justify-center"
+          style={{ background: `${profile.avatar_color}22` }}
         >
-          {profile.display_name.charAt(0).toUpperCase()}
+          <AlignedSprite spriteId={profile.sprite_id} facing="down" size={32} mode="preview" />
         </div>
         <div
           className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-background ${
