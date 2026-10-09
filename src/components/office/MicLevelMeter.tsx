@@ -2,8 +2,13 @@ import { useEffect, useRef, useState } from "react";
 import { MicLevelMeter as Meter, type MeterAnalyser } from "@/lib/rtc/mic-level-meter";
 
 /** Medidor visual da LocalAudioTrack (RTC v2). Nunca controla o microfone. */
-export function MicLevelMeter({ track }: { track: unknown | null }) {
+export function MicLevelMeter({ track, onLevel }: { track: unknown | null; onLevel?: (level: number) => void }) {
   const [level, setLevel] = useState(0);
+  const onLevelRef = useRef(onLevel);
+  onLevelRef.current = onLevel;
+  useEffect(() => {
+    onLevelRef.current?.(track ? Math.min(1, Math.sqrt(level) * 1.6) : 0);
+  }, [level, track]);
   // restartTrack/setDeviceId trocam a MediaStreamTrack dentro do mesmo objeto.
   const [restarts, setRestarts] = useState(0);
   useEffect(() => {

@@ -12,9 +12,13 @@ type Section = {
 export function DeviceMenu({
   title,
   sections,
+  placement = "down",
+  buttonClassName,
 }: {
   title: string;
   sections: Section[];
+  placement?: "down" | "up";
+  buttonClassName?: string;
 }) {
   const [open, setOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement | null>(null);
@@ -36,12 +40,14 @@ export function DeviceMenu({
         type="button"
         onClick={() => setOpen((v) => !v)}
         title={title}
-        className="inline-flex items-center justify-center w-5 h-9 rounded-md text-foreground/60 hover:text-foreground hover:bg-foreground/10 transition"
+        aria-label={title}
+        aria-expanded={open}
+        className={buttonClassName ?? "inline-flex items-center justify-center w-5 h-9 rounded-md text-foreground/60 hover:text-foreground hover:bg-foreground/10 transition"}
       >
         <ChevronDown className="w-3.5 h-3.5" />
       </button>
       {open && (
-        <div className="absolute top-full right-0 mt-1 min-w-[260px] max-w-[320px] bg-popover text-popover-foreground rounded-lg shadow-soft border border-border z-[140] p-1">
+        <div role="menu" aria-label={title} className={`absolute ${placement === "up" ? "bottom-full mb-2" : "top-full mt-1"} right-0 min-w-[260px] max-w-[320px] bg-popover text-popover-foreground rounded-lg shadow-soft border border-border z-[140] p-1 pointer-events-auto`}>
           {!hasAny && (
             <div className="px-3 py-2 text-xs text-muted-foreground">
               Nenhum dispositivo encontrado. Conceda permissão e tente novamente.
@@ -59,6 +65,8 @@ export function DeviceMenu({
                     <button
                       key={d.deviceId}
                       type="button"
+                      role="menuitemradio"
+                      aria-checked={active}
                       onClick={() => {
                         section.onSelect(d.deviceId);
                         setOpen(false);
