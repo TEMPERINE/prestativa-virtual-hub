@@ -1,12 +1,14 @@
 {
   "name": "prestativa-virtual-desktop",
-  "version": "1.0.6",
+  "version": "1.0.7",
   "description": "Virtual Office — desktop shell (Windows)",
   "main": "electron/main.cjs",
   "author": "Prestativa",
   "license": "UNLICENSED",
   "private": true,
   "scripts": {
+    "test": "node --test test/*.test.cjs",
+    "verify:update": "node scripts/verify-update.cjs",
     "start": "electron .",
     "pack:win": "electron-packager . VirtualOffice --platform=win32 --arch=x64 --out=release --overwrite --asar",
     "dist:win": "electron-builder --win --x64 --publish never"
@@ -15,7 +17,9 @@
     "appId": "com.prestativa.virtualoffice",
     "productName": "Virtual Office",
     "asar": true,
+    "files": ["electron/**/*", "package.json"],
     "win": {
+      "artifactName": "Virtual-Office-Setup-${version}.${ext}",
       "target": [
         "nsis"
       ]
@@ -32,11 +36,12 @@
       {
         "provider": "github",
         "owner": "TEMPERINE",
-        "repo": "prestativa-virtual-hub"
+        "repo": "prestativa-virtual-office"
       }
     ]
   },
   "devDependencies": {
+    "yaml": "^2.8.1",
     "electron": "^32.0.0",
     "electron-builder": "^25.0.0",
     "@electron/packager": "^18.3.0"

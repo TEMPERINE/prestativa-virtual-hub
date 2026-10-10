@@ -1,149 +1,77 @@
-# Virtual Office — Desktop (Windows)
+# Prestativa Office — Desktop Windows
 
-Casca **Electron** que empacota o app web em um `.exe` instalável,
-com **gravação de tela sem diálogo** e **auto-update** via GitHub Releases.
+O Electron carrega `https://prestativaoffice.com.br`. O Office, o RTC e os overlays
+continuam sendo o aplicativo web publicado. A gravação V2 usa LiveKit Egress + R2,
+sem captura local. O seletor Electron é usado somente para compartilhamento de tela.
 
-> ⚠️ Este diretório é independente do app web. Você deve copiá-lo para
-> um **repositório GitHub separado** (sugestão: `prestativa-virtual-desktop`)
-> e rodar o build em uma máquina Windows ou via GitHub Actions.
+O pacote fica neste repositório, atualmente `TEMPERINE/prestativa-virtual-office`
+(o endereço antigo `prestativa-virtual-hub` redireciona para ele).
 
----
+## Desenvolvimento e build
 
-## Estrutura
-
-```
-desktop/
-├── package.json          # deps Electron + scripts
-├── electron/
-│   ├── main.cjs          # processo principal (janela, auto-update, displayMedia)
-│   └── preload.cjs       # ponte segura → window.prestativaDesktop
-├── build/
-│   └── icon.ico          # (coloque aqui o ícone 256x256 multi-resolução)
-└── README.md
-```
-
----
-
-## Setup inicial (uma vez)
-
-```bash
+```sh
 cd desktop
-npm install
-```
-
-### Ícone
-Gere `build/icon.ico` (256x256, multi-resolução) a partir de
-`src/assets/prestativa-icon.png`. No Linux:
-```bash
-nix run nixpkgs#imagemagick -- convert prestativa-icon.png -define icon:auto-resize=256,128,64,48,32,16 build/icon.ico
-```
-
----
-
-## Rodar em modo dev
-
-```bash
+npm ci
+npm test
 npm start
 ```
 
-Abre uma janela carregando `https://prestativa-virtual-hub.lovable.app`.
-Para testar contra outro ambiente:
-```bash
-PRESTATIVA_URL=https://id-preview--xxx.lovable.app npm start
-```
+`PRESTATIVA_URL` permite testar um preview. Somente a origem configurada pode
+usar mídia/notificações; a decisão de ligar mic/câmera e o opt-in de notificações
+continuam sob controle do Office. Um novo domínio tem armazenamento/sessão próprios:
+o primeiro uso pode exigir login e preferências novamente.
 
----
+Em Windows:
 
-## Build do instalador Windows (.exe NSIS)
-
-Em uma máquina **Windows** (ou GitHub Actions com runner `windows-latest`):
-
-```bash
+```sh
 npm run dist:win
+npm run verify:update
 ```
 
-Saída em `dist/`:
-- `Virtual Office Setup X.Y.Z.exe` — instalador
-- `latest.yml` — manifesto para o auto-updater
+O build não publica. Produz em `dist/` o instalador
+`Virtual-Office-Setup-X.Y.Z.exe`, seu `.blockmap` e `latest.yml`.
+A validação confere versão, nomes, existência, tamanho e SHA-512 do instalador.
+Preservamos appId, instalação por máquina e atalhos para atualizar instalações existentes.
+O executável ainda não possui assinatura de editor configurada; checksum não substitui
+assinatura Authenticode nem homologação.
 
-Para apenas empacotar sem instalador (mais rápido, gera pasta portável):
-```bash
-npm run pack:win
-```
+## Homologação antes da release
 
----
+O workflow `.github/workflows/release.yml` gera um artifact Windows sem publicar.
+Pushes para branches `desktop/**` também geram somente o artifact para teste,
+sem alterar a branch sincronizada com o Lovable ou distribuir atualizações.
+Execução manual usa o commit/ref selecionado, com `prepare_draft=false` por padrão.
+Se solicitado, `prepare_draft=true` cria somente um rascunho novo, recusando substituir
+uma release/tag existente. Tags também geram apenas artifacts. Publicação do rascunho
+exige autorização explícita do responsável.
 
-## Auto-update (GitHub Releases)
+Antes de publicar, testar no Windows:
 
-1. Crie um repositório GitHub (privado ou público) com este diretório.
-2. Edite `package.json` → `build.publish`:
-   ```json
-   "owner": "SEU_USUARIO_GITHUB",
-   "repo": "prestativa-virtual-desktop"
-   ```
-3. Crie um Personal Access Token (classic) com escopo `repo`
-   e exporte como `GH_TOKEN`.
-4. Bump da versão em `package.json` → `"version": "0.1.1"` etc.
-5. Rode `npm run dist:win`. O `--publish always` faz upload pra
-   GitHub Releases automaticamente como **draft**.
-6. No GitHub, marque a release como **Published** quando estiver pronto.
+- Instalar sobre 1.0.6; confirmar versão 1.0.7 com
+  `await window.prestativaDesktop.getAppVersion()` no DevTools.
+- Login e seleção de workspace permanecem no EXE, inclusive após fechar/reabrir.
+- Mic/câmera iniciam OFF; testar ligação, desligamento físico e Privacy Guard.
+- Chamada com dois usuários; compartilhar tela/janela, cancelar seletor e encerrar.
+- Overlays na composição real: MeetingStage, compartilhamento legado e fullscreen.
+- Gravação V2 até playback R2; nenhuma captura local para gravar.
+- Notificações com opt-in, clique apenas foca; não aceita convite/teleporta.
+- Atualização de uma versão antiga, download em background e instalação ao fechar.
 
-Apps instalados checam updates no boot (5s após abrir) e a cada 6h.
-Baixam em background e instalam ao fechar/reabrir.
+## Página de download e atualização
 
----
+`/download` consulta a última release publicada no GitHub e usa o asset `.exe`.
+Um commit web não gera nem troca o instalador. Um rascunho não aparece nessa página.
+O EXE consulta updates após 5 segundos e a cada 6 horas; instala o download ao sair.
+Mudanças exclusivamente web aparecem ao carregar o site; mudanças do shell exigem
+uma nova versão do instalador.
 
-## CI/CD recomendado — `.github/workflows/release.yml`
+Na release 1.0.6 observada em 10/10/2026, `latest.yml` referencia
+`Virtual-Office-Setup-1.0.6.exe` (404), mas o asset publicado é
+`Virtual.Office.Setup.1.0.6.exe` (200). A 1.0.7 fixa explicitamente o nome gerado.
+Não alteramos os assets publicados da 1.0.6.
 
-```yaml
-name: Release Desktop
-on:
-  push:
-    tags: ["v*"]
-jobs:
-  release:
-    runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with: { node-version: "20" }
-      - run: npm ci
-      - run: npm run dist:win
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-```
-
-Tag → release automática. Bump `package.json`, commit, `git tag v0.1.1 && git push --tags`.
-
----
-
-## Segurança aplicada
-
-- `contextIsolation: true` — renderer não acessa Node direto
-- `nodeIntegration: false` — sem `require` no front
-- `sandbox: true`
-- `allowRunningInsecureContent: false`
-- Carrega apenas HTTPS do domínio configurado em `APP_URL`
-- `will-navigate` e `setWindowOpenHandler` bloqueiam navegação externa,
-  abrindo no browser padrão
-- Single-instance lock (não abre duas janelas)
-- Auto-updater verifica assinatura criptográfica do manifesto antes de instalar
-- Preload expõe **apenas** `getAppVersion` e `getScreenStream`
-
----
-
-## Code signing (opcional, recomendado pós-beta)
-
-Sem assinatura digital, o Windows SmartScreen mostra
-"Editor desconhecido — Mais informações → Executar mesmo assim".
-
-Para assinar, obtenha um certificado **OV** (~US$ 100/ano) ou **EV**
-(~US$ 300/ano, sem warm-up) e configure:
-
-```bash
-set CSC_LINK=caminho/certificado.pfx
-set CSC_KEY_PASSWORD=sua_senha
-npm run dist:win
-```
-
-`electron-builder` assina o `.exe` e o manifesto de update automaticamente.
+Depois de publicar a versão homologada, tentar primeiro abrir o EXE antigo,
+aguardar o download e fechar/reabrir. Se continuar antigo ou houver falha no updater,
+baixar a nova versão em `https://prestativaoffice.com.br/download` e instalar sobre
+a existente, com o Office fechado. Não é necessário desinstalar antes.
+A página só deve mostrar a versão nova quando a release estiver publicada.

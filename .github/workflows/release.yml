@@ -1,107 +1,98 @@
-name: Release Desktop
+name: Build Desktop
 
 on:
   push:
+    branches:
+      - "desktop/**"
     tags:
       - "v*"
   workflow_dispatch:
     inputs:
-      tag:
-        description: "Versão para gerar/publicar (ex: v1.0.6)"
-        required: true
-        default: "v1.0.6"
+      prepare_draft:
+        description: "Preparar release em rascunho (somente após homologação)"
+        type: boolean
+        default: false
 
 jobs:
-  release:
+  build:
     runs-on: windows-latest
     permissions:
-      contents: write
-    env:
-      RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+      contents: read
     defaults:
       run:
         working-directory: desktop
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
-          ref: ${{ github.event_name == 'workflow_dispatch' && github.event.repository.default_branch || github.ref }}
-          fetch-depth: 0
-
-      - name: Prepare release version
-        shell: pwsh
-        working-directory: .
-        run: |
-          # Evita que stderr de comandos nativos (git/npm escrevem progresso em stderr)
-          # derrube o script no PowerShell 7.4+.
-          $PSNativeCommandUseErrorActionPreference = $false
-          $ErrorActionPreference = "Continue"
-
-          $tag = "${{ env.RELEASE_TAG }}"
-          if ($tag -notmatch '^v\d+\.\d+\.\d+$') {
-            throw "Use uma versão no formato v1.0.6"
-          }
-
-          $version = $tag.TrimStart('v')
-          npm version $version --prefix desktop --no-git-tag-version --allow-same-version
-          if ($LASTEXITCODE -ne 0) { throw "npm version falhou" }
-
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-
-          git fetch --tags origin | Out-Null
-          git rev-parse --verify "refs/tags/$tag" 2>$null | Out-Null
-          if ($LASTEXITCODE -eq 0) {
-            Write-Host "Tag $tag já existe. Vou anexar/atualizar os arquivos nessa release."
-          } else {
-            git tag -a $tag -m "Release $tag"
-            if ($LASTEXITCODE -ne 0) { throw "git tag falhou" }
-            git push origin $tag
-            if ($LASTEXITCODE -ne 0) { throw "git push da tag falhou" }
-          }
-
-          # Garante saída limpa mesmo que o último comando tenha deixado $LASTEXITCODE != 0
-          $global:LASTEXITCODE = 0
-          exit 0
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-
+          node-version: "22"
       - name: Install dependencies
-        run: npm install --no-audit --no-fund
-
-      - name: Build and publish Windows installer
+        run: npm ci --no-audit --no-fund
+      - name: Test desktop
+        run: npm test
+      - name: Build Windows installer without publication
         run: npm run dist:win
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: List build output
-        shell: pwsh
-        run: |
-          Write-Host "=== dist contents (cwd=desktop) ==="
-          if (Test-Path dist) { Get-ChildItem -Path dist -Recurse | Select-Object FullName, Length } else { Write-Host "dist/ does not exist" }
-
-      - name: Check installer exists
-        shell: pwsh
-        run: |
-          $exe = Get-ChildItem -Path dist -Filter *.exe -File -ErrorAction SilentlyContinue
-          if (-not $exe) {
-            throw "O instalador .exe não foi gerado em desktop/dist. Veja o passo 'Build and publish Windows installer'."
-          }
-          $exe | Select-Object Name, Length
-
-      - name: Attach installer to GitHub release
-        uses: softprops/action-gh-release@v2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Validate update assets
+        run: npm run verify:update
+      - name: Save installer for homologation
+        uses: actions/upload-artifact@v4
         with:
-          tag_name: ${{ env.RELEASE_TAG }}
-          name: Virtual Office ${{ env.RELEASE_TAG }}
-          generate_release_notes: true
-          fail_on_unmatched_files: true
-          files: |
+          name: prestativa-office-windows-${{ github.sha }}
+          if-no-files-found: error
+          path: |
             desktop/dist/*.exe
             desktop/dist/*.blockmap
             desktop/dist/latest.yml
+      - name: Read package version
+        id: version
+        shell: pwsh
+        run: |
+          $version = (Get-Content package.json | ConvertFrom-Json).version
+          if ($version -notmatch '^\d+\.\d+\.\d+$') { throw "Invalid version" }
+          if ("${{ github.ref_type }}" -eq "tag" -and "${{ github.ref_name }}" -ne "v$version") {
+            throw "Tag and desktop version must match"
+          }
+          "tag=v$version" >> $env:GITHUB_OUTPUT
+    outputs:
+      tag: ${{ steps.version.outputs.tag }}
+
+  draft:
+    if: github.event_name == 'workflow_dispatch' && inputs.prepare_draft
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: prestativa-office-windows-${{ github.sha }}
+          path: installers
+      - name: Refuse to replace an existing release or tag
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ needs.build.outputs.tag }}
+        run: |
+          gh api "repos/$GH_REPO/releases?per_page=100" > /tmp/releases.json
+          if jq -e --arg tag "$RELEASE_TAG" 'any(.[]; .tag_name == $tag)' /tmp/releases.json >/dev/null; then
+            echo "Release already exists; refusing replacement"
+            exit 1
+          fi
+          gh api "repos/$GH_REPO/git/matching-refs/tags/$RELEASE_TAG" > /tmp/tags.json
+          if jq -e --arg ref "refs/tags/$RELEASE_TAG" 'any(.[]; .ref == $ref)' /tmp/tags.json >/dev/null; then
+            echo "Tag already exists; refusing replacement"
+            exit 1
+          fi
+      - name: Create draft only; publication requires explicit authorization
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.build.outputs.tag }}
+          target_commitish: ${{ github.sha }}
+          name: Virtual Office ${{ needs.build.outputs.tag }}
+          draft: true
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+          files: |
+            installers/*.exe
+            installers/*.blockmap
+            installers/latest.yml

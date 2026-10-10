@@ -12,7 +12,15 @@ const { pickSource } = require("./picker.cjs");
 // Config
 // ============================================================
 const APP_URL =
-  process.env.PRESTATIVA_URL || "https://prestativa-virtual-hub.lovable.app";
+  process.env.PRESTATIVA_URL || "https://prestativaoffice.com.br";
+
+function isAllowedAppUrl(url) {
+  try {
+    return new URL(url).origin === new URL(APP_URL).origin;
+  } catch {
+    return false;
+  }
+}
 
 log.transports.file.level = "info";
 autoUpdater.logger = log;
@@ -75,8 +83,8 @@ function createWindow() {
 
 // ============================================================
 // getDisplayMedia
-// - Gravação da reunião usa IPC dedicado `prestativa:get-screen-source-id`
-//   (captura direto a janela do Prestativa, sem seletor).
+// - Gravação V2 usa LiveKit Egress + R2 no servidor, sem captura local.
+//   O IPC de source-id permanece somente por compatibilidade legada.
 // - Compartilhamento de tela na chamada usa `navigator.mediaDevices.getDisplayMedia`
 //   e SEMPRE abre o seletor de telas/janelas (estilo Windows) antes de
 //   compartilhar. Nunca compartilha automaticamente.
@@ -86,7 +94,11 @@ function setupDisplayMediaHandler() {
   const ses = session.defaultSession;
   log.info("display-media-picker:setup", { appVersion: app.getVersion() });
 
-  ses.setDisplayMediaRequestHandler(async (_request, callback) => {
+  ses.setDisplayMediaRequestHandler(async (request, callback) => {
+    if (!isAllowedAppUrl(request.securityOrigin)) {
+      callback({});
+      return;
+    }
     log.info("display-media-picker:request — abrindo seletor");
     try {
       const source = await pickSource(mainWindow);
@@ -106,15 +118,6 @@ function setupDisplayMediaHandler() {
 
 function setupMediaPermissions() {
   const ses = session.defaultSession;
-  const allowedOrigin = new URL(APP_URL).origin;
-
-  const isAllowedAppUrl = (url) => {
-    try {
-      return new URL(url).origin === allowedOrigin;
-    } catch {
-      return false;
-    }
-  };
 
   const wantsMediaDevice = (details) => {
     const mediaTypes = details?.mediaTypes ?? [];
@@ -124,16 +127,26 @@ function setupMediaPermissions() {
   };
 
   ses.setPermissionRequestHandler((webContents, permission, callback, details) => {
-    if (permission === "media" && isAllowedAppUrl(webContents.getURL())) {
-      callback(wantsMediaDevice(details));
-      return;
+    const requestingUrl = details?.requestingUrl || webContents?.getURL();
+    if (isAllowedAppUrl(requestingUrl)) {
+      if (permission === "notifications") {
+        // O Office mantém o opt-in e solicita somente por ação do usuário.
+        callback(true);
+        return;
+      }
+      if (permission === "media") {
+        callback(wantsMediaDevice(details));
+        return;
+      }
     }
     callback(false);
   });
 
   ses.setPermissionCheckHandler((_webContents, permission, requestingOrigin, details) => {
     const origin = details?.securityOrigin || requestingOrigin;
-    if (permission !== "media" || !isAllowedAppUrl(origin)) return false;
+    if (!isAllowedAppUrl(origin)) return false;
+    if (permission === "notifications") return true;
+    if (permission !== "media") return false;
     return wantsMediaDevice(details);
   });
 }

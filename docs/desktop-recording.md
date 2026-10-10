@@ -1,5 +1,10 @@
 # Gravação no app desktop (Electron / Windows)
 
+> Documento histórico do fluxo legado. Não aplicar estas instruções ao RTC V2:
+> a gravação atual usa LiveKit Egress + R2 no servidor, sem captura local.
+> Para o pacote desktop atual, consulte [desktop/README.md](../desktop/README.md).
+> O preload atual não expõe `getScreenStream`.
+
 No navegador, a API `getDisplayMedia` **obriga** o diálogo "Compartilhar
 esta aba?". Tratamos esse diálogo como a própria confirmação de gravação
 (clique único). No app desktop, podemos gravar **sem nenhum diálogo**.
