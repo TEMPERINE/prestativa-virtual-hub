@@ -103,8 +103,8 @@ import { EditProfileModal } from "@/components/profile/EditProfileModal";
 import { OnboardingWizard } from "@/components/onboarding/OnboardingWizard";
 import { NotificationsPrompt } from "@/components/onboarding/NotificationsPrompt";
 import { FollowRequestsOverlay } from "@/components/office/FollowRequestsOverlay";
-import { createWebNotificationAdapter } from "@/lib/notifications/web-notification-adapter";
-import { setNotificationService, isNotificationSetupDone, type OfficeNotificationService } from "@/lib/notifications/notification-service";
+import { createOfficeNotificationAdapter } from "@/lib/notifications/office-notification-adapter";
+import { setNotificationService, clearNotificationService, isNotificationSetupDone, type OfficeNotificationService } from "@/lib/notifications/notification-service";
 import { useMeetingTracker } from "@/lib/meetings/useMeetingTracker";
 import { useMeetingRecorder } from "@/lib/meetings/useMeetingRecorder";
 import { useServerRecorder } from "@/lib/meetings/useServerRecorder";
@@ -2211,9 +2211,13 @@ export function OfficeScene({
   declineLeadRef.current = declineLead;
   const notifServiceRef = useRef<OfficeNotificationService | null>(null);
   if (!notifServiceRef.current) {
-    notifServiceRef.current = createWebNotificationAdapter();
-    setNotificationService(notifServiceRef.current);
+    notifServiceRef.current = createOfficeNotificationAdapter();
   }
+  useEffect(() => {
+    const service = notifServiceRef.current!;
+    setNotificationService(service);
+    return () => { service.dispose?.(); clearNotificationService(service); };
+  }, []);
   const followCenterRef = useRef<FollowRequestCenter | null>(null);
   if (!followCenterRef.current) {
     // Popup persistente (30s) + indicador vêm do FollowRequestsOverlay.
@@ -2230,6 +2234,7 @@ export function OfficeScene({
   if (!joinCenterRef.current) {
     joinCenterRef.current = createJoinInviteCenter({
       service: () => notifServiceRef.current,
+      isBackground: notifServiceRef.current.kind === "desktop" ? () => notifServiceRef.current!.isAppHidden() : undefined,
       playSound: () => void playFollowChime(),
       showPopup: (inv) => {
         toast(`${inv.fromName} quer que você se junte a ele(a)`, {

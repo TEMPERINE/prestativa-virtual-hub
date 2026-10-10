@@ -19,6 +19,7 @@ export type OfficeNotification = {
 };
 
 export interface OfficeNotificationService {
+  kind?: "desktop" | "web";
   getPermission(): OfficePermission;
   /** Só pode ser chamado após clique explícito do usuário. */
   requestPermission(): Promise<OfficePermission>;
@@ -27,6 +28,7 @@ export interface OfficeNotificationService {
   isAppHidden(): boolean;
   notify(n: OfficeNotification): void;
   focusApp(): void;
+  dispose?(): void;
 }
 
 let current: OfficeNotificationService | null = null;
@@ -35,6 +37,9 @@ export function setNotificationService(s: OfficeNotificationService) {
 }
 export function getNotificationService(): OfficeNotificationService | null {
   return current;
+}
+export function clearNotificationService(s: OfficeNotificationService | null) {
+  if (current === s) current = null;
 }
 
 // ===== Etapa de onboarding de notificações (por usuário, neste dispositivo) =====

@@ -6,7 +6,8 @@
  * (hoje WebNotificationAdapter; futuramente DesktopNotificationAdapter).
  * Nada aqui chama RTC, mídia ou movimento.
  */
-import type { OfficeNotificationService } from "./notification-service";
+import { getNotificationService, type OfficeNotificationService } from "./notification-service";
+import * as webNotifications from "./web-notification-adapter";
 
 export type FollowRequestReceived = { fromUid: string; fromName: string; at: number };
 
@@ -205,12 +206,20 @@ export function createFollowRequestCenter(
 
 export type FollowRequestCenter = ReturnType<typeof createFollowRequestCenter>;
 
-// ===== Compat: opt-in do menu de perfil (delegam ao adapter web) =====
-export {
-  getNotificationsOptIn,
-  enableOfficeNotifications,
-  disableOfficeNotifications,
-} from "./web-notification-adapter";
+// ===== Compat: Web keeps its original helpers; Desktop uses the native service. =====
+export function getNotificationsOptIn() {
+  const service = getNotificationService();
+  return service?.kind === "desktop" ? service.isOptedIn() : webNotifications.getNotificationsOptIn();
+}
+export function enableOfficeNotifications() {
+  const service = getNotificationService();
+  return service?.kind === "desktop" ? service.requestPermission() : webNotifications.enableOfficeNotifications();
+}
+export function disableOfficeNotifications() {
+  const service = getNotificationService();
+  if (service?.kind === "desktop") service.setOptedIn(false);
+  else webNotifications.disableOfficeNotifications();
+}
 
 let audioCtx: AudioContext | null = null;
 /** Prepara o som após a primeira interação válida (política de autoplay). */
