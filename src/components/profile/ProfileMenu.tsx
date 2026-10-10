@@ -36,7 +36,6 @@ type Props = {
   onEditProfile: () => void;
   onGoToMyDesk: () => void;
   onRestartOnboarding: () => void;
-  onSignOut: () => void;
   onStatusChanged: () => void;
   onOpenSavedNotes: () => void;
   onLeaveDesk: () => void;
@@ -146,12 +145,13 @@ export function ProfileMenu(p: Props) {
 
         <div className="p-2 flex items-center gap-2">
           <div className="text-[11px] text-muted-foreground truncate flex-1">{p.email}</div>
-          <button
-            onClick={() => { setOpen(false); p.onSignOut(); }}
+          <Link
+            to="/workspaces"
+            onClick={() => setOpen(false)}
             className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded hover:bg-muted"
           >
-            <LogOut className="w-3.5 h-3.5" /> Sair
-          </button>
+            <LogOut className="w-3.5 h-3.5" /> Sair do espaço
+          </Link>
         </div>
       </PopoverContent>
     </Popover>

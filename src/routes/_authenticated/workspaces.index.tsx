@@ -280,9 +280,6 @@ function WorkspacesHubPage() {
           </div>
         )}
 
-        <div className="mt-10 text-xs text-muted-foreground text-center">
-          <Link to="/meetings" className="hover:text-foreground transition">Minhas reuniões →</Link>
-        </div>
       </div>
     </div>
   );

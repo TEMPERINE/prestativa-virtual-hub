@@ -2876,11 +2876,6 @@ export function OfficeScene({
     return Object.values(profiles).filter((p) => !onlineIds.has(p.id));
   }, [profiles, onlineList]);
 
-  const signOut = async () => {
-    await supabase.auth.signOut();
-    window.location.href = "/auth";
-  };
-
   // ===== Meeting UI V2 (somente composição visual; não toca RTC) =====
   const inPrivateRoomVisual = IS_RTC_V2
     ? rtc.v2?.room?.status === "CONNECTED" && rtc.v2?.room?.connected?.kind === "PRIVATE_ROOM"
@@ -4103,7 +4098,6 @@ export function OfficeScene({
                 onEditProfile={() => setEditProfOpen(true)}
                 onGoToMyDesk={teleportToMyClaim}
                 onRestartOnboarding={() => setForceOnboarding(true)}
-                onSignOut={signOut}
                 onStatusChanged={refreshMe}
                 onOpenSavedNotes={() => setSavedNotesOpen(true)}
                 onOpenMeetings={() => onPanelChange?.("meetings")}
