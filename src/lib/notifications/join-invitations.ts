@@ -39,10 +39,11 @@ export function createJoinInviteCenter(deps: JoinInviteDeps) {
     const bg = isBg();
     const svc = deps.service();
     notifyTrace("join invitation received", {
+      adapter: svc?.kind ?? "web",
       sender: inv.fromName,
       notificationsEnabled: svc?.isOptedIn() ?? false,
-      serviceWorkerReady: typeof navigator !== "undefined" && "serviceWorker" in navigator && !!navigator.serviceWorker.controller,
-      adapterUsed: svc ? "OfficeNotificationService(web)" : "none",
+      serviceWorkerReady: svc?.kind !== "desktop" && typeof navigator !== "undefined" && "serviceWorker" in navigator && !!navigator.serviceWorker.controller,
+      adapterUsed: svc ? `OfficeNotificationService(${svc.kind ?? "web"})` : "none",
       background: bg,
     });
     // Popup atual sempre mantido.
@@ -56,7 +57,7 @@ export function createJoinInviteCenter(deps: JoinInviteDeps) {
     if (!bg) return;
     deps.playSound();
     if (!svc) return;
-    notifyTrace("system notification attempted", { sender: inv.fromName });
+    notifyTrace("system notification attempted", { sender: inv.fromName, adapter: svc.kind ?? "web" });
     try {
       svc.notify({
         title: "Prestativa Office",
@@ -70,7 +71,7 @@ export function createJoinInviteCenter(deps: JoinInviteDeps) {
         },
       });
     } catch (e) {
-      notifyTrace("system notification error", { error: String(e) });
+      notifyTrace("system notification error", { error: String(e), adapter: svc.kind ?? "web" });
     }
   }
 

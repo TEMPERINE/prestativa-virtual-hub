@@ -2,11 +2,12 @@
 // Boas práticas: contextIsolation + nodeIntegration:false + sandbox + CSP.
 // Carrega a URL publicada (web app) e adiciona capacidades nativas via preload.
 
-const { app, BrowserWindow, desktopCapturer, ipcMain, session, shell } = require("electron");
+const { app, BrowserWindow, desktopCapturer, ipcMain, session, shell, Notification } = require("electron");
 const path = require("path");
 const log = require("electron-log");
 const { autoUpdater } = require("electron-updater");
 const { pickSource } = require("./picker.cjs");
+const { setupDesktopNotifications } = require("./notifications.cjs");
 
 // ============================================================
 // Config
@@ -28,6 +29,15 @@ autoUpdater.autoDownload = true;
 autoUpdater.autoInstallOnAppQuit = true;
 
 let mainWindow = null;
+let desktopNotifications = null;
+
+function openExternal(url, source) {
+  const parsed = new URL(url);
+  // Do not log query strings, signed URLs, or identifiers in path segments.
+  const route = parsed.pathname.startsWith("/office") ? "office" : parsed.pathname.startsWith("/workspaces") ? "workspaces" : "other";
+  log.info("navigation:external", { source, origin: parsed.origin, route });
+  return shell.openExternal(url);
+}
 
 // ============================================================
 // Janela principal
@@ -56,7 +66,7 @@ function createWindow() {
     try {
       const u = new URL(url);
       if (u.origin !== new URL(APP_URL).origin) {
-        shell.openExternal(url);
+        openExternal(url, "window-open");
         return { action: "deny" };
       }
     } catch {
@@ -71,7 +81,7 @@ function createWindow() {
       const u = new URL(url);
       if (u.origin !== new URL(APP_URL).origin) {
         event.preventDefault();
-        shell.openExternal(url);
+        openExternal(url, "will-navigate");
       }
     } catch {
       event.preventDefault();
@@ -190,16 +200,15 @@ if (!gotLock) {
   app.quit();
 } else {
   app.on("second-instance", () => {
-    if (mainWindow) {
-      if (mainWindow.isMinimized()) mainWindow.restore();
-      mainWindow.focus();
-    }
+    desktopNotifications?.focus();
   });
 
   app.whenReady().then(() => {
+    if (process.platform === "win32") app.setAppUserModelId("com.prestativa.virtualoffice");
     setupMediaPermissions();
     setupDisplayMediaHandler();
     createWindow();
+    desktopNotifications = setupDesktopNotifications({ Notification, ipcMain, getWindow: () => mainWindow, isAllowedAppUrl, log });
     setupAutoUpdate();
 
     app.on("activate", () => {
